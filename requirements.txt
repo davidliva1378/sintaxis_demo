@@ -1,0 +1,12 @@
+fastapi~=0.115.12
+uvicorn~=0.34.0
+jinja2
+pywebview~=5.4
+playwright~=1.50.0
+python-multipart
+mysql-connector-python~=9.2.0
+pandas~=2.2.3
+openpyxl~=3.1.5
+
+requests~=2.32.3
+PySide6~=6.8.2.1

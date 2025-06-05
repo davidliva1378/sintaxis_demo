@@ -1,0 +1,48 @@
+# Entorno virtual
+.venv/
+venv/
+env/
+
+# PyCharm y JetBrains
+.idea/
+*.iml
+
+# Archivos de Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Archivos temporales
+*.log
+*.bak
+*.tmp
+*.swp
+
+# Configuraciones sensibles
+config/credenciales.env
+*.env
+
+# Datos generados por el sistema
+base_datos_simulada/
+datos_extraidos/
+backup_*/
+*.json
+
+# Archivos comprimidos y exportaciones
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+
+# Informes generados
+*.pdf
+*.docx
+*.xlsx
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+desktop.ini
