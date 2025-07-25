@@ -805,3 +805,79 @@ Call log:
 Call log:
   - waiting for locator(":scope")
 
+[2025-06-05 15:31:13] 🔍 Iniciando verificación de expedientes...
+[2025-06-05 15:31:29] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-06-05 15:31:29] 📦 Estado: fallo
+[2025-06-05 15:31:29] ❌ Fallo en la verificación.
+[2025-06-05 15:31:29] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-06-05 15:31:34] 🔍 Iniciando verificación de expedientes...
+[2025-06-05 15:31:39] 🌐 Navegación a consultas realizada.
+[2025-06-05 15:38:39] 📦 Estado: repetido_detectado
+[2025-06-05 15:38:39] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-06-05 15:38:39] 📊 Total extraídos: 1591
+[2025-06-05 15:38:39] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-06-05 15:38:44] 🔍 Iniciando verificación de expedientes...
+[2025-06-05 15:38:49] 🌐 Navegación a consultas realizada.
+[2025-06-05 15:43:51] 📦 Estado: repetido_detectado
+[2025-06-05 15:43:51] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-06-05 15:43:51] 📊 Total extraídos: 765
+[2025-06-05 15:43:51] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-06-05 15:43:56] 🔍 Iniciando verificación de expedientes...
+[2025-06-05 15:44:01] 🌐 Navegación a consultas realizada.
+[2025-06-05 15:47:52] 📦 Estado: repetido_detectado
+[2025-06-05 15:47:52] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-06-05 15:47:52] 📊 Total extraídos: 870
+[2025-06-05 15:47:52] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-06-05 15:47:57] 🔍 Iniciando verificación de expedientes...
+[2025-06-05 15:48:02] 🌐 Navegación a consultas realizada.
+[2025-06-05 15:49:56] 📦 Estado: repetido_detectado
+[2025-06-05 15:49:56] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-06-05 15:49:56] 📊 Total extraídos: 360
+[2025-06-05 15:49:56] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-16 16:23:57] 🔍 Iniciando verificación de expedientes...
+[2025-07-16 16:24:14] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-07-16 16:24:14] 📦 Estado: fallo
+[2025-07-16 16:24:14] ❌ Fallo en la verificación.
+[2025-07-16 16:24:14] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-16 16:24:19] 🔍 Iniciando verificación de expedientes...
+[2025-07-16 16:24:30] 🌐 Navegación a consultas realizada.
+[2025-07-16 16:25:19] 📦 Estado: repetido_detectado
+[2025-07-16 16:25:19] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-16 16:25:19] 📊 Total extraídos: 300
+[2025-07-16 16:25:19] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-07-16 16:25:24] 🔍 Iniciando verificación de expedientes...
+[2025-07-16 16:25:29] 🌐 Navegación a consultas realizada.
+[2025-07-16 16:26:21] 📦 Estado: repetido_detectado
+[2025-07-16 16:26:21] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-16 16:26:21] 📊 Total extraídos: 315
+[2025-07-16 16:26:21] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-07-16 16:26:26] 🔍 Iniciando verificación de expedientes...
+[2025-07-16 16:26:35] 🌐 Navegación a consultas realizada.
+[2025-07-16 16:26:57] 📦 Estado: repetido_detectado
+[2025-07-16 16:26:57] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-16 16:26:57] 📊 Total extraídos: 120
+[2025-07-16 16:26:57] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-07-16 16:27:02] 🔍 Iniciando verificación de expedientes...
+[2025-07-16 16:27:09] 🌐 Navegación a consultas realizada.
+[2025-07-16 16:29:06] 📦 Estado: repetido_detectado
+[2025-07-16 16:29:06] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-16 16:29:06] 📊 Total extraídos: 720
+[2025-07-16 16:29:06] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-16 16:29:26] 🔍 Iniciando verificación de expedientes...
+[2025-07-16 16:29:37] 🌐 Navegación a consultas realizada.
+[2025-07-16 16:31:01] 📦 Estado: repetido_detectado
+[2025-07-16 16:31:01] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-16 16:31:01] 📊 Total extraídos: 510
+[2025-07-16 16:31:01] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-24 14:06:46] 🔍 Iniciando verificación de expedientes...
+[2025-07-24 14:07:10] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-07-24 14:07:10] 📦 Estado: fallo
+[2025-07-24 14:07:10] ❌ Fallo en la verificación.
+[2025-07-24 14:07:10] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-24 14:07:15] 🔍 Iniciando verificación de expedientes...
+[2025-07-24 14:07:20] 🌐 Navegación a consultas realizada.
+[2025-07-24 14:15:24] 📦 Estado: completo
+[2025-07-24 14:15:24] ✅ Extracción finalizada exitosamente.
+[2025-07-24 14:15:24] 📊 Total extraídos: 2046
+[2025-07-24 14:15:24] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-07-24 14:15:24] 📊 Comparación automática: sin cambios detectados.
