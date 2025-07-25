@@ -3,7 +3,7 @@ import json
 import csv
 import time
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from playwright.async_api import Page
 from typing import Optional
 
@@ -142,4 +142,63 @@ async def actualizar_notificaciones_nuevas(page: Page, destino: Optional[str] = 
         print("📂 No se encontraron notificaciones nuevas.")
 
     return len(nuevas)
+
+
+def notificaciones_proximas_a_vencer(destino: Optional[str] = None,
+                                     horas: int = 48):
+    """Devuelve las notificaciones cuyo vencimiento es dentro de las
+    próximas ``horas`` horas.
+
+    La función lee el archivo ``historial_notificaciones.json`` generado por
+    :func:`actualizar_notificaciones_nuevas` y compara la fecha de cada
+    notificación con la fecha y hora actuales. Si el archivo no existe se
+    devolverá una lista vacía.
+
+    Parameters
+    ----------
+    destino : Optional[str]
+        Carpeta donde se ubica ``historial_notificaciones.json``. Si no se
+        especifica se asume ``datos_extraidos/monitoreo`` dentro del directorio
+        actual.
+    horas : int
+        Cantidad de horas hacia adelante que se consideran para detectar los
+        vencimientos. Por defecto es ``48``.
+
+    Returns
+    -------
+    list[dict]
+        Lista de notificaciones con vencimiento próximo. Cada elemento es el
+        diccionario almacenado en el historial.
+    """
+
+    if destino:
+        notif_dir = destino
+    else:
+        notif_dir = os.path.join(os.getcwd(), "datos_extraidos", "monitoreo")
+
+    historial_path = os.path.join(notif_dir, "historial_notificaciones.json")
+
+    if not os.path.exists(historial_path):
+        return []
+
+    with open(historial_path, "r", encoding="utf-8") as f:
+        historial = json.load(f)
+
+    ahora = datetime.now()
+    limite = ahora + timedelta(hours=horas)
+    proximas = []
+
+    for notif in historial:
+        fecha_str = notif.get("fecha")
+        if not fecha_str:
+            continue
+        try:
+            venc = datetime.strptime(fecha_str, "%Y-%m-%d")
+        except ValueError:
+            continue
+
+        if ahora <= venc <= limite:
+            proximas.append(notif)
+
+    return proximas
 
