@@ -7,7 +7,7 @@ from datetime import datetime
 from web.auto_login import reutilizar_sesion_async
 from core.modulos_monitor.expedientes_modular.extraer_expedientes import extraer_expedientes
 from notificaciones_v2.notificaciones_control_v4_async import actualizar_notificaciones_nuevas
-from panel_pjn.acciones_pjn.urls_pjn import URL_CONSULTAS
+from panel_pjn.acciones_pjn.urls_pjn import URL_CONSULTAS, URL_NOTIFICACIONES
 
 
 async def recopilar_datos_iniciales():
@@ -43,6 +43,8 @@ async def recopilar_datos_iniciales():
         print(f"📁 Guardados en: {archivo_expedientes}")
 
     print("\n🔔 Extrayendo notificaciones...")
+    print("\n🔔 Navegando a la página de notificaciones...")
+    await page.goto(URL_NOTIFICACIONES)
     await actualizar_notificaciones_nuevas(page, destino=carpeta_destino)
     historial = os.path.join(carpeta_destino, "historial_notificaciones.json")
     if os.path.exists(historial):
