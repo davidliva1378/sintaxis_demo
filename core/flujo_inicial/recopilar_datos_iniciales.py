@@ -1,21 +1,20 @@
 import os
 import json
 import asyncio
+import shutil
 from datetime import datetime
 
 from web.auto_login import reutilizar_sesion_async
 from core.modulos_monitor.expedientes_modular.extraer_expedientes import extraer_expedientes
 from notificaciones_v2.notificaciones_control_v4_async import actualizar_notificaciones_nuevas
-from panel_pjn.acciones_pjn.gestion_actuaciones.extraccion_completa import extraer_actuaciones_completas
 from panel_pjn.acciones_pjn.urls_pjn import URL_CONSULTAS
 
 
 async def recopilar_datos_iniciales():
-    """
-    Realiza la extracción inicial completa:
-    - Expedientes
-    - Notificaciones
-    - Actuaciones por expediente (sin descargar archivos)
+    """Extrae la lista completa de expedientes y las notificaciones nuevas.
+
+    El resultado se guarda dentro de ``datos_extraidos/monitoreo/historico``.
+    No se realiza descarga de actuaciones.
     """
     fecha = datetime.now().strftime("%Y-%m-%d")
     carpeta_destino = "datos_extraidos/monitoreo/historico"
@@ -31,46 +30,27 @@ async def recopilar_datos_iniciales():
     await page.goto(URL_CONSULTAS)
 
     print("\n📂 Extrayendo expedientes...")
-    expedientes, _, _ = await extraer_expedientes(
+    expedientes, archivo_expedientes, _ = await extraer_expedientes(
         page,
-        carpeta_salida=None,
-        nombre_archivo=None,
+        carpeta_salida=carpeta_destino,
+        nombre_archivo=f"expedientes_completo_{fecha}.json",
         detener_en_duplicado=True,
-        guardar_json=False,
+        guardar_json=True,
         tiempo_maximo_segundos=None
     )
-    archivo_expedientes = os.path.join(carpeta_destino, f"expedientes_completo_{fecha}.json")
-    with open(archivo_expedientes, "w", encoding="utf-8") as f:
-        json.dump(expedientes, f, indent=2, ensure_ascii=False)
     print(f"✅ Expedientes extraídos: {len(expedientes)}")
+    if archivo_expedientes:
+        print(f"📁 Guardados en: {archivo_expedientes}")
 
     print("\n🔔 Extrayendo notificaciones...")
-    notificaciones = await actualizar_notificaciones_nuevas(page)
-    archivo_notificaciones = os.path.join(carpeta_destino, f"notificaciones_completo_{fecha}.json")
-    with open(archivo_notificaciones, "w", encoding="utf-8") as f:
-        json.dump(notificaciones, f, indent=2, ensure_ascii=False)
-    print(f"✅ Notificaciones extraídas: {len(notificaciones)}")
-
-    print("\n📑 Extrayendo actuaciones (solo metadatos)...")
-    actuaciones_por_expediente = {}
-    for exp in expedientes:
-        numero = exp.get("numero") or exp.get("expediente")
-        print(f"  - {numero}...", end=" ")
-        try:
-            actuaciones, _, error = await extraer_actuaciones_completas(
-                page_expediente=page,
-                expediente_datos=exp,
-                incluir_historicas=False,
-                directorio_base="base_datos_simulada/"
-            )
-            actuaciones_por_expediente[numero] = actuaciones
-            print(f"{len(actuaciones)} actuaciones")
-        except Exception as e:
-            print(f"❌ Error: {e}")
-
-    archivo_actuaciones = os.path.join(carpeta_destino, f"actuaciones_completo_{fecha}.json")
-    with open(archivo_actuaciones, "w", encoding="utf-8") as f:
-        json.dump(actuaciones_por_expediente, f, indent=2, ensure_ascii=False)
+    await actualizar_notificaciones_nuevas(page, destino=carpeta_destino)
+    historial = os.path.join(carpeta_destino, "historial_notificaciones.json")
+    if os.path.exists(historial):
+        with open(historial, "r", encoding="utf-8") as f:
+            notificaciones = json.load(f)
+        print(f"✅ Notificaciones extraídas: {len(notificaciones)}")
+    else:
+        print("⚠️ No se encontró el historial de notificaciones.")
 
     print("\n🎉 Recopilación de datos inicial completada.")
 
