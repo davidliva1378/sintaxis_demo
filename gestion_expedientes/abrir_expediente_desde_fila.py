@@ -1,0 +1,1 @@
+from panel_pjn.acciones_pjn.gestion_expedientes.abrir_expediente_desde_fila import *
