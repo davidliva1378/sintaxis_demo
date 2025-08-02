@@ -1,21 +1,14 @@
 import os
 import json
 import asyncio
-import shutil
 from datetime import datetime
-
 from web.auto_login import reutilizar_sesion_async
 from core.modulos_monitor.expedientes_modular.extraer_expedientes import extraer_expedientes
 from notificaciones_v2.notificaciones_control_v4_async import actualizar_notificaciones_nuevas
 from panel_pjn.acciones_pjn.urls_pjn import URL_CONSULTAS, URL_NOTIFICACIONES
 
-
 async def recopilar_datos_iniciales():
-    """Extrae la lista completa de expedientes y las notificaciones nuevas.
-
-    El resultado se guarda dentro de ``datos_extraidos/monitoreo/historico``.
-    No se realiza descarga de actuaciones.
-    """
+    """Extrae expedientes y notificaciones, y los guarda en datos_extraidos/monitoreo/historico/"""
     fecha = datetime.now().strftime("%Y-%m-%d")
     carpeta_destino = "datos_extraidos/monitoreo/historico"
     os.makedirs(carpeta_destino, exist_ok=True)
@@ -26,39 +19,51 @@ async def recopilar_datos_iniciales():
         print("❌ No se pudo iniciar sesión. Abortando.")
         return
 
-    print("\n🌐 Navegando a la página de expedientes...")
-    await page.goto(URL_CONSULTAS)
+    try:
+        print("\n🌐 Navegando a la página de expedientes...")
+        await page.goto(URL_CONSULTAS)
+        print("📂 Extrayendo expedientes...")
+        expedientes, archivo_expedientes, _ = await extraer_expedientes(
+            page,
+            carpeta_salida=carpeta_destino,
+            nombre_archivo=f"expedientes_completo_{fecha}.json",
+            detener_en_duplicado=True,
+            guardar_json=True,
+            tiempo_maximo_segundos=None
+        )
+        print(f"✅ Expedientes extraídos: {len(expedientes)}")
+        if archivo_expedientes:
+            print(f"📁 Guardados en: {archivo_expedientes}")
 
-    print("\n📂 Extrayendo expedientes...")
-    expedientes, archivo_expedientes, _ = await extraer_expedientes(
-        page,
-        carpeta_salida=carpeta_destino,
-        nombre_archivo=f"expedientes_completo_{fecha}.json",
-        detener_en_duplicado=True,
-        guardar_json=True,
-        tiempo_maximo_segundos=None
-    )
-    print(f"✅ Expedientes extraídos: {len(expedientes)}")
-    if archivo_expedientes:
-        print(f"📁 Guardados en: {archivo_expedientes}")
+        # ⚠️ Detección de duplicados
+        numeros = [exp["numero"] for exp in expedientes if "numero" in exp]
+        repetidos = set([x for x in numeros if numeros.count(x) > 1])
+        if repetidos:
+            print(f"⚠️ Detectados expedientes duplicados: {list(repetidos)}")
 
-    print("\n🔔 Extrayendo notificaciones...")
-    print("\n🔔 Navegando a la página de notificaciones...")
-    await page.goto(URL_NOTIFICACIONES)
-    await actualizar_notificaciones_nuevas(page, destino=carpeta_destino)
-    historial = os.path.join(carpeta_destino, "historial_notificaciones.json")
-    if os.path.exists(historial):
-        with open(historial, "r", encoding="utf-8") as f:
-            notificaciones = json.load(f)
-        print(f"✅ Notificaciones extraídas: {len(notificaciones)}")
-    else:
-        print("⚠️ No se encontró el historial de notificaciones.")
+        print("\n🔔 Navegando a la página de notificaciones...")
+        await page.goto(URL_NOTIFICACIONES)
+        await page.wait_for_selector("table.tablaGeneral, .dataTables_wrapper", timeout=15000)
 
-    print("\n🎉 Recopilación de datos inicial completada.")
+        print("📨 Extrayendo notificaciones...")
+        await actualizar_notificaciones_nuevas(page, destino=carpeta_destino)
 
-    await browser.close()
-    await playwright.stop()
+        historial = os.path.join(carpeta_destino, "historial_notificaciones.json")
+        if os.path.exists(historial):
+            with open(historial, "r", encoding="utf-8") as f:
+                notificaciones = json.load(f)
+            print(f"✅ Notificaciones extraídas: {len(notificaciones)}")
+        else:
+            print("⚠️ No se encontró el historial de notificaciones.")
 
+    except Exception as e:
+        print(f"❌ Error durante la recopilación: {e}")
 
+    finally:
+        await browser.close()
+        await playwright.stop()
+        print("\n🎉 Recopilación de datos inicial completada.")
+
+# Para uso manual
 if __name__ == "__main__":
     asyncio.run(recopilar_datos_iniciales())

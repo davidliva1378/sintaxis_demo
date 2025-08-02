@@ -8,27 +8,11 @@ from PySide6.QtCore import QTimer, QThread, Signal, Qt
 from web.auto_login import reutilizar_sesion_async, SESSION_FILE
 from core.modulos_monitor.expedientes_modular.verificacion_expedientes import VerificadorExpedientes, registrar_log
 from core.gestion_expedientes.comparar_expedientes_monitor import comparar_expedientes_monitor
+from core.modulos_monitor.notificaciones_modular.verificacion_notificaciones import VerificadorNotificaciones
 
 
 CONFIG_PATH = "config_monitor.json"
 
-class VerificadorNotificaciones(QThread):
-    resultado = Signal(object)
-
-    def run(self):
-        import asyncio
-        asyncio.run(self.verificar_async())
-
-    async def verificar_async(self):
-        from notificaciones_v2.notificaciones_control_v4_async import actualizar_notificaciones_nuevas
-        page, _, _, _ = await reutilizar_sesion_async()
-        if page:
-            destino = os.path.abspath(os.path.join(os.getcwd(), "datos_extraidos", "monitoreo"))
-            nuevas = await actualizar_notificaciones_nuevas(page, destino=destino)
-
-            self.resultado.emit(nuevas)
-        else:
-            self.resultado.emit(None)
 
 class MonitorGeneral:
     def __init__(self):

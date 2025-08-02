@@ -881,3 +881,157 @@ Call log:
 [2025-07-24 14:15:24] 📊 Total extraídos: 2046
 [2025-07-24 14:15:24] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
 [2025-07-24 14:15:24] 📊 Comparación automática: sin cambios detectados.
+[2025-07-24 21:26:32] 🔍 Iniciando verificación de expedientes...
+[2025-07-24 21:26:53] 🌐 Navegación a consultas realizada.
+[2025-07-24 21:31:53] 📦 Estado: repetido_detectado
+[2025-07-24 21:31:53] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-24 21:31:53] 📊 Total extraídos: 1410
+[2025-07-24 21:31:53] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-24 21:31:58] 🔍 Iniciando verificación de expedientes...
+[2025-07-24 21:32:04] 🌐 Navegación a consultas realizada.
+[2025-07-24 21:37:03] 📦 Estado: repetido_detectado
+[2025-07-24 21:37:03] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-24 21:37:03] 📊 Total extraídos: 1590
+[2025-07-24 21:37:03] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-07-24 21:37:08] 🔍 Iniciando verificación de expedientes...
+[2025-07-24 21:37:12] 🌐 Navegación a consultas realizada.
+[2025-07-24 22:48:46] 🔍 Iniciando verificación de expedientes...
+[2025-07-24 22:49:03] 🌐 Navegación a consultas realizada.
+[2025-07-24 22:50:54] 📦 Estado: repetido_detectado
+[2025-07-24 22:50:54] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-24 22:50:54] 📊 Total extraídos: 420
+[2025-07-24 22:50:54] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-24 22:50:59] 🔍 Iniciando verificación de expedientes...
+[2025-07-24 22:51:04] 🌐 Navegación a consultas realizada.
+[2025-07-24 22:59:35] 📦 Estado: completo
+[2025-07-24 22:59:35] ✅ Extracción finalizada exitosamente.
+[2025-07-24 22:59:35] 📊 Total extraídos: 2046
+[2025-07-24 22:59:35] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-07-24 22:59:35] 📊 Comparación automática: sin cambios detectados.
+[2025-07-28 12:54:43] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 12:55:08] 🌐 Navegación a consultas realizada.
+[2025-07-28 12:55:54] 📦 Estado: repetido_detectado
+[2025-07-28 12:55:54] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 12:55:54] 📊 Total extraídos: 300
+[2025-07-28 12:55:54] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-28 12:55:59] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 12:56:06] 🌐 Navegación a consultas realizada.
+[2025-07-28 12:56:16] 📦 Estado: repetido_detectado
+[2025-07-28 12:56:16] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 12:56:16] 📊 Total extraídos: 60
+[2025-07-28 12:56:16] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-07-28 12:56:21] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 12:56:36] 🌐 Navegación a consultas realizada.
+[2025-07-28 12:58:11] 📦 Estado: repetido_detectado
+[2025-07-28 12:58:11] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 12:58:11] 📊 Total extraídos: 615
+[2025-07-28 12:58:11] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-07-28 12:58:16] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 12:58:34] 🌐 Navegación a consultas realizada.
+[2025-07-28 12:59:14] 📦 Estado: repetido_detectado
+[2025-07-28 12:59:14] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 12:59:14] 📊 Total extraídos: 255
+[2025-07-28 12:59:14] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-07-28 12:59:19] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 12:59:28] 🌐 Navegación a consultas realizada.
+[2025-07-28 12:59:54] 📦 Estado: repetido_detectado
+[2025-07-28 12:59:54] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 12:59:54] 📊 Total extraídos: 165
+[2025-07-28 12:59:55] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-28 13:02:45] ⏳ Verificación de notificaciones ya en curso.
+[2025-07-28 13:02:45] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 13:02:51] 🌐 Navegación a consultas realizada.
+[2025-07-28 13:04:54] 📦 Estado: repetido_detectado
+[2025-07-28 13:04:54] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 13:04:54] 📊 Total extraídos: 795
+[2025-07-28 13:04:54] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-28 13:30:37] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 13:30:43] 🌐 Navegación a consultas realizada.
+[2025-07-28 13:31:10] 📦 Estado: repetido_detectado
+[2025-07-28 13:31:10] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 13:31:10] 📊 Total extraídos: 180
+[2025-07-28 13:31:10] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-28 13:31:32] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 13:31:40] 🌐 Navegación a consultas realizada.
+[2025-07-28 13:32:06] 📦 Estado: repetido_detectado
+[2025-07-28 13:32:06] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 13:32:06] 📊 Total extraídos: 165
+[2025-07-28 13:32:06] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-28 13:32:45] ⏳ Verificación de notificaciones ya en curso.
+[2025-07-28 13:32:45] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 13:32:51] 🌐 Navegación a consultas realizada.
+[2025-07-28 13:40:01] 📦 Estado: completo
+[2025-07-28 13:40:01] ✅ Extracción finalizada exitosamente.
+[2025-07-28 13:40:01] 📊 Total extraídos: 2046
+[2025-07-28 13:40:01] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-07-28 13:40:01] 📊 Comparación automática: sin cambios detectados.
+[2025-07-28 14:10:10] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 14:10:34] 🌐 Navegación a consultas realizada.
+[2025-07-28 14:12:18] 📦 Estado: repetido_detectado
+[2025-07-28 14:12:18] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 14:12:18] 📊 Total extraídos: 390
+[2025-07-28 14:12:18] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-28 14:12:23] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 14:12:28] 🌐 Navegación a consultas realizada.
+[2025-07-28 14:16:22] 📦 Estado: repetido_detectado
+[2025-07-28 14:16:22] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 14:16:22] 📊 Total extraídos: 1335
+[2025-07-28 14:16:22] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-07-28 14:16:27] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 14:16:31] 🌐 Navegación a consultas realizada.
+[2025-07-28 14:54:03] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 14:54:21] 🌐 Navegación a consultas realizada.
+[2025-07-28 15:32:37] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 15:32:54] 🌐 Navegación a consultas realizada.
+[2025-07-28 15:37:54] 📦 Estado: repetido_detectado
+[2025-07-28 15:37:54] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 15:37:54] 📊 Total extraídos: 1980
+[2025-07-28 15:37:54] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-28 15:37:59] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 15:38:03] 🌐 Navegación a consultas realizada.
+[2025-07-28 15:38:12] ⏳ Verificación de notificaciones ya en curso.
+[2025-07-28 15:38:20] ❌ Error en verificación: Browser.close: Connection closed while reading from the driver
+[2025-07-28 15:38:26] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 15:38:32] 🌐 Navegación a consultas realizada.
+[2025-07-28 15:42:36] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 15:42:41] 🌐 Navegación a consultas realizada.
+[2025-07-28 16:29:57] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 16:30:14] 🌐 Navegación a consultas realizada.
+[2025-07-28 16:35:24] 📦 Estado: completo
+[2025-07-28 16:35:24] ✅ Extracción finalizada exitosamente.
+[2025-07-28 16:35:24] 📊 Total extraídos: 2046
+[2025-07-28 16:35:24] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-07-28 16:35:24] 📊 Comparación automática: sin cambios detectados.
+[2025-07-28 16:37:18] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 16:37:23] 🌐 Navegación a consultas realizada.
+[2025-07-28 16:42:23] 📦 Estado: repetido_detectado
+[2025-07-28 16:42:23] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 16:42:23] 📊 Total extraídos: 1770
+[2025-07-28 16:42:23] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-28 16:42:28] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 16:42:33] 🌐 Navegación a consultas realizada.
+[2025-07-28 16:51:00] 📦 Estado: completo
+[2025-07-28 16:51:00] ✅ Extracción finalizada exitosamente.
+[2025-07-28 16:51:00] 📊 Total extraídos: 2046
+[2025-07-28 16:51:00] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-07-28 16:51:00] 📊 Comparación automática: sin cambios detectados.
+[2025-07-28 17:07:18] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 17:07:22] 🌐 Navegación a consultas realizada.
+[2025-07-28 17:12:33] 📦 Estado: completo
+[2025-07-28 17:12:33] ✅ Extracción finalizada exitosamente.
+[2025-07-28 17:12:33] 📊 Total extraídos: 2046
+[2025-07-28 17:12:33] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-07-28 17:12:33] 📊 Comparación automática: sin cambios detectados.
+[2025-08-02 15:39:38] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 15:39:55] 🌐 Navegación a consultas realizada.
+[2025-08-02 15:40:14] ❌ Error en verificación: Page.query_selector_all: Connection closed while reading from the driver
+[2025-08-02 15:40:18] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 15:40:23] 🌐 Navegación a consultas realizada.
+[2025-08-02 15:40:36] ❌ Error en verificación: Page.query_selector_all: Connection closed while reading from the driver
+[2025-08-02 15:40:36] 📦 Estado: fallo
+[2025-08-02 15:40:36] ❌ Fallo en la verificación.
+[2025-08-02 15:40:36] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 15:40:41] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 15:40:46] 🌐 Navegación a consultas realizada.
+[2025-08-02 15:44:30] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 15:44:42] 🌐 Navegación a consultas realizada.
