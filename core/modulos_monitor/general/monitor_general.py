@@ -11,6 +11,7 @@ from core.gestion_expedientes.comparar_expedientes_monitor import comparar_exped
 from core.modulos_monitor.notificaciones_modular.verificacion_notificaciones import VerificadorNotificaciones
 
 
+
 CONFIG_PATH = "config/config_monitor.json"
 
 
