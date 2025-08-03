@@ -11,7 +11,7 @@ from core.gestion_expedientes.comparar_expedientes_monitor import comparar_exped
 from core.modulos_monitor.notificaciones_modular.verificacion_notificaciones import VerificadorNotificaciones
 
 
-CONFIG_PATH = "config_monitor.json"
+CONFIG_PATH = "config/config_monitor.json"
 
 
 class MonitorGeneral:
@@ -129,6 +129,7 @@ class MonitorGeneral:
             "tiempo_maximo": "⏱ Se alcanzó el tiempo máximo permitido.",
             "tabla_no_disponible": "❌ No se encontró la tabla de expedientes en la página.",
             "fallo": "❌ Fallo en la verificación.",
+            "corte_fecha": "📆 Se aplicó la fecha de corte. Extracción finalizada.",
             "desconocido": "❓ Estado no reconocido."
         }
 
@@ -143,7 +144,7 @@ class MonitorGeneral:
 
         self.tray.showMessage("📥 Expedientes", mensajes.get(estado, "❓ Estado no reconocido"))
 
-        if estado != "completo":
+        if estado not in ("completo", "corte_fecha"):
             self.reintentos += 1
             if self.reintentos < 5:
                 registrar_log(f"🔁 Reintentando verificación ({self.reintentos}/5) en 5 segundos...")

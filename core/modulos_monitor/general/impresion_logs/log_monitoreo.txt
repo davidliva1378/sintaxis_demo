@@ -1035,3 +1035,230 @@ Call log:
 [2025-08-02 15:40:46] 🌐 Navegación a consultas realizada.
 [2025-08-02 15:44:30] 🔍 Iniciando verificación de expedientes...
 [2025-08-02 15:44:42] 🌐 Navegación a consultas realizada.
+[2025-08-02 15:53:34] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 15:53:39] 🌐 Navegación a consultas realizada.
+[2025-08-02 15:58:50] 📦 Estado: completo
+[2025-08-02 15:58:50] ✅ Extracción finalizada exitosamente.
+[2025-08-02 15:58:50] 📊 Total extraídos: 2046
+[2025-08-02 15:58:50] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-08-02 15:58:50] 📊 Comparación automática: sin cambios detectados.
+[2025-08-02 16:34:26] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:34:38] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-08-02 16:34:38] 📦 Estado: fallo
+[2025-08-02 16:34:38] ❌ Fallo en la verificación.
+[2025-08-02 16:34:38] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 16:34:43] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:34:48] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:34:48] ❌ Error en verificación: [Errno 2] No such file or directory: 'config/config_monitor.json'
+[2025-08-02 16:34:48] 📦 Estado: fallo
+[2025-08-02 16:34:48] ❌ Fallo en la verificación.
+[2025-08-02 16:34:48] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-02 16:34:53] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:34:57] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:34:57] ❌ Error en verificación: [Errno 2] No such file or directory: 'config/config_monitor.json'
+[2025-08-02 16:34:57] 📦 Estado: fallo
+[2025-08-02 16:34:57] ❌ Fallo en la verificación.
+[2025-08-02 16:34:57] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-08-02 16:35:02] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:35:06] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:35:06] ❌ Error en verificación: [Errno 2] No such file or directory: 'config/config_monitor.json'
+[2025-08-02 16:35:06] 📦 Estado: fallo
+[2025-08-02 16:35:06] ❌ Fallo en la verificación.
+[2025-08-02 16:35:06] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-08-02 16:35:11] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:35:16] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-08-02 16:35:30] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:35:34] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:35:34] ❌ Error en verificación: [Errno 2] No such file or directory: 'config/config_monitor.json'
+[2025-08-02 16:35:34] 📦 Estado: fallo
+[2025-08-02 16:35:34] ❌ Fallo en la verificación.
+[2025-08-02 16:35:35] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 16:35:40] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:35:44] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-08-02 16:40:11] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:40:16] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:40:16] ❌ Error en verificación: [Errno 2] No such file or directory: 'config/config_monitor.json'
+[2025-08-02 16:40:16] 📦 Estado: fallo
+[2025-08-02 16:40:16] ❌ Fallo en la verificación.
+[2025-08-02 16:40:16] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 16:40:21] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:40:24] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-08-02 16:40:24] 📦 Estado: fallo
+[2025-08-02 16:40:24] ❌ Fallo en la verificación.
+[2025-08-02 16:40:24] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-02 16:41:31] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:41:35] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:41:35] ❌ Error en verificación: [Errno 2] No such file or directory: 'config/config_monitor.json'
+[2025-08-02 16:41:35] 📦 Estado: fallo
+[2025-08-02 16:41:35] ❌ Fallo en la verificación.
+[2025-08-02 16:41:35] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 16:41:40] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:41:42] ❌ Error en verificación: Page.is_visible: Target page, context or browser has been closed
+[2025-08-02 16:41:56] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:42:01] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:42:01] ❌ Error en verificación: [Errno 2] No such file or directory: 'config/config_monitor.json'
+[2025-08-02 16:42:01] 📦 Estado: fallo
+[2025-08-02 16:42:01] ❌ Fallo en la verificación.
+[2025-08-02 16:42:01] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 16:45:58] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:46:03] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:46:03] 📦 Estado: fecha_invalida
+[2025-08-02 16:46:03] ❓ Estado no reconocido.
+[2025-08-02 16:46:03] 📊 Total extraídos: 0
+[2025-08-02 16:46:03] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 16:46:08] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:46:11] ❌ Error en verificación: Page.goto: net::ERR_ABORTED at https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-08-02 21:05:17] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:05:30] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-08-02 21:05:30] 📦 Estado: fallo
+[2025-08-02 21:05:30] ❌ Fallo en la verificación.
+[2025-08-02 21:05:30] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:05:35] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:05:37] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-08-02 21:06:11] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:06:48] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-08-02 21:06:52] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:07:23] ❌ Error en verificación: Page.goto: Timeout 30000ms exceeded.
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-08-02 21:07:23] 📦 Estado: fallo
+[2025-08-02 21:07:23] ❌ Fallo en la verificación.
+[2025-08-02 21:07:23] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:07:28] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:07:44] ❌ Error en verificación: Page.goto: net::ERR_ABORTED; maybe frame was detached?
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-08-02 21:08:28] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:08:35] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:08:35] 📦 Estado: corte_fecha
+[2025-08-02 21:08:35] ❓ Estado no reconocido.
+[2025-08-02 21:08:35] 📊 Total extraídos: 0
+[2025-08-02 21:08:36] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:08:41] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:08:46] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:08:46] 📦 Estado: corte_fecha
+[2025-08-02 21:08:46] ❓ Estado no reconocido.
+[2025-08-02 21:08:46] 📊 Total extraídos: 0
+[2025-08-02 21:08:46] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-02 21:08:51] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:08:55] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:08:56] 📦 Estado: corte_fecha
+[2025-08-02 21:08:56] ❓ Estado no reconocido.
+[2025-08-02 21:08:56] 📊 Total extraídos: 0
+[2025-08-02 21:08:56] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-08-02 21:09:01] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:09:02] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-08-02 21:09:15] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:09:19] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:09:20] 📦 Estado: corte_fecha
+[2025-08-02 21:09:20] ❓ Estado no reconocido.
+[2025-08-02 21:09:20] 📊 Total extraídos: 0
+[2025-08-02 21:09:20] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:09:25] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:09:27] ❌ Error en verificación: Page.is_visible: Target page, context or browser has been closed
+[2025-08-02 21:25:48] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:25:52] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:25:52] 📦 Estado: corte_fecha
+[2025-08-02 21:25:52] ❓ Estado no reconocido.
+[2025-08-02 21:25:52] 📊 Total extraídos: 0
+[2025-08-02 21:25:52] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:25:57] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:26:02] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:26:02] 📦 Estado: corte_fecha
+[2025-08-02 21:26:02] ❓ Estado no reconocido.
+[2025-08-02 21:26:02] 📊 Total extraídos: 0
+[2025-08-02 21:26:02] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-02 21:33:37] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:33:42] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:33:52] 📦 Estado: corte_fecha
+[2025-08-02 21:33:52] ❓ Estado no reconocido.
+[2025-08-02 21:33:52] 📊 Total extraídos: 72
+[2025-08-02 21:33:52] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:33:57] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:34:01] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:34:11] 📦 Estado: corte_fecha
+[2025-08-02 21:34:11] ❓ Estado no reconocido.
+[2025-08-02 21:34:11] 📊 Total extraídos: 72
+[2025-08-02 21:34:11] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-02 21:34:16] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:34:21] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:34:31] 📦 Estado: corte_fecha
+[2025-08-02 21:34:31] ❓ Estado no reconocido.
+[2025-08-02 21:34:31] 📊 Total extraídos: 72
+[2025-08-02 21:34:31] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-08-02 21:34:36] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:34:41] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:34:51] 📦 Estado: corte_fecha
+[2025-08-02 21:34:51] ❓ Estado no reconocido.
+[2025-08-02 21:34:51] 📊 Total extraídos: 72
+[2025-08-02 21:34:51] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-08-02 21:34:56] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:35:01] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:35:11] 📦 Estado: corte_fecha
+[2025-08-02 21:35:11] ❓ Estado no reconocido.
+[2025-08-02 21:35:11] 📊 Total extraídos: 72
+[2025-08-02 21:35:11] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-08-02 21:37:36] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:37:40] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:37:48] 📦 Estado: repetido_detectado
+[2025-08-02 21:37:48] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-08-02 21:37:48] 📊 Total extraídos: 45
+[2025-08-02 21:37:48] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:37:53] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:38:16] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-08-02 21:38:20] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:38:26] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:38:36] 📦 Estado: corte_fecha
+[2025-08-02 21:38:36] ❓ Estado no reconocido.
+[2025-08-02 21:38:36] 📊 Total extraídos: 72
+[2025-08-02 21:38:36] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:38:41] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:38:46] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:38:56] 📦 Estado: corte_fecha
+[2025-08-02 21:38:56] ❓ Estado no reconocido.
+[2025-08-02 21:38:56] 📊 Total extraídos: 72
+[2025-08-02 21:38:56] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-02 21:39:01] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:39:06] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:39:17] 📦 Estado: corte_fecha
+[2025-08-02 21:39:17] ❓ Estado no reconocido.
+[2025-08-02 21:39:17] 📊 Total extraídos: 72
+[2025-08-02 21:39:17] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-08-02 21:39:22] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:39:27] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:39:35] ❌ Error en verificación: ElementHandle.inner_text: Target page, context or browser has been closed
+Call log:
+  - waiting for locator(":scope")
+
+[2025-08-02 21:43:06] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:43:11] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:43:21] 📦 Estado: corte_fecha
+[2025-08-02 21:43:21] 📆 Se aplicó la fecha de corte. Extracción finalizada.
+[2025-08-02 21:43:21] 📊 Total extraídos: 72
+[2025-08-02 21:43:21] 📊 Comparación automática: sin cambios detectados.
