@@ -16,13 +16,32 @@ async def extraer_expedientes(
     detener_en_duplicado: bool = True,
     guardar_json: bool = True,
     fecha_corte: Optional[str] = None,
-    tiempo_maximo_segundos: Optional[int] = None
+    tiempo_maximo_segundos: Optional[int] = None,
+    orden: Optional[str] = None
 ) -> tuple[list[dict], Optional[str], str]:
     try:
         await page.wait_for_selector("table.table-striped tbody tr", timeout=10000)
     except PlaywrightTimeoutError:
         print("❌ No se detectó la tabla de expedientes.")
         return [], None, "tabla_no_disponible"
+
+    # 🔽 Ordenamiento según parámetro
+    if orden:
+        orden_map = {
+            "fecha": "FECHA",
+            "caratula": "CARATULA",
+            "oficina": "OFICINA",
+            "situacion": "SITUACION"
+        }
+        valor_orden = orden_map.get(orden.lower())
+        if valor_orden:
+            try:
+                await page.select_option("#j_idt150\:order_by_form\:camara", value=valor_orden)
+                await page.click("a:has-text('Ordenar')")
+                await page.wait_for_selector("table.table-striped tbody tr", timeout=10000)
+                print(f"🔽 Tabla ordenada por {orden.upper()}")
+            except Exception as e:
+                print(f"⚠️ No se pudo ordenar la tabla por {orden}: {e}")
 
     expedientes = []
     expedientes_vistos = set()
