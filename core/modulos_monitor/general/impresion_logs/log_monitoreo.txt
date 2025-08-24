@@ -1273,3 +1273,9 @@ Call log:
 [2025-08-02 22:36:39] 📆 Se aplicó la fecha de corte. Extracción finalizada.
 [2025-08-02 22:36:39] 📊 Total extraídos: 72
 [2025-08-02 22:36:39] 📊 Comparación automática: sin cambios detectados.
+[2025-08-20 11:59:38] 🔍 Iniciando verificación de expedientes...
+[2025-08-20 11:59:58] 🌐 Navegación a consultas realizada.
+[2025-08-20 12:00:07] 📦 Estado: corte_fecha
+[2025-08-20 12:00:07] 📆 Se aplicó la fecha de corte. Extracción finalizada.
+[2025-08-20 12:00:07] 📊 Total extraídos: 47
+[2025-08-20 12:00:07] 📊 Comparación automática: sin cambios detectados.
