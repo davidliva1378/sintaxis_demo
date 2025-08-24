@@ -1,1 +1,0 @@
-from panel_pjn.acciones_pjn.gestion_expedientes.extraer_datos_expediente import *

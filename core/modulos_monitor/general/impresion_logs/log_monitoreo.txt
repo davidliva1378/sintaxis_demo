@@ -1279,3 +1279,103 @@ Call log:
 [2025-08-20 12:00:07] 📆 Se aplicó la fecha de corte. Extracción finalizada.
 [2025-08-20 12:00:07] 📊 Total extraídos: 47
 [2025-08-20 12:00:07] 📊 Comparación automática: sin cambios detectados.
+[2025-08-24 12:15:12] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 12:15:30] 🌐 Navegación a consultas realizada.
+[2025-08-24 12:15:38] 📦 Estado: corte_fecha
+[2025-08-24 12:15:38] 📆 Se aplicó la fecha de corte. Extracción finalizada.
+[2025-08-24 12:15:38] 📊 Total extraídos: 54
+[2025-08-24 12:15:38] 📊 Comparación automática: sin cambios detectados.
+[2025-08-24 12:16:00] ⏳ Verificación de notificaciones ya en curso.
+[2025-08-24 12:16:33] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 12:16:38] 🌐 Navegación a consultas realizada.
+[2025-08-24 12:16:46] 📦 Estado: corte_fecha
+[2025-08-24 12:16:46] 📆 Se aplicó la fecha de corte. Extracción finalizada.
+[2025-08-24 12:16:46] 📊 Total extraídos: 54
+[2025-08-24 12:16:46] 📊 Comparación automática: sin cambios detectados.
+[2025-08-24 13:11:24] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 13:11:41] 🌐 Navegación a consultas realizada.
+[2025-08-24 13:11:49] 📦 Estado: corte_fecha
+[2025-08-24 13:11:49] 📆 Se aplicó la fecha de corte. Extracción finalizada.
+[2025-08-24 13:11:49] 📊 Total extraídos: 54
+[2025-08-24 13:11:49] 📊 Comparación automática: sin cambios detectados.
+[2025-08-24 13:12:26] ⏳ Verificación de notificaciones ya en curso.
+[2025-08-24 13:58:11] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 13:58:28] 🌐 Navegación a consultas realizada.
+[2025-08-24 13:58:37] 📦 Estado: corte_fecha
+[2025-08-24 13:58:37] 📆 Se aplicó la fecha de corte. Extracción finalizada.
+[2025-08-24 13:58:37] 📊 Total extraídos: 54
+[2025-08-24 13:58:37] 📊 Comparación automática: sin cambios detectados.
+[2025-08-24 13:59:36] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 13:59:41] 🌐 Navegación a consultas realizada.
+[2025-08-24 13:59:41] ❌ Error en verificación: Illegal trailing comma before end of object: line 19 column 23 (char 341)
+[2025-08-24 13:59:41] 📦 Estado: fallo
+[2025-08-24 13:59:41] ❌ Fallo en la verificación.
+[2025-08-24 13:59:41] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-24 13:59:46] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 13:59:51] 🌐 Navegación a consultas realizada.
+[2025-08-24 13:59:51] ❌ Error en verificación: Illegal trailing comma before end of object: line 19 column 23 (char 341)
+[2025-08-24 13:59:51] 📦 Estado: fallo
+[2025-08-24 13:59:51] ❌ Fallo en la verificación.
+[2025-08-24 13:59:51] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-24 13:59:56] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:00:00] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:00:00] ❌ Error en verificación: Illegal trailing comma before end of object: line 19 column 23 (char 341)
+[2025-08-24 14:00:00] 📦 Estado: fallo
+[2025-08-24 14:00:00] ❌ Fallo en la verificación.
+[2025-08-24 14:00:00] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-08-24 14:00:05] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:00:10] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:00:10] ❌ Error en verificación: Illegal trailing comma before end of object: line 19 column 23 (char 341)
+[2025-08-24 14:00:10] 📦 Estado: fallo
+[2025-08-24 14:00:10] ❌ Fallo en la verificación.
+[2025-08-24 14:00:10] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-08-24 14:00:32] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:00:37] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:00:37] ❌ Error en verificación: Illegal trailing comma before end of object: line 19 column 23 (char 341)
+[2025-08-24 14:00:37] 📦 Estado: fallo
+[2025-08-24 14:00:37] ❌ Fallo en la verificación.
+[2025-08-24 14:00:37] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-24 14:00:42] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:00:44] ❌ Error en verificación: Page.is_visible: Target page, context or browser has been closed
+[2025-08-24 14:00:44] 📦 Estado: fallo
+[2025-08-24 14:00:44] ❌ Fallo en la verificación.
+[2025-08-24 14:00:44] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-24 14:00:49] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:00:54] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:00:54] ❌ Error en verificación: Illegal trailing comma before end of object: line 19 column 23 (char 341)
+[2025-08-24 14:00:54] 📦 Estado: fallo
+[2025-08-24 14:00:54] ❌ Fallo en la verificación.
+[2025-08-24 14:00:54] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-08-24 14:01:57] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:02:02] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:03:09] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:03:13] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:08:14] 📦 Estado: repetido_detectado
+[2025-08-24 14:08:14] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-08-24 14:08:14] 📊 Total extraídos: 1755
+[2025-08-24 14:08:14] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-24 14:08:19] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:08:24] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:13:24] 📦 Estado: repetido_detectado
+[2025-08-24 14:13:24] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-08-24 14:13:24] 📊 Total extraídos: 1785
+[2025-08-24 14:13:25] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-24 14:13:30] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:13:34] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:18:34] 📦 Estado: repetido_detectado
+[2025-08-24 14:18:34] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-08-24 14:18:34] 📊 Total extraídos: 1830
+[2025-08-24 14:18:34] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-08-24 14:18:39] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:18:44] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:20:36] 📦 Estado: repetido_detectado
+[2025-08-24 14:20:36] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-08-24 14:20:36] 📊 Total extraídos: 690
+[2025-08-24 14:20:37] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-08-24 14:20:42] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:20:46] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:26:20] 📦 Estado: completo
+[2025-08-24 14:26:20] ✅ Extracción finalizada exitosamente.
+[2025-08-24 14:26:20] 📊 Total extraídos: 2063
+[2025-08-24 14:26:20] 📁 Guardado en: F:\RESPALDO DAVID\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-08-24 14:26:20] 📊 Comparación automática: sin cambios detectados.
