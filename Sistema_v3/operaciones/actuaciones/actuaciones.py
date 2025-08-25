@@ -9,15 +9,25 @@ Módulo principal de operaciones sobre actuaciones judiciales:
 - Extracción de actuaciones históricas
 """
 
-# === EXTRACCIÓN V2 ===
 import os
 import re
 import json
 from datetime import datetime, date
 from urllib.parse import urlparse, parse_qs
-import hashlib
+
 from playwright.async_api import TimeoutError
-from panel_pjn.acciones_pjn.gestion_actuaciones.utilidades import limpiar_texto, normalizar_fecha, generar_hash_archivo
+
+from Sistema_v3.operaciones.actuaciones.actuaciones_utils import (
+    limpiar_texto,
+    normalizar_fecha,
+    generar_hash_archivo,
+)
+from panel_pjn.acciones_pjn.gestion_actuaciones.bk.descarga import (
+    descargar_archivos_actuaciones,
+)
+
+
+# === EXTRACCIÓN V2 ===
 
 
 async def extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_inicial=1):
@@ -140,11 +150,8 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
     return todas, None, carpeta_destino
 
 
+
 # === EXTRACCIÓN COMPLETA ===
-import os
-import json
-from panel_pjn.acciones_pjn.gestion_actuaciones.extraccion_v2 import obtener_actuaciones_todas_paginas_async
-from panel_pjn.acciones_pjn.gestion_actuaciones.bk.historicas import extraer_actuaciones_historicas
 
 
 async def extraer_actuaciones_completas(
@@ -225,9 +232,6 @@ async def extraer_actuaciones_completas(
 
 
 # === DESCARGA V2 ===
-import os
-import json
-from panel_pjn.acciones_pjn.gestion_actuaciones.bk.descarga import descargar_archivos_actuaciones
 
 async def descargar_archivos_de_json(page, carpeta_destino: str):
     """
@@ -269,11 +273,6 @@ async def descargar_archivos_de_json(page, carpeta_destino: str):
 
 
 # === HISTÓRICAS ===
-import os
-import re
-from datetime import datetime
-from urllib.parse import urlparse, parse_qs
-from panel_pjn.acciones_pjn.gestion_actuaciones.utilidades import limpiar_texto, normalizar_fecha, generar_hash_archivo
 
 async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indice_inicial=1):
     actuaciones = []
