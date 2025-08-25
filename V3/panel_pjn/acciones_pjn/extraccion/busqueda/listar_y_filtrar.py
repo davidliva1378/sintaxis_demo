@@ -1,7 +1,7 @@
 from playwright.async_api import Page, TimeoutError
 from panel_pjn.acciones_pjn.gestion_expedientes.buscar_expediente_por_numero import buscar_expediente_por_numero
 
-#from buscar_expediente_por_numero import buscar_expediente_por_numero
+from .buscar_por_numero import buscar_expediente_por_numero
 from typing import Optional, List
 
 async def buscar_expedientes(page: Page, numero: Optional[str] = None, anio: Optional[str] = None, caratula: Optional[str] = None) -> List:

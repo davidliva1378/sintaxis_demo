@@ -1,6 +1,5 @@
 import asyncio
-#from .extraer_datos_expediente import extraer_datos_expediente
-from panel_pjn.acciones_pjn.gestion_expedientes.extraer_datos_expediente import extraer_datos_expediente
+from .extraer_detalle import extraer_datos_expediente
 
 
 async def abrir_expediente_desde_fila(fila, page):
