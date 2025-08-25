@@ -1,7 +1,7 @@
 
 import os
 import json
-import time
+import asyncio
 import csv
 from datetime import datetime, timedelta
 from typing import Optional
@@ -80,7 +80,7 @@ async def extraer_entradas(page: Page, destino: Optional[str] = None) -> int:
             await page.evaluate("(sel) => document.querySelector(sel).scrollBy(0, 1500);", SELEC_CONTENEDOR_SCROLL)
         except Exception:
             break
-        time.sleep(1)
+        await asyncio.sleep(1)
 
     if nuevas:
         historial = nuevas + historial
