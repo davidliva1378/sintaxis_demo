@@ -7,7 +7,6 @@ from typing import Optional
 from pathlib import Path
 import asyncio
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
-from .utils import normalizar_texto, limpiar_texto
 
 async def extraer_expedientes(
     page: Page,
