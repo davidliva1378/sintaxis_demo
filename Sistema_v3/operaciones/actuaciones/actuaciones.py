@@ -25,11 +25,13 @@ from Sistema_v3.operaciones.actuaciones.actuaciones_utils import (
 )
 
 async def aviso_si_tarda(idx, segundos):
+    """Muestra un aviso si la descarga tarda más de lo esperado."""
     await asyncio.sleep(segundos)
     print(f"⏳ Descarga en curso para actuación {idx}... lleva más de {segundos} segundos.")
 
 
 async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_destino: str):
+    """Descarga los archivos adjuntos de las actuaciones dadas."""
     if not actuaciones:
         print("⚠️ No se proporcionaron actuaciones para descargar.")
         return
@@ -85,6 +87,7 @@ async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_
 
 
 async def extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_inicial=1):
+    """Obtiene las actuaciones listadas en la página actual del expediente."""
     actuaciones = []
     try:
         await page_expediente.wait_for_selector(r"#expediente\:action-table tbody tr", timeout=8000)
@@ -152,6 +155,7 @@ async def extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_i
 
 
 async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_datos, carpeta_destino="Actuaciones"):
+    """Recorre todas las páginas del expediente y reúne sus actuaciones."""
     todas = []
     pagina = 1
     indice_actual = 1
@@ -329,6 +333,7 @@ async def descargar_archivos_de_json(page, carpeta_destino: str):
 # === HISTÓRICAS ===
 
 async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indice_inicial=1):
+    """Recupera las actuaciones históricas del expediente indicado."""
     actuaciones = []
     try:
         await page_expediente.click("a:has-text('Ver históricas')")
