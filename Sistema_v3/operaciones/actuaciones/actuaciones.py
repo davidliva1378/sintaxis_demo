@@ -12,25 +12,82 @@ Módulo principal de operaciones sobre actuaciones judiciales:
 import os
 import re
 import json
+import asyncio
 from datetime import datetime, date
 from urllib.parse import urlparse, parse_qs
 
-from playwright.async_api import TimeoutError
+from playwright.async_api import TimeoutError, Page
 
 from Sistema_v3.operaciones.actuaciones.actuaciones_utils import (
     limpiar_texto,
     normalizar_fecha,
     generar_hash_archivo,
 )
-from panel_pjn.acciones_pjn.gestion_actuaciones.bk.descarga import (
-    descargar_archivos_actuaciones,
-)
+
+async def aviso_si_tarda(idx, segundos):
+    """Muestra un aviso si la descarga tarda más de lo esperado."""
+    await asyncio.sleep(segundos)
+    print(f"⏳ Descarga en curso para actuación {idx}... lleva más de {segundos} segundos.")
+
+
+async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_destino: str):
+    """Descarga los archivos adjuntos de las actuaciones dadas."""
+    if not actuaciones:
+        print("⚠️ No se proporcionaron actuaciones para descargar.")
+        return
+
+    print(f"📥 Iniciando descarga de archivos ({len(actuaciones)} actuaciones)...")
+    os.makedirs(carpeta_destino, exist_ok=True)
+
+    for idx, act in enumerate(actuaciones, start=1):
+        archivo_url = act.get("Archivo", "N/A")
+        nombre_archivo = act.get("NombreArchivo", f"documento_{idx}.pdf")
+
+        if archivo_url == "N/A":
+            print(f"🚫 Actuación {idx}: sin archivo para descargar.")
+            continue
+
+        ruta_archivo = os.path.join(carpeta_destino, nombre_archivo)
+
+        if os.path.exists(ruta_archivo):
+            print(f"⏭️ Archivo ya existe: {nombre_archivo}")
+            continue
+
+        for intento in range(3):
+            try:
+                async with page.expect_download() as download_info:
+                    await page.evaluate("""
+                        (url) => {
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.target = '_blank';
+                            a.rel = 'noopener';
+                            a.click();
+                        }
+                    """, archivo_url)
+
+                download = await download_info.value
+
+                # Aviso si tarda
+                advertencia = asyncio.create_task(aviso_si_tarda(idx, 30))
+                await download.save_as(ruta_archivo)
+                advertencia.cancel()
+
+                print(f"✅ Archivo descargado: {nombre_archivo}")
+                break  # éxito
+            except Exception as e:
+                if intento == 2:
+                    print(f"❌ Falló la descarga tras 3 intentos para actuación {idx}: {e}")
+                else:
+                    print(f"⚠️ Reintentando actuación {idx} ({intento + 1}/3)...")
+                    await asyncio.sleep(4)
 
 
 # === EXTRACCIÓN V2 ===
 
 
 async def extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_inicial=1):
+    """Obtiene las actuaciones listadas en la página actual del expediente."""
     actuaciones = []
     try:
         await page_expediente.wait_for_selector(r"#expediente\:action-table tbody tr", timeout=8000)
@@ -98,6 +155,7 @@ async def extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_i
 
 
 async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_datos, carpeta_destino="Actuaciones"):
+    """Recorre todas las páginas del expediente y reúne sus actuaciones."""
     todas = []
     pagina = 1
     indice_actual = 1
@@ -275,6 +333,7 @@ async def descargar_archivos_de_json(page, carpeta_destino: str):
 # === HISTÓRICAS ===
 
 async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indice_inicial=1):
+    """Recupera las actuaciones históricas del expediente indicado."""
     actuaciones = []
     try:
         await page_expediente.click("a:has-text('Ver históricas')")
