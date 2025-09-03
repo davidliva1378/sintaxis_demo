@@ -271,7 +271,7 @@ async def buscar_expediente_por_numero(page: Page, numero: str, anio: str, timeo
             await page.wait_for_selector("text=No se han encontrado expedientes", timeout=3000)
             print(f"❗ Expediente {numero}/{anio} no encontrado.")
             return False, "no_encontrado"
-        except TimeoutError:
+        except PlaywrightTimeoutError:
             pass  # No hay mensaje de error, seguir esperando la tabla
 
         # Esperar la tabla de resultados
@@ -279,7 +279,7 @@ async def buscar_expediente_por_numero(page: Page, numero: str, anio: str, timeo
         print(f"✅ Resultados cargados correctamente para {numero}/{anio}.")
         return True, "OK"
 
-    except TimeoutError:
+    except PlaywrightTimeoutError:
         print(f"⏳ Tiempo de espera agotado buscando expediente {numero}/{anio}.")
         return False, "timeout"
 
