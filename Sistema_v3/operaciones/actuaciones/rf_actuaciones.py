@@ -2,7 +2,7 @@ import os
 import re
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
-from panel_pjn.acciones_pjn.gestion_actuaciones.utilidades import limpiar_texto, normalizar_fecha, generar_hash_archivo
+from .actuaciones_utils import limpiar_texto, normalizar_fecha, generar_hash_archivo
 
 async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indice_inicial=1):
     actuaciones = []
