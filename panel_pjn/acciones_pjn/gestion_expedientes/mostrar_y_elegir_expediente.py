@@ -1,3 +1,4 @@
+#refactorizada
 from playwright.async_api import Page
 from panel_pjn.acciones_pjn.gestion_expedientes.abrir_expediente_desde_fila import abrir_expediente_desde_fila
 #from abrir_expediente_desde_fila import abrir_expediente_desde_fila

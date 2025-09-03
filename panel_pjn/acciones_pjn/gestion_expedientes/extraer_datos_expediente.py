@@ -1,4 +1,5 @@
 import asyncio
+#refactorizada
 
 async def extraer_datos_expediente(page):
     try:

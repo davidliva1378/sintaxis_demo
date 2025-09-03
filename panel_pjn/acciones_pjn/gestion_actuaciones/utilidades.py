@@ -1,3 +1,4 @@
+#llevados a utils.py
 import re
 import hashlib
 from datetime import datetime

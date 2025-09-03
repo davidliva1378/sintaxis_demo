@@ -1,3 +1,4 @@
+#refactorizada
 from playwright.async_api import Page, TimeoutError
 import asyncio
 
