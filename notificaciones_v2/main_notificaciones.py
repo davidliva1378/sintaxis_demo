@@ -1,19 +1,20 @@
-from web.auto_login import reutilizar_sesion
+import asyncio
+from web.auto_login import reutilizar_sesion_async
 from notificaciones_control_v4_async import actualizar_notificaciones_nuevas
 
 
-def main():
-    page = reutilizar_sesion()
+async def main():
+    page, _, _, _ = await reutilizar_sesion_async()
     if not page:
         print("❌ No se pudo iniciar sesión en el portal del PJN.")
         return
 
-    actualizar_notificaciones_nuevas(page)
+    await actualizar_notificaciones_nuevas(page)
 
     print("✅ Proceso finalizado. El navegador permanecerá abierto.")
     while True:
-        pass  # Mantener el navegador abierto
+        await asyncio.sleep(1)  # Mantener el navegador abierto
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
