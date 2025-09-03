@@ -2,10 +2,14 @@ import asyncio
 import os
 from playwright.async_api import async_playwright
 from panel_pjn.acciones_pjn.urls_pjn import URL_LOGIN, URL_CONSULTAS
-from .expedientes.ref_expedientes import buscar_expedientes #ref
-from expedientes.ref_expedientes import mostrar_y_elegir_expediente #ref
-from .actuaciones.rf_actuaciones import extraer_actuaciones_completas #ref
-from .actuaciones.rf_actuaciones import descargar_archivos_de_json
+from Sistema_v3.operaciones.expedientes.ref_expedientes import (
+    buscar_expedientes,
+    mostrar_y_elegir_expediente,
+)
+from Sistema_v3.operaciones.actuaciones.rf_actuaciones import (
+    extraer_actuaciones_completas,
+    descargar_archivos_de_json,
+)
 
 #from panel_pjn.acciones_pjn.gestion_actuaciones.extraccion_completa import extraer_actuaciones_completas, descargar_archivos_de_json
 
