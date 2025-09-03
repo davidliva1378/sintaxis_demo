@@ -1,3 +1,4 @@
+#refactorizada
 from playwright.async_api import Page, TimeoutError
 from panel_pjn.acciones_pjn.gestion_expedientes.buscar_expediente_por_numero import buscar_expediente_por_numero
 

@@ -1,5 +1,6 @@
 import asyncio
 #from .extraer_datos_expediente import extraer_datos_expediente
+#refactorizada
 from panel_pjn.acciones_pjn.gestion_expedientes.extraer_datos_expediente import extraer_datos_expediente
 
 
