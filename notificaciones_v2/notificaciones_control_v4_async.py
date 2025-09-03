@@ -1,7 +1,7 @@
 import os
 import json
 import csv
-import time
+import asyncio
 import unicodedata
 from datetime import datetime, timedelta
 from playwright.async_api import Page
@@ -124,7 +124,7 @@ async def actualizar_notificaciones_nuevas(page: Page, destino: Optional[str] = 
             print(f"⚠️ Error al hacer scroll: {e}")
             break  # ⚠️ Importante: salimos del bucle para evitar loops infinitos
 
-        time.sleep(1)
+        await asyncio.sleep(1)
 
     if nuevas:
         historial = nuevas + historial
