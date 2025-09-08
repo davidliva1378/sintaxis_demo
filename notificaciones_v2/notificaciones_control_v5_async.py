@@ -1,6 +1,7 @@
-# notificaciones_control_v5_4_async.py
-# Corte determinístico al final de la lista sin usar el botón "Refrescar".
-# Mantiene compatibilidad con v4: historial JSON/CSV, deduplicación y campos existentes.
+# notificaciones_control_v5_6_async.py
+# - Agrega 'evento' ("N"/"D") y 'tipo_evento' ("NOTIFICACION"/"DESPACHO") a JSON/CSV.
+# - Dedupe compatible con históricos sin 'evento' (los enriquece si puede).
+# - Mantiene gating de fin por heading local + fondo + al menos un scroll.
 
 import os
 import json
@@ -9,7 +10,7 @@ import re
 import asyncio
 import unicodedata
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Tuple
 from playwright.async_api import Page
 
 # ================================
@@ -20,6 +21,10 @@ SELEC_TABLA = "div.MuiTableContainer-root tr"
 SELEC_EXPEDIENTE_NUMERO = "p.MuiTypography-root.MuiTypography-body1.w-full.css-11dlpbt"
 SELEC_EXPEDIENTE_CARATULA = "p.MuiTypography-root.MuiTypography-body1.w-full.italic.css-4icvzy"
 SELEC_CONTENEDOR_SCROLL = "#LayoutScrollingContainer"
+
+# regex robustas para aria-label del Avatar
+RE_EVENTO_NOTIF = re.compile(r"evento\s+notificaci[oó]n", re.I)
+RE_EVENTO_DESP  = re.compile(r"evento\s+despacho", re.I)
 
 def limpiar_texto(texto: str) -> str:
     return texto.replace("\n\n", " ").replace("\n", " ").strip()
@@ -39,7 +44,6 @@ async def _near_bottom(page: Page) -> bool:
     )
 
 async def _scroll_step(page: Page):
-    # Paso grande (pantalla completa o 600px mínimo)
     await page.evaluate(
         "(sel)=>{const el=document.querySelector(sel); if(el){"
         " const paso=Math.max(el.clientHeight*0.9,600);"
@@ -48,7 +52,6 @@ async def _scroll_step(page: Page):
     )
 
 async def _wheel(page: Page, cont_locator):
-    # Refuerzo por si la UI engancha eventos de rueda
     try:
         box = await cont_locator.bounding_box()
         if box:
@@ -61,17 +64,54 @@ async def _wheel(page: Page, cont_locator):
         pass
 
 # ================================
-# Funciones principales
+# Detección de indicador N/D por fila
+# ================================
+
+async def _detectar_indicador_evento(fila) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Devuelve (evento, tipo_evento):
+        evento: 'N' / 'D' / None
+        tipo_evento: 'NOTIFICACION' / 'DESPACHO' / None
+    Estrategia:
+      1) Buscar cualquier hijo con aria-label que matchee 'Evento Notificación' o 'Evento Despacho'
+      2) Fallback: dentro del Avatar, leer el <p> 'n'/'d'
+    """
+    try:
+        # 1) Por aria-label (más robusto)
+        con_aria = await fila.query_selector_all("[aria-label]")
+        for el in con_aria:
+            al = await el.get_attribute("aria-label") or ""
+            if RE_EVENTO_NOTIF.search(al):
+                return "N", "NOTIFICACION"
+            if RE_EVENTO_DESP.search(al):
+                return "D", "DESPACHO"
+    except Exception:
+        pass
+
+    # 2) Fallback: letra en el Avatar (minúscula)
+    try:
+        avatar_p = await fila.query_selector(".MuiAvatar-root p")
+        if avatar_p:
+            ch = (await avatar_p.inner_text()).strip().lower()
+            if ch == "n":
+                return "N", "NOTIFICACION"
+            if ch == "d":
+                return "D", "DESPACHO"
+    except Exception:
+        pass
+
+    return None, None
+
+# ================================
+# Función principal
 # ================================
 
 async def actualizar_notificaciones_nuevas(page: Page, destino: Optional[str] = None) -> int:
     """
-    Extrae notificaciones nuevas y las agrega al historial.
-
-    Corta solo cuando:
-      - se scrolleó al menos una vez,
-      - se está al fondo del contenedor,
-      - y es visible el heading 'No hay más eventos' (dentro del contenedor).
+    Extrae notificaciones/despachos y agrega/actualiza el historial (JSON/CSV).
+    - Añade 'evento' y 'tipo_evento' a cada registro nuevo.
+    - Si existe en historial el mismo (numero, fecha, caratula) sin 'evento', lo enriquece.
+    - Corta solo con: scroll>=1 + fondo + heading local 'No hay más eventos'.
     """
 
     print("🔍 Iniciando actualización de notificaciones...")
@@ -92,11 +132,15 @@ async def actualizar_notificaciones_nuevas(page: Page, destino: Optional[str] = 
     else:
         historial = []
 
-    # Deduplicación (igual criterio que v4)
-    claves_historial = set(
-        (normalizar_texto(n.get("numero", "")), n.get("fecha", ""), normalizar_texto(n.get("caratula", "")))
-        for n in historial if "numero" in n and "fecha" in n and "caratula" in n
-    )
+    # Conjuntos de dedupe
+    def _base_key(e):
+        return (normalizar_texto(e.get("numero","")), e.get("fecha",""), normalizar_texto(e.get("caratula","")))
+
+    def _event_key(e):
+        return _base_key(e) + (e.get("evento","") or "",)
+
+    claves_historial_base  = set(_base_key(e) for e in historial if e.get("numero") and e.get("fecha") and e.get("caratula"))
+    claves_historial_event = set(_event_key(e) for e in historial if e.get("numero") and e.get("fecha") and e.get("caratula"))
 
     # Asegurar contenedor/lista
     try:
@@ -109,20 +153,20 @@ async def actualizar_notificaciones_nuevas(page: Page, destino: Optional[str] = 
     cont = page.locator(SELEC_CONTENEDOR_SCROLL)
     await cont.scroll_into_view_if_needed()
 
-    # Señales scopeadas al contenedor (solo heading de fin)
+    # Señales scopeadas al contenedor
     fin_loc = cont.get_by_role("heading", name=re.compile(r"No hay m[aá]s eventos", re.I))
     loading_loc = cont.get_by_text(re.compile(r"Cargando m[aá]s eventos", re.I))
 
     nuevas = []
-    claves_vistas = set()
+    claves_vistas_event = set()
 
     # Control general
-    max_iter = 250                 # límite por seguridad
+    max_iter = 250
     scrolled_count = 0
     intentos_sin_nuevos = 0
-    max_intentos_sin_nuevos = 10   # respaldo suave para evitar loops si la página no cambia nada
+    max_intentos_sin_nuevos = 10
 
-    # Para confirmar avance de tramo (lista virtualizada)
+    # Para confirmar avance (lista virtualizada)
     async def _ultima_fila_texto() -> str:
         filas = await page.query_selector_all(SELEC_TABLA)
         if not filas:
@@ -130,15 +174,14 @@ async def actualizar_notificaciones_nuevas(page: Page, destino: Optional[str] = 
         textos = []
         for fila in filas[-2:]:
             try:
-                t = limpiar_texto(await fila.inner_text())
+                textos.append(limpiar_texto(await fila.inner_text()))
             except Exception:
-                t = ""
-            textos.append(t)
+                textos.append("")
         return " || ".join(textos)
 
     ultima_fila_prev = await _ultima_fila_texto()
 
-    # Posicionar el mouse dentro del contenedor para el wheel
+    # Posicionar el mouse dentro del contenedor para wheel
     try:
         box = await cont.bounding_box()
         if box:
@@ -171,22 +214,42 @@ async def actualizar_notificaciones_nuevas(page: Page, destino: Optional[str] = 
                 if not fecha_str:
                     continue
 
+                # Tipo de evento (N/D)
+                evento, tipo_evento = await _detectar_indicador_evento(fila)
+
                 # "dd/mm/YYYY" -> "YYYY-mm-dd"
                 fecha = datetime.strptime(fecha_str, "%d/%m/%Y").strftime("%Y-%m-%d")
 
-                # Validaciones mínimas
                 if numero == "N/D" or caratula == "N/D" or fecha == "1900-01-01":
                     continue
 
-                clave = (normalizar_texto(numero), fecha, normalizar_texto(caratula))
-                if clave in claves_historial or clave in claves_vistas:
+                base_key = (normalizar_texto(numero), fecha, normalizar_texto(caratula))
+                event_key = base_key + ((evento or ""),)
+
+                # ¿ya existe exactamente este evento?
+                if event_key in claves_historial_event or event_key in claves_vistas_event:
                     continue
 
-                claves_vistas.add(clave)
+                # ¿existe la base en historial pero sin 'evento'? => enriquecer
+                if base_key in claves_historial_base and evento:
+                    # actualizar en lista historial para añadir el evento
+                    for reg in historial:
+                        if (normalizar_texto(reg.get("numero","")), reg.get("fecha",""), normalizar_texto(reg.get("caratula",""))) == base_key:
+                            if not reg.get("evento"):
+                                reg["evento"] = evento
+                                reg["tipo_evento"] = tipo_evento
+                    # marcar como visto para no volver a intentar añadir
+                    claves_historial_event.add(event_key)
+                    continue
+
+                # si no está, agregamos como nuevo
+                claves_vistas_event.add(event_key)
                 nuevas.append({
                     "numero": numero,
                     "caratula": caratula,
                     "fecha": fecha,
+                    "evento": evento,                 # 'N' / 'D' / None
+                    "tipo_evento": tipo_evento,       # 'NOTIFICACION' / 'DESPACHO' / None
                     "leida": False,
                     "extraida_en": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 })
@@ -196,7 +259,7 @@ async def actualizar_notificaciones_nuevas(page: Page, destino: Optional[str] = 
                 print(f"⚠️ Error en fila: {e}")
 
         if nuevos_en_scroll > 0:
-            print(f"➕ Nuevas notificaciones detectadas: {nuevos_en_scroll}")
+            print(f"➕ Nuevas filas detectadas: {nuevos_en_scroll}")
             intentos_sin_nuevos = 0
         else:
             intentos_sin_nuevos += 1
@@ -208,60 +271,63 @@ async def actualizar_notificaciones_nuevas(page: Page, destino: Optional[str] = 
             print("🏁 Fin detectado al llegar al fondo (heading 'No hay más eventos').")
             break
 
-        # 3) Avanzar tramo: scroll grande + rueda, esperar loader si aparece
+        # 3) Avanzar tramo: scroll + wheel, sync con loader
         await _scroll_step(page)
         scrolled_count += 1
         await _wheel(page, cont)
 
-        # Sincronizar con loader si está
         try:
             if await loading_loc.is_visible():
                 await loading_loc.wait_for(state="hidden", timeout=10_000)
         except Exception:
             pass
 
-        # 4) Confirmar avance de tramo: cambió la última fila visible
+        # 4) Confirmar avance: cambió la última fila visible
         ultima_fila_now = await _ultima_fila_texto()
         if ultima_fila_now == ultima_fila_prev and not await _near_bottom(page):
-            # No avanzó el render; empujones extra
             for _ in range(2):
                 await _wheel(page, cont)
                 await asyncio.sleep(0.2)
             ultima_fila_now = await _ultima_fila_texto()
         ultima_fila_prev = ultima_fila_now
 
-        # Ritmo
         await asyncio.sleep(0.3)
 
     # ================================
-    # Persistencia
+    # Persistencia (JSON/CSV)
     # ================================
-    if nuevas:
-        historial = nuevas + historial  # prepend (compatibilidad v4)
-        try:
-            with open(HISTORIAL_JSON, "w", encoding="utf-8") as f:
-                json.dump(historial, f, indent=4, ensure_ascii=False)
-            print(f"✅ {len(nuevas)} notificaciones nuevas agregadas al historial.")
-        except Exception as e:
-            print(f"❌ Error guardando historial JSON: {e}")
+    hubo_nuevas = len(nuevas) > 0
+    if hubo_nuevas:
+        historial = nuevas + historial  # prepend
+    # Guardar JSON
+    try:
+        with open(HISTORIAL_JSON, "w", encoding="utf-8") as f:
+            json.dump(historial, f, indent=4, ensure_ascii=False)
+        if hubo_nuevas:
+            print(f"✅ {len(nuevas)} filas nuevas agregadas al historial.")
+        else:
+            print("ℹ️ Historial actualizado (enriquecido) sin filas nuevas.")
+    except Exception as e:
+        print(f"❌ Error guardando historial JSON: {e}")
 
-        try:
-            with open(HISTORIAL_CSV, "w", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f)
-                writer.writerow(["Fecha", "Número", "Carátula", "Leída", "Extraída En"])
-                for e in historial:
-                    writer.writerow([
-                        e.get("fecha", ""),
-                        e.get("numero", ""),
-                        e.get("caratula", ""),
-                        "Sí" if e.get("leida", False) else "No",
-                        e.get("extraida_en", "")
-                    ])
-            print("✅ Historial CSV actualizado.")
-        except Exception as e:
-            print(f"❌ Error guardando CSV: {e}")
-    else:
-        print("📂 No se encontraron notificaciones nuevas.")
+    # Regenerar CSV completo desde historial
+    try:
+        with open(HISTORIAL_CSV, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Fecha", "Número", "Carátula", "Evento", "TipoEvento", "Leída", "Extraída En"])
+            for e in historial:
+                writer.writerow([
+                    e.get("fecha", ""),
+                    e.get("numero", ""),
+                    e.get("caratula", ""),
+                    e.get("evento", "") or "",
+                    e.get("tipo_evento", "") or "",
+                    "Sí" if e.get("leida", False) else "No",
+                    e.get("extraida_en", "")
+                ])
+        print("✅ Historial CSV actualizado.")
+    except Exception as e:
+        print(f"❌ Error guardando CSV: {e}")
 
     return len(nuevas)
 
@@ -282,6 +348,8 @@ def notificaciones_proximas_a_vencer(destino: Optional[str] = None, horas: int =
     limite = ahora + timedelta(hours=horas)
     proximas = []
     for notif in historial:
+        if (notif.get("evento") or "").upper() != "N":
+            continue  # solo notificaciones para agenda/vencimientos
         fecha_str = notif.get("fecha")
         if not fecha_str:
             continue
