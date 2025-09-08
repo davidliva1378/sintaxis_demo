@@ -1,6 +1,6 @@
 import asyncio
 from web.auto_login import reutilizar_sesion_async
-from notificaciones_control_v4_async import actualizar_notificaciones_nuevas
+from notificaciones_control_v5_async import actualizar_notificaciones_nuevas
 
 
 async def main():
