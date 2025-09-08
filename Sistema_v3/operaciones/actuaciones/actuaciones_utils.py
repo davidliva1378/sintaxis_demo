@@ -16,3 +16,4 @@ def normalizar_fecha(texto: str) -> str:
 def generar_hash_archivo(fecha: str, tipo: str, detalle: str, longitud: int = 6) -> str:
     base_str = f"{fecha}_{tipo}_{detalle}"
     return hashlib.sha256(base_str.encode("utf-8")).hexdigest()[:longitud]
+

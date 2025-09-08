@@ -1381,3 +1381,26 @@ Call log:
 [2025-08-24 14:26:20] 📊 Comparación automática: sin cambios detectados.
 [2025-08-27 21:04:14] 🔍 Iniciando verificación de expedientes...
 [2025-08-27 21:04:32] 🌐 Navegación a consultas realizada.
+[2025-09-03 13:57:36] 🔍 Iniciando verificación de expedientes...
+[2025-09-03 13:57:53] 🌐 Navegación a consultas realizada.
+[2025-09-03 13:58:30] ⏳ Verificación de notificaciones ya en curso.
+[2025-09-03 13:58:47] 📦 Estado: repetido_detectado
+[2025-09-03 13:58:47] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-09-03 13:58:47] 📊 Total extraídos: 336
+[2025-09-03 13:58:47] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-09-03 13:58:52] 🔍 Iniciando verificación de expedientes...
+[2025-09-03 13:58:57] 🌐 Navegación a consultas realizada.
+[2025-09-03 14:08:00] 📦 Estado: completo
+[2025-09-03 14:08:00] ✅ Extracción finalizada exitosamente.
+[2025-09-03 14:08:00] 📊 Total extraídos: 2062
+[2025-09-03 14:08:00] 📁 Guardado en: F:\RESPALDO DAVID\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-09-03 14:08:00] 📊 Comparación automática: sin cambios detectados.
+[2025-09-03 14:11:12] 🔍 Iniciando verificación de expedientes...
+[2025-09-03 14:11:16] 🌐 Navegación a consultas realizada.
+[2025-09-03 14:11:25] ⏳ Verificación de notificaciones ya en curso.
+[2025-09-03 14:11:29] ❌ Error en verificación: Page.query_selector_all: Target page, context or browser has been closed
+[2025-09-03 14:11:29] 📦 Estado: fallo
+[2025-09-03 14:11:29] ❌ Fallo en la verificación.
+[2025-09-03 14:11:29] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-09-05 12:39:10] 🔍 Iniciando verificación de expedientes...
+[2025-09-05 12:39:28] 🌐 Navegación a consultas realizada.
