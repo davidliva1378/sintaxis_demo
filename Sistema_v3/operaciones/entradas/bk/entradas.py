@@ -6,7 +6,7 @@ import csv
 from datetime import datetime, timedelta
 from typing import Optional
 from playwright.async_api import Page
-from .utils import limpiar_texto, normalizar_texto
+from Sistema_v3.operaciones.entradas.utils import limpiar_texto, normalizar_texto
 
 SELEC_TABLA = "div.MuiTableContainer-root tr"
 SELEC_EXPEDIENTE_NUMERO = "p.MuiTypography-root.MuiTypography-body1.w-full.css-11dlpbt"
