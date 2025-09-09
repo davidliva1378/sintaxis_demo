@@ -1,0 +1,281 @@
+import sys
+import os
+import json
+from datetime import datetime
+from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox, QWidget
+from PySide6.QtGui import QIcon
+from PySide6.QtCore import QTimer, QThread, Signal, Qt
+
+from web.auto_login import reutilizar_sesion_async, SESSION_FILE
+from urls_pjn import URL_CONSULTAS
+from Sistema_v3.operaciones.expedientes.ref_expedientes import (
+    extraer_expedientes,
+)
+from Sistema_v3.operaciones.entradas.extractor_entradas import (
+    extraer_entradas_pjn,
+)
+
+
+CONFIG_PATH = "config/config_monitor.json"
+
+
+def registrar_log(mensaje: str) -> None:
+    """Registra mensajes en archivo y también los imprime por consola."""
+    try:
+        os.makedirs("impresion_logs", exist_ok=True)
+        with open("impresion_logs/log_monitoreo.txt", "a", encoding="utf-8") as f:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"[{timestamp}] {mensaje}\n")
+    except Exception as e:
+        print(f"Error al registrar log: {e}")
+    print(mensaje)
+
+
+class VerificadorExpedientesV3(QThread):
+    resultado = Signal(object)
+
+    def __init__(self, carpeta_salida: str = "datos_extraidos/monitoreo"):
+        super().__init__()
+        self.carpeta_salida = carpeta_salida
+
+    def run(self) -> None:  # type: ignore[override]
+        import asyncio
+
+        asyncio.run(self.verificar_async())
+
+    async def verificar_async(self) -> None:
+        try:
+            page, _, _, _ = await reutilizar_sesion_async()
+            if page:
+                await page.goto(URL_CONSULTAS)
+                expedientes, ruta, estado = await extraer_expedientes(
+                    page,
+                    carpeta_salida=self.carpeta_salida,
+                    nombre_archivo="expedientes_monitor.json",
+                    detener_en_duplicado=True,
+                    guardar_json=True,
+                )
+                self.resultado.emit(
+                    {"estado": estado, "cantidad": len(expedientes), "ruta": ruta}
+                )
+            else:
+                self.resultado.emit({"estado": "fallo"})
+        except Exception as e:  # pragma: no cover - logging de errores
+            registrar_log(f"❌ Error crítico en hilo de expedientes: {e}")
+            self.resultado.emit({"estado": "fallo", "error": str(e)})
+
+
+class VerificadorEntradasV3(QThread):
+    resultado = Signal(object)
+
+    def run(self) -> None:  # type: ignore[override]
+        import asyncio
+
+        asyncio.run(self.verificar_async())
+
+    async def verificar_async(self) -> None:
+        try:
+            page, _, _, _ = await reutilizar_sesion_async()
+            if page:
+                destino = os.path.abspath(
+                    os.path.join(os.getcwd(), "datos_extraidos", "monitoreo")
+                )
+                nuevas = await extraer_entradas_pjn(page, destino=destino)
+                self.resultado.emit(nuevas)
+            else:
+                self.resultado.emit(None)
+        except Exception as e:  # pragma: no cover - logging de errores
+            registrar_log(f"❌ Error en verificación de entradas: {e}")
+            self.resultado.emit(None)
+
+
+class MonitorEntradasExpedientes:
+    def __init__(self) -> None:
+        self.app = QApplication(sys.argv)
+        self.tray = QSystemTrayIcon(QIcon("icono.ico"))
+        self.tray.setToolTip("Monitor Expedientes/Entradas PJN")
+        self.tray.setVisible(True)
+
+        self.menu = QMenu()
+        self.menu.addAction("📥 Verificar Expedientes").triggered.connect(
+            self.verificar_expedientes
+        )
+        self.menu.addAction("📤 Verificar Entradas").triggered.connect(
+            self.verificar_entradas
+        )
+        self.menu.addAction("🔐 Estado de Sesión").triggered.connect(self.estado_sesion)
+        self.menu.addSeparator()
+        self.menu.addAction("🛑 Salir").triggered.connect(self.salir)
+        self.tray.setContextMenu(self.menu)
+
+        self.config = self.cargar_config()
+
+        self.timer_expedientes = QTimer()
+        self.timer_expedientes.timeout.connect(self.verificar_expedientes)
+
+        self.timer_entradas = QTimer()
+        self.timer_entradas.timeout.connect(self.verificar_entradas)
+
+        self.reintentos_expedientes = 0
+        self.reintentos_entradas = 0
+        self.ejecutando_expedientes = False
+        self.ejecutando_entradas = False
+
+        self.iniciar_temporizadores()
+        sys.exit(self.app.exec())
+
+    def cargar_config(self) -> dict:
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {
+                "horario_laboral": {
+                    "dias": ["lunes", "martes", "miércoles", "jueves", "viernes"],
+                    "hora_inicio": "07:00",
+                    "hora_fin": "20:00",
+                    "intervalo_minutos": 30,
+                },
+                "fuera_horario": {"intervalo_minutos": 240},
+            }
+
+    def esta_en_horario_laboral(self) -> bool:
+        ahora = datetime.now()
+        dia_actual = ahora.strftime("%A").lower()
+        dias = [d.lower() for d in self.config["horario_laboral"]["dias"]]
+        hora_inicio = datetime.strptime(
+            self.config["horario_laboral"]["hora_inicio"], "%H:%M"
+        ).time()
+        hora_fin = datetime.strptime(
+            self.config["horario_laboral"]["hora_fin"], "%H:%M"
+        ).time()
+        return dia_actual in dias and hora_inicio <= ahora.time() <= hora_fin
+
+    def obtener_intervalo(self) -> int:
+        if self.esta_en_horario_laboral():
+            return self.config["horario_laboral"]["intervalo_minutos"]
+        return self.config["fuera_horario"]["intervalo_minutos"]
+
+    def iniciar_temporizadores(self) -> None:
+        intervalo = self.obtener_intervalo()
+        self.timer_expedientes.start(intervalo * 60 * 1000)
+        self.timer_entradas.start(intervalo * 60 * 1000)
+        self.verificar_expedientes()
+        self.verificar_entradas()
+
+    def verificar_expedientes(self) -> None:
+        if self.ejecutando_expedientes:
+            registrar_log("⏳ Verificación de expedientes ya en curso.")
+            return
+        self.ejecutando_expedientes = True
+        self.hilo_expedientes = VerificadorExpedientesV3(
+            carpeta_salida=os.path.abspath(
+                os.path.join(os.getcwd(), "datos_extraidos", "monitoreo")
+            )
+        )
+        self.hilo_expedientes.resultado.connect(self.procesar_resultado_expedientes)
+        self.hilo_expedientes.start()
+
+    def verificar_entradas(self) -> None:
+        if self.ejecutando_entradas:
+            registrar_log("⏳ Verificación de entradas ya en curso.")
+            return
+        self.ejecutando_entradas = True
+        self.hilo_entradas = VerificadorEntradasV3()
+        self.hilo_entradas.resultado.connect(self.procesar_resultado_entradas)
+        self.hilo_entradas.start()
+
+    def procesar_resultado_expedientes(self, datos: dict) -> None:
+        estado = datos.get("estado", "desconocido")
+        mensajes = {
+            "completo": "✅ Extracción finalizada exitosamente.",
+            "repetido_detectado": "⚠️ Se detectó repetición de expedientes.",
+            "tiempo_maximo": "⏱ Se alcanzó el tiempo máximo permitido.",
+            "tabla_no_disponible": "❌ No se encontró la tabla de expedientes.",
+            "corte_fecha": "📆 Se aplicó la fecha de corte.",
+            "fallo": "❌ Fallo en la verificación.",
+            "desconocido": "❓ Estado no reconocido.",
+        }
+
+        registrar_log(f"📦 Estado: {estado}")
+        registrar_log(mensajes.get(estado, mensajes["desconocido"]))
+
+        if datos.get("cantidad") is not None:
+            registrar_log(f"📊 Total extraídos: {datos['cantidad']}")
+        if datos.get("ruta"):
+            registrar_log(f"📁 Guardado en: {datos['ruta']}")
+
+        if estado not in ("completo", "corte_fecha"):
+            self.reintentos_expedientes += 1
+            if self.reintentos_expedientes < 5:
+                registrar_log(
+                    f"🔁 Reintentando verificación ({self.reintentos_expedientes}/5) en 5 segundos..."
+                )
+                QTimer.singleShot(5000, self.verificar_expedientes)
+            else:
+                registrar_log(
+                    "❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación."
+                )
+        else:
+            self.reintentos_expedientes = 0
+
+        self.ejecutando_expedientes = False
+
+    def procesar_resultado_entradas(self, nuevas: int | None) -> None:
+        if nuevas is not None:
+            self.reintentos_entradas = 0
+            if nuevas > 0:
+                self.tray.showMessage("📤 Entradas", f"{nuevas} nuevas registradas.")
+            else:
+                self.tray.showMessage("📤 Entradas", "Sin nuevas entradas.")
+        else:
+            self.reintentos_entradas += 1
+            if self.reintentos_entradas < 5:
+                registrar_log(
+                    f"🔁 Reintentando entradas ({self.reintentos_entradas}/5) en 5 segundos..."
+                )
+                QTimer.singleShot(5000, self.verificar_entradas)
+            else:
+                registrar_log("❌ Se alcanzó el límite de reintentos de entradas.")
+
+        self.ejecutando_entradas = False
+
+    def estado_sesion(self) -> None:
+        estado = "❌ No verificado"
+        try:
+            with open(SESSION_FILE, "r", encoding="utf-8") as f:
+                datos = json.load(f)
+                if any(
+                    "pjn.gov.ar" in c.get("domain", "")
+                    for c in datos.get("cookies", [])
+                ):
+                    estado = "🟢 Sesión activa y válida"
+                else:
+                    estado = "⚠️ Sesión incompleta"
+        except FileNotFoundError:
+            estado = "❌ Archivo de sesión no encontrado"
+        except json.JSONDecodeError:
+            estado = "❌ Archivo de sesión ilegible"
+        except Exception as e:
+            estado = f"❌ Error inesperado: {e}"
+
+        intervalo = self.obtener_intervalo()
+        ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        mensaje = (
+            f"📅 Fecha y hora: {ahora}\n"
+            f"⏱ Intervalo de verificación: {intervalo} minutos\n"
+            f"{estado}"
+        )
+
+        ventana = QWidget()
+        ventana.setWindowFlag(Qt.Tool)
+        QMessageBox.information(ventana, "Estado del Monitor", mensaje)
+
+    def salir(self) -> None:
+        self.tray.hide()
+        self.app.quit()
+
+
+if __name__ == "__main__":
+    MonitorEntradasExpedientes()
