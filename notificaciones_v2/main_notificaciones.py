@@ -1,6 +1,9 @@
 import asyncio
+from playwright.async_api import async_playwright
+from datetime import datetime
 from web.auto_login import reutilizar_sesion_async
-from notificaciones_control_v5_async import actualizar_notificaciones_nuevas
+from extractor_entradas import extraer_entradas_pjn
+
 
 
 async def main():
@@ -9,7 +12,14 @@ async def main():
         print("❌ No se pudo iniciar sesión en el portal del PJN.")
         return
 
-    await actualizar_notificaciones_nuevas(page)
+    nuevas = await extraer_entradas_pjn(page, destino="./datos_extraidos/monitoreo",
+            duplicados=False,
+            incluir_tipos=("N","D"),
+            fechas=None,
+            fecha_desde=None,
+            fecha_hasta=None,)
+
+    print(f"✅ Nuevas agregadas en esta corrida: {nuevas}")
 
     print("✅ Proceso finalizado. El navegador permanecerá abierto.")
     while True:
