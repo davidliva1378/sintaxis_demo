@@ -8,8 +8,12 @@ from PySide6.QtCore import QTimer, QThread, Signal, Qt
 
 from web.auto_login import reutilizar_sesion_async, SESSION_FILE
 from urls_pjn import URL_CONSULTAS
-from ..operaciones.expedientes.ref_expedientes import extraer_expedientes
-from ..operaciones.entradas.extractor_entradas import extraer_entradas_pjn
+from Sistema_v3.operaciones.expedientes.ref_expedientes import (
+    extraer_expedientes,
+)
+from Sistema_v3.operaciones.entradas.extractor_entradas import (
+    extraer_entradas_pjn,
+)
 
 
 CONFIG_PATH = "config/config_monitor.json"
