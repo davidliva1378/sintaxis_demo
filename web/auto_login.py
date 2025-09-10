@@ -10,19 +10,6 @@ SELEC_BOTON = "#kc-login"
 SELEC_CONFIRMACION = "text='Menú'"
 SESSION_FILE = "estado_sesion.json"
 
-USUARIO = os.getenv("PJN_USUARIO")
-CONTRASENA = os.getenv("PJN_CLAVE")
-
-missing_vars = [
-    name
-    for name, value in (("PJN_USUARIO", USUARIO), ("PJN_CLAVE", CONTRASENA))
-    if value is None
-]
-if missing_vars:
-    raise EnvironmentError(
-        f"Faltan variables de entorno requeridas: {', '.join(missing_vars)}"
-    )
-
 
 async def guardar_sesion(context):
     storage = await context.storage_state()
@@ -32,6 +19,18 @@ async def guardar_sesion(context):
 
 
 async def iniciar_sesion(p):
+    USUARIO = os.getenv("PJN_USUARIO")
+    CONTRASENA = os.getenv("PJN_CLAVE")
+    missing_vars = [
+        name
+        for name, value in (("PJN_USUARIO", USUARIO), ("PJN_CLAVE", CONTRASENA))
+        if value is None
+    ]
+    if missing_vars:
+        raise EnvironmentError(
+            f"Faltan variables de entorno requeridas: {', '.join(missing_vars)}"
+        )
+
     print("🔐 Iniciando nueva sesión...")
     browser = await p.chromium.launch(
         headless=False,
@@ -60,6 +59,14 @@ async def iniciar_sesion(p):
 
 
 async def reutilizar_sesion_async():
+    missing_vars = [
+        name for name in ("PJN_USUARIO", "PJN_CLAVE") if os.getenv(name) is None
+    ]
+    if missing_vars:
+        raise EnvironmentError(
+            f"Faltan variables de entorno requeridas: {', '.join(missing_vars)}"
+        )
+
     p = await async_playwright().start()
 
     if not os.path.exists(SESSION_FILE):
