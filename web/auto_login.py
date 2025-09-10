@@ -1,3 +1,9 @@
+"""Automatiza el inicio de sesión en el portal PJN.
+
+Este módulo espera las credenciales a través de las variables de entorno
+``PJN_USER`` y ``PJN_PASSWORD``.
+"""
+
 import os
 import json
 import asyncio
@@ -19,11 +25,12 @@ async def guardar_sesion(context):
 
 
 async def iniciar_sesion(p):
-    USUARIO = os.getenv("PJN_USUARIO")
-    CONTRASENA = os.getenv("PJN_CLAVE")
+    """Inicia una nueva sesión usando ``PJN_USER`` y ``PJN_PASSWORD``."""
+    USUARIO = os.getenv("PJN_USER")
+    CONTRASENA = os.getenv("PJN_PASSWORD")
     missing_vars = [
         name
-        for name, value in (("PJN_USUARIO", USUARIO), ("PJN_CLAVE", CONTRASENA))
+        for name, value in (("PJN_USER", USUARIO), ("PJN_PASSWORD", CONTRASENA))
         if value is None
     ]
     if missing_vars:
@@ -59,8 +66,9 @@ async def iniciar_sesion(p):
 
 
 async def reutilizar_sesion_async():
+    """Reutiliza una sesión guardada o inicia una nueva si es necesario."""
     missing_vars = [
-        name for name in ("PJN_USUARIO", "PJN_CLAVE") if os.getenv(name) is None
+        name for name in ("PJN_USER", "PJN_PASSWORD") if os.getenv(name) is None
     ]
     if missing_vars:
         raise EnvironmentError(
