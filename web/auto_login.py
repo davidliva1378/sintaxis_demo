@@ -10,8 +10,19 @@ SELEC_BOTON = "#kc-login"
 SELEC_CONFIRMACION = "text='Menú'"
 SESSION_FILE = "estado_sesion.json"
 
-USUARIO = os.getenv("PJN_USUARIO", "20213071662")
-CONTRASENA = os.getenv("PJN_CLAVE", "surrey1970")
+USUARIO = os.getenv("PJN_USUARIO")
+CONTRASENA = os.getenv("PJN_CLAVE")
+
+missing_vars = [
+    name
+    for name, value in (("PJN_USUARIO", USUARIO), ("PJN_CLAVE", CONTRASENA))
+    if value is None
+]
+if missing_vars:
+    raise EnvironmentError(
+        f"Faltan variables de entorno requeridas: {', '.join(missing_vars)}"
+    )
+
 
 async def guardar_sesion(context):
     storage = await context.storage_state()
@@ -19,11 +30,17 @@ async def guardar_sesion(context):
         json.dump(storage, f)
     print("✅ Estado de sesión guardado correctamente.")
 
+
 async def iniciar_sesion(p):
     print("🔐 Iniciando nueva sesión...")
-    browser = await p.chromium.launch(headless=False, args=["--disable-blink-features=AutomationControlled", "--no-sandbox"])
+    browser = await p.chromium.launch(
+        headless=False,
+        args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+    )
     context = await browser.new_context()
-    await context.add_init_script("Object.defineProperty(navigator, 'webdriver', { get: () => undefined });")
+    await context.add_init_script(
+        "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
+    )
     page = await context.new_page()
     await page.goto(URL_LOGIN)
     await page.wait_for_load_state("domcontentloaded")
@@ -41,6 +58,7 @@ async def iniciar_sesion(p):
 
     return page, context, browser, p
 
+
 async def reutilizar_sesion_async():
     p = await async_playwright().start()
 
@@ -52,9 +70,14 @@ async def reutilizar_sesion_async():
     with open(SESSION_FILE, "r") as f:
         storage_state = json.load(f)
 
-    browser = await p.chromium.launch(headless=False, args=["--disable-blink-features=AutomationControlled", "--no-sandbox"])
+    browser = await p.chromium.launch(
+        headless=False,
+        args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+    )
     context = await browser.new_context(storage_state=storage_state)
-    await context.add_init_script("Object.defineProperty(navigator, 'webdriver', { get: () => undefined });")
+    await context.add_init_script(
+        "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
+    )
     page = await context.new_page()
     await page.goto(URL_LOGIN)
     await page.wait_for_load_state("domcontentloaded")
@@ -63,9 +86,11 @@ async def reutilizar_sesion_async():
         await page.wait_for_selector(SELEC_CONFIRMACION, timeout=10000)
         print("✅ Sesión activa, acceso exitoso.")
         return page, context, browser, p
-    except:
+    except Exception:
         if await page.is_visible(SELEC_USUARIO):
-            print("⚠️ Página de login detectada. Eliminando sesión y reiniciando login...")
+            print(
+                "⚠️ Página de login detectada. Eliminando sesión y reiniciando login..."
+            )
             await context.close()
             await browser.close()
             os.remove(SESSION_FILE)
@@ -76,6 +101,7 @@ async def reutilizar_sesion_async():
             await browser.close()
             await p.stop()
             return None, None, None, None
+
 
 # Test manual
 async def main():
@@ -92,6 +118,7 @@ async def main():
         if p:
             await p.stop()
     print("📋 Fin del proceso.")
+
 
 def reutilizar_sesion():
     return asyncio.run(reutilizar_sesion_async())
