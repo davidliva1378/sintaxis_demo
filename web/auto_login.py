@@ -75,6 +75,7 @@ async def iniciar_sesion():
         await guardar_sesion(context)
     except Exception as e:
         print("❌ Error en login automático:", e)
+        raise RuntimeError("Login fallido") from e
     finally:
         if page:
             try:
