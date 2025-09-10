@@ -7,6 +7,7 @@ Este módulo espera las credenciales a través de las variables de entorno
 import os
 import json
 import asyncio
+from pathlib import Path
 from contextlib import asynccontextmanager
 from playwright.async_api import async_playwright
 
@@ -15,19 +16,17 @@ SELEC_USUARIO = "input[name='username']"
 SELEC_CLAVE = "input[name='password']"
 SELEC_BOTON = "#kc-login"
 SELEC_CONFIRMACION = "text='Menú'"
-SESSION_FILE = "estado_sesion.json"
+SESSION_FILE = Path(__file__).with_name("estado_sesion.json")
 
 
 async def guardar_sesion(context):
     try:
         storage = await context.storage_state()
-        with open(SESSION_FILE, "w") as f:
-            json.dump(storage, f)
+        with SESSION_FILE.open("w", encoding="utf-8") as f:
+            json.dump(storage, f, ensure_ascii=False, indent=2)
         print("✅ Estado de sesión guardado correctamente.")
     except Exception as e:
         print("❌ Error al guardar la sesión:", e)
-    finally:
-        pass
 
 
 async def iniciar_sesion():
@@ -106,14 +105,18 @@ async def reutilizar_sesion_async():
     p = browser = context = page = None
     try:
         p = await async_playwright().start()
-        if not os.path.exists(SESSION_FILE):
+        if not SESSION_FILE.exists():
             print("⚠️ No hay sesión guardada. Ejecutando login manual...")
             await iniciar_sesion()
         else:
             print("🔄 Reutilizando sesión guardada...")
 
-        with open(SESSION_FILE, "r") as f:
-            storage_state = json.load(f)
+        try:
+            with SESSION_FILE.open("r", encoding="utf-8") as f:
+                storage_state = json.load(f)
+        except Exception as e:
+            print("❌ Error al leer la sesión:", e)
+            raise
 
         browser = await p.chromium.launch(
             headless=False,
@@ -139,10 +142,17 @@ async def reutilizar_sesion_async():
                 await context.close()
                 await browser.close()
                 page = context = browser = None
-                os.remove(SESSION_FILE)
+                try:
+                    SESSION_FILE.unlink()
+                except Exception:
+                    pass
                 await iniciar_sesion()
-                with open(SESSION_FILE, "r") as f:
-                    storage_state = json.load(f)
+                try:
+                    with SESSION_FILE.open("r", encoding="utf-8") as f:
+                        storage_state = json.load(f)
+                except Exception as e:
+                    print("❌ Error al leer la sesión:", e)
+                    raise
                 browser = await p.chromium.launch(
                     headless=False,
                     args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
