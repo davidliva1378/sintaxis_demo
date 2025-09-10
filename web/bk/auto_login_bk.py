@@ -5,8 +5,8 @@ import json
 from playwright.sync_api import sync_playwright
 
 # 🔐 Mejora: Mueve credenciales a variables de entorno (no las hardcodees)
-USUARIO = os.getenv("PJN_USUARIO", "20213071662")
-CONTRASEÑA = os.getenv("PJN_CLAVE", "surrey1970")
+USUARIO = os.getenv("PJN_USER", "20213071662")
+CONTRASEÑA = os.getenv("PJN_PASSWORD", "surrey1970")
 
 URL_LOGIN = "https://portalpjn.pjn.gov.ar/inicio"
 SELEC_USUARIO = "input[name='username']"
