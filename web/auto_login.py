@@ -2,6 +2,8 @@
 
 Este módulo espera las credenciales a través de las variables de entorno
 ``PJN_USER`` y ``PJN_PASSWORD``.
+Incluye utilidades para reutilizar una sesión previamente guardada tanto en
+código sincrónico como asincrónico.
 """
 
 import os
@@ -224,34 +226,39 @@ async def main():
 
 
 def reutilizar_sesion():
-    page = context = browser = p = None
+    """Reutiliza una sesión guardada o inicia una nueva si es necesario.
+
+    La función detecta si existe un bucle de eventos de :mod:`asyncio` en
+    ejecución para adaptarse a ambos escenarios:
+
+    * **Con loop activo:** retorna el context manager :func:`reutilizar_sesion_async`
+      para ser utilizado con ``async with``.
+    * **Sin loop activo:** ejecuta ``reutilizar_sesion_async`` mediante
+      :func:`asyncio.run` y devuelve directamente la tupla
+      ``(page, context, browser)``.
+
+    Ejemplos
+    --------
+    Uso sincrónico::
+
+        page, context, browser = reutilizar_sesion()
+
+    Uso asincrónico::
+
+        async with reutilizar_sesion() as (page, context, browser):
+            ...
+    """
+
+    async def _runner():
+        async with reutilizar_sesion_async() as triple:
+            return triple
+
     try:
-        raise RuntimeError(
-            "reutilizar_sesion() ha sido reemplazado por el context manager reutilizar_sesion_async()"
-        )
-    except Exception:
-        raise
-    finally:
-        if page:
-            try:
-                page.close()
-            except Exception:
-                pass
-        if context:
-            try:
-                context.close()
-            except Exception:
-                pass
-        if browser:
-            try:
-                browser.close()
-            except Exception:
-                pass
-        if p:
-            try:
-                p.stop()
-            except Exception:
-                pass
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(_runner())
+    else:
+        return reutilizar_sesion_async()
 
 
 if __name__ == "__main__":
