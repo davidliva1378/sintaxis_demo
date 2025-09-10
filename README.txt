@@ -22,7 +22,7 @@
 
    En PowerShell (ejecutado una vez):
 
-   setx PJN_USUARIO "tu_usuario"
-   setx PJN_CLAVE "tu_clave"
+   setx PJN_USER "tu_usuario"
+   setx PJN_PASSWORD "tu_clave"
 
    Luego cerrá y abrí de nuevo la terminal para que los valores se apliquen.
