@@ -9,7 +9,7 @@ import json
 import asyncio
 from pathlib import Path
 from contextlib import asynccontextmanager
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, Browser, BrowserContext
 
 URL_LOGIN = "https://portalpjn.pjn.gov.ar/inicio"
 SELEC_USUARIO = "input[name='username']"
@@ -17,6 +17,18 @@ SELEC_CLAVE = "input[name='password']"
 SELEC_BOTON = "#kc-login"
 SELEC_CONFIRMACION = "text='Menú'"
 SESSION_FILE = Path(__file__).with_name("estado_sesion.json")
+
+
+async def crear_contexto(p, storage_state=None) -> tuple[Browser, BrowserContext]:
+    browser = await p.chromium.launch(
+        headless=False,
+        args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+    )
+    context = await browser.new_context(storage_state=storage_state)
+    await context.add_init_script(
+        "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
+    )
+    return browser, context
 
 
 async def guardar_sesion(context):
@@ -47,14 +59,7 @@ async def iniciar_sesion():
     try:
         print("🔐 Iniciando nueva sesión...")
         p = await async_playwright().start()
-        browser = await p.chromium.launch(
-            headless=False,
-            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
-        )
-        context = await browser.new_context()
-        await context.add_init_script(
-            "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
-        )
+        browser, context = await crear_contexto(p)
         page = await context.new_page()
         await page.goto(URL_LOGIN)
         await page.wait_for_load_state("domcontentloaded")
@@ -118,14 +123,7 @@ async def reutilizar_sesion_async():
             print("❌ Error al leer la sesión:", e)
             raise
 
-        browser = await p.chromium.launch(
-            headless=False,
-            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
-        )
-        context = await browser.new_context(storage_state=storage_state)
-        await context.add_init_script(
-            "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });",
-        )
+        browser, context = await crear_contexto(p, storage_state=storage_state)
         page = await context.new_page()
         await page.goto(URL_LOGIN)
         await page.wait_for_load_state("domcontentloaded")
@@ -153,14 +151,7 @@ async def reutilizar_sesion_async():
                 except Exception as e:
                     print("❌ Error al leer la sesión:", e)
                     raise
-                browser = await p.chromium.launch(
-                    headless=False,
-                    args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
-                )
-                context = await browser.new_context(storage_state=storage_state)
-                await context.add_init_script(
-                    "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
-                )
+                browser, context = await crear_contexto(p, storage_state=storage_state)
                 page = await context.new_page()
                 await page.goto(URL_LOGIN)
                 await page.wait_for_load_state("domcontentloaded")
