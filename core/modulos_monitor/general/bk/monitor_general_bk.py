@@ -23,27 +23,25 @@ class VerificadorExpedientes(QThread):
 
     async def verificar_async(self):
         from panel_pjn.acciones_pjn.urls_pjn import URL_CONSULTAS
-        page, _, browser, playwright = await reutilizar_sesion_async()
-        if page:
-            await page.goto(URL_CONSULTAS)
-            carpeta = os.path.join(os.getcwd(), "descargas_monitoreo", "expedientes")
-            expedientes, ruta, estado = await extraer_expedientes(
-                page,
-                carpeta_salida=carpeta,
-                nombre_archivo="expedientes_monitor.json",
-                detener_en_duplicado=True,
-                guardar_json=True,
-                tiempo_maximo_segundos=None
-            )
-            await browser.close()
-            await playwright.stop()
-            self.resultado.emit({
-                "estado": estado,
-                "ruta": ruta,
-                "cantidad": len(expedientes)
-            })
-        else:
-            self.resultado.emit({"estado": "fallo"})
+        async with reutilizar_sesion_async() as (page, context, browser):
+            if page:
+                await page.goto(URL_CONSULTAS)
+                carpeta = os.path.join(os.getcwd(), "descargas_monitoreo", "expedientes")
+                expedientes, ruta, estado = await extraer_expedientes(
+                    page,
+                    carpeta_salida=carpeta,
+                    nombre_archivo="expedientes_monitor.json",
+                    detener_en_duplicado=True,
+                    guardar_json=True,
+                    tiempo_maximo_segundos=None
+                )
+                self.resultado.emit({
+                    "estado": estado,
+                    "ruta": ruta,
+                    "cantidad": len(expedientes)
+                })
+            else:
+                self.resultado.emit({"estado": "fallo"})
 
 
 class VerificadorNotificaciones(QThread):
@@ -55,12 +53,12 @@ class VerificadorNotificaciones(QThread):
 
     async def verificar_async(self):
         from notificaciones_v2.notificaciones_control_v4_async import actualizar_notificaciones_nuevas
-        page, _, _, _ = await reutilizar_sesion_async()
-        if page:
-            nuevas = await actualizar_notificaciones_nuevas(page)
-            self.resultado.emit(nuevas)
-        else:
-            self.resultado.emit(None)
+        async with reutilizar_sesion_async() as (page, context, browser):
+            if page:
+                nuevas = await actualizar_notificaciones_nuevas(page)
+                self.resultado.emit(nuevas)
+            else:
+                self.resultado.emit(None)
 
 
 class MonitorGeneral:

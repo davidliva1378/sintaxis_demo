@@ -215,10 +215,10 @@ class VerificadorExpedientes(QThread):
     async def verificar_async(self):
         try:
             registrar_log("🔍 Iniciando verificación de expedientes...")
-            page, _, browser, playwright = await reutilizar_sesion_async()
-            if page:
-                await page.goto(URL_CONSULTAS)
-                registrar_log("🌐 Navegación a consultas realizada.")
+            async with reutilizar_sesion_async() as (page, context, browser):
+                if page:
+                    await page.goto(URL_CONSULTAS)
+                    registrar_log("🌐 Navegación a consultas realizada.")
 
                 # Resolver ruta del archivo de configuración (proyecto/config/config_monitor.json)
                 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -247,33 +247,24 @@ class VerificadorExpedientes(QThread):
 
                 orden = config.get("filtro_expedientes", {}).get("orden", "fecha")
 
-                expedientes, ruta, estado = await extraer_expedientes(
-                    page,
-                    carpeta_salida=self.carpeta_salida,
-                    nombre_archivo="expedientes_monitor.json",
-                    detener_en_duplicado=True,
-                    guardar_json=True,
-                    fecha_corte=fecha_corte,
-                    tiempo_maximo_segundos=None,
-                    orden=orden
-                )
+                    expedientes, ruta, estado = await extraer_expedientes(
+                        page,
+                        carpeta_salida=self.carpeta_salida,
+                        nombre_archivo="expedientes_monitor.json",
+                        detener_en_duplicado=True,
+                        guardar_json=True,
+                        fecha_corte=fecha_corte,
+                        tiempo_maximo_segundos=None,
+                        orden=orden
+                    )
 
-                # Cierre ordenado de recursos
-                try:
-                    await browser.close()
-                finally:
-                    try:
-                        await playwright.stop()
-                    except Exception as e:
-                        registrar_log(f"⚠️ Aviso al detener Playwright: {e}")
-
-                self.resultado.emit({
-                    "estado": estado if (estado in {"completo", "repetido_detectado", "tiempo_maximo", "tabla_no_disponible", "fallo", "corte_fecha"}) else ("corte_fecha" if fecha_corte else "completo"),
-                    "ruta": ruta,
-                    "cantidad": len(expedientes)
-                })
-            else:
-                self.resultado.emit({"estado": "fallo"})
+                    self.resultado.emit({
+                        "estado": estado if (estado in {"completo", "repetido_detectado", "tiempo_maximo", "tabla_no_disponible", "fallo", "corte_fecha"}) else ("corte_fecha" if fecha_corte else "completo"),
+                        "ruta": ruta,
+                        "cantidad": len(expedientes)
+                    })
+                else:
+                    self.resultado.emit({"estado": "fallo"})
         except Exception as e:
             registrar_log(f"❌ Error en verificación: {e}")
             self.resultado.emit({"estado": "fallo", "error": str(e)})

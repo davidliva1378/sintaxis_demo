@@ -31,25 +31,23 @@ class VerificadorExpedientes(QThread):
     async def verificar_async(self):
         registrar_log("🔍 Iniciando verificación de expedientes...")
         try:
-            page, _, browser, playwright = await reutilizar_sesion_async()
-            await page.goto(URL_CONSULTAS)
-            registrar_log("🌐 Navegación a consultas realizada.")
-            expedientes, ruta, estado = await extraer_expedientes(
-                page,
-                carpeta_salida="datos_iniciales/",
-                nombre_archivo="expedientes_monitor.json",
-                detener_en_duplicado=True,
-                guardar_json=True,
-                tiempo_maximo_segundos=None
-            )
-            resultado = {
-                "estado": estado,
-                "ruta": ruta,
-                "cantidad": len(expedientes)
-            }
-            await browser.close()
-            await playwright.stop()
-            self.resultado.emit(resultado)
+            async with reutilizar_sesion_async() as (page, context, browser):
+                await page.goto(URL_CONSULTAS)
+                registrar_log("🌐 Navegación a consultas realizada.")
+                expedientes, ruta, estado = await extraer_expedientes(
+                    page,
+                    carpeta_salida="datos_iniciales/",
+                    nombre_archivo="expedientes_monitor.json",
+                    detener_en_duplicado=True,
+                    guardar_json=True,
+                    tiempo_maximo_segundos=None
+                )
+                resultado = {
+                    "estado": estado,
+                    "ruta": ruta,
+                    "cantidad": len(expedientes)
+                }
+                self.resultado.emit(resultado)
         except Exception as e:
             registrar_log(f"❌ Error en verificación: {e}")
             self.resultado.emit({"estado": "fallo", "error": str(e)})

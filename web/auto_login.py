@@ -7,6 +7,7 @@ Este módulo espera las credenciales a través de las variables de entorno
 import os
 import json
 import asyncio
+from contextlib import asynccontextmanager
 from playwright.async_api import async_playwright
 
 URL_LOGIN = "https://portalpjn.pjn.gov.ar/inicio"
@@ -65,6 +66,7 @@ async def iniciar_sesion(p):
     return page, context, browser
 
 
+@asynccontextmanager
 async def reutilizar_sesion_async():
     """Reutiliza una sesión guardada o inicia una nueva si es necesario."""
     missing_vars = [
@@ -75,61 +77,72 @@ async def reutilizar_sesion_async():
             f"Faltan variables de entorno requeridas: {', '.join(missing_vars)}"
         )
 
+    browser = context = page = None
     async with async_playwright() as p:
-        if not os.path.exists(SESSION_FILE):
-            print("⚠️ No hay sesión guardada. Ejecutando login manual...")
-            page, context, browser = await iniciar_sesion(p)
-            return page, context, browser, None
-
-        print("🔄 Reutilizando sesión guardada...")
-        with open(SESSION_FILE, "r") as f:
-            storage_state = json.load(f)
-
-        browser = await p.chromium.launch(
-            headless=False,
-            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
-        )
-        context = await browser.new_context(storage_state=storage_state)
-        await context.add_init_script(
-            "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
-        )
-        page = await context.new_page()
-        await page.goto(URL_LOGIN)
-        await page.wait_for_load_state("domcontentloaded")
-
         try:
-            await page.wait_for_selector(SELEC_CONFIRMACION, timeout=10000)
-            print("✅ Sesión activa, acceso exitoso.")
-            return page, context, browser, None
-        except Exception:
-            if await page.is_visible(SELEC_USUARIO):
-                print(
-                    "⚠️ Página de login detectada. Eliminando sesión y reiniciando login..."
-                )
-                await context.close()
-                await browser.close()
-                os.remove(SESSION_FILE)
+            if not os.path.exists(SESSION_FILE):
+                print("⚠️ No hay sesión guardada. Ejecutando login manual...")
                 page, context, browser = await iniciar_sesion(p)
-                return page, context, browser, None
             else:
-                print("❌ No se pudo verificar si está logueado.")
-                await context.close()
-                await browser.close()
-                return None, None, None, None
+                print("🔄 Reutilizando sesión guardada...")
+                with open(SESSION_FILE, "r") as f:
+                    storage_state = json.load(f)
 
+                browser = await p.chromium.launch(
+                    headless=False,
+                    args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+                )
+                context = await browser.new_context(storage_state=storage_state)
+                await context.add_init_script(
+                    "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });",
+                )
+                page = await context.new_page()
+                await page.goto(URL_LOGIN)
+                await page.wait_for_load_state("domcontentloaded")
+
+                try:
+                    await page.wait_for_selector(SELEC_CONFIRMACION, timeout=10000)
+                    print("✅ Sesión activa, acceso exitoso.")
+                except Exception:
+                    if await page.is_visible(SELEC_USUARIO):
+                        print("⚠️ Página de login detectada. Eliminando sesión y reiniciando login...")
+                        await context.close()
+                        await browser.close()
+                        os.remove(SESSION_FILE)
+                        page, context, browser = await iniciar_sesion(p)
+                    else:
+                        print("❌ No se pudo verificar si está logueado.")
+                        await context.close()
+                        await browser.close()
+                        page = context = browser = None
+
+            yield page, context, browser
+        finally:
+            if context:
+                try:
+                    await context.close()
+                except Exception:
+                    pass
+            if browser:
+                try:
+                    await browser.close()
+                except Exception:
+                    pass
 
 # Test manual
 async def main():
-    page, context, browser, _ = await reutilizar_sesion_async()
-    if page:
-        print("✅ Login exitoso y navegador activo.")
-    else:
-        print("❌ No se pudo iniciar sesión.")
-    print("📋 Fin del proceso.")
+    async with reutilizar_sesion_async() as (page, context, browser):
+        if page:
+            print("✅ Login exitoso y navegador activo.")
+        else:
+            print("❌ No se pudo iniciar sesión.")
+        print("📋 Fin del proceso.")
 
 
 def reutilizar_sesion():
-    return asyncio.run(reutilizar_sesion_async())
+    raise RuntimeError(
+        "reutilizar_sesion() ha sido reemplazado por el context manager reutilizar_sesion_async()"
+    )
 
 
 if __name__ == "__main__":
