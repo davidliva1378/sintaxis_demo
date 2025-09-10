@@ -4,7 +4,6 @@ from datetime import datetime
 import os
 import json
 
-from playwright.async_api import async_playwright
 from web.auto_login import reutilizar_sesion_async
 from core.modulos_monitor.expedientes_modular.extraer_expedientes import extraer_expedientes
 from panel_pjn.acciones_pjn.urls_pjn import URL_CONSULTAS
@@ -20,9 +19,7 @@ async def extraccion_incremental_async():
     expedientes_totales = []
     intentos = 0
 
-    async with async_playwright() as p:
-        page, context, browser, _ = await reutilizar_sesion_async()
-
+    async with reutilizar_sesion_async() as (page, context, browser):
         while intentos < MAX_INTENTOS:
             intentos += 1
             print(f"🔁 Intento {intentos} de extracción...")
@@ -76,9 +73,7 @@ async def extraccion_incremental_async():
             json.dump(expedientes_totales, f, indent=2, ensure_ascii=False)
         print(f"📁 Expedientes guardados en {ruta_final}")
 
-        await context.close()
-        await browser.close()
-        print("🏁 Extracción finalizada.")
+    print("🏁 Extracción finalizada.")
 
 
 if __name__ == "__main__":
