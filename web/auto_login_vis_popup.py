@@ -10,8 +10,8 @@ SELEC_BOTON = "#kc-login"
 SELEC_CONFIRMACION = "text='Menú'"
 SESSION_FILE = "estado_sesion.json"
 
-USUARIO = os.getenv("PJN_USUARIO", "20213071662")
-CONTRASENA = os.getenv("PJN_CLAVE", "surrey1970")
+USUARIO = os.getenv("PJN_USER", "20213071662")
+CONTRASENA = os.getenv("PJN_PASSWORD", "surrey1970")
 
 last_popup = None
 
