@@ -62,7 +62,7 @@ async def iniciar_sesion(p):
     except Exception as e:
         print("❌ Error en login automático:", e)
 
-    return page, context, browser, p
+    return page, context, browser
 
 
 async def reutilizar_sesion_async():
@@ -75,63 +75,56 @@ async def reutilizar_sesion_async():
             f"Faltan variables de entorno requeridas: {', '.join(missing_vars)}"
         )
 
-    p = await async_playwright().start()
+    async with async_playwright() as p:
+        if not os.path.exists(SESSION_FILE):
+            print("⚠️ No hay sesión guardada. Ejecutando login manual...")
+            page, context, browser = await iniciar_sesion(p)
+            return page, context, browser, None
 
-    if not os.path.exists(SESSION_FILE):
-        print("⚠️ No hay sesión guardada. Ejecutando login manual...")
-        return await iniciar_sesion(p)
+        print("🔄 Reutilizando sesión guardada...")
+        with open(SESSION_FILE, "r") as f:
+            storage_state = json.load(f)
 
-    print("🔄 Reutilizando sesión guardada...")
-    with open(SESSION_FILE, "r") as f:
-        storage_state = json.load(f)
+        browser = await p.chromium.launch(
+            headless=False,
+            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+        )
+        context = await browser.new_context(storage_state=storage_state)
+        await context.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
+        )
+        page = await context.new_page()
+        await page.goto(URL_LOGIN)
+        await page.wait_for_load_state("domcontentloaded")
 
-    browser = await p.chromium.launch(
-        headless=False,
-        args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
-    )
-    context = await browser.new_context(storage_state=storage_state)
-    await context.add_init_script(
-        "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
-    )
-    page = await context.new_page()
-    await page.goto(URL_LOGIN)
-    await page.wait_for_load_state("domcontentloaded")
-
-    try:
-        await page.wait_for_selector(SELEC_CONFIRMACION, timeout=10000)
-        print("✅ Sesión activa, acceso exitoso.")
-        return page, context, browser, p
-    except Exception:
-        if await page.is_visible(SELEC_USUARIO):
-            print(
-                "⚠️ Página de login detectada. Eliminando sesión y reiniciando login..."
-            )
-            await context.close()
-            await browser.close()
-            os.remove(SESSION_FILE)
-            return await iniciar_sesion(p)
-        else:
-            print("❌ No se pudo verificar si está logueado.")
-            await context.close()
-            await browser.close()
-            await p.stop()
-            return None, None, None, None
+        try:
+            await page.wait_for_selector(SELEC_CONFIRMACION, timeout=10000)
+            print("✅ Sesión activa, acceso exitoso.")
+            return page, context, browser, None
+        except Exception:
+            if await page.is_visible(SELEC_USUARIO):
+                print(
+                    "⚠️ Página de login detectada. Eliminando sesión y reiniciando login..."
+                )
+                await context.close()
+                await browser.close()
+                os.remove(SESSION_FILE)
+                page, context, browser = await iniciar_sesion(p)
+                return page, context, browser, None
+            else:
+                print("❌ No se pudo verificar si está logueado.")
+                await context.close()
+                await browser.close()
+                return None, None, None, None
 
 
 # Test manual
 async def main():
-    page, context, browser, p = await reutilizar_sesion_async()
+    page, context, browser, _ = await reutilizar_sesion_async()
     if page:
         print("✅ Login exitoso y navegador activo.")
-        input("Presione ENTER para cerrar...")
-        await browser.close()
-        await p.stop()
     else:
         print("❌ No se pudo iniciar sesión.")
-        if browser:
-            await browser.close()
-        if p:
-            await p.stop()
     print("📋 Fin del proceso.")
 
 
