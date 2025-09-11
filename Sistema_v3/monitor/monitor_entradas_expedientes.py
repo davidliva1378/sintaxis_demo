@@ -162,6 +162,7 @@ class MonitorEntradasExpedientes:
                 os.path.join(os.getcwd(), "datos_extraidos", "monitoreo")
             )
         )
+        self.hilo_expedientes.finished.connect(self.hilo_expedientes.deleteLater)
         self.hilo_expedientes.resultado.connect(self.procesar_resultado_expedientes)
         self.hilo_expedientes.start()
 
@@ -171,6 +172,7 @@ class MonitorEntradasExpedientes:
             return
         self.ejecutando_entradas = True
         self.hilo_entradas = VerificadorEntradasV3()
+        self.hilo_entradas.finished.connect(self.hilo_entradas.deleteLater)
         self.hilo_entradas.resultado.connect(self.procesar_resultado_entradas)
         self.hilo_entradas.start()
 
