@@ -6,7 +6,8 @@ from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox,
 from PySide6.QtGui import QIcon, QAction
 from PySide6.QtCore import QTimer, QThread, Signal, Qt
 from web.auto_login import reutilizar_sesion_async, SESSION_FILE
-from core.modulos_monitor.expedientes_modular.verificacion_expedientes import VerificadorExpedientes, registrar_log
+from core.modulos_monitor.expedientes_modular.verificacion_expedientes import VerificadorExpedientes
+from core.utils.logging import registrar_log
 from core.gestion_expedientes.comparar_expedientes_monitor import comparar_expedientes_monitor
 from core.modulos_monitor.notificaciones_modular.verificacion_notificaciones import VerificadorNotificaciones
 

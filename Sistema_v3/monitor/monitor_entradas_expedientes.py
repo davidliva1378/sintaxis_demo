@@ -14,21 +14,10 @@ from Sistema_v3.operaciones.expedientes.ref_expedientes import (
 from Sistema_v3.operaciones.entradas.extractor_entradas import (
     extraer_entradas_pjn,
 )
+from core.utils.logging import registrar_log
 
 
 CONFIG_PATH = "config/config_monitor.json"
-
-
-def registrar_log(mensaje: str) -> None:
-    """Registra mensajes en archivo y también los imprime por consola."""
-    try:
-        os.makedirs("impresion_logs", exist_ok=True)
-        with open("impresion_logs/log_monitoreo.txt", "a", encoding="utf-8") as f:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(f"[{timestamp}] {mensaje}\n")
-    except Exception as e:
-        print(f"Error al registrar log: {e}")
-    print(mensaje)
 
 
 class VerificadorExpedientesV3(QThread):
