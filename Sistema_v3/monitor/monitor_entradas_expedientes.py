@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox,
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import QTimer, QThread, Signal, Qt
 
-from web.auto_login import reutilizar_sesion_async, SESSION_FILE
+from Sistema_v3.web.auto_login import reutilizar_sesion_async, SESSION_FILE
 from urls_pjn import URL_CONSULTAS
 from Sistema_v3.operaciones.expedientes.ref_expedientes import (
     extraer_expedientes,

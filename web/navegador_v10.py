@@ -1,7 +1,7 @@
 import sys
 import asyncio
 from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QMessageBox
-from web.auto_login_vis_popup import reutilizar_sesion, obtener_ultima_pestania
+from web.auto_login import reutilizar_sesion_async
 from funciones_navegador_async import extraer_datos_expediente, obtener_actuaciones, comparar_actuaciones
 
 class NavegadorPersonalizado(QMainWindow):
@@ -10,7 +10,8 @@ class NavegadorPersonalizado(QMainWindow):
         self.setWindowTitle("Navegador Personalizado - SCW PJN")
         self.setGeometry(100, 100, 400, 300)
 
-        self.page, self.context, self.browser, self.playwright = reutilizar_sesion()
+        self._autologin_cm = reutilizar_sesion_async()
+        self.page, self.context, self.browser = asyncio.run(self._autologin_cm.__aenter__())
         if not self.page:
             self.mostrar_mensaje("Error", "❌ Error en el autologin. La aplicación se cerrará.")
             sys.exit()
@@ -55,12 +56,19 @@ class NavegadorPersonalizado(QMainWindow):
 
     def obtener_pestaña_activa(self):
         try:
-            page = obtener_ultima_pestania()
-            if page is None or page.is_closed():
-                self.mostrar_mensaje("Advertencia", "⚠️ No se detectó ninguna pestaña activa con un expediente.")
-                return None
-            print(f"✅ Pestaña activa detectada: {page.url}")
-            return page
+            for page in reversed(self.context.pages):
+                if not page.is_closed() and "expediente.seam" in page.url:
+                    print(f"✅ Pestaña activa detectada: {page.url}")
+                    return page
+
+            pages = [p for p in self.context.pages if not p.is_closed()]
+            if pages:
+                last_page = pages[-1]
+                print(f"⚠️ No se detectó pestaña con expediente.seam. Usando: {last_page.url}")
+                return last_page
+
+            self.mostrar_mensaje("Error", "❌ No hay pestañas abiertas.")
+            return None
         except Exception as e:
             self.mostrar_mensaje("Error", f"⚠️ No se pudo obtener la pestaña activa: {e}")
             return None
@@ -122,10 +130,8 @@ class NavegadorPersonalizado(QMainWindow):
     def cerrar_navegador(self):
         async def cerrar():
             try:
-                if self.browser:
-                    await self.browser.close()
-                if self.playwright:
-                    await self.playwright.stop()
+                if self._autologin_cm:
+                    await self._autologin_cm.__aexit__(None, None, None)
             except Exception as e:
                 print(f"❌ Error al cerrar navegador: {e}")
 
