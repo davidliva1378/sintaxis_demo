@@ -159,6 +159,7 @@ def obtener_fecha_corte(config: dict) -> str | None:
       - "hoy+ultimo_dia_habil"
       - "completo" / "sin_corte" / "none" / ""  -> sin corte
     Si el valor es desconocido, no se aplica corte (None).
+    Si "dias_atras" no es un entero válido, se registra un aviso y tampoco se aplica corte.
     """
     modo = (config.get("filtro_expedientes", {}).get("modo", "ultimo_dia_habil") or "").lower()
 
@@ -181,7 +182,12 @@ def obtener_fecha_corte(config: dict) -> str | None:
         return dia_habil.strftime("%Y-%m-%d")
 
     if modo == "dias_atras":
-        dias = int(config.get("filtro_expedientes", {}).get("dias_atras", 1))
+        dias_raw = config.get("filtro_expedientes", {}).get("dias_atras", 1)
+        try:
+            dias = int(dias_raw)
+        except ValueError:
+            registrar_log(f"Valor de dias_atras inválido: {dias_raw!r}. Se omite corte.")
+            return None
         fecha = datetime.now() - timedelta(days=max(dias, 0))
         return fecha.strftime("%Y-%m-%d")
 
