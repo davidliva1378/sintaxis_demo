@@ -15,6 +15,9 @@ from Sistema_v3.operaciones.entradas.extractor_entradas import (
     extraer_entradas_pjn,
 )
 from core.utils.logging import registrar_log
+from core.gestion_expedientes.comparar_expedientes_monitor import (
+    comparar_expedientes_monitor,
+)
 
 
 CONFIG_PATH = "config/config_monitor.json"
@@ -93,6 +96,12 @@ class MonitorEntradasExpedientes:
             self.verificar_entradas
         )
         self.menu.addAction("🔐 Estado de Sesión").triggered.connect(self.estado_sesion)
+        self.menu.addAction("🧪 Comparar Expedientes").triggered.connect(
+            self.comparar_expedientes
+        )
+        self.menu.addAction(
+            "🗂 Copiar últimos resultados a histórico"
+        ).triggered.connect(self.respaldar_resultados)
         self.menu.addSeparator()
         self.menu.addAction("🛑 Salir").triggered.connect(self.salir)
         self.tray.setContextMenu(self.menu)
@@ -230,6 +239,60 @@ class MonitorEntradasExpedientes:
                 registrar_log("❌ Se alcanzó el límite de reintentos de entradas.")
 
         self.ejecutando_entradas = False
+
+    def comparar_expedientes(self) -> None:
+        """Compara el último archivo de expedientes con la base histórica."""
+        try:
+            base_dir = os.path.abspath(
+                os.path.join(os.getcwd(), "datos_extraidos", "monitoreo")
+            )
+            ruta_actual = os.path.join(base_dir, "expedientes_monitor.json")
+            ruta_base = os.path.join(base_dir, "expedientes_monitor - base.json")
+            carpeta_salida = os.path.join(base_dir, "reportes")
+
+            nuevos, modificados, eliminados = comparar_expedientes_monitor(
+                ruta_actual, ruta_base, carpeta_salida
+            )
+
+            total = len(nuevos) + len(modificados) + len(eliminados)
+            if total > 0:
+                self.tray.showMessage(
+                    "📊 Comparación de Expedientes",
+                    f"{total} cambios detectados.",
+                )
+            else:
+                self.tray.showMessage(
+                    "📊 Comparación de Expedientes",
+                    "Sin cambios detectados.",
+                )
+        except Exception as e:
+            self.tray.showMessage(
+                "❌ Error", f"No se pudo completar la comparación: {e}"
+            )
+
+    def respaldar_resultados(self) -> None:
+        """Copia los últimos resultados de verificación a un histórico."""
+        from datetime import datetime
+        import shutil
+
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        destino = os.path.join(
+            "datos_extraidos", "monitoreo", "historico", timestamp
+        )
+        os.makedirs(destino, exist_ok=True)
+
+        base_dir = os.path.join("datos_extraidos", "monitoreo")
+        archivos = {
+            os.path.join(base_dir, "expedientes_monitor.json"): "expedientes_completo.json",
+            os.path.join(base_dir, "historial_notificaciones.json"): "notificaciones_completo.json",
+        }
+
+        for origen, nombre_destino in archivos.items():
+            if os.path.exists(origen):
+                shutil.copy(origen, os.path.join(destino, nombre_destino))
+                print(f"✅ Copiado: {origen} → {nombre_destino}")
+            else:
+                print(f"⚠️ Archivo no encontrado: {origen}")
 
     def estado_sesion(self) -> None:
         estado = "❌ No verificado"
