@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from PySide6.QtCore import QThread, Signal, QTimer, Qt
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox, QWidget
 from PySide6.QtGui import QIcon
@@ -46,6 +47,10 @@ class MonitorExpedientes(QSystemTrayIcon):
     ejecutando_verificacion = False
 
     def __init__(self):
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            registrar_log("❌ La bandeja del sistema no está disponible. La aplicación se cerrará.")
+            QMessageBox.critical(None, "Error", "La bandeja del sistema no está disponible.")
+            sys.exit(1)
         super().__init__()
         self.setIcon(QIcon("icono.ico"))
         self.setToolTip("Monitor de Expedientes")
