@@ -9,7 +9,8 @@ from web.auto_login import reutilizar_sesion_async, SESSION_FILE
 from modulos_monitor.expedientes.obtener_intervalo_monitor import obtener_intervalo_monitor
 from modulos_monitor.expedientes.monitoreo_automatico_habilitado import monitoreo_automatico_habilitado
 from core.modulos_monitor.expedientes_modular.extraer_expedientes import extraer_expedientes
-from modulos_monitor.expedientes_modular.verificacion_expedientes import VerificadorExpedientes, registrar_log
+from modulos_monitor.expedientes_modular.verificacion_expedientes import VerificadorExpedientes
+from core.utils.logging import registrar_log
 
 CONFIG_PATH = "config_monitor.json"
 
