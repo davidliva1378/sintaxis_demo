@@ -58,13 +58,13 @@ class VerificadorAsync(QThread):
         asyncio.run(self.verificar_async())
 
     async def verificar_async(self):
-        page, context, browser, p = await reutilizar_sesion_async()
-        if page:
-            from notificaciones_v2.notificaciones_control_v4_async import actualizar_notificaciones_nuevas
-            nuevas = await actualizar_notificaciones_nuevas(page)
-            self.resultado.emit(nuevas)
-        else:
-            self.resultado.emit(None)
+        async with reutilizar_sesion_async() as (page, context, browser):
+            if page:
+                from notificaciones_v2.notificaciones_control_v4_async import actualizar_notificaciones_nuevas
+                nuevas = await actualizar_notificaciones_nuevas(page)
+                self.resultado.emit(nuevas)
+            else:
+                self.resultado.emit(None)
 
 class MonitorNotificaciones:
     def __init__(self):

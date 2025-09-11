@@ -17,3 +17,12 @@
 
 📌 NOTA: si tenés problemas al activar el entorno, usá este comando primero:
    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+4. Definí las variables de entorno requeridas para el acceso al PJN:
+
+   En PowerShell (ejecutado una vez):
+
+   setx PJN_USER "tu_usuario"
+   setx PJN_PASSWORD "tu_clave"
+
+   Luego cerrá y abrí de nuevo la terminal para que los valores se apliquen.

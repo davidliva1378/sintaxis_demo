@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox,
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import QTimer, QThread, Signal, Qt
 
-from web.auto_login import reutilizar_sesion_async, SESSION_FILE
+from Sistema_v3.web.auto_login import reutilizar_sesion_async, SESSION_FILE
 from urls_pjn import URL_CONSULTAS
 from Sistema_v3.operaciones.expedientes.ref_expedientes import (
     extraer_expedientes,
@@ -45,21 +45,21 @@ class VerificadorExpedientesV3(QThread):
 
     async def verificar_async(self) -> None:
         try:
-            page, _, _, _ = await reutilizar_sesion_async()
-            if page:
-                await page.goto(URL_CONSULTAS)
-                expedientes, ruta, estado = await extraer_expedientes(
-                    page,
-                    carpeta_salida=self.carpeta_salida,
-                    nombre_archivo="expedientes_monitor.json",
-                    detener_en_duplicado=True,
-                    guardar_json=True,
-                )
-                self.resultado.emit(
-                    {"estado": estado, "cantidad": len(expedientes), "ruta": ruta}
-                )
-            else:
-                self.resultado.emit({"estado": "fallo"})
+            async with reutilizar_sesion_async() as (page, context, browser):
+                if page:
+                    await page.goto(URL_CONSULTAS)
+                    expedientes, ruta, estado = await extraer_expedientes(
+                        page,
+                        carpeta_salida=self.carpeta_salida,
+                        nombre_archivo="expedientes_monitor.json",
+                        detener_en_duplicado=True,
+                        guardar_json=True,
+                    )
+                    self.resultado.emit(
+                        {"estado": estado, "cantidad": len(expedientes), "ruta": ruta}
+                    )
+                else:
+                    self.resultado.emit({"estado": "fallo"})
         except Exception as e:  # pragma: no cover - logging de errores
             registrar_log(f"❌ Error crítico en hilo de expedientes: {e}")
             self.resultado.emit({"estado": "fallo", "error": str(e)})
@@ -75,15 +75,15 @@ class VerificadorEntradasV3(QThread):
 
     async def verificar_async(self) -> None:
         try:
-            page, _, _, _ = await reutilizar_sesion_async()
-            if page:
-                destino = os.path.abspath(
-                    os.path.join(os.getcwd(), "datos_extraidos", "monitoreo")
-                )
-                nuevas = await extraer_entradas_pjn(page, destino=destino)
-                self.resultado.emit(nuevas)
-            else:
-                self.resultado.emit(None)
+            async with reutilizar_sesion_async() as (page, context, browser):
+                if page:
+                    destino = os.path.abspath(
+                        os.path.join(os.getcwd(), "datos_extraidos", "monitoreo")
+                    )
+                    nuevas = await extraer_entradas_pjn(page, destino=destino)
+                    self.resultado.emit(nuevas)
+                else:
+                    self.resultado.emit(None)
         except Exception as e:  # pragma: no cover - logging de errores
             registrar_log(f"❌ Error en verificación de entradas: {e}")
             self.resultado.emit(None)
