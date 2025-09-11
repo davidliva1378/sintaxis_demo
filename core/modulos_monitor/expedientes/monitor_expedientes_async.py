@@ -19,7 +19,7 @@ class VerificadorAsync(QThread):
     async def verificar_async(self):
         registrar_log("🔍 Iniciando verificación de expedientes...")
         try:
-            async with reutilizar_sesion_async() as (page, context, browser):
+            async with reutilizar_sesion_async() as (page, _, _):
                 await page.goto(URL_CONSULTAS)
                 registrar_log("🌐 Navegación a consultas realizada.")
                 expedientes, ruta, estado = await extraer_expedientes(
