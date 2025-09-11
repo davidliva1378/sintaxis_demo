@@ -89,6 +89,7 @@ class VerificadorEntradasV3(QThread):
 class MonitorEntradasExpedientes:
     def __init__(self) -> None:
         self.app = QApplication(sys.argv)
+        self.app.setQuitOnLastWindowClosed(False)
         pixmap = QPixmap()
         if not pixmap.loadFromData(base64.b64decode(ICONO_BASE64)):
             registrar_log("⚠️ icono incrustado inválido, usando icono por defecto")
