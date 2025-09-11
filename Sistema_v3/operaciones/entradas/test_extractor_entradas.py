@@ -1,7 +1,7 @@
 import asyncio
 from playwright.async_api import async_playwright
 from datetime import datetime
-from web.auto_login import reutilizar_sesion_async
+from Sistema_v3.web.auto_login import reutilizar_sesion_async
 from extractor_entradas import extraer_entradas_pjn
 
 

@@ -1,7 +1,7 @@
 import sys
 import asyncio
 from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QMessageBox
-from web.auto_login_vis import reutilizar_sesion
+from web.auto_login import reutilizar_sesion_async
 from funciones_navegador_async import extraer_datos_expediente, obtener_actuaciones, comparar_actuaciones
 
 class NavegadorPersonalizado(QMainWindow):
@@ -10,7 +10,8 @@ class NavegadorPersonalizado(QMainWindow):
         self.setWindowTitle("Navegador Personalizado - SCW PJN")
         self.setGeometry(100, 100, 400, 300)
 
-        self.page, self.context, self.browser, self.playwright = reutilizar_sesion()
+        self._autologin_cm = reutilizar_sesion_async()
+        self.page, self.context, self.browser = asyncio.run(self._autologin_cm.__aenter__())
         if not self.page:
             self.mostrar_mensaje("Error", "❌ Error en el autologin. La aplicación se cerrará.")
             sys.exit()
@@ -131,10 +132,8 @@ class NavegadorPersonalizado(QMainWindow):
     def cerrar_navegador(self):
         async def cerrar():
             try:
-                if self.browser:
-                    await self.browser.close()
-                if self.playwright:
-                    await self.playwright.stop()
+                if self._autologin_cm:
+                    await self._autologin_cm.__aexit__(None, None, None)
             except Exception as e:
                 print(f"❌ Error al cerrar navegador: {e}")
 
