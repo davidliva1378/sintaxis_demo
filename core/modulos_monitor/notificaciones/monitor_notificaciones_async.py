@@ -58,7 +58,7 @@ class VerificadorAsync(QThread):
         asyncio.run(self.verificar_async())
 
     async def verificar_async(self):
-        async with reutilizar_sesion_async() as (page, context, browser):
+        async with reutilizar_sesion_async() as (page, _, _):
             if page:
                 from notificaciones_v2.notificaciones_control_v4_async import actualizar_notificaciones_nuevas
                 nuevas = await actualizar_notificaciones_nuevas(page)
