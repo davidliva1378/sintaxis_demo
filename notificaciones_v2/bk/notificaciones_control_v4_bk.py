@@ -1,15 +1,20 @@
 import sys
 import os
-from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
+from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox
 from PySide6.QtGui import QIcon, QAction
 from PySide6.QtCore import QTimer
 from datetime import datetime
 from web.auto_login import reutilizar_sesion
 from notificaciones_v2.notificaciones_control_v4_async import actualizar_notificaciones_nuevas
+from core.utils.logging import registrar_log
 
 class MonitorNotificaciones:
     def __init__(self):
         self.app = QApplication(sys.argv)
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            registrar_log("❌ La bandeja del sistema no está disponible. La aplicación se cerrará.")
+            QMessageBox.critical(None, "Error", "La bandeja del sistema no está disponible.")
+            sys.exit(1)
         self.tray = QSystemTrayIcon()
 
         icon_path = os.path.join(os.path.dirname(__file__), "icono.png")

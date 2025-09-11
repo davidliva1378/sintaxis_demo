@@ -19,6 +19,10 @@ CONFIG_PATH = "config/config_monitor.json"
 class MonitorGeneral:
     def __init__(self):
         self.app = QApplication(sys.argv)
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            registrar_log("❌ La bandeja del sistema no está disponible. La aplicación se cerrará.")
+            QMessageBox.critical(None, "Error", "La bandeja del sistema no está disponible.")
+            sys.exit(1)
         self.tray = QSystemTrayIcon(QIcon("icono.ico"))
         self.tray.setToolTip("Monitor General PJN")
         self.tray.setVisible(True)
