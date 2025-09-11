@@ -1,11 +1,13 @@
 import sys
 import os
 import json
+import base64
 from datetime import datetime
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox, QWidget
-from PySide6.QtGui import QIcon, QAction
+from PySide6.QtGui import QIcon, QAction, QPixmap
 from PySide6.QtCore import QTimer, QThread, Signal, Qt
 
+from .icono_base64 import ICONO_BASE64
 from Sistema_v3.web.auto_login import reutilizar_sesion_async, SESSION_FILE
 from urls_pjn import URL_CONSULTAS
 from Sistema_v3.operaciones.expedientes.ref_expedientes import (
@@ -18,7 +20,6 @@ from core.utils.logging import registrar_log
 from core.gestion_expedientes.comparar_expedientes_monitor import (
     comparar_expedientes_monitor,
 )
-
 
 CONFIG_PATH = "config/config_monitor.json"
 
@@ -84,7 +85,13 @@ class VerificadorEntradasV3(QThread):
 class MonitorEntradasExpedientes:
     def __init__(self) -> None:
         self.app = QApplication(sys.argv)
-        self.tray = QSystemTrayIcon(QIcon("icono.ico"))
+        pixmap = QPixmap()
+        if not pixmap.loadFromData(base64.b64decode(ICONO_BASE64)):
+            registrar_log("⚠️ icono incrustado inválido, usando icono por defecto")
+            icono = QIcon()
+        else:
+            icono = QIcon(pixmap)
+        self.tray = QSystemTrayIcon(icono)
         self.tray.setToolTip("Monitor Expedientes/Entradas PJN")
         self.tray.setVisible(True)
 
@@ -313,15 +320,17 @@ class MonitorEntradasExpedientes:
         import shutil
 
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        destino = os.path.join(
-            "datos_extraidos", "monitoreo", "historico", timestamp
-        )
+        destino = os.path.join("datos_extraidos", "monitoreo", "historico", timestamp)
         os.makedirs(destino, exist_ok=True)
 
         base_dir = os.path.join("datos_extraidos", "monitoreo")
         archivos = {
-            os.path.join(base_dir, "expedientes_monitor.json"): "expedientes_completo.json",
-            os.path.join(base_dir, "historial_notificaciones.json"): "notificaciones_completo.json",
+            os.path.join(
+                base_dir, "expedientes_monitor.json"
+            ): "expedientes_completo.json",
+            os.path.join(
+                base_dir, "historial_notificaciones.json"
+            ): "notificaciones_completo.json",
         }
 
         for origen, nombre_destino in archivos.items():
