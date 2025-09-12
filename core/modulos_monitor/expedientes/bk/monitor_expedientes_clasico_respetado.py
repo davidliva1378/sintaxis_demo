@@ -1,16 +1,9 @@
 import asyncio
 from playwright.async_api import async_playwright
-from datetime import datetime
 
 from panel_pjn.acciones_pjn.urls_pjn import URL_LOGIN, URL_CONSULTAS
 from core.modulos_monitor.expedientes_modular.extraer_expedientes import extraer_expedientes_v2
-
-def registrar_log(mensaje):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_entry = f"[{timestamp}] {mensaje}"
-    print(log_entry)
-    with open("log_monitor_expedientes.txt", "a", encoding="utf-8") as f:
-        f.write(log_entry + "\n")
+from core.utils.logging import registrar_log
 
 async def monitor_expedientes():
     registrar_log("🔐 Iniciando sesión PJN...")

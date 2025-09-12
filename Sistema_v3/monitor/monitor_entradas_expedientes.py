@@ -1,34 +1,31 @@
 import sys
 import os
 import json
+import base64
 from datetime import datetime
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox, QWidget
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QAction, QPixmap
 from PySide6.QtCore import QTimer, QThread, Signal, Qt
 
+try:
+    from .icono_base64 import ICONO_BASE64
+except ImportError:  # running as standalone script
+    # Fallback to absolute import when executed outside the package
+    from icono_base64 import ICONO_BASE64
 from Sistema_v3.web.auto_login import reutilizar_sesion_async, SESSION_FILE
-from urls_pjn import URL_CONSULTAS
+from Sistema_v3.config.urls_pjn import URL_CONSULTAS
 from Sistema_v3.operaciones.expedientes.ref_expedientes import (
     extraer_expedientes,
 )
 from Sistema_v3.operaciones.entradas.extractor_entradas import (
     extraer_entradas_pjn,
 )
-
+from Sistema_v3.utils.logging import registrar_log
+from Sistema_v3.gestion_expedientes.comparar_expedientes_monitor import (
+    comparar_expedientes_monitor,
+)
 
 CONFIG_PATH = "config/config_monitor.json"
-
-
-def registrar_log(mensaje: str) -> None:
-    """Registra mensajes en archivo y también los imprime por consola."""
-    try:
-        os.makedirs("impresion_logs", exist_ok=True)
-        with open("impresion_logs/log_monitoreo.txt", "a", encoding="utf-8") as f:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(f"[{timestamp}] {mensaje}\n")
-    except Exception as e:
-        print(f"Error al registrar log: {e}")
-    print(mensaje)
 
 
 class VerificadorExpedientesV3(QThread):
@@ -92,7 +89,18 @@ class VerificadorEntradasV3(QThread):
 class MonitorEntradasExpedientes:
     def __init__(self) -> None:
         self.app = QApplication(sys.argv)
-        self.tray = QSystemTrayIcon(QIcon("icono.ico"))
+        self.app.setQuitOnLastWindowClosed(False)
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            registrar_log("❌ La bandeja del sistema no está disponible. La aplicación se cerrará.")
+            QMessageBox.critical(None, "Error", "La bandeja del sistema no está disponible.")
+            sys.exit(1)
+        pixmap = QPixmap()
+        if not pixmap.loadFromData(base64.b64decode(ICONO_BASE64)):
+            registrar_log("⚠️ icono incrustado inválido, usando icono por defecto")
+            icono = QIcon()
+        else:
+            icono = QIcon(pixmap)
+        self.tray = QSystemTrayIcon(icono)
         self.tray.setToolTip("Monitor Expedientes/Entradas PJN")
         self.tray.setVisible(True)
 
@@ -104,11 +112,28 @@ class MonitorEntradasExpedientes:
             self.verificar_entradas
         )
         self.menu.addAction("🔐 Estado de Sesión").triggered.connect(self.estado_sesion)
+        self.menu.addAction("🧪 Comparar Expedientes").triggered.connect(
+            self.comparar_expedientes
+        )
+        self.menu.addAction(
+            "🗂 Copiar últimos resultados a histórico"
+        ).triggered.connect(self.respaldar_resultados)
+        self.submenu_modo = QMenu("🛠️ Modo de Trabajo")
+        for modo in ["automatico", "laboral", "no_laboral"]:
+            nombre_visible = modo.replace("_", " ").capitalize()
+            accion = QAction(nombre_visible, checkable=True)
+            accion.setData(modo)
+            accion.triggered.connect(
+                lambda checked, a=accion: self.cambiar_modo(a.data())
+            )
+            self.submenu_modo.addAction(accion)
+        self.menu.addMenu(self.submenu_modo)
         self.menu.addSeparator()
         self.menu.addAction("🛑 Salir").triggered.connect(self.salir)
         self.tray.setContextMenu(self.menu)
 
         self.config = self.cargar_config()
+        self.actualizar_modo_seleccionado()
 
         self.timer_expedientes = QTimer()
         self.timer_expedientes.timeout.connect(self.verificar_expedientes)
@@ -127,9 +152,12 @@ class MonitorEntradasExpedientes:
     def cargar_config(self) -> dict:
         try:
             with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
+                datos = json.load(f)
+                datos.setdefault("modo", "automatico")
+                return datos
         except Exception:
             return {
+                "modo": "automatico",
                 "horario_laboral": {
                     "dias": ["lunes", "martes", "miércoles", "jueves", "viernes"],
                     "hora_inicio": "07:00",
@@ -152,9 +180,18 @@ class MonitorEntradasExpedientes:
         return dia_actual in dias and hora_inicio <= ahora.time() <= hora_fin
 
     def obtener_intervalo(self) -> int:
-        if self.esta_en_horario_laboral():
+        modo = self.config.get("modo", "automatico")
+        if modo == "laboral":
             return self.config["horario_laboral"]["intervalo_minutos"]
-        return self.config["fuera_horario"]["intervalo_minutos"]
+        elif modo == "no_laboral":
+            return self.config["fuera_horario"]["intervalo_minutos"]
+        elif modo == "automatico":
+            return (
+                self.config["horario_laboral"]["intervalo_minutos"]
+                if self.esta_en_horario_laboral()
+                else self.config["fuera_horario"]["intervalo_minutos"]
+            )
+        return 60
 
     def iniciar_temporizadores(self) -> None:
         intervalo = self.obtener_intervalo()
@@ -162,6 +199,20 @@ class MonitorEntradasExpedientes:
         self.timer_entradas.start(intervalo * 60 * 1000)
         self.verificar_expedientes()
         self.verificar_entradas()
+
+    def cambiar_modo(self, nuevo_modo: str) -> None:
+        self.config["modo"] = nuevo_modo
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(self.config, f, indent=2)
+        self.actualizar_modo_seleccionado()
+        self.timer_expedientes.stop()
+        self.timer_entradas.stop()
+        self.iniciar_temporizadores()
+
+    def actualizar_modo_seleccionado(self) -> None:
+        modo = self.config.get("modo", "automatico")
+        for accion in self.submenu_modo.actions():
+            accion.setChecked(accion.data() == modo)
 
     def verificar_expedientes(self) -> None:
         if self.ejecutando_expedientes:
@@ -173,6 +224,7 @@ class MonitorEntradasExpedientes:
                 os.path.join(os.getcwd(), "datos_extraidos", "monitoreo")
             )
         )
+        self.hilo_expedientes.finished.connect(self.hilo_expedientes.deleteLater)
         self.hilo_expedientes.resultado.connect(self.procesar_resultado_expedientes)
         self.hilo_expedientes.start()
 
@@ -182,6 +234,7 @@ class MonitorEntradasExpedientes:
             return
         self.ejecutando_entradas = True
         self.hilo_entradas = VerificadorEntradasV3()
+        self.hilo_entradas.finished.connect(self.hilo_entradas.deleteLater)
         self.hilo_entradas.resultado.connect(self.procesar_resultado_entradas)
         self.hilo_entradas.start()
 
@@ -240,6 +293,62 @@ class MonitorEntradasExpedientes:
 
         self.ejecutando_entradas = False
 
+    def comparar_expedientes(self) -> None:
+        """Compara el último archivo de expedientes con la base histórica."""
+        try:
+            base_dir = os.path.abspath(
+                os.path.join(os.getcwd(), "datos_extraidos", "monitoreo")
+            )
+            ruta_actual = os.path.join(base_dir, "expedientes_monitor.json")
+            ruta_base = os.path.join(base_dir, "expedientes_monitor - base.json")
+            carpeta_salida = os.path.join(base_dir, "reportes")
+
+            nuevos, modificados, eliminados = comparar_expedientes_monitor(
+                ruta_actual, ruta_base, carpeta_salida
+            )
+
+            total = len(nuevos) + len(modificados) + len(eliminados)
+            if total > 0:
+                self.tray.showMessage(
+                    "📊 Comparación de Expedientes",
+                    f"{total} cambios detectados.",
+                )
+            else:
+                self.tray.showMessage(
+                    "📊 Comparación de Expedientes",
+                    "Sin cambios detectados.",
+                )
+        except Exception as e:
+            self.tray.showMessage(
+                "❌ Error", f"No se pudo completar la comparación: {e}"
+            )
+
+    def respaldar_resultados(self) -> None:
+        """Copia los últimos resultados de verificación a un histórico."""
+        from datetime import datetime
+        import shutil
+
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        destino = os.path.join("datos_extraidos", "monitoreo", "historico", timestamp)
+        os.makedirs(destino, exist_ok=True)
+
+        base_dir = os.path.join("datos_extraidos", "monitoreo")
+        archivos = {
+            os.path.join(
+                base_dir, "expedientes_monitor.json"
+            ): "expedientes_completo.json",
+            os.path.join(
+                base_dir, "historial_notificaciones.json"
+            ): "notificaciones_completo.json",
+        }
+
+        for origen, nombre_destino in archivos.items():
+            if os.path.exists(origen):
+                shutil.copy(origen, os.path.join(destino, nombre_destino))
+                print(f"✅ Copiado: {origen} → {nombre_destino}")
+            else:
+                print(f"⚠️ Archivo no encontrado: {origen}")
+
     def estado_sesion(self) -> None:
         estado = "❌ No verificado"
         try:
@@ -259,11 +368,13 @@ class MonitorEntradasExpedientes:
         except Exception as e:
             estado = f"❌ Error inesperado: {e}"
 
+        modo = self.config.get("modo", "automatico").replace("_", " ").capitalize()
         intervalo = self.obtener_intervalo()
         ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         mensaje = (
             f"📅 Fecha y hora: {ahora}\n"
+            f"🕒 Modo de trabajo actual: {modo}\n"
             f"⏱ Intervalo de verificación: {intervalo} minutos\n"
             f"{estado}"
         )

@@ -1,17 +1,8 @@
 import asyncio
 from playwright.async_api import async_playwright
 from panel_pjn.acciones_pjn.urls_pjn import URL_LOGIN, URL_CONSULTAS
-from datetime import datetime
-import os
 from core.modulos_monitor.expedientes_modular.extraer_expedientes import extraer_expedientes_v2
-
-def registrar_log(texto):
-    ruta = os.path.join(os.path.dirname(__file__), "log.txt")
-    os.makedirs(os.path.dirname(ruta), exist_ok=True)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(ruta, "a", encoding="utf-8") as f:
-        f.write(f"[{timestamp}] {texto}\n")
-    print(texto)
+from core.utils.logging import registrar_log
 
 async def monitor_expedientes_robusto():
     try:

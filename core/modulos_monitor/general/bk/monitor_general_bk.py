@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import sys
 from datetime import datetime
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox
 from PySide6.QtGui import QIcon, QAction
@@ -9,7 +10,8 @@ from web.auto_login import reutilizar_sesion_async, SESSION_FILE
 from modulos_monitor.expedientes.obtener_intervalo_monitor import obtener_intervalo_monitor
 from modulos_monitor.expedientes.monitoreo_automatico_habilitado import monitoreo_automatico_habilitado
 from core.modulos_monitor.expedientes_modular.extraer_expedientes import extraer_expedientes
-from modulos_monitor.expedientes_modular.verificacion_expedientes import VerificadorExpedientes, registrar_log
+from modulos_monitor.expedientes_modular.verificacion_expedientes import VerificadorExpedientes
+from core.utils.logging import registrar_log
 
 CONFIG_PATH = "config_monitor.json"
 
@@ -64,6 +66,10 @@ class VerificadorNotificaciones(QThread):
 class MonitorGeneral:
     def __init__(self):
         self.app = QApplication(sys.argv)
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            registrar_log("❌ La bandeja del sistema no está disponible. La aplicación se cerrará.")
+            QMessageBox.critical(None, "Error", "La bandeja del sistema no está disponible.")
+            sys.exit(1)
         self.tray = QSystemTrayIcon(QIcon("icono.ico"))
         self.tray.setToolTip("Monitor General PJN")
         self.tray.setVisible(True)

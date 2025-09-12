@@ -4,10 +4,11 @@ import os
 import json
 import asyncio
 from datetime import datetime
-from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
+from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox
 from PySide6.QtGui import QIcon, QAction
 from PySide6.QtCore import QTimer, QThread, Signal
 from web.auto_login import reutilizar_sesion_async, SESSION_FILE
+from core.utils.logging import registrar_log
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config_monitor.json")
 
@@ -58,7 +59,7 @@ class VerificadorAsync(QThread):
         asyncio.run(self.verificar_async())
 
     async def verificar_async(self):
-        async with reutilizar_sesion_async() as (page, context, browser):
+        async with reutilizar_sesion_async() as (page, _, _):
             if page:
                 from notificaciones_v2.notificaciones_control_v4_async import actualizar_notificaciones_nuevas
                 nuevas = await actualizar_notificaciones_nuevas(page)
@@ -69,6 +70,10 @@ class VerificadorAsync(QThread):
 class MonitorNotificaciones:
     def __init__(self):
         self.app = QApplication(sys.argv)
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            registrar_log("❌ La bandeja del sistema no está disponible. La aplicación se cerrará.")
+            QMessageBox.critical(None, "Error", "La bandeja del sistema no está disponible.")
+            sys.exit(1)
         self.tray = QSystemTrayIcon()
 
         icon_path = os.path.join(os.path.dirname(__file__), "icono.png")

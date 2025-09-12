@@ -1,6 +1,5 @@
 import asyncio
-import os
-from datetime import datetime
+import sys
 from PySide6.QtCore import QThread, Signal, QTimer, Qt
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox, QWidget
 from PySide6.QtGui import QIcon
@@ -9,17 +8,7 @@ from panel_pjn.acciones_pjn.urls_pjn import URL_CONSULTAS
 from core.modulos_monitor.expedientes_modular.extraer_expedientes import extraer_expedientes
 from web.auto_login import reutilizar_sesion_async
 from obtener_intervalo_monitor import obtener_intervalo_monitor
-
-
-def registrar_log(mensaje):
-    try:
-        os.makedirs("impresion_logs", exist_ok=True)
-        with open("impresion_logs/log_monitoreo.txt", "a", encoding="utf-8") as f:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(f"[{timestamp}] {mensaje}\n")
-    except Exception as e:
-        print(f"Error al registrar log: {e}")
-    print(mensaje)
+from core.utils.logging import registrar_log
 
 
 class VerificadorAsync(QThread):
@@ -31,7 +20,7 @@ class VerificadorAsync(QThread):
     async def verificar_async(self):
         registrar_log("🔍 Iniciando verificación de expedientes...")
         try:
-            async with reutilizar_sesion_async() as (page, context, browser):
+            async with reutilizar_sesion_async() as (page, _, _):
                 await page.goto(URL_CONSULTAS)
                 registrar_log("🌐 Navegación a consultas realizada.")
                 expedientes, ruta, estado = await extraer_expedientes(
@@ -58,6 +47,10 @@ class MonitorExpedientes(QSystemTrayIcon):
     ejecutando_verificacion = False
 
     def __init__(self):
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            registrar_log("❌ La bandeja del sistema no está disponible. La aplicación se cerrará.")
+            QMessageBox.critical(None, "Error", "La bandeja del sistema no está disponible.")
+            sys.exit(1)
         super().__init__()
         self.setIcon(QIcon("icono.ico"))
         self.setToolTip("Monitor de Expedientes")
