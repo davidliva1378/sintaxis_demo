@@ -13,15 +13,15 @@ except ImportError:  # running as standalone script
     # Fallback to absolute import when executed outside the package
     from icono_base64 import ICONO_BASE64
 from Sistema_v3.web.auto_login import reutilizar_sesion_async, SESSION_FILE
-from urls_pjn import URL_CONSULTAS
+from Sistema_v3.config.urls_pjn import URL_CONSULTAS
 from Sistema_v3.operaciones.expedientes.ref_expedientes import (
     extraer_expedientes,
 )
 from Sistema_v3.operaciones.entradas.extractor_entradas import (
     extraer_entradas_pjn,
 )
-from core.utils.logging import registrar_log
-from core.gestion_expedientes.comparar_expedientes_monitor import (
+from Sistema_v3.utils.logging import registrar_log
+from Sistema_v3.gestion_expedientes.comparar_expedientes_monitor import (
     comparar_expedientes_monitor,
 )
 
