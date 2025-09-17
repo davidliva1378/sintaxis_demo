@@ -112,7 +112,7 @@ async def extraer_expedientes_completos(
         # Esperar a que cambie el tbody (evita loops)
         try:
             await page.wait_for_function(
-                """(sel, prev, maxLen) => {
+                """({ sel, prev, maxLen }) => {
                     const el = document.querySelector(sel);
                     if (!el) return false;
                     const html = el.innerHTML ?? "";
@@ -120,7 +120,7 @@ async def extraer_expedientes_completos(
                     const truncated = maxLen == null ? signature : signature.slice(0, maxLen);
                     return truncated !== prev;
                 }""",
-                arg=(sel_tbody, antes, _FP_MAX_LEN),
+                arg={"sel": sel_tbody, "prev": antes, "maxLen": _FP_MAX_LEN},
                 timeout=12_000
             )
         except PlaywrightTimeoutError:
