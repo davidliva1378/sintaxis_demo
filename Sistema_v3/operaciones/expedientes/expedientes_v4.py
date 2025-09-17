@@ -36,9 +36,9 @@ def _build_fingerprint(html: str, max_len: int | None = _FP_MAX_LEN) -> str:
     return signature[:max_len]
 
 
-async def _tbody_fingerprint(page: Page) -> str:
+async def _tbody_fingerprint(page: Page, sel_tbody: str = SEL_TBODY) -> str:
     """Crea un fingerprint simple del tbody para detectar cambio de página."""
-    html = await page.locator(SEL_TBODY).inner_html()
+    html = await page.locator(sel_tbody).inner_html()
     return _build_fingerprint(html)
 
 async def extraer_expedientes_completos(
@@ -61,6 +61,8 @@ async def extraer_expedientes_completos(
     ]
     """
     resultados: list[dict] = []
+
+    sel_tbody = f"{sel_tabla} tbody"
 
     # Aseguramos presencia de tabla
     tabla = page.locator(sel_tabla)
@@ -99,7 +101,7 @@ async def extraer_expedientes_completos(
             break  # no hay control de siguiente
 
         # Fingerprint antes del click para confirmar cambio real
-        antes = await _tbody_fingerprint(page)
+        antes = await _tbody_fingerprint(page, sel_tbody=sel_tbody)
         try:
             await next_btn.first.click()
         except Exception:
@@ -116,7 +118,7 @@ async def extraer_expedientes_completos(
                     const truncated = maxLen == null ? signature : signature.slice(0, maxLen);
                     return truncated !== prev;
                 }""",
-                arg=(SEL_TBODY, antes, _FP_MAX_LEN),
+                arg=(sel_tbody, antes, _FP_MAX_LEN),
                 timeout=12_000
             )
         except PlaywrightTimeoutError:
