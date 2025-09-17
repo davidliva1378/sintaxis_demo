@@ -26,10 +26,20 @@ def _norm_fecha(s: str) -> str:
     except ValueError:
         return s  # por si viene algo raro
 
+_FP_MAX_LEN = 4_096
+
+
+def _build_fingerprint(html: str, max_len: int | None = _FP_MAX_LEN) -> str:
+    signature = f"{len(html)}::{html}"
+    if max_len is None:
+        return signature
+    return signature[:max_len]
+
+
 async def _tbody_fingerprint(page: Page) -> str:
     """Crea un fingerprint simple del tbody para detectar cambio de página."""
     html = await page.locator(SEL_TBODY).inner_html()
-    return f"{len(html)}::{hash(html)}"
+    return _build_fingerprint(html)
 
 async def extraer_expedientes_completos(
     page: Page,
@@ -98,14 +108,15 @@ async def extraer_expedientes_completos(
         # Esperar a que cambie el tbody (evita loops)
         try:
             await page.wait_for_function(
-                """(sel, prev) => {
+                """(sel, prev, maxLen) => {
                     const el = document.querySelector(sel);
                     if (!el) return false;
-                    const html = el.innerHTML;
-                    const fp = String(html.length) + '::' + String(html);
-                    return fp.substring(0,300) !== prev.substring(0,300);
+                    const html = el.innerHTML ?? "";
+                    const signature = String(html.length) + '::' + html;
+                    const truncated = maxLen == null ? signature : signature.slice(0, maxLen);
+                    return truncated !== prev;
                 }""",
-                arg=(SEL_TBODY, antes),
+                arg=(SEL_TBODY, antes, _FP_MAX_LEN),
                 timeout=12_000
             )
         except PlaywrightTimeoutError:
