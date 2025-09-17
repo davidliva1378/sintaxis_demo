@@ -8,6 +8,7 @@ SEL_TBODY = f"{SEL_TABLA} tbody"
 # Varios selectores posibles de "Siguiente" (ajustá según tu portal)
 SEL_SIGUIENTE = (
     "a[aria-label='Siguiente'], button[aria-label='Siguiente'], "
+    "a:has(span[title='Siguiente']), button:has(span[title='Siguiente']), "
     ".pagination li.next:not(.disabled) a, .pagination a:has-text('Siguiente'), "
     ".rf-ds-btn-next"
 )
@@ -97,7 +98,8 @@ async def extraer_expedientes_completos(
             break
 
         next_btn = page.locator(sel_siguiente)
-        if await next_btn.count() == 0:
+        btn_count = await next_btn.count()
+        if btn_count <= 0:
             break  # no hay control de siguiente
 
         # Fingerprint antes del click para confirmar cambio real
