@@ -162,13 +162,11 @@ class AnimatedSplashScreen(QSplashScreen):
         self.animation_phase = "complete"
         self.repaint_timer.stop()
         self.update()
-        QTimer.singleShot(500, self.close_and_quit)
+        self.close_and_quit()
 
     def close_and_quit(self):
-        self.close()
-        app = QApplication.instance()
-        if app is not None:
-            app.quit()
+        self.hide()
+        self.animation_complete.emit()
 
     # ---------------------- RENDERIZADO ------------------------- #
     def paintEvent(self, event):
@@ -220,6 +218,7 @@ def main():
     splash = AnimatedSplashScreen(width=1200, height=800, cols=50, rows=30)
     splash.show()
     app.processEvents()
+    splash.animation_complete.connect(app.quit)
 
     return app.exec()
 
