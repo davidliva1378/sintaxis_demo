@@ -181,8 +181,12 @@ class AnimatedSplashScreen(QSplashScreen):
 
         # Métricas para centrado vertical/horizontal
         painter.setFont(self.font)
-        fm = QFontMetrics(self.font)
-        baseline_offset = (self.cell_h - fm.height()) // 2 + fm.ascent()
+        fm_regular = QFontMetrics(self.font)
+        regular_baseline_offset = (
+            (self.cell_h - fm_regular.height()) // 2 + fm_regular.ascent()
+        )
+        fm_bold = None
+        bold_baseline_offset = None
 
         for i, cell in enumerate(self.char_grid):
             if not cell["visible"]:
@@ -194,19 +198,23 @@ class AnimatedSplashScreen(QSplashScreen):
             y = self.grid_y0 + row * self.cell_h
 
             if cell["is_sintaxis"] and self.animation_phase in ("forming", "complete"):
+                if fm_bold is None:
+                    fm_bold = QFontMetrics(self.font_bold)
+                    bold_baseline_offset = (
+                        (self.cell_h - fm_bold.height()) // 2 + fm_bold.ascent()
+                    )
                 painter.setFont(self.font_bold)
                 painter.setPen(QColor(255, 255, 255))
-                fm_b = QFontMetrics(self.font_bold)
-                text_w = fm_b.horizontalAdvance(cell["char"])
+                text_w = fm_bold.horizontalAdvance(cell["char"])
                 tx = x + (self.cell_w - text_w) // 2
-                ty = y + baseline_offset
+                ty = y + bold_baseline_offset
                 painter.drawText(tx, ty, cell["char"])
                 painter.setFont(self.font)
             else:
                 painter.setPen(QColor(255, 255, 255))
-                text_w = fm.horizontalAdvance(cell["char"])
+                text_w = fm_regular.horizontalAdvance(cell["char"])
                 tx = x + (self.cell_w - text_w) // 2
-                ty = y + baseline_offset
+                ty = y + regular_baseline_offset
                 painter.drawText(tx, ty, cell["char"])
 
 
