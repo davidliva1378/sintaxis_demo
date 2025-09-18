@@ -108,9 +108,12 @@ class VerificadorExpedientesV4(QThread):
                 if self.guardar_json:
                     ruta_archivo = self._guardar_resultados(expedientes)
 
+                motivos_exitosos = {"fin_listado", "sin_siguiente", "sin_siguiente_habilitado"}
+                estado_resultado = "completo" if motivo in motivos_exitosos else motivo
+
                 self.resultado.emit(
                     ResultadoExpedientes(
-                        estado="completo" if motivo == "fin_listado" else motivo,
+                        estado=estado_resultado,
                         cantidad=len(expedientes),
                         ruta=str(ruta_archivo) if ruta_archivo else None,
                     )
