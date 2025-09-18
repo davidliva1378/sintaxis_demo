@@ -143,8 +143,23 @@ async def extraer_expedientes_completos(
       ...
     ]
 
-    `sel_tabla` puede utilizar cualquier motor de selectores soportado por
-    Playwright (css=, xpath=, text=, etc.).
+    Parámetros
+    ----------
+    page:
+        Instancia ``Page`` de Playwright ya posicionada en el listado a recorrer.
+    sel_tabla:
+        Selector principal de la tabla de expedientes. Puede usar cualquier
+        motor soportado por Playwright (``css=``, ``xpath=``, ``text=``, etc.).
+        Consultar la tabla de selectores sugeridos en
+        ``DOCUMENTACION_EXPEDIENTES_V4.md`` (sección "Selectores Configurables").
+    sel_siguiente:
+        Cadena con uno o varios selectores del control "Siguiente" separados
+        por comas. El valor por defecto incluye las variantes descritas en la
+        documentación citada previamente.
+    max_paginas:
+        Número máximo de páginas a procesar antes de detener la extracción.
+        Al alcanzarse se retorna el motivo ``"limite_paginas"``. El valor por
+        defecto es ``200``.
 
     Parámetros opcionales
     ---------------------
@@ -152,22 +167,26 @@ async def extraer_expedientes_completos(
         Fecha mínima (inclusive) en formato ``YYYY-MM-DD`` o ``DD/MM/AAAA``.
         Cuando la columna ``ultima_actuacion`` cae por debajo de este umbral se
         finaliza la extracción inmediatamente y se retorna el motivo
-        ``"limite_fecha"``.
+        ``"limite_fecha"``. Su valor por defecto es ``None`` (sin límite).
     tiempo_maximo_segundos:
         Límite máximo de duración del scraping. Al superarse se devuelve lo
-        acumulado hasta el momento con motivo ``"limite_tiempo"``.
+        acumulado hasta el momento con motivo ``"limite_tiempo"``. Por defecto
+        es ``None`` (sin tope temporal).
     omitir_duplicados:
         Cuando es ``True`` (valor por defecto) evita agregar filas duplicadas
         detectadas a partir de la combinación (``numero``, ``caratula``,
-        ``dependencia``).
+        ``dependencia``). Si es ``False`` conserva todas las filas aun cuando se
+        repitan.
     detener_en_duplicado:
-        Si está activo y se detecta un duplicado, finaliza inmediatamente la
-        extracción devolviendo el motivo ``"duplicado_encontrado"`` junto con lo
-        acumulado hasta el momento.
+        Si está activo (valor por defecto ``True``) y se detecta un duplicado,
+        finaliza inmediatamente la extracción devolviendo el motivo
+        ``"duplicado_encontrado"`` junto con lo acumulado hasta el momento. Con
+        ``False`` continúa el proceso aunque existan repetidos.
     orden:
         Permite reordenar el listado antes de comenzar la extracción.
         Actualmente acepta ``"fecha"``, ``"caratula"``, ``"oficina"`` y
-        ``"situacion"`` (sin distinción entre mayúsculas y minúsculas).
+        ``"situacion"`` (sin distinción entre mayúsculas y minúsculas). Su
+        valor por defecto es ``None`` para conservar el orden original.
 
     Retorna
     -------
