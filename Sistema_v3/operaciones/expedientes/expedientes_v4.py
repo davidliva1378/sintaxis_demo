@@ -84,6 +84,7 @@ async def extraer_expedientes_completos(
     paginas_recorridas = 0
     while True:
         paginas_recorridas += 1
+        print(f"Procesando página {paginas_recorridas}")
 
         # 1) Extraer filas visibles de ESTA página en un solo evaluate
         filas: list[list[str]] = await tabla.evaluate(
