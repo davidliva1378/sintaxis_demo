@@ -3,8 +3,10 @@ from datetime import datetime
 
 from playwright.async_api import (
     ElementHandle,
+    Error,
     Locator,
     Page,
+    TimeoutError,
 )
 
 # --- Config por defecto (ajustables por parámetro) ---
@@ -115,11 +117,31 @@ async def extraer_expedientes_completos(
         if btn_count <= 0:
             break  # no hay control de siguiente
 
+        boton: Locator | None = None
+        for idx in range(btn_count):
+            candidato = next_btn.nth(idx)
+            if await candidato.is_enabled() and await candidato.is_visible():
+                boton = candidato
+                break
+
+        if boton is None:
+            break
+
+        try:
+            await boton.wait_for(state="visible", timeout=10_000)
+        except TimeoutError as exc:
+            print(f"Botón 'Siguiente' no visible: {exc}")
+            break
+
+        if not await boton.is_enabled():
+            break
+
         # Fingerprint antes del click para confirmar cambio real
         antes = await _tbody_fingerprint(tbody_locator)
         try:
-            await next_btn.first.click()
-        except Exception:
+            await boton.click()
+        except (TimeoutError, Error) as exc:
+            print(f"Fallo al hacer clic en 'Siguiente': {exc}")
             break
 
         # Esperar a que cambie el tbody (evita loops)
