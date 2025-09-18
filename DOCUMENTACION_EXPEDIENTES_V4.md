@@ -87,6 +87,7 @@ Sistema_v4/
 async def extraer_expedientes_completos(
     page: Page,
     sel_tabla: str = SEL_TABLA,
+    sel_tbody: str = SEL_TBODY,
     sel_siguiente: str = SEL_SIGUIENTE,
     max_paginas: int = 200,
     omitir_duplicados: bool = True,
@@ -104,6 +105,7 @@ async def extraer_expedientes_completos(
 |-----------|------|-------------|-------------------|
 | `page` | `Page` | Instancia de página de Playwright | **Requerido** |
 | `sel_tabla` | `str` | Selector CSS de la tabla de expedientes | `"table.table-striped"` |
+| `sel_tbody` | `str` | Selector CSS del contenedor de filas (usado como `${sel_tbody} tr`) | `SEL_TBODY` |
 | `sel_siguiente` | `str` | Selector del botón "Siguiente" | Múltiples selectores |
 | `max_paginas` | `int` | Máximo número de páginas a procesar | `200` |
 | `omitir_duplicados` | `bool` | Evitar agregar expedientes duplicados | `True` |
@@ -161,6 +163,9 @@ Convierte valores de ordenamiento legibles a códigos del sistema.
 ```python
 # Selector principal de tabla
 SEL_TABLA = "table.table-striped"
+
+# Selector del contenedor de filas dentro de la tabla
+SEL_TBODY = f"{SEL_TABLA} tbody"
 
 # Múltiples selectores para botón "Siguiente"
 SEL_SIGUIENTE = ", ".join([
