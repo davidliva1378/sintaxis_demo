@@ -13,14 +13,16 @@ from playwright.async_api import (
 SEL_TABLA = "table.table-striped"
 SEL_TBODY = f"{SEL_TABLA} tbody"
 # Varios selectores posibles de "Siguiente" (ajustá según tu portal)
-SEL_SIGUIENTE = (
-    "a[aria-label='Siguiente'], "
-    "button[aria-label='Siguiente'], "
-    "a:has(span[title='Siguiente']), "
-    "button:has(span[title='Siguiente']), "
-    ".pagination li.next:not(.disabled) a, "
-    ".pagination a:has-text('Siguiente'), "
-    ".rf-ds-btn-next"
+SEL_SIGUIENTE = ", ".join(
+    [
+        "a[aria-label='Siguiente']",
+        "button[aria-label='Siguiente']",
+        "a:has(span[title='Siguiente'])",
+        "button:has(span[title='Siguiente'])",
+        ".pagination li.next:not(.disabled) a",
+        ".pagination a:has-text('Siguiente')",
+        ".rf-ds-btn-next",
+    ]
 )
 
 def _norm_fecha(s: str) -> str:
