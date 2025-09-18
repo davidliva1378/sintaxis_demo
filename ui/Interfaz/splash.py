@@ -2,6 +2,7 @@
 import sys
 import random
 import string
+from collections import deque
 
 from PySide6.QtCore import Qt, QTimer, Signal, QRect
 from PySide6.QtGui import (
@@ -90,7 +91,7 @@ class AnimatedSplashScreen(QSplashScreen):
         self.repaint_timer.start(16)  # ~60fps
 
         # Desaparición fluida (un solo timer + cola)
-        self.indices_to_disappear = []
+        self.indices_to_disappear = deque()
         self.disappear_timer = QTimer(self)
         self.disappear_timer.timeout.connect(self.on_disappear_tick)
         self.disappear_interval_ms = 14  # ajustable 10–20ms
@@ -132,7 +133,7 @@ class AnimatedSplashScreen(QSplashScreen):
             QTimer.singleShot(500, self.start_forming_sintaxis)
             return
 
-        idx = self.indices_to_disappear.pop(0)
+        idx = self.indices_to_disappear.popleft()
         self.char_grid[idx]["visible"] = False
         self.disappeared_count += 1
         self.update()
