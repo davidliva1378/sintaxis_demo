@@ -5,7 +5,6 @@ from playwright.async_api import (
     ElementHandle,
     Locator,
     Page,
-    TimeoutError as PlaywrightTimeoutError,
 )
 
 # --- Config por defecto (ajustables por parámetro) ---
@@ -123,22 +122,22 @@ async def extraer_expedientes_completos(
             break
 
         # Esperar a que cambie el tbody (evita loops)
-        try:
-            tbody_handle = await tbody_locator.element_handle()
-            if tbody_handle is None:
+        max_wait_ms = 12_000
+        poll_interval_ms = 400
+        elapsed_ms = 0
+        fingerprint_cambio = False
+        while elapsed_ms < max_wait_ms:
+            despues = await _tbody_fingerprint(tbody_locator)
+            if despues != antes:
+                fingerprint_cambio = True
                 break
-            await page.wait_for_function(
-                """({ tbody, prev, maxLen }) => {
-                    if (!tbody) return false;
-                    const html = tbody.innerHTML ?? "";
-                    const signature = String(html.length) + '::' + html;
-                    const truncated = maxLen == null ? signature : signature.slice(0, maxLen);
-                    return truncated !== prev;
-                }""",
-                arg={"tbody": tbody_handle, "prev": antes, "maxLen": _FP_MAX_LEN},
-                timeout=12_000
-            )
-        except PlaywrightTimeoutError:
+            wait_time = min(poll_interval_ms, max_wait_ms - elapsed_ms)
+            if wait_time <= 0:
+                break
+            await page.wait_for_timeout(wait_time)
+            elapsed_ms += wait_time
+
+        if not fingerprint_cambio:
             # No cambió el contenido → estamos al final
             break
 
