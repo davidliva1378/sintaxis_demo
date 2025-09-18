@@ -44,6 +44,48 @@ def _build_fingerprint(html: str, max_len: int | None = _FP_MAX_LEN) -> str:
     return signature[:max_len]
 
 
+_FORM_CONTROL_TAGS = {
+    "button",
+    "input",
+    "select",
+    "textarea",
+    "option",
+    "optgroup",
+}
+
+
+async def _is_locator_enabled(locator: Locator) -> bool:
+    """Determina si un locator corresponde a un control habilitado."""
+
+    try:
+        tag_name = await locator.evaluate("el => el.tagName.toLowerCase()")
+    except Error:
+        return False
+
+    if tag_name in _FORM_CONTROL_TAGS:
+        try:
+            return await locator.is_enabled()
+        except Error:
+            pass
+
+    try:
+        aria_disabled = (await locator.get_attribute("aria-disabled")) or ""
+        if aria_disabled.strip().lower() in {"true", "1"}:
+            return False
+
+        if await locator.get_attribute("disabled") is not None:
+            return False
+
+        class_attr = (await locator.get_attribute("class")) or ""
+    except Error:
+        return False
+
+    if re.search(r"\\bdisabled\\b", class_attr, re.IGNORECASE):
+        return False
+
+    return True
+
+
 async def _tbody_fingerprint(tbody: Locator | ElementHandle) -> str:
     """
     Crea un fingerprint simple del tbody para detectar cambio de página.
@@ -120,7 +162,7 @@ async def extraer_expedientes_completos(
         boton: Locator | None = None
         for idx in range(btn_count):
             candidato = next_btn.nth(idx)
-            if await candidato.is_enabled() and await candidato.is_visible():
+            if await _is_locator_enabled(candidato) and await candidato.is_visible():
                 boton = candidato
                 break
 
@@ -133,7 +175,7 @@ async def extraer_expedientes_completos(
             print(f"Botón 'Siguiente' no visible: {exc}")
             break
 
-        if not await boton.is_enabled():
+        if not await _is_locator_enabled(boton):
             break
 
         # Fingerprint antes del click para confirmar cambio real
