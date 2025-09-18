@@ -107,6 +107,8 @@ async def extraer_expedientes_completos(
     sel_tabla: str = SEL_TABLA,
     sel_siguiente: str = SEL_SIGUIENTE,
     max_paginas: int = 200,
+    omitir_duplicados: bool = True,
+    detener_en_duplicado: bool = True,
     *,
     fecha_corte: str | None = None,
     tiempo_maximo_segundos: int | None = None,
@@ -137,6 +139,14 @@ async def extraer_expedientes_completos(
     tiempo_maximo_segundos:
         Límite máximo de duración del scraping. Al superarse se devuelve lo
         acumulado hasta el momento con motivo ``"limite_tiempo"``.
+    omitir_duplicados:
+        Cuando es ``True`` (valor por defecto) evita agregar filas duplicadas
+        detectadas a partir de la combinación (``numero``, ``caratula``,
+        ``dependencia``).
+    detener_en_duplicado:
+        Si está activo y se detecta un duplicado, finaliza inmediatamente la
+        extracción devolviendo el motivo ``"duplicado_encontrado"`` junto con lo
+        acumulado hasta el momento.
 
     Retorna
     -------
@@ -153,8 +163,10 @@ async def extraer_expedientes_completos(
         * ``"siguiente_timeout"``: el botón "Siguiente" no apareció a tiempo.
         * ``"siguiente_deshabilitado"``: el botón se deshabilitó al intentar usarlo.
         * ``"error_click"``: falló el clic en "Siguiente".
+        * ``"duplicado_encontrado"``: se detectó un expediente repetido.
     """
     resultados: list[dict] = []
+    huellas: set[tuple[str, str, str]] = set()
 
     fecha_corte_dt: datetime | None = None
     if fecha_corte:
@@ -209,13 +221,29 @@ async def extraer_expedientes_completos(
                 except ValueError:
                     ultima_dt = None
 
+            numero = cols[0]
+            dependencia = cols[1]
+            caratula = cols[2]
+
+            huella = (numero, caratula, dependencia)
+            duplicado = huella in huellas
+
+            if duplicado and detener_en_duplicado:
+                return resultados, "duplicado_encontrado"
+
             if fecha_corte_dt and ultima_dt and ultima_dt < fecha_corte_dt:
                 return resultados, "limite_fecha"
 
+            if duplicado and omitir_duplicados:
+                continue
+
+            if not duplicado:
+                huellas.add(huella)
+
             resultados.append({
-                "numero":           cols[0],
-                "dependencia":      cols[1],
-                "caratula":         cols[2],
+                "numero":           numero,
+                "dependencia":      dependencia,
+                "caratula":         caratula,
                 "situacion":        cols[3],
                 "ultima_actuacion": ultima_actuacion_norm,
             })
