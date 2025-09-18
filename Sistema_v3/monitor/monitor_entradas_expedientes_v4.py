@@ -104,7 +104,8 @@ class VerificadorExpedientesV4(QThread):
 
                 await page.goto(URL_CONSULTAS)
                 expedientes, motivo = await extraer_expedientes_completos(
-                    page, orden="fecha"
+                    page, orden="fecha",
+                    fecha_corte="2025-09-15"
                 )
 
                 ruta_archivo: Path | None = None
