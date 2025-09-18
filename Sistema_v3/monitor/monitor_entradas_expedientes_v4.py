@@ -58,6 +58,7 @@ class ResultadoExpedientes:
     cantidad: int | None = None
     ruta: str | None = None
     error: str | None = None
+    motivo: str | None = None
 
 
 CONFIG_PATH = Path("config/config_monitor.json")
@@ -110,7 +111,15 @@ class VerificadorExpedientesV4(QThread):
                 if self.guardar_json:
                     ruta_archivo = self._guardar_resultados(expedientes)
 
-                motivos_exitosos = {"fin_listado", "sin_siguiente", "sin_siguiente_habilitado"}
+                motivos_exitosos = {
+                    "fin_listado",
+                    "sin_siguiente",
+                    "sin_siguiente_habilitado",
+                    "limite_fecha",
+                    "limite_paginas",
+                    "limite_tiempo",
+                    "duplicado_encontrado",
+                }
                 estado_resultado = "completo" if motivo in motivos_exitosos else motivo
 
                 self.resultado.emit(
@@ -118,6 +127,7 @@ class VerificadorExpedientesV4(QThread):
                         estado=estado_resultado,
                         cantidad=len(expedientes),
                         ruta=str(ruta_archivo) if ruta_archivo else None,
+                        motivo=motivo,
                     )
                 )
         except Exception as exc:  # pragma: no cover - logging de errores
@@ -248,11 +258,20 @@ class MonitorExpedientesTray:
     def procesar_resultado_expedientes(self, datos: ResultadoExpedientes) -> None:
         mensajes = {
             "completo": "✅ Extracción finalizada exitosamente.",
+            "limite_fecha": "✅ Extracción detenida en la fecha límite.",
+            "limite_paginas": "✅ Extracción detenida al alcanzar el máximo de páginas configurado.",
+            "limite_tiempo": "✅ Extracción detenida al alcanzar el límite de tiempo configurado.",
+            "duplicado_encontrado": "✅ Extracción detenida tras detectar un expediente duplicado.",
             "fallo": "❌ Fallo en la verificación.",
         }
 
         registrar_log(f"📦 Estado: {datos.estado}")
         registrar_log(mensajes.get(datos.estado, "❓ Estado no reconocido."))
+
+        if datos.motivo and datos.motivo != datos.estado:
+            mensaje_motivo = mensajes.get(datos.motivo)
+            if mensaje_motivo:
+                registrar_log(mensaje_motivo)
 
         if datos.cantidad is not None:
             registrar_log(f"📊 Total extraídos: {datos.cantidad}")
