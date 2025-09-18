@@ -466,6 +466,8 @@ Función principal de extracción de expedientes.
 **Parámetros:**
 - `page: Page` - Página de Playwright
 - `sel_tabla: str` - Selector de tabla
+- `sel_tbody: str` - Selector del cuerpo de la tabla (se usa como `${sel_tbody} tr`).
+  Si el DOM no posee un `<tbody>` estándar, pasá aquí el nodo contenedor de las filas.
 - `sel_siguiente: str` - Selector botón siguiente
 - `max_paginas: int` - Límite de páginas
 - `omitir_duplicados: bool` - Evitar duplicados
@@ -502,8 +504,11 @@ Hilo de verificación de expedientes.
 ```python
 # Selectores por defecto
 SEL_TABLA = "table.table-striped"
-SEL_TBODY = f"{SEL_TABLA} tbody"
+SEL_TBODY = f"{SEL_TABLA} tbody"  # Valor por defecto para el parámetro sel_tbody
 SEL_SIGUIENTE = "..." # Múltiples selectores
+
+# Para portales sin `<tbody>` clásico podés redefinir sel_tbody, por ejemplo:
+# sel_tbody = ".tabla-resultados .filas"
 
 # Mapeo de ordenamiento
 _ORDEN_MAP = {
