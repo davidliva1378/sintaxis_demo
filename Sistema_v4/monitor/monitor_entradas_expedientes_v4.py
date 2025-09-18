@@ -58,6 +58,7 @@ class ResultadoExpedientes:
     cantidad: int | None = None
     ruta: str | None = None
     error: str | None = None
+    motivo: str | None = None
 
 
 CONFIG_PATH = Path("config/config_monitor.json")
@@ -110,11 +111,20 @@ class VerificadorExpedientesV4(QThread):
                 if self.guardar_json:
                     ruta_archivo = self._guardar_resultados(expedientes)
 
+                motivos_exitosos = {
+                    "fin_listado": "completo",
+                    "limite_fecha": "corte_controlado",
+                    "limite_tiempo": "corte_controlado",
+                    "limite_paginas": "corte_controlado",
+                }
+                estado_normalizado = motivos_exitosos.get(motivo, motivo)
+
                 self.resultado.emit(
                     ResultadoExpedientes(
-                        estado="completo" if motivo == "fin_listado" else motivo,
+                        estado=estado_normalizado,
                         cantidad=len(expedientes),
                         ruta=str(ruta_archivo) if ruta_archivo else None,
+                        motivo=motivo,
                     )
                 )
         except Exception as exc:  # pragma: no cover - logging de errores
@@ -245,11 +255,20 @@ class MonitorExpedientesTray:
     def procesar_resultado_expedientes(self, datos: ResultadoExpedientes) -> None:
         mensajes = {
             "completo": "✅ Extracción finalizada exitosamente.",
+            "corte_controlado": "✅ Extracción detenida por corte planificado ({motivo}).",
             "fallo": "❌ Fallo en la verificación.",
         }
 
         registrar_log(f"📦 Estado: {datos.estado}")
-        registrar_log(mensajes.get(datos.estado, "❓ Estado no reconocido."))
+        mensaje_estado = mensajes.get(datos.estado, "❓ Estado no reconocido.")
+        try:
+            mensaje_estado = mensaje_estado.format(
+                motivo=datos.motivo or "motivo no especificado"
+            )
+        except (KeyError, IndexError, ValueError):
+            # El mensaje no requiere formateo o incluye llaves incompatibles.
+            pass
+        registrar_log(mensaje_estado)
 
         if datos.cantidad is not None:
             registrar_log(f"📊 Total extraídos: {datos.cantidad}")
@@ -262,7 +281,9 @@ class MonitorExpedientesTray:
         if datos.error:
             registrar_log(f"🛑 Error: {datos.error}")
 
-        if datos.estado != "completo":
+        estados_exitosos = {"completo", "corte_controlado"}
+
+        if datos.estado not in estados_exitosos:
             self.reintentos_expedientes += 1
             if self.reintentos_expedientes < 5:
                 registrar_log(
