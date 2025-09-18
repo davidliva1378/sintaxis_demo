@@ -51,7 +51,7 @@ La función siempre devuelve una tupla `(expedientes, motivo)`:
 | --- | --- | --- |
 | `SEL_TABLA` | ``"table.table-striped"`` | Identifica la tabla principal del listado. |
 | `SEL_TBODY` | ``f"{SEL_TABLA} tbody"`` | Selecciona el cuerpo de filas dentro de la tabla. |
-| `SEL_SIGUIENTE` | Cadena con varios selectores posibles (`a[aria-label='Siguiente']`, `button[aria-label='Siguiente']`, etc.) | Ubica el control que avanza el paginado. |
+| `SEL_SIGUIENTE` | `a[aria-label='Siguiente']`<br>`button[aria-label='Siguiente']`<br>`a:has(span[title='Siguiente'])`<br>`button:has(span[title='Siguiente'])`<br>`.pagination li.next:not(.disabled) a`<br>`.pagination a:has-text('Siguiente')`<br>`.rf-ds-btn-next` | Ubica el control que avanza el paginado. |
 
 Los portales que utilicen otros selectores pueden ajustar el comportamiento de dos formas:
 
