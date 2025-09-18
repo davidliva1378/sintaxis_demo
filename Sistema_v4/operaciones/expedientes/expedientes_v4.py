@@ -146,6 +146,28 @@ async def extraer_expedientes_completos(
     `sel_tabla` puede utilizar cualquier motor de selectores soportado por
     Playwright (css=, xpath=, text=, etc.).
 
+    Selectores por defecto
+    ----------------------
+    ==================  =========================  =====================================
+    Constante           Valor por defecto          Propósito
+    ==================  =========================  =====================================
+    ``SEL_TABLA``       ``"table.table-striped"``  Tabla principal del listado.
+    ``SEL_TBODY``       ``f"{SEL_TABLA} tbody"``   Cuerpo de la tabla con las filas.
+    ``SEL_SIGUIENTE``   Cadena con múltiples       Control que avanza a la página
+                        selectores                 siguiente del paginado.
+    ==================  =========================  =====================================
+
+    Parámetros posicionales
+    -----------------------
+    page (Page):
+        Página de Playwright ya posicionada sobre el listado de expedientes.
+    sel_tabla (str, predeterminado=``SEL_TABLA``):
+        Selector del elemento ``<table>`` que contiene el paginado de expedientes.
+    sel_siguiente (str, predeterminado=``SEL_SIGUIENTE``):
+        Selector (o conjunto de selectores) para ubicar el control "Siguiente".
+    max_paginas (int, predeterminado=``200``):
+        Límite máximo de páginas a recorrer antes de abortar la extracción.
+
     Parámetros opcionales
     ---------------------
     fecha_corte:
@@ -172,8 +194,9 @@ async def extraer_expedientes_completos(
     Retorna
     -------
     tuple[list[dict], str]
-        La lista de expedientes junto con un código que indica por qué se
-        detuvo el recorrido. Los posibles valores actuales son:
+        Una tupla ``(expedientes, motivo)`` donde ``expedientes`` es la lista de
+        diccionarios extraídos y ``motivo`` el código de finalización. Los
+        códigos actuales son:
 
         * ``"fin_listado"``: se alcanzó el final natural del paginado.
         * ``"limite_paginas"``: se alcanzó ``max_paginas``.
