@@ -121,6 +121,7 @@ async def _tbody_fingerprint(tbody: Locator | ElementHandle) -> str:
 async def extraer_expedientes_completos(
     page: Page,
     sel_tabla: str = SEL_TABLA,
+    sel_tbody: str = SEL_TBODY,
     sel_siguiente: str = SEL_SIGUIENTE,
     max_paginas: int = 200,
     omitir_duplicados: bool = True,
@@ -152,7 +153,9 @@ async def extraer_expedientes_completos(
     Constante           Valor por defecto          Propósito
     ==================  =========================  =====================================
     ``SEL_TABLA``       ``"table.table-striped"``  Tabla principal del listado.
-    ``SEL_TBODY``       ``f"{SEL_TABLA} tbody"``   Cuerpo de la tabla con las filas.
+    ``SEL_TBODY``       ``f"{SEL_TABLA} tbody"``   Valor por defecto del parámetro
+                                                ``sel_tbody``; apunta al cuerpo de la
+                                                tabla desde donde se leen las filas.
     ``SEL_SIGUIENTE``   Cadena con múltiples       Control que avanza a la página
                         selectores                 siguiente del paginado.
     ==================  =========================  =====================================
@@ -163,6 +166,10 @@ async def extraer_expedientes_completos(
         Página de Playwright ya posicionada sobre el listado de expedientes.
     sel_tabla (str, predeterminado=``SEL_TABLA``):
         Selector del elemento ``<table>`` que contiene el paginado de expedientes.
+    sel_tbody (str, predeterminado=``SEL_TBODY``):
+        Selector (CSS) del contenedor que agrupa las filas dentro de la tabla. Se
+        utiliza para ubicar las filas como ``f"{sel_tbody} tr"``. Si el listado no
+        utiliza ``<tbody>``, ajustá este selector al nodo que contenga las filas.
     sel_siguiente (str, predeterminado=``SEL_SIGUIENTE``):
         Selector (o conjunto de selectores) para ubicar el control "Siguiente".
     max_paginas (int, predeterminado=``200``):
@@ -257,7 +264,7 @@ async def extraer_expedientes_completos(
             except Error as exc:
                 print(f"⚠️ No se pudo reordenar la tabla por {orden}: {exc}")
 
-    tbody_locator = tabla.locator("tbody")
+    tbody_locator = page.locator(sel_tbody)
 
     paginas_recorridas = 0
     while True:
@@ -268,11 +275,12 @@ async def extraer_expedientes_completos(
         print(f"Procesando página {paginas_recorridas}")
 
         # 1) Extraer filas visibles de ESTA página en un solo evaluate
-        filas: list[list[str]] = await tabla.evaluate(
-            """table => Array.from(
-                   table.querySelectorAll('tbody tr'),
-                   tr => Array.from(tr.cells, c => c.innerText.trim())
-               )"""
+        filas: list[list[str]] = await page.evaluate(
+            """(tbodySelector) => Array.from(
+                    document.querySelectorAll(`${tbodySelector} tr`),
+                    tr => Array.from(tr.cells, c => c.innerText.trim())
+                )""",
+            sel_tbody,
         )
 
         # 2) Mapear a dicts usando las 5 columnas útiles
