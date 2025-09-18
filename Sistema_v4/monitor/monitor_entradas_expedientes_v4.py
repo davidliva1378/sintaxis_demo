@@ -102,7 +102,9 @@ class VerificadorExpedientesV4(QThread):
                     return
 
                 await page.goto(URL_CONSULTAS)
-                expedientes, motivo = await extraer_expedientes_completos(page)
+                expedientes, motivo = await extraer_expedientes_completos(
+                    page, orden="fecha"
+                )
 
                 ruta_archivo: Path | None = None
                 if self.guardar_json:
