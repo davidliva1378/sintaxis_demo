@@ -25,12 +25,31 @@ try:
 except ImportError:  # pragma: no cover - ejecución directa
     from icono_base64 import ICONO_BASE64
 
-from Sistema_v3.config.urls_pjn import URL_CONSULTAS
-from Sistema_v3.operaciones.expedientes.expedientes_v4 import (
-    extraer_expedientes_completos,
-)
-from Sistema_v3.utils.logging import registrar_log
-from Sistema_v3.web.auto_login import reutilizar_sesion_async
+try:  # Importa primero desde la nueva arquitectura (Sistema_v4)
+    from Sistema_v4.config.urls_pjn import URL_CONSULTAS  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover - compatibilidad con Sistema_v3
+    from Sistema_v3.config.urls_pjn import URL_CONSULTAS
+
+try:
+    from Sistema_v4.operaciones.expedientes.expedientes_v4 import (  # type: ignore[import-not-found]
+        extraer_expedientes_completos,
+    )
+except ImportError:  # pragma: no cover - compatibilidad con Sistema_v3
+    from Sistema_v3.operaciones.expedientes.expedientes_v4 import (
+        extraer_expedientes_completos,
+    )
+
+try:
+    from Sistema_v4.utils.logging import registrar_log  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover - compatibilidad con Sistema_v3
+    from Sistema_v3.utils.logging import registrar_log
+
+try:
+    from Sistema_v4.web.auto_login import (  # type: ignore[import-not-found]
+        reutilizar_sesion_async,
+    )
+except ImportError:  # pragma: no cover - compatibilidad con Sistema_v3
+    from Sistema_v3.web.auto_login import reutilizar_sesion_async
 
 
 @dataclass
