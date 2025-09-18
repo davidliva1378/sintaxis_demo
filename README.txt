@@ -26,3 +26,8 @@
    setx PJN_PASSWORD "tu_clave"
 
    Luego cerrá y abrí de nuevo la terminal para que los valores se apliquen.
+
+🗂️ DOCUMENTACIÓN DEL SISTEMA V4
+
+- Toda la documentación nueva relacionada con el Sistema V4 debe guardarse en el directorio `Sistema_v4/documentacion/`.
+- Utilizá el archivo `Sistema_v4/documentacion/README.md` como guía para el formato y convenciones de los documentos futuros.
