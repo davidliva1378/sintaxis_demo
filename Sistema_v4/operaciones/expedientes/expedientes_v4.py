@@ -26,6 +26,22 @@ SEL_SIGUIENTE = ", ".join(
     ]
 )
 
+_ORDEN_MAP = {
+    "fecha": "FECHA",
+    "caratula": "CARATULA",
+    "oficina": "OFICINA",
+    "situacion": "SITUACION",
+}
+
+_SEL_ORDEN_SELECT = "#j_idt150\\:order_by_form\\:camara"
+_SEL_ORDENAR_LINK = "a:has-text('Ordenar')"
+
+
+def _resolver_valor_orden(orden: str | None) -> str | None:
+    if not orden:
+        return None
+    return _ORDEN_MAP.get(orden.lower())
+
 def _norm_fecha(s: str) -> str:
     """Convierte dd/mm/yyyy o d/m/yyyy a YYYY-MM-DD. Si no matchea, devuelve original."""
     s = (s or "").strip()
@@ -112,6 +128,7 @@ async def extraer_expedientes_completos(
     *,
     fecha_corte: str | None = None,
     tiempo_maximo_segundos: int | None = None,
+    orden: str | None = None,
 ) -> tuple[list[dict], str]:
     """
     Extrae TODAS las páginas del listado de expedientes y devuelve:
@@ -147,6 +164,10 @@ async def extraer_expedientes_completos(
         Si está activo y se detecta un duplicado, finaliza inmediatamente la
         extracción devolviendo el motivo ``"duplicado_encontrado"`` junto con lo
         acumulado hasta el momento.
+    orden:
+        Permite reordenar el listado antes de comenzar la extracción.
+        Actualmente acepta ``"fecha"``, ``"caratula"``, ``"oficina"`` y
+        ``"situacion"`` (sin distinción entre mayúsculas y minúsculas).
 
     Retorna
     -------
@@ -189,6 +210,30 @@ async def extraer_expedientes_completos(
     # Aseguramos presencia de tabla
     tabla = page.locator(sel_tabla)
     await tabla.wait_for(state="visible", timeout=25_000)
+
+    if orden:
+        valor_orden = _resolver_valor_orden(orden)
+        if not valor_orden:
+            print(
+                f"⚠️ Valor de orden desconocido ({orden}). Se mantiene el orden actual."
+            )
+        else:
+            try:
+                await page.select_option(_SEL_ORDEN_SELECT, value=valor_orden)
+                await page.locator(_SEL_ORDENAR_LINK).click()
+                try:
+                    await tabla.wait_for(state="hidden", timeout=5_000)
+                except TimeoutError:
+                    pass
+                await tabla.wait_for(state="visible", timeout=25_000)
+                print(f"🔽 Tabla ordenada por {orden.upper()}")
+            except TimeoutError as exc:
+                print(
+                    f"⚠️ El reordenamiento por {orden} no se completó a tiempo: {exc}"
+                )
+            except Error as exc:
+                print(f"⚠️ No se pudo reordenar la tabla por {orden}: {exc}")
+
     tbody_locator = tabla.locator("tbody")
 
     paginas_recorridas = 0
