@@ -14,9 +14,12 @@ SEL_TABLA = "table.table-striped"
 SEL_TBODY = f"{SEL_TABLA} tbody"
 # Varios selectores posibles de "Siguiente" (ajustá según tu portal)
 SEL_SIGUIENTE = (
-    "a[aria-label='Siguiente'], button[aria-label='Siguiente'], "
-    "a:has(span[title='Siguiente']), button:has(span[title='Siguiente']), "
-    ".pagination li.next:not(.disabled) a, .pagination a:has-text('Siguiente'), "
+    "a[aria-label='Siguiente'], "
+    "button[aria-label='Siguiente'], "
+    "a:has(span[title='Siguiente']), "
+    "button:has(span[title='Siguiente']), "
+    ".pagination li.next:not(.disabled) a, "
+    ".pagination a:has-text('Siguiente'), "
     ".rf-ds-btn-next"
 )
 
