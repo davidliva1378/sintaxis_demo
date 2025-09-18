@@ -1,6 +1,12 @@
 import re
 from datetime import datetime
-from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
+
+from playwright.async_api import (
+    ElementHandle,
+    Locator,
+    Page,
+    TimeoutError as PlaywrightTimeoutError,
+)
 
 # --- Config por defecto (ajustables por parámetro) ---
 SEL_TABLA = "table.table-striped"
@@ -37,9 +43,14 @@ def _build_fingerprint(html: str, max_len: int | None = _FP_MAX_LEN) -> str:
     return signature[:max_len]
 
 
-async def _tbody_fingerprint(page: Page, sel_tbody: str = SEL_TBODY) -> str:
-    """Crea un fingerprint simple del tbody para detectar cambio de página."""
-    html = await page.locator(sel_tbody).inner_html()
+async def _tbody_fingerprint(tbody: Locator | ElementHandle) -> str:
+    """
+    Crea un fingerprint simple del tbody para detectar cambio de página.
+
+    Al recibir directamente el locator/handle podemos usar cualquier motor de
+    selectores soportados por Playwright (css=, xpath=, text=, etc.).
+    """
+    html = await tbody.inner_html()
     return _build_fingerprint(html)
 
 async def extraer_expedientes_completos(
@@ -60,14 +71,16 @@ async def extraer_expedientes_completos(
       },
       ...
     ]
+
+    `sel_tabla` puede utilizar cualquier motor de selectores soportado por
+    Playwright (css=, xpath=, text=, etc.).
     """
     resultados: list[dict] = []
-
-    sel_tbody = f"{sel_tabla} tbody"
 
     # Aseguramos presencia de tabla
     tabla = page.locator(sel_tabla)
     await tabla.wait_for(state="visible", timeout=25_000)
+    tbody_locator = tabla.locator("tbody")
 
     paginas_recorridas = 0
     while True:
@@ -103,7 +116,7 @@ async def extraer_expedientes_completos(
             break  # no hay control de siguiente
 
         # Fingerprint antes del click para confirmar cambio real
-        antes = await _tbody_fingerprint(page, sel_tbody=sel_tbody)
+        antes = await _tbody_fingerprint(tbody_locator)
         try:
             await next_btn.first.click()
         except Exception:
@@ -111,16 +124,18 @@ async def extraer_expedientes_completos(
 
         # Esperar a que cambie el tbody (evita loops)
         try:
+            tbody_handle = await tbody_locator.element_handle()
+            if tbody_handle is None:
+                break
             await page.wait_for_function(
-                """({ sel, prev, maxLen }) => {
-                    const el = document.querySelector(sel);
-                    if (!el) return false;
-                    const html = el.innerHTML ?? "";
+                """({ tbody, prev, maxLen }) => {
+                    if (!tbody) return false;
+                    const html = tbody.innerHTML ?? "";
                     const signature = String(html.length) + '::' + html;
                     const truncated = maxLen == null ? signature : signature.slice(0, maxLen);
                     return truncated !== prev;
                 }""",
-                arg={"sel": sel_tbody, "prev": antes, "maxLen": _FP_MAX_LEN},
+                arg={"tbody": tbody_handle, "prev": antes, "maxLen": _FP_MAX_LEN},
                 timeout=12_000
             )
         except PlaywrightTimeoutError:
