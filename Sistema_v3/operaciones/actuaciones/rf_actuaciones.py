@@ -54,6 +54,7 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
                 archivo_url = None
                 nombre_archivo = None
                 tipo_archivo = None
+                hash_val = generar_hash_archivo(fecha, tipo, detalle)
 
                 icono = await fila.query_selector("i.fa-download")
                 tiene_archivo = bool(icono)
@@ -62,15 +63,21 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
                     link = await page_expediente.evaluate_handle("(el) => el.closest('a')", icono)
                     if link:
                         archivo_url = await link.get_attribute("href")
-                        nombre_archivo = await link.get_attribute("download")
-                        if not nombre_archivo and archivo_url:
-                            parsed = urlparse(archivo_url)
-                            nombre_archivo = parse_qs(parsed.query).get("tipoDoc", ["documento.pdf"])[0]
-                        tipo_archivo = os.path.splitext(nombre_archivo)[1][1:].lower() if nombre_archivo else None
-                        hash_val = generar_hash_archivo(fecha, tipo, detalle)
-                        nombre_archivo = f"{fecha}_{tipo}_{hash_val}.pdf"
-                else:
-                    hash_val = generar_hash_archivo(fecha, tipo, detalle)
+                        if archivo_url:
+                            nombre_archivo = await link.get_attribute("download")
+                            if not nombre_archivo:
+                                parsed = urlparse(archivo_url)
+                                nombre_archivo = parse_qs(parsed.query).get("tipoDoc", ["documento.pdf"])[0]
+                            tipo_archivo = os.path.splitext(nombre_archivo)[1][1:].lower() if nombre_archivo else None
+                            nombre_archivo = f"{fecha}_{tipo}_{hash_val}.pdf"
+                        else:
+                            archivo_url = None
+                            nombre_archivo = None
+                            tipo_archivo = None
+                    else:
+                        archivo_url = None
+                        nombre_archivo = None
+                        tipo_archivo = None
 
                 actuaciones.append({
                     "Indice": len(actuaciones) + 1,
@@ -153,6 +160,7 @@ async def extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_i
             archivo_url = None
             nombre_archivo = None
             tipo_archivo = None
+            hash_val = generar_hash_archivo(fecha, tipo, detalle)
 
             icono = await fila.query_selector("i.fa-download")
             tiene_archivo = bool(icono)
@@ -161,15 +169,21 @@ async def extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_i
                 link = await page_expediente.evaluate_handle("(el) => el.closest('a')", icono)
                 if link:
                     archivo_url = await link.get_attribute("href")
-                    nombre_archivo = await link.get_attribute("download")
-                    if not nombre_archivo and archivo_url:
-                        parsed = urlparse(archivo_url)
-                        nombre_archivo = parse_qs(parsed.query).get("tipoDoc", ["documento.pdf"])[0]
-                    tipo_archivo = os.path.splitext(nombre_archivo)[1][1:].lower() if nombre_archivo else None
-                    hash_val = generar_hash_archivo(fecha, tipo, detalle)
-                    nombre_archivo = f"{fecha}_{tipo}_{hash_val}.pdf"
-            else:
-                hash_val = generar_hash_archivo(fecha, tipo, detalle)
+                    if archivo_url:
+                        nombre_archivo = await link.get_attribute("download")
+                        if not nombre_archivo:
+                            parsed = urlparse(archivo_url)
+                            nombre_archivo = parse_qs(parsed.query).get("tipoDoc", ["documento.pdf"])[0]
+                        tipo_archivo = os.path.splitext(nombre_archivo)[1][1:].lower() if nombre_archivo else None
+                        nombre_archivo = f"{fecha}_{tipo}_{hash_val}.pdf"
+                    else:
+                        archivo_url = None
+                        nombre_archivo = None
+                        tipo_archivo = None
+                else:
+                    archivo_url = None
+                    nombre_archivo = None
+                    tipo_archivo = None
 
             actuaciones.append({
                 "Indice": idx,
