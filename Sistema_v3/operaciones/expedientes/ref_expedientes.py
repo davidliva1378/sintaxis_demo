@@ -169,10 +169,11 @@ async def extraer_datos_expediente(page):
 
 
  #funcion para seleccionar un expedientes desde varias filas
-async def abrir_expediente_desde_fila(fila, page):
+async def abrir_expediente_desde_fila(fila, page) -> Optional[Dict]:
+    """Abre un expediente a partir de la fila provista y devuelve los datos extraídos."""
     if not fila:
         print("❌ No se proporcionó ninguna fila válida.")
-        return False
+        return None
 
     enlace = await fila.query_selector("a")
     if enlace:
@@ -185,13 +186,13 @@ async def abrir_expediente_desde_fila(fila, page):
         datos = await extraer_datos_expediente(page)
         if datos:
             print("✅ Datos del expediente extraídos correctamente.")
-            return True
+            return datos
         else:
             print("⚠️ No se pudieron extraer datos. Posible error de apertura.")
-            return False
+            return None
     else:
         print("⚠️ No se encontró enlace para abrir el expediente en la fila.")
-        return False
+        return None
 
 
 async def mostrar_y_elegir_expediente(page: Page, filas: List) -> Optional[Dict]:
@@ -234,20 +235,14 @@ async def mostrar_y_elegir_expediente(page: Page, filas: List) -> Optional[Dict]
             print("❌ Selección inválida.")
             return None
 
-    # Abrir el expediente seleccionado
-    exito_apertura = await abrir_expediente_desde_fila(fila, page)
-    if not exito_apertura:
+    # Abrir el expediente seleccionado y obtener datos
+    datos = await abrir_expediente_desde_fila(fila, page)
+    if not datos:
         print("⚠️ No se pudo abrir el expediente seleccionado.")
         return None
 
-    # Extraer datos
-    datos = await extraer_datos_expediente(page)
-    if datos:
-        print("✅ Datos extraídos correctamente del expediente.")
-        return datos
-    else:
-        print("⚠️ No se pudieron extraer datos luego de abrir el expediente.")
-        return None
+    print("✅ Datos extraídos correctamente del expediente.")
+    return datos
 
 
 async def buscar_expediente_por_numero(page: Page, numero: str, anio: str, timeout: int = 8000) -> tuple[bool, str]:
