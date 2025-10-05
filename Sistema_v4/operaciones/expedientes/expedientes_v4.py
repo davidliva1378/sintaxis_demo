@@ -27,6 +27,8 @@ SEL_SIGUIENTE = ", ".join(
     ]
 )
 
+EXPEDIENTES_POR_PAGINA = 15
+
 _ORDEN_MAP = {
     "fecha": "FECHA",
     "caratula": "CARATULA",
@@ -259,12 +261,16 @@ async def extraer_expedientes_completos(
     huellas: set[tuple[str, str, str]] = set()
     paginas_visitadas: dict[str, int] = {}
     metadata: dict[str, object] = {}
+    paginas_esperadas: int | None = None
     filas_descartadas = 0
     duplicados_descartados = 0
 
     def _finalizar(motivo: str) -> tuple[list[dict], str, dict[str, object]]:
         metadata["filas_descartadas"] = filas_descartadas
         metadata["duplicados_descartados"] = duplicados_descartados
+        metadata["paginas_recorridas"] = paginas_recorridas
+        if paginas_esperadas is not None:
+            metadata["paginas_esperadas"] = paginas_esperadas
         return resultados, motivo, metadata
 
     fecha_corte_dt: datetime | None = None
@@ -292,6 +298,11 @@ async def extraer_expedientes_completos(
     total_esperado = await _extraer_total_esperado(page)
     if total_esperado is not None:
         metadata["total_esperado"] = total_esperado
+        if isinstance(total_esperado, int):
+            paginas_esperadas = (
+                (total_esperado + EXPEDIENTES_POR_PAGINA - 1)
+                // EXPEDIENTES_POR_PAGINA
+            )
 
     if orden:
         valor_orden = _resolver_valor_orden(orden)
