@@ -3,11 +3,10 @@ from datetime import datetime
 import json
 import os
 import time
-from typing import Optional
 from pathlib import Path
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
 import asyncio
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
 async def extraer_expedientes(
     page: Page,
@@ -288,21 +287,62 @@ async def buscar_expediente_por_numero(page: Page, numero: str, anio: str, timeo
         return False, "error"
 
 
+async def buscar_expedientes_por_caratula(page: Page, caratula: str) -> List:
+    """
+    Realiza la búsqueda de expedientes utilizando únicamente la carátula como criterio.
+
+    Actualmente actúa como punto de extensión: si no se implementa una búsqueda real,
+    devuelve una lista vacía e informa al usuario.
+    """
+
+    if not caratula:
+        print("❌ Debe indicar una carátula válida para utilizar este modo de búsqueda.")
+        return []
+
+    print(
+        "ℹ️ La búsqueda exclusiva por carátula no está automatizada aún. "
+        "Se devuelve una lista vacía para permitir un manejo seguro."
+    )
+    return []
+
+
 
 async def buscar_expedientes(page: Page, numero: Optional[str] = None, anio: Optional[str] = None, caratula: Optional[str] = None) -> List:
     """
-    Busca expedientes en el portal PJN y devuelve una lista de filas encontradas.
+    Busca expedientes en el portal PJN y devuelve las filas encontradas según los filtros.
+
+    Combinaciones admitidas:
+      * ``numero`` + ``anio``: realiza la búsqueda principal en el portal.
+      * ``numero`` + ``anio`` + ``caratula``: filtra los resultados obtenidos por número/año.
+      * Sólo ``caratula``: deriva a ``buscar_expedientes_por_caratula``.
 
     :param page: Página Playwright actual.
-    :param numero: Número de expediente (opcional).
-    :param anio: Año de expediente (opcional).
-    :param caratula: Carátula filtro (opcional).
+    :param numero: Número de expediente (requiere ``anio`` si se especifica).
+    :param anio: Año de expediente (requiere ``numero`` si se especifica).
+    :param caratula: Carátula utilizada como filtro adicional o único criterio.
     :return: Lista de filas (ElementHandle) encontradas.
     """
 
-    if not numero and not caratula:
-        print("❌ Se debe proporcionar al menos un número o una carátula para buscar.")
+    numero = numero.strip() if numero and numero.strip() else None
+    anio = anio.strip() if anio and anio.strip() else None
+    caratula = caratula.strip() if caratula and caratula.strip() else None
+
+    if numero and not anio:
+        print("❌ Para buscar por número debe indicar también el año del expediente.")
         return []
+
+    if anio and not numero:
+        print("❌ Para buscar por año debe indicar también el número del expediente.")
+        return []
+
+    if not numero and not caratula:
+        print(
+            "❌ Debe proporcionar un número y año del expediente o bien una carátula para realizar la búsqueda."
+        )
+        return []
+
+    if not numero and caratula:
+        return await buscar_expedientes_por_caratula(page, caratula)
 
     exito, motivo = await buscar_expediente_por_numero(page, numero, anio)
 
