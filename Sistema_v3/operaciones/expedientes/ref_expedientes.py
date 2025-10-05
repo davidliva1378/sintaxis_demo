@@ -3,11 +3,10 @@ from datetime import datetime
 import json
 import os
 import time
-from typing import Optional
 from pathlib import Path
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
 import asyncio
-from typing import List, Optional, Dict
+from typing import Callable, Dict, List, Optional
 
 async def extraer_expedientes(
     page: Page,
@@ -170,10 +169,11 @@ async def extraer_datos_expediente(page):
 
 
  #funcion para seleccionar un expedientes desde varias filas
-async def abrir_expediente_desde_fila(fila, page):
+async def abrir_expediente_desde_fila(fila, page) -> Optional[Dict]:
+    """Abre un expediente a partir de la fila provista y devuelve los datos extraídos."""
     if not fila:
         print("❌ No se proporcionó ninguna fila válida.")
-        return False
+        return None
 
     enlace = await fila.query_selector("a")
     if enlace:
@@ -186,21 +186,40 @@ async def abrir_expediente_desde_fila(fila, page):
         datos = await extraer_datos_expediente(page)
         if datos:
             print("✅ Datos del expediente extraídos correctamente.")
-            return True
+            return datos
         else:
             print("⚠️ No se pudieron extraer datos. Posible error de apertura.")
-            return False
+            return None
     else:
         print("⚠️ No se encontró enlace para abrir el expediente en la fila.")
-        return False
+        return None
 
 
-async def mostrar_y_elegir_expediente(page: Page, filas: List) -> Optional[Dict]:
+SeleccionEstrategia = Callable[[List[Dict[str, str]]], Optional[int]]
+
+
+def _seleccionar_primera_opcion(opciones: List[Dict[str, str]]) -> Optional[int]:
+    """Estrategia por defecto: selecciona la primera opción disponible."""
+
+    return 0 if opciones else None
+
+
+async def mostrar_y_elegir_expediente(
+    page: Page,
+    filas: List,
+    *,
+    estrategia_seleccion: Optional[SeleccionEstrategia] = None,
+    descripcion_estrategia: Optional[str] = None,
+) -> Optional[Dict]:
     """
     Muestra los expedientes encontrados y permite al usuario seleccionar uno para abrir y extraer datos.
 
     :param page: Página Playwright actual.
     :param filas: Lista de filas encontradas.
+    :param estrategia_seleccion: Callable que recibe la lista de opciones disponibles
+        y devuelve el índice seleccionado (0-based). Si no se indica se utilizará una
+        estrategia automática que elige la primera opción válida.
+    :param descripcion_estrategia: Texto descriptivo del modo o estrategia aplicado.
     :return: Diccionario de datos extraídos del expediente seleccionado, o None.
     """
 
@@ -208,12 +227,23 @@ async def mostrar_y_elegir_expediente(page: Page, filas: List) -> Optional[Dict]
         print("❌ No hay filas disponibles para seleccionar.")
         return None
 
+    descripcion_final = descripcion_estrategia or (
+        "automática" if estrategia_seleccion is None else "personalizada"
+    )
+
     if len(filas) == 1:
-        print("✅ Solo un expediente encontrado. Abriendo directamente...")
+        print(
+            "✅ Solo un expediente encontrado. "
+            f"La estrategia '{descripcion_final}' no es necesaria."
+        )
         fila = filas[0]
     else:
-        print("🔎 Se encontraron múltiples expedientes:")
-        opciones = []
+        print(
+            "🔎 Se encontraron múltiples expedientes. "
+            f"Aplicando estrategia '{descripcion_final}'."
+        )
+        opciones_filas: List = []
+        opciones_datos: List[Dict[str, str]] = []
 
         for idx, fila in enumerate(filas, start=1):
             columnas = await fila.query_selector_all("td")
@@ -221,34 +251,52 @@ async def mostrar_y_elegir_expediente(page: Page, filas: List) -> Optional[Dict]
                 nro = (await columnas[0].inner_text()).strip()
                 anio_fila = (await columnas[1].inner_text()).strip()
                 caratula_fila = (await columnas[2].inner_text()).strip()
-                print(f"[{idx}] Número: {nro} / Año: {anio_fila} / Carátula: {caratula_fila}")
-                opciones.append(fila)
+                print(
+                    f"[{idx}] Número: {nro} / Año: {anio_fila} / Carátula: {caratula_fila}"
+                )
+                opciones_filas.append(fila)
+                opciones_datos.append(
+                    {
+                        "indice": str(idx - 1),
+                        "numero": nro,
+                        "anio": anio_fila,
+                        "caratula": caratula_fila,
+                    }
+                )
 
-        seleccion = input("👉 Ingrese el número de opción que desea abrir (0 para cancelar): ")
-        try:
-            idx_elegido = int(seleccion) - 1
-            if idx_elegido == -1:
-                print("❌ Operación cancelada por el usuario.")
-                return None
-            fila = opciones[idx_elegido]
-        except (ValueError, IndexError):
-            print("❌ Selección inválida.")
+        if not opciones_filas:
+            print("❌ No se pudieron obtener opciones válidas para seleccionar.")
             return None
 
-    # Abrir el expediente seleccionado
-    exito_apertura = await abrir_expediente_desde_fila(fila, page)
-    if not exito_apertura:
+        estrategia = estrategia_seleccion or _seleccionar_primera_opcion
+        indice = estrategia(opciones_datos)
+
+        if indice is None:
+            print(
+                "❌ La estrategia de selección no devolvió ninguna opción válida."
+            )
+            return None
+
+        if not isinstance(indice, int) or indice < 0 or indice >= len(opciones_filas):
+            print(
+                "❌ La estrategia devolvió un índice fuera de rango: "
+                f"{indice} (opciones disponibles: {len(opciones_filas)})."
+            )
+            return None
+
+        print(
+            f"🎯 Estrategia '{descripcion_final}' seleccionó la opción {indice + 1}."
+        )
+        fila = opciones_filas[indice]
+
+    # Abrir el expediente seleccionado y obtener datos
+    datos = await abrir_expediente_desde_fila(fila, page)
+    if not datos:
         print("⚠️ No se pudo abrir el expediente seleccionado.")
         return None
 
-    # Extraer datos
-    datos = await extraer_datos_expediente(page)
-    if datos:
-        print("✅ Datos extraídos correctamente del expediente.")
-        return datos
-    else:
-        print("⚠️ No se pudieron extraer datos luego de abrir el expediente.")
-        return None
+    print("✅ Datos extraídos correctamente del expediente.")
+    return datos
 
 
 async def buscar_expediente_por_numero(page: Page, numero: str, anio: str, timeout: int = 8000) -> tuple[bool, str]:
@@ -288,21 +336,62 @@ async def buscar_expediente_por_numero(page: Page, numero: str, anio: str, timeo
         return False, "error"
 
 
+async def buscar_expedientes_por_caratula(page: Page, caratula: str) -> List:
+    """
+    Realiza la búsqueda de expedientes utilizando únicamente la carátula como criterio.
+
+    Actualmente actúa como punto de extensión: si no se implementa una búsqueda real,
+    devuelve una lista vacía e informa al usuario.
+    """
+
+    if not caratula:
+        print("❌ Debe indicar una carátula válida para utilizar este modo de búsqueda.")
+        return []
+
+    print(
+        "ℹ️ La búsqueda exclusiva por carátula no está automatizada aún. "
+        "Se devuelve una lista vacía para permitir un manejo seguro."
+    )
+    return []
+
+
 
 async def buscar_expedientes(page: Page, numero: Optional[str] = None, anio: Optional[str] = None, caratula: Optional[str] = None) -> List:
     """
-    Busca expedientes en el portal PJN y devuelve una lista de filas encontradas.
+    Busca expedientes en el portal PJN y devuelve las filas encontradas según los filtros.
+
+    Combinaciones admitidas:
+      * ``numero`` + ``anio``: realiza la búsqueda principal en el portal.
+      * ``numero`` + ``anio`` + ``caratula``: filtra los resultados obtenidos por número/año.
+      * Sólo ``caratula``: deriva a ``buscar_expedientes_por_caratula``.
 
     :param page: Página Playwright actual.
-    :param numero: Número de expediente (opcional).
-    :param anio: Año de expediente (opcional).
-    :param caratula: Carátula filtro (opcional).
+    :param numero: Número de expediente (requiere ``anio`` si se especifica).
+    :param anio: Año de expediente (requiere ``numero`` si se especifica).
+    :param caratula: Carátula utilizada como filtro adicional o único criterio.
     :return: Lista de filas (ElementHandle) encontradas.
     """
 
-    if not numero and not caratula:
-        print("❌ Se debe proporcionar al menos un número o una carátula para buscar.")
+    numero = numero.strip() if numero and numero.strip() else None
+    anio = anio.strip() if anio and anio.strip() else None
+    caratula = caratula.strip() if caratula and caratula.strip() else None
+
+    if numero and not anio:
+        print("❌ Para buscar por número debe indicar también el año del expediente.")
         return []
+
+    if anio and not numero:
+        print("❌ Para buscar por año debe indicar también el número del expediente.")
+        return []
+
+    if not numero and not caratula:
+        print(
+            "❌ Debe proporcionar un número y año del expediente o bien una carátula para realizar la búsqueda."
+        )
+        return []
+
+    if not numero and caratula:
+        return await buscar_expedientes_por_caratula(page, caratula)
 
     exito, motivo = await buscar_expediente_por_numero(page, numero, anio)
 

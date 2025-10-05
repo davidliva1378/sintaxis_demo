@@ -2,6 +2,7 @@
 import sys
 import random
 import string
+from collections import deque
 
 from PySide6.QtCore import Qt, QTimer, Signal, QRect
 from PySide6.QtGui import (
@@ -90,7 +91,7 @@ class AnimatedSplashScreen(QSplashScreen):
         self.repaint_timer.start(16)  # ~60fps
 
         # Desaparición fluida (un solo timer + cola)
-        self.indices_to_disappear = []
+        self.indices_to_disappear = deque()
         self.disappear_timer = QTimer(self)
         self.disappear_timer.timeout.connect(self.on_disappear_tick)
         self.disappear_interval_ms = 14  # ajustable 10–20ms
@@ -132,7 +133,7 @@ class AnimatedSplashScreen(QSplashScreen):
             QTimer.singleShot(500, self.start_forming_sintaxis)
             return
 
-        idx = self.indices_to_disappear.pop(0)
+        idx = self.indices_to_disappear.popleft()
         self.char_grid[idx]["visible"] = False
         self.disappeared_count += 1
         self.update()
@@ -162,13 +163,11 @@ class AnimatedSplashScreen(QSplashScreen):
         self.animation_phase = "complete"
         self.repaint_timer.stop()
         self.update()
-        QTimer.singleShot(500, self.close_and_quit)
+        self.close_and_quit()
 
     def close_and_quit(self):
-        self.close()
-        app = QApplication.instance()
-        if app is not None:
-            app.quit()
+        self.hide()
+        self.animation_complete.emit()
 
     # ---------------------- RENDERIZADO ------------------------- #
     def paintEvent(self, event):
@@ -182,8 +181,12 @@ class AnimatedSplashScreen(QSplashScreen):
 
         # Métricas para centrado vertical/horizontal
         painter.setFont(self.font)
-        fm = QFontMetrics(self.font)
-        baseline_offset = (self.cell_h - fm.height()) // 2 + fm.ascent()
+        fm_regular = QFontMetrics(self.font)
+        regular_baseline_offset = (
+            (self.cell_h - fm_regular.height()) // 2 + fm_regular.ascent()
+        )
+        fm_bold = None
+        bold_baseline_offset = None
 
         for i, cell in enumerate(self.char_grid):
             if not cell["visible"]:
@@ -195,19 +198,23 @@ class AnimatedSplashScreen(QSplashScreen):
             y = self.grid_y0 + row * self.cell_h
 
             if cell["is_sintaxis"] and self.animation_phase in ("forming", "complete"):
+                if fm_bold is None:
+                    fm_bold = QFontMetrics(self.font_bold)
+                    bold_baseline_offset = (
+                        (self.cell_h - fm_bold.height()) // 2 + fm_bold.ascent()
+                    )
                 painter.setFont(self.font_bold)
                 painter.setPen(QColor(255, 255, 255))
-                fm_b = QFontMetrics(self.font_bold)
-                text_w = fm_b.horizontalAdvance(cell["char"])
+                text_w = fm_bold.horizontalAdvance(cell["char"])
                 tx = x + (self.cell_w - text_w) // 2
-                ty = y + baseline_offset
+                ty = y + bold_baseline_offset
                 painter.drawText(tx, ty, cell["char"])
                 painter.setFont(self.font)
             else:
                 painter.setPen(QColor(255, 255, 255))
-                text_w = fm.horizontalAdvance(cell["char"])
+                text_w = fm_regular.horizontalAdvance(cell["char"])
                 tx = x + (self.cell_w - text_w) // 2
-                ty = y + baseline_offset
+                ty = y + regular_baseline_offset
                 painter.drawText(tx, ty, cell["char"])
 
 
@@ -220,6 +227,7 @@ def main():
     splash = AnimatedSplashScreen(width=1200, height=800, cols=50, rows=30)
     splash.show()
     app.processEvents()
+    splash.animation_complete.connect(app.quit)
 
     return app.exec()
 
