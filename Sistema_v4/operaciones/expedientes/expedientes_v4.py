@@ -259,6 +259,13 @@ async def extraer_expedientes_completos(
     huellas: set[tuple[str, str, str]] = set()
     paginas_visitadas: dict[str, int] = {}
     metadata: dict[str, object] = {}
+    filas_descartadas = 0
+    duplicados_descartados = 0
+
+    def _finalizar(motivo: str) -> tuple[list[dict], str, dict[str, object]]:
+        metadata["filas_descartadas"] = filas_descartadas
+        metadata["duplicados_descartados"] = duplicados_descartados
+        return resultados, motivo, metadata
 
     fecha_corte_dt: datetime | None = None
     if fecha_corte:
@@ -314,7 +321,7 @@ async def extraer_expedientes_completos(
     paginas_recorridas = 0
     while True:
         if _excedio_tiempo():
-            return resultados, "limite_tiempo", metadata
+            return _finalizar("limite_tiempo")
 
         paginas_recorridas += 1
         print(f"Procesando página {paginas_recorridas}")
@@ -326,7 +333,7 @@ async def extraer_expedientes_completos(
                 f"🔁 Página {paginas_recorridas} coincide con la ya vista en la "
                 f"página {pagina_prev}. Finalizando para evitar bucles."
             )
-            return resultados, "bucle_detectado", metadata
+            return _finalizar("bucle_detectado")
 
         paginas_visitadas[fingerprint_actual] = paginas_recorridas
 
@@ -342,6 +349,7 @@ async def extraer_expedientes_completos(
         # 2) Mapear a dicts usando las 5 columnas útiles
         for cols in filas:
             if len(cols) < 5:
+                filas_descartadas += 1
                 continue
             ultima_actuacion_norm = _norm_fecha(cols[4])
             ultima_dt: datetime | None = None
@@ -361,12 +369,13 @@ async def extraer_expedientes_completos(
             duplicado = huella in huellas
 
             if duplicado and detener_en_duplicado:
-                return resultados, "duplicado_encontrado", metadata
+                return _finalizar("duplicado_encontrado")
 
             if fecha_corte_dt and ultima_dt and ultima_dt < fecha_corte_dt:
-                return resultados, "limite_fecha", metadata
+                return _finalizar("limite_fecha")
 
             if duplicado and omitir_duplicados:
+                duplicados_descartados += 1
                 continue
 
             if not duplicado:
@@ -381,16 +390,16 @@ async def extraer_expedientes_completos(
             })
 
             if _excedio_tiempo():
-                return resultados, "limite_tiempo", metadata
+                return _finalizar("limite_tiempo")
 
         # 3) Intentar ir a la siguiente página; cortar si no hay
         if paginas_recorridas >= max_paginas:
-            return resultados, "limite_paginas", metadata
+            return _finalizar("limite_paginas")
 
         next_btn = page.locator(sel_siguiente)
         btn_count = await next_btn.count()
         if btn_count <= 0:
-            return resultados, "sin_siguiente", metadata  # no hay control de siguiente
+            return _finalizar("sin_siguiente")  # no hay control de siguiente
 
         boton: Locator | None = None
         for idx in range(btn_count):
@@ -400,16 +409,16 @@ async def extraer_expedientes_completos(
                 break
 
         if boton is None:
-            return resultados, "sin_siguiente_habilitado", metadata
+            return _finalizar("sin_siguiente_habilitado")
 
         try:
             await boton.wait_for(state="visible", timeout=10_000)
         except TimeoutError as exc:
             print(f"Botón 'Siguiente' no visible: {exc}")
-            return resultados, "siguiente_timeout", metadata
+            return _finalizar("siguiente_timeout")
 
         if not await _is_locator_enabled(boton):
-            return resultados, "siguiente_deshabilitado", metadata
+            return _finalizar("siguiente_deshabilitado")
 
         # Fingerprint antes del click para confirmar cambio real
         antes = fingerprint_actual
@@ -417,7 +426,7 @@ async def extraer_expedientes_completos(
             await boton.click()
         except (TimeoutError, Error) as exc:
             print(f"Fallo al hacer clic en 'Siguiente': {exc}")
-            return resultados, "error_click", metadata
+            return _finalizar("error_click")
 
         # Esperar a que cambie el tbody (evita loops)
         max_wait_ms = 12_000
@@ -437,12 +446,11 @@ async def extraer_expedientes_completos(
 
         if not fingerprint_cambio:
             # No cambió el contenido → estamos al final
-            return resultados, "fin_listado", metadata
+            return _finalizar("fin_listado")
 
         if _excedio_tiempo():
-            return resultados, "limite_tiempo", metadata
-
-    return resultados, "fin_listado", metadata
+            return _finalizar("limite_tiempo")
+    return _finalizar("fin_listado")
 
 
 async def extraer_datos_expediente(page: Page) -> dict[str, str] | None:
