@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import re
+from contextlib import suppress
 from datetime import date, datetime
 from urllib.parse import parse_qs, urlparse
 
@@ -428,6 +429,7 @@ async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_
             continue
 
         for intento in range(3):
+            advertencia = None
             try:
                 async with page.expect_download() as download_info:
                     await page.evaluate("""
@@ -445,7 +447,6 @@ async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_
                 # Aviso si tarda
                 advertencia = asyncio.create_task(aviso_si_tarda(idx, 30))
                 await download.save_as(ruta_archivo)
-                advertencia.cancel()
 
                 print(f"✅ Archivo descargado: {nombre_archivo}")
                 break  # éxito
@@ -455,6 +456,11 @@ async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_
                 else:
                     print(f"⚠️ Reintentando actuación {idx} ({intento + 1}/3)...")
                     await asyncio.sleep(4)
+            finally:
+                if advertencia is not None:
+                    advertencia.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await advertencia
 
 
 
