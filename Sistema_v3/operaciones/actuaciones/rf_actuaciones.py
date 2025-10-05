@@ -262,7 +262,7 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
         print(f"📄 Página {pagina}: extrayendo...")
         nuevas, error = await extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_actual)
         if error:
-            return todas, f"❌ Error en página {pagina}: {error}"
+            return todas, f"❌ Error en página {pagina}: {error}", None
         if not nuevas:
             break
         todas.extend(nuevas)
@@ -285,9 +285,9 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
             )
             pagina += 1
         except TimeoutError:
-            return todas, f"⏳ Timeout al intentar avanzar a la página {pagina + 1}"
+            return todas, f"⏳ Timeout al intentar avanzar a la página {pagina + 1}", None
         except Exception as e:
-            return todas, f"⚠️ Error inesperado al avanzar a la página {pagina + 1}: {type(e).__name__}: {str(e)}"
+            return todas, f"⚠️ Error inesperado al avanzar a la página {pagina + 1}: {type(e).__name__}: {str(e)}", None
 
     expediente_numero = expediente_datos.get("numero", "expediente").replace("/", "_")
     expediente_datos["Cantidad de Actuaciones Obtenidas"] = len(todas)
@@ -306,7 +306,7 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
 
     print(f"✅ Archivo JSON guardado: {json_path}")
     print(f"📂 Total de actuaciones: {len(todas)}")
-    return todas, None, carpeta_destino
+    return todas, None, carpeta_actuaciones
 
 
 import os
@@ -341,6 +341,8 @@ async def extraer_actuaciones_completas(
         )
         if error_actuales:
             return [], [], f"Error al extraer actuaciones actuales: {error_actuales}"
+        if not carpeta_final:
+            return [], [], "No se pudo determinar la carpeta de salida para las actuaciones actuales."
 
         for act in actuaciones_actuales:
             act["EsHistorica"] = False
