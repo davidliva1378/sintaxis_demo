@@ -64,6 +64,7 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
         timestamp_extraccion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         pagina = 1
+        indice_actual = indice_inicial
         while True:
             print(f"Página {pagina} (históricas): extrayendo...")
 
@@ -116,7 +117,7 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
                         tipo_archivo = None
 
                 actuaciones.append({
-                    "Indice": len(actuaciones) + 1,
+                    "Indice": indice_actual,
                     "Oficina": oficina,
                     "OficinaCompleta": oficina_completa,
                     "Fecha": fecha,
@@ -131,6 +132,8 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
                     "ExtraidaEn": timestamp_extraccion,
                     "EsHistorica": True
                 })
+
+                indice_actual += 1
 
             boton_siguiente = await page_expediente.query_selector("a[id^='expediente:j_idt']:not(.ui-state-disabled):has-text('Siguiente')")
             if boton_siguiente:
