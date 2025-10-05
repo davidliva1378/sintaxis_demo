@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from panel_pjn.acciones_pjn.gestion_actuaciones import extraccion_completa
+from Sistema_v4.actuaciones import actuaciones_v4 as extraccion_completa
 
 
 def test_historicas_continuan_numeracion(monkeypatch, tmp_path):
