@@ -77,6 +77,9 @@ _FORM_CONTROL_TAGS = {
 }
 
 
+SeleccionEstrategia = Callable[[list[dict[str, str]]], int | None]
+
+
 async def _is_locator_enabled(locator: Locator) -> bool:
     """Determina si un locator corresponde a un control habilitado."""
 
@@ -448,4 +451,207 @@ async def abrir_expediente_desde_fila(
     return None
 
 
-SeleccionEstrategia = Callable[[list[dict[str, str]]], int | None]
+def _seleccionar_primera_opcion(opciones: list[dict[str, str]]) -> int | None:
+    """Estrategia por defecto: selecciona la primera opción disponible."""
+
+    return 0 if opciones else None
+
+
+async def mostrar_y_elegir_expediente(
+    page: Page,
+    filas: list[ElementHandle | Locator],
+    *,
+    estrategia_seleccion: SeleccionEstrategia | None = None,
+    descripcion_estrategia: str | None = None,
+) -> dict[str, str] | None:
+    """Muestra las filas encontradas y abre la opción seleccionada."""
+
+    if not filas:
+        print("❌ No hay filas disponibles para seleccionar.")
+        return None
+
+    descripcion_final = descripcion_estrategia or (
+        "automática" if estrategia_seleccion is None else "personalizada"
+    )
+
+    if len(filas) == 1:
+        print(
+            "✅ Solo un expediente encontrado. "
+            f"La estrategia '{descripcion_final}' no es necesaria."
+        )
+        fila = filas[0]
+    else:
+        print(
+            "🔎 Se encontraron múltiples expedientes. "
+            f"Aplicando estrategia '{descripcion_final}'."
+        )
+        opciones_filas: list[ElementHandle | Locator] = []
+        opciones_datos: list[dict[str, str]] = []
+
+        for idx, fila in enumerate(filas, start=1):
+            columnas = await fila.query_selector_all("td")
+            if len(columnas) >= 3:
+                nro = (await columnas[0].inner_text()).strip()
+                anio_fila = (await columnas[1].inner_text()).strip()
+                caratula_fila = (await columnas[2].inner_text()).strip()
+                print(
+                    f"[{idx}] Número: {nro} / Año: {anio_fila} / Carátula: {caratula_fila}"
+                )
+                opciones_filas.append(fila)
+                opciones_datos.append(
+                    {
+                        "indice": str(idx - 1),
+                        "numero": nro,
+                        "anio": anio_fila,
+                        "caratula": caratula_fila,
+                    }
+                )
+
+        if not opciones_filas:
+            print("❌ No se pudieron obtener opciones válidas para seleccionar.")
+            return None
+
+        estrategia = estrategia_seleccion or _seleccionar_primera_opcion
+        indice = estrategia(opciones_datos)
+
+        if indice is None:
+            print(
+                "❌ La estrategia de selección no devolvió ninguna opción válida."
+            )
+            return None
+
+        if not isinstance(indice, int) or indice < 0 or indice >= len(opciones_filas):
+            print(
+                "❌ La estrategia devolvió un índice fuera de rango: "
+                f"{indice} (opciones disponibles: {len(opciones_filas)})."
+            )
+            return None
+
+        print(
+            f"🎯 Estrategia '{descripcion_final}' seleccionó la opción {indice + 1}."
+        )
+        fila = opciones_filas[indice]
+
+    datos = await abrir_expediente_desde_fila(fila, page)
+    if not datos:
+        print("⚠️ No se pudo abrir el expediente seleccionado.")
+        return None
+
+    print("✅ Datos extraídos correctamente del expediente.")
+    return datos
+
+
+async def buscar_expediente_por_numero(
+    page: Page, numero: str, anio: str, timeout: int = 8_000
+) -> tuple[bool, str]:
+    try:
+        print(f"🔎 Buscando expediente {numero}/{anio} usando el formulario...")
+
+        await page.click("a[href='#collapseOne']")
+        await page.wait_for_selector("#collapseOne.collapse.in", timeout=5_000)
+
+        await page.fill("#j_idt83\\:consultaExpediente\\:j_idt116\\:numero", numero)
+        await page.fill("#j_idt83\\:consultaExpediente\\:j_idt118\\:anio", anio)
+
+        await page.click("#j_idt83\\:consultaExpediente\\:consultaFiltroSearchButtonSAU")
+
+        try:
+            await page.wait_for_selector(
+                "text=No se han encontrado expedientes", timeout=3_000
+            )
+            print(f"❗ Expediente {numero}/{anio} no encontrado.")
+            return False, "no_encontrado"
+        except TimeoutError:
+            pass
+
+        await page.wait_for_selector("table.table-striped", timeout=timeout)
+        print(f"✅ Resultados cargados correctamente para {numero}/{anio}.")
+        return True, "OK"
+
+    except TimeoutError:
+        print(f"⏳ Tiempo de espera agotado buscando expediente {numero}/{anio}.")
+        return False, "timeout"
+
+    except Exception as exc:  # noqa: BLE001
+        print(f"❌ Error general buscando expediente {numero}/{anio}: {exc}")
+        return False, "error"
+
+
+async def buscar_expedientes_por_caratula(
+    page: Page, caratula: str
+) -> list[ElementHandle]:
+    """Realiza la búsqueda de expedientes utilizando sólo la carátula."""
+
+    if not caratula:
+        print("❌ Debe indicar una carátula válida para utilizar este modo de búsqueda.")
+        return []
+
+    print(
+        "ℹ️ La búsqueda exclusiva por carátula no está automatizada aún. "
+        "Se devuelve una lista vacía para permitir un manejo seguro."
+    )
+    return []
+
+
+async def buscar_expedientes(
+    page: Page,
+    numero: str | None = None,
+    anio: str | None = None,
+    caratula: str | None = None,
+) -> list[ElementHandle]:
+    """Busca expedientes en el portal PJN según los filtros indicados."""
+
+    numero = numero.strip() if numero and numero.strip() else None
+    anio = anio.strip() if anio and anio.strip() else None
+    caratula = caratula.strip() if caratula and caratula.strip() else None
+
+    if numero and not anio:
+        print("❌ Para buscar por número debe indicar también el año del expediente.")
+        return []
+
+    if anio and not numero:
+        print("❌ Para buscar por año debe indicar también el número del expediente.")
+        return []
+
+    if not numero and not caratula:
+        print(
+            "❌ Debe proporcionar un número y año del expediente o bien una carátula para realizar la búsqueda."
+        )
+        return []
+
+    if not numero and caratula:
+        return await buscar_expedientes_por_caratula(page, caratula)
+
+    assert numero is not None and anio is not None
+    exito, motivo = await buscar_expediente_por_numero(page, numero, anio)
+
+    if not exito:
+        if motivo == "no_encontrado":
+            print("❗ No se encontraron expedientes para los datos ingresados.")
+        elif motivo == "timeout":
+            print("⏳ La búsqueda tardó demasiado en cargar.")
+        else:
+            print(f"❌ Error inesperado durante la búsqueda: {motivo}")
+        return []
+
+    tabla = await page.query_selector("table.table-striped")
+    if not tabla:
+        print("⚠️ No se encontró la tabla de resultados.")
+        return []
+
+    filas = await tabla.query_selector_all("tbody tr")
+    if not filas:
+        print("❌ No se encontraron filas en la tabla de resultados.")
+        return []
+
+    if caratula:
+        filas_filtradas: list[ElementHandle] = []
+        for fila in filas:
+            columnas = await fila.query_selector_all("td")
+            if len(columnas) >= 3:
+                caratula_texto = (await columnas[2].inner_text()).strip().lower()
+                if caratula_texto == caratula.lower():
+                    filas_filtradas.append(fila)
+        return filas_filtradas
+
+    return filas
