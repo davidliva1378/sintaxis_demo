@@ -1,8 +1,13 @@
+import asyncio
+import json
 import os
 import re
-from datetime import datetime
-from urllib.parse import urlparse, parse_qs
-from .actuaciones_utils import limpiar_texto, normalizar_fecha, generar_hash_archivo
+from datetime import date, datetime
+from urllib.parse import parse_qs, urlparse
+
+from playwright.async_api import Page, TimeoutError
+
+from .actuaciones_utils import generar_hash_archivo, limpiar_texto, normalizar_fecha
 
 
 def construir_nombre_archivo_normalizado(fecha, tipo, hash_val, archivo_url, nombre_descarga=None):
@@ -245,14 +250,6 @@ async def extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_i
     except Exception as e:
         return [], f"{type(e).__name__}: {str(e)}"
 
-import os
-import re
-import json
-import asyncio
-from datetime import datetime, date
-from urllib.parse import urlparse, parse_qs
-import hashlib
-from playwright.async_api import TimeoutError
 async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_datos, carpeta_destino="Actuaciones"):
     todas = []
     pagina = 1
@@ -307,12 +304,6 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
     print(f"✅ Archivo JSON guardado: {json_path}")
     print(f"📂 Total de actuaciones: {len(todas)}")
     return todas, None, carpeta_actuaciones
-
-
-import os
-import json
-from panel_pjn.acciones_pjn.gestion_actuaciones.extraccion_v2 import obtener_actuaciones_todas_paginas_async #ref
-from panel_pjn.acciones_pjn.gestion_actuaciones.bk.historicas import extraer_actuaciones_historicas #ref
 
 
 async def extraer_actuaciones_completas(
@@ -403,10 +394,6 @@ async def extraer_actuaciones_completas(
         return [], [], f"Error general: {type(e).__name__}: {str(e)}"
 
 
-
-import os
-import asyncio
-from playwright.async_api import Page
 
 async def aviso_si_tarda(idx, segundos):
     await asyncio.sleep(segundos)
