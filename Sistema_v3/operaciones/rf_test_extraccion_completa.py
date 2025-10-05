@@ -1,5 +1,6 @@
 import asyncio
 import os
+from typing import Optional
 from playwright.async_api import async_playwright
 from panel_pjn.acciones_pjn.urls_pjn import URL_LOGIN, URL_CONSULTAS
 from Sistema_v3.operaciones.expedientes.ref_expedientes import (
@@ -15,6 +16,28 @@ from Sistema_v3.operaciones.actuaciones.rf_actuaciones import (
 
 USUARIO = "20213071662"
 CONTRASENA = "surrey1970"
+
+
+def seleccionar_por_consola(opciones: list[dict[str, str]]) -> Optional[int]:
+    """Estrategia interactiva basada en la entrada del usuario por consola."""
+
+    seleccion = input("👉 Ingrese el número de opción que desea abrir (0 para cancelar): ")
+    try:
+        idx = int(seleccion) - 1
+    except ValueError:
+        print("❌ Selección inválida.")
+        return None
+
+    if idx < 0:
+        print("❌ Operación cancelada por el usuario.")
+        return None
+
+    if idx >= len(opciones):
+        print("❌ Selección fuera de rango.")
+        return None
+
+    return idx
+
 
 async def login_portal(page):
     try:
@@ -55,7 +78,12 @@ async def main():
             await navegador.close()
             return
 
-        datos_expediente = await mostrar_y_elegir_expediente(page, filas)
+        datos_expediente = await mostrar_y_elegir_expediente(
+            page,
+            filas,
+            estrategia_seleccion=seleccionar_por_consola,
+            descripcion_estrategia="interactiva",
+        )
         if not datos_expediente:
             print("❌ No se pudo abrir ni extraer el expediente.")
             await navegador.close()

@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
 import asyncio
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 async def extraer_expedientes(
     page: Page,
@@ -195,12 +195,31 @@ async def abrir_expediente_desde_fila(fila, page) -> Optional[Dict]:
         return None
 
 
-async def mostrar_y_elegir_expediente(page: Page, filas: List) -> Optional[Dict]:
+SeleccionEstrategia = Callable[[List[Dict[str, str]]], Optional[int]]
+
+
+def _seleccionar_primera_opcion(opciones: List[Dict[str, str]]) -> Optional[int]:
+    """Estrategia por defecto: selecciona la primera opción disponible."""
+
+    return 0 if opciones else None
+
+
+async def mostrar_y_elegir_expediente(
+    page: Page,
+    filas: List,
+    *,
+    estrategia_seleccion: Optional[SeleccionEstrategia] = None,
+    descripcion_estrategia: Optional[str] = None,
+) -> Optional[Dict]:
     """
     Muestra los expedientes encontrados y permite al usuario seleccionar uno para abrir y extraer datos.
 
     :param page: Página Playwright actual.
     :param filas: Lista de filas encontradas.
+    :param estrategia_seleccion: Callable que recibe la lista de opciones disponibles
+        y devuelve el índice seleccionado (0-based). Si no se indica se utilizará una
+        estrategia automática que elige la primera opción válida.
+    :param descripcion_estrategia: Texto descriptivo del modo o estrategia aplicado.
     :return: Diccionario de datos extraídos del expediente seleccionado, o None.
     """
 
@@ -208,12 +227,23 @@ async def mostrar_y_elegir_expediente(page: Page, filas: List) -> Optional[Dict]
         print("❌ No hay filas disponibles para seleccionar.")
         return None
 
+    descripcion_final = descripcion_estrategia or (
+        "automática" if estrategia_seleccion is None else "personalizada"
+    )
+
     if len(filas) == 1:
-        print("✅ Solo un expediente encontrado. Abriendo directamente...")
+        print(
+            "✅ Solo un expediente encontrado. "
+            f"La estrategia '{descripcion_final}' no es necesaria."
+        )
         fila = filas[0]
     else:
-        print("🔎 Se encontraron múltiples expedientes:")
-        opciones = []
+        print(
+            "🔎 Se encontraron múltiples expedientes. "
+            f"Aplicando estrategia '{descripcion_final}'."
+        )
+        opciones_filas: List = []
+        opciones_datos: List[Dict[str, str]] = []
 
         for idx, fila in enumerate(filas, start=1):
             columnas = await fila.query_selector_all("td")
@@ -221,19 +251,43 @@ async def mostrar_y_elegir_expediente(page: Page, filas: List) -> Optional[Dict]
                 nro = (await columnas[0].inner_text()).strip()
                 anio_fila = (await columnas[1].inner_text()).strip()
                 caratula_fila = (await columnas[2].inner_text()).strip()
-                print(f"[{idx}] Número: {nro} / Año: {anio_fila} / Carátula: {caratula_fila}")
-                opciones.append(fila)
+                print(
+                    f"[{idx}] Número: {nro} / Año: {anio_fila} / Carátula: {caratula_fila}"
+                )
+                opciones_filas.append(fila)
+                opciones_datos.append(
+                    {
+                        "indice": str(idx - 1),
+                        "numero": nro,
+                        "anio": anio_fila,
+                        "caratula": caratula_fila,
+                    }
+                )
 
-        seleccion = input("👉 Ingrese el número de opción que desea abrir (0 para cancelar): ")
-        try:
-            idx_elegido = int(seleccion) - 1
-            if idx_elegido == -1:
-                print("❌ Operación cancelada por el usuario.")
-                return None
-            fila = opciones[idx_elegido]
-        except (ValueError, IndexError):
-            print("❌ Selección inválida.")
+        if not opciones_filas:
+            print("❌ No se pudieron obtener opciones válidas para seleccionar.")
             return None
+
+        estrategia = estrategia_seleccion or _seleccionar_primera_opcion
+        indice = estrategia(opciones_datos)
+
+        if indice is None:
+            print(
+                "❌ La estrategia de selección no devolvió ninguna opción válida."
+            )
+            return None
+
+        if not isinstance(indice, int) or indice < 0 or indice >= len(opciones_filas):
+            print(
+                "❌ La estrategia devolvió un índice fuera de rango: "
+                f"{indice} (opciones disponibles: {len(opciones_filas)})."
+            )
+            return None
+
+        print(
+            f"🎯 Estrategia '{descripcion_final}' seleccionó la opción {indice + 1}."
+        )
+        fila = opciones_filas[indice]
 
     # Abrir el expediente seleccionado y obtener datos
     datos = await abrir_expediente_desde_fila(fila, page)
