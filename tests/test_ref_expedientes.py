@@ -69,3 +69,81 @@ def test_buscar_expedientes_solo_caratula(monkeypatch):
     )
 
     assert filas == ["fila"]
+
+
+class DummyCelda:
+    def __init__(self, texto: str):
+        self._texto = texto
+
+    async def inner_text(self) -> str:
+        return self._texto
+
+
+class DummyFila:
+    def __init__(self, numero: str, anio: str, caratula: str):
+        self.numero = numero
+        self.anio = anio
+        self.caratula = caratula
+
+    async def query_selector_all(self, selector):
+        assert selector == "td"
+        return [
+            DummyCelda(self.numero),
+            DummyCelda(self.anio),
+            DummyCelda(self.caratula),
+        ]
+
+
+def crear_filas_prueba():
+    return [
+        DummyFila("EXP-1", "2023", "Carátula A"),
+        DummyFila("EXP-2", "2022", "Carátula B"),
+    ]
+
+
+def test_mostrar_y_elegir_expediente_automatico(monkeypatch, capsys):
+    filas = crear_filas_prueba()
+
+    async def fake_abrir(fila, page):
+        return {"numero": fila.numero}
+
+    monkeypatch.setattr(ref_expedientes, "abrir_expediente_desde_fila", fake_abrir)
+
+    resultado = asyncio.run(
+        ref_expedientes.mostrar_y_elegir_expediente(
+            object(),
+            filas,
+            descripcion_estrategia="automática",
+        )
+    )
+
+    assert resultado == {"numero": "EXP-1"}
+    salida = capsys.readouterr().out
+    assert "estrategia 'automática'" in salida
+
+
+def test_mostrar_y_elegir_expediente_con_estrategia(monkeypatch, capsys):
+    filas = crear_filas_prueba()
+
+    async def fake_abrir(fila, page):
+        return {"numero": fila.numero}
+
+    monkeypatch.setattr(ref_expedientes, "abrir_expediente_desde_fila", fake_abrir)
+
+    def estrategia_personalizada(opciones):
+        assert len(opciones) == 2
+        assert opciones[1]["numero"] == "EXP-2"
+        return 1
+
+    resultado = asyncio.run(
+        ref_expedientes.mostrar_y_elegir_expediente(
+            object(),
+            filas,
+            estrategia_seleccion=estrategia_personalizada,
+            descripcion_estrategia="interactiva",
+        )
+    )
+
+    assert resultado == {"numero": "EXP-2"}
+    salida = capsys.readouterr().out
+    assert "estrategia 'interactiva'" in salida
