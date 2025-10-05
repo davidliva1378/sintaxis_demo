@@ -104,7 +104,9 @@ class VerificadorExpedientesV4(QThread):
 
                 await page.goto(URL_CONSULTAS)
                 expedientes, motivo = await extraer_expedientes_completos(
-                    page, orden="fecha"
+                    page,
+                    orden="fecha",
+                    detener_en_duplicado=False,
                 )
 
                 ruta_archivo: Path | None = None
@@ -265,7 +267,7 @@ class MonitorExpedientesTray:
             "limite_fecha": "📅 Se alcanzó la fecha límite configurada.",
             "limite_tiempo": "⏱️ Se cumplió el tiempo máximo de extracción permitido.",
             "limite_paginas": "📄 Se alcanzó el tope de páginas configurado para la búsqueda.",
-            "duplicado_encontrado": "📎 Se detuvo la extracción al detectar un expediente duplicado, evitando inconsistencias.",
+            "duplicado_encontrado": "📎 Se detuvo la extracción al detectar un expediente duplicado (solo si se fuerza detener_en_duplicado=True).",
             "bucle_detectado": "🌀 Se detectó un posible bucle de navegación y la extracción se detuvo de forma segura.",
         }
 

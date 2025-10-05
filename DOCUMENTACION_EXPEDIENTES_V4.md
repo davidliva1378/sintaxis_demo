@@ -229,6 +229,7 @@ Hilo separado que ejecuta la extracción de expedientes sin bloquear la interfaz
 - **Guardado automático**: Resultados en formato JSON
 - **Manejo de errores**: Captura y reporta excepciones
 - **Señales Qt**: Comunicación thread-safe con la interfaz
+- **Omisión de duplicados**: Invoca al scraper con `detener_en_duplicado=False` para continuar paginando aunque aparezcan expedientes repetidos.
 
 ---
 
