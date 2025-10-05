@@ -36,10 +36,12 @@ async def extraer_actuaciones_completas(
             if act.get("TieneArchivo"):
                 act["Descargado"] = False
 
+        indice_base = len(actuaciones_actuales) + 1
+
         # Actuaciones históricas (si corresponde)
         if incluir_historicas:
             actuaciones_historicas, error_hist = await extraer_actuaciones_historicas(
-                page_expediente, expediente_datos
+                page_expediente, expediente_datos, indice_base
             )
             if error_hist:
                 return actuaciones_actuales, [], f"Error al extraer actuaciones históricas: {error_hist}"
@@ -52,6 +54,15 @@ async def extraer_actuaciones_completas(
             actuaciones_historicas = []
 
         todas = actuaciones_actuales + actuaciones_historicas
+
+        if actuaciones_historicas:
+            indice_historico_esperado = len(actuaciones_actuales) + 1
+            primer_indice_historico = actuaciones_historicas[0].get("Indice")
+            if primer_indice_historico != indice_historico_esperado:
+                print(
+                    "⚠️ Verificar numeración histórica: se esperaba que iniciara en "
+                    f"{indice_historico_esperado}, pero comenzó en {primer_indice_historico}."
+                )
 
         expediente_info = {
             "numero": expediente_datos.get("numero"),

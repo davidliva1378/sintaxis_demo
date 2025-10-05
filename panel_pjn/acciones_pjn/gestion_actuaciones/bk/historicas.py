@@ -8,6 +8,7 @@ from panel_pjn.acciones_pjn.gestion_actuaciones.utilidades import limpiar_texto,
 
 async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indice_inicial=1):
     actuaciones = []
+    indice_actual = indice_inicial
     try:
         await page_expediente.click("a:has-text('Ver históricas')")
 
@@ -75,7 +76,7 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
                     hash_val = generar_hash_archivo(fecha, tipo, detalle)
 
                 actuaciones.append({
-                    "Indice": len(actuaciones) + 1,
+                    "Indice": indice_actual,
                     "Oficina": oficina,
                     "OficinaCompleta": oficina_completa,
                     "Fecha": fecha,
@@ -90,6 +91,8 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
                     "ExtraidaEn": timestamp_extraccion,
                     "EsHistorica": True
                 })
+
+                indice_actual += 1
 
             boton_siguiente = await page_expediente.query_selector("a[id^='expediente:j_idt']:not(.ui-state-disabled):has-text('Siguiente')")
             if boton_siguiente:
