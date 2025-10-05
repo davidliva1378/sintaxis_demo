@@ -71,6 +71,7 @@ DEFAULT_CONFIG = {
         "intervalo_minutos": 30,
     },
     "fuera_horario": {"intervalo_minutos": 240},
+    "detener_en_duplicado": True,
 }
 
 
@@ -84,11 +85,14 @@ class VerificadorExpedientesV4(QThread):
         carpeta_salida: str | Path = "datos_extraidos/monitoreo",
         nombre_archivo: str = "expedientes_monitor.json",
         guardar_json: bool = True,
+        *,
+        detener_en_duplicado: bool = True,
     ) -> None:
         super().__init__()
         self.carpeta_salida = Path(carpeta_salida)
         self.nombre_archivo = nombre_archivo
         self.guardar_json = guardar_json
+        self.detener_en_duplicado = detener_en_duplicado
 
     def run(self) -> None:  # type: ignore[override]
         import asyncio
@@ -104,7 +108,9 @@ class VerificadorExpedientesV4(QThread):
 
                 await page.goto(URL_CONSULTAS)
                 expedientes, motivo = await extraer_expedientes_completos(
-                    page, orden="fecha"
+                    page,
+                    orden="fecha",
+                    detener_en_duplicado=self.detener_en_duplicado,
                 )
 
                 ruta_archivo: Path | None = None
@@ -203,6 +209,7 @@ class MonitorExpedientesTray:
         datos.setdefault("modo", DEFAULT_CONFIG["modo"])
         datos.setdefault("horario_laboral", DEFAULT_CONFIG["horario_laboral"])
         datos.setdefault("fuera_horario", DEFAULT_CONFIG["fuera_horario"])
+        datos.setdefault("detener_en_duplicado", DEFAULT_CONFIG["detener_en_duplicado"])
         return datos
 
     def esta_en_horario_laboral(self) -> bool:
@@ -243,7 +250,10 @@ class MonitorExpedientesTray:
 
         self.ejecutando_expedientes = True
         carpeta = Path(os.getcwd()) / "datos_extraidos" / "monitoreo"
-        self.hilo_expedientes = VerificadorExpedientesV4(carpeta_salida=carpeta)
+        self.hilo_expedientes = VerificadorExpedientesV4(
+            carpeta_salida=carpeta,
+            detener_en_duplicado=self.config.get("detener_en_duplicado", True),
+        )
         self.hilo_expedientes.resultado.connect(self.procesar_resultado_expedientes)
         self.hilo_expedientes.finished.connect(self._limpiar_hilo_expedientes)
         self.hilo_expedientes.start()
