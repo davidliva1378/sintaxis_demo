@@ -8,6 +8,42 @@ from pathlib import Path
 import asyncio
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
 
+_FP_MAX_LEN = 4_096
+_TBODY_SELECTOR = "table.table-striped tbody"
+
+
+def _build_fingerprint(html: str, max_len: Optional[int] = _FP_MAX_LEN) -> str:
+    signature = f"{len(html)}::{html}"
+    if max_len is None:
+        return signature
+    return signature[:max_len]
+
+
+async def _tbody_fingerprint(page: Page, selector: str = _TBODY_SELECTOR) -> Optional[str]:
+    tbody = await page.query_selector(selector)
+    if not tbody:
+        return None
+    html = await tbody.inner_html()
+    return _build_fingerprint(html)
+
+
+async def _esperar_cambio_tbody(
+    page: Page,
+    selector: str,
+    fingerprint_anterior: Optional[str],
+    intentos: int = 10,
+    espera_segundos: float = 0.5,
+) -> Optional[str]:
+    if fingerprint_anterior is None:
+        return await _tbody_fingerprint(page, selector)
+
+    for _ in range(intentos):
+        await asyncio.sleep(espera_segundos)
+        fingerprint_actual = await _tbody_fingerprint(page, selector)
+        if fingerprint_actual and fingerprint_actual != fingerprint_anterior:
+            return fingerprint_actual
+    return None
+
 async def extraer_expedientes(
     page: Page,
     carpeta_salida: str = "datos_extraidos/monitoreo",
@@ -56,11 +92,12 @@ async def extraer_expedientes(
 
     while True:
         print(f"📄 Página {pagina}...")
-        filas = await page.query_selector_all("table.table-striped tbody tr")
+        filas = await page.query_selector_all(f"{_TBODY_SELECTOR} tr")
         if not filas:
             break
 
         nuevos_en_pagina = 0
+        duplicados_en_pagina = 0
         for fila in filas:
             celdas = await fila.query_selector_all("td")
             if len(celdas) < 5:
@@ -84,9 +121,7 @@ async def extraer_expedientes(
 
             hash_expte = f"{numero}|{caratula}|{dependencia}"
             if hash_expte in expedientes_vistos:
-                if detener_en_duplicado:
-                    print("⚠️ Expediente repetido detectado. Finalizando.")
-                    return expedientes, None, "repetido_detectado"
+                duplicados_en_pagina += 1
                 continue
 
             expediente = {
@@ -104,6 +139,14 @@ async def extraer_expedientes(
 
         print(f"📊 Expedientes extraídos en página {pagina}: {nuevos_en_pagina}")
 
+        if (
+            detener_en_duplicado
+            and duplicados_en_pagina > 0
+            and nuevos_en_pagina == 0
+        ):
+            print("ℹ️ Sin expedientes nuevos en la página. Se alcanzó el fin del listado.")
+            return expedientes, None, "fin_listado"
+
         if tiempo_maximo_segundos and (time.time() - inicio > tiempo_maximo_segundos):
             print(f"⏳ Tiempo máximo alcanzado ({tiempo_maximo_segundos}s). Finalizando.")
             return expedientes, None, "tiempo_maximo"
@@ -112,9 +155,19 @@ async def extraer_expedientes(
             boton_siguiente = await page.query_selector("a:has(span[title='Siguiente'])")
             if not boton_siguiente:
                 break
+            fingerprint_actual = await _tbody_fingerprint(page, _TBODY_SELECTOR)
             await boton_siguiente.click()
             await page.wait_for_load_state("domcontentloaded")
             await asyncio.sleep(2)
+            nuevo_fingerprint = await _esperar_cambio_tbody(
+                page, _TBODY_SELECTOR, fingerprint_actual
+            )
+            if not nuevo_fingerprint:
+                print(
+                    "ℹ️ No se detectaron cambios en la tabla tras hacer clic en 'Siguiente'."
+                )
+                print("ℹ️ Se asume fin del listado de expedientes.")
+                return expedientes, None, "fin_listado"
             pagina += 1
         except Exception:
             break
