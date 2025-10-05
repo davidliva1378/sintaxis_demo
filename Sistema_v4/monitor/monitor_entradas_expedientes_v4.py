@@ -63,6 +63,8 @@ class ResultadoExpedientes:
     motivo_original: str | None = None
     duplicados_descartados: int | None = None
     filas_descartadas: int | None = None
+    paginas_recorridas: int | None = None
+    paginas_esperadas: int | None = None
 
 
 CONFIG_PATH = Path("config/config_monitor.json")
@@ -120,6 +122,8 @@ class VerificadorExpedientesV4(QThread):
                 total_esperado = None
                 duplicados_descartados = 0
                 filas_descartadas = 0
+                paginas_recorridas = None
+                paginas_esperadas = None
                 if isinstance(metadata, dict):
                     total_meta = metadata.get("total_esperado")
                     if isinstance(total_meta, int):
@@ -130,6 +134,12 @@ class VerificadorExpedientesV4(QThread):
                     filas_meta = metadata.get("filas_descartadas")
                     if isinstance(filas_meta, int):
                         filas_descartadas = max(0, filas_meta)
+                    paginas_meta = metadata.get("paginas_recorridas")
+                    if isinstance(paginas_meta, int):
+                        paginas_recorridas = max(0, paginas_meta)
+                    paginas_esp_meta = metadata.get("paginas_esperadas")
+                    if isinstance(paginas_esp_meta, int):
+                        paginas_esperadas = max(0, paginas_esp_meta)
 
                 motivo_original = motivo
                 cantidad = len(expedientes)
@@ -142,6 +152,16 @@ class VerificadorExpedientesV4(QThread):
                     "🧹 Filas descartadas durante la extracción: "
                     f"{duplicados_descartados} duplicadas / {filas_descartadas} inválidas."
                 )
+
+                if paginas_recorridas is not None:
+                    esperado_log = (
+                        str(paginas_esperadas)
+                        if paginas_esperadas is not None
+                        else "?"
+                    )
+                    registrar_log(
+                        f"📄 Paginación: {paginas_recorridas} / {esperado_log}"
+                    )
 
                 if total_esperado is not None:
                     if total_esperado > cantidad:
@@ -182,6 +202,16 @@ class VerificadorExpedientesV4(QThread):
                             "ℹ️ Se extrajeron más expedientes que los anunciados."
                         )
 
+                if (
+                    paginas_recorridas is not None
+                    and paginas_esperadas is not None
+                    and paginas_recorridas < paginas_esperadas
+                ):
+                    registrar_log(
+                        "⚠️ No se alcanzó la cantidad de páginas anunciadas por el portal."
+                    )
+                    motivo = "paginas_incompletas"
+
                 ruta_archivo: Path | None = None
                 if self.guardar_json:
                     ruta_archivo = self._guardar_resultados(expedientes)
@@ -195,6 +225,7 @@ class VerificadorExpedientesV4(QThread):
                     "bucle_detectado": "corte_controlado",
                     "sin_siguiente": "completo",
                     "sin_siguiente_habilitado": "corte_controlado",
+                    "paginas_incompletas": "total_incompleto",
                 }
                 estado_normalizado = motivos_exitosos.get(motivo, motivo)
 
@@ -210,6 +241,8 @@ class VerificadorExpedientesV4(QThread):
                         ),
                         duplicados_descartados=duplicados_descartados,
                         filas_descartadas=filas_descartadas,
+                        paginas_recorridas=paginas_recorridas,
+                        paginas_esperadas=paginas_esperadas,
                     )
                 )
         except Exception as exc:  # pragma: no cover - logging de errores
@@ -354,6 +387,7 @@ class MonitorExpedientesTray:
             "sin_siguiente": "ℹ️ No se detectó un botón 'Siguiente'; se asumió el final del listado.",
             "sin_siguiente_habilitado": "ℹ️ El botón 'Siguiente' estaba deshabilitado, por lo que se consideró finalizado el listado.",
             "total_incompleto": "⚠️ Los registros obtenidos no alcanzaron el total informado por el portal.",
+            "paginas_incompletas": "⚠️ No se recorrieron todas las páginas anunciadas por el portal; se reintentará la extracción.",
         }
 
         registrar_log(f"📦 Estado: {datos.estado}")
@@ -376,6 +410,16 @@ class MonitorExpedientesTray:
         if datos.motivo_original:
             registrar_log(f"ℹ️ Motivo original reportado: {datos.motivo_original}")
 
+        paginas_recorridas = datos.paginas_recorridas
+        paginas_esperadas = datos.paginas_esperadas
+        if paginas_recorridas is not None:
+            esperado_log = (
+                str(paginas_esperadas)
+                if paginas_esperadas is not None
+                else "?"
+            )
+            registrar_log(f"📄 Paginación reportada: {paginas_recorridas} / {esperado_log}")
+
         if datos.cantidad is not None:
             if datos.total_esperado is not None:
                 registrar_log(
@@ -396,9 +440,26 @@ class MonitorExpedientesTray:
                 f"{duplicados_descartados} duplicadas / {filas_descartadas} inválidas."
             )
 
+            if paginas_recorridas is not None:
+                esperado_mensaje = (
+                    str(paginas_esperadas)
+                    if paginas_esperadas is not None
+                    else "?"
+                )
+                mensaje_total += (
+                    f" Paginación: {paginas_recorridas} / {esperado_mensaje}."
+                )
+                if (
+                    paginas_esperadas is not None
+                    and paginas_recorridas < paginas_esperadas
+                ):
+                    mensaje_total += (
+                        " Se detectaron páginas pendientes; se reintentará la extracción."
+                    )
+
             icono = (
                 QSystemTrayIcon.Warning
-                if datos.motivo == "total_incompleto"
+                if datos.estado == "total_incompleto"
                 else QSystemTrayIcon.Information
             )
             self.tray.showMessage(
