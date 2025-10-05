@@ -61,6 +61,8 @@ class ResultadoExpedientes:
     error: str | None = None
     motivo: str | None = None
     motivo_original: str | None = None
+    duplicados_descartados: int | None = None
+    filas_descartadas: int | None = None
 
 
 CONFIG_PATH = Path("config/config_monitor.json")
@@ -116,25 +118,69 @@ class VerificadorExpedientesV4(QThread):
                 )
 
                 total_esperado = None
+                duplicados_descartados = 0
+                filas_descartadas = 0
                 if isinstance(metadata, dict):
                     total_meta = metadata.get("total_esperado")
                     if isinstance(total_meta, int):
                         total_esperado = total_meta
+                    duplicados_meta = metadata.get("duplicados_descartados")
+                    if isinstance(duplicados_meta, int):
+                        duplicados_descartados = max(0, duplicados_meta)
+                    filas_meta = metadata.get("filas_descartadas")
+                    if isinstance(filas_meta, int):
+                        filas_descartadas = max(0, filas_meta)
 
                 motivo_original = motivo
+                cantidad = len(expedientes)
                 if total_esperado is not None:
                     registrar_log(
                         f"📈 Total anunciado por el portal: {total_esperado} expedientes"
                     )
 
-                if (
-                    total_esperado is not None
-                    and total_esperado > len(expedientes)
-                ):
-                    registrar_log(
-                        "⚠️ La cantidad recopilada es menor al total anunciado."
-                    )
-                    motivo = "total_incompleto"
+                registrar_log(
+                    "🧹 Filas descartadas durante la extracción: "
+                    f"{duplicados_descartados} duplicadas / {filas_descartadas} inválidas."
+                )
+
+                if total_esperado is not None:
+                    if total_esperado > cantidad:
+                        total_descartado = duplicados_descartados + filas_descartadas
+                        diferencia = total_esperado - cantidad
+                        if total_esperado == cantidad + total_descartado:
+                            detalle_descartes = []
+                            if duplicados_descartados:
+                                detalle_descartes.append(
+                                    f"{duplicados_descartados} duplicadas"
+                                )
+                            if filas_descartadas:
+                                detalle_descartes.append(
+                                    f"{filas_descartadas} inválidas"
+                                )
+                            detalle = ", ".join(detalle_descartes) or "sin descartes registrados"
+                            registrar_log(
+                                "⚠️ El portal informó más expedientes de los que se "
+                                "guardaron, pero la diferencia se explicó por "
+                                f"{detalle} (total descartado: {total_descartado}; "
+                                f"diferencia informada: {diferencia})."
+                            )
+                        else:
+                            registrar_log(
+                                "⚠️ La cantidad recopilada es menor al total anunciado "
+                                f"por {diferencia} expedientes."
+                            )
+                            if total_descartado:
+                                registrar_log(
+                                    "🧮 Descartes registrados: "
+                                    f"{duplicados_descartados} duplicadas / "
+                                    f"{filas_descartadas} inválidas (total "
+                                    f"{total_descartado})."
+                                )
+                            motivo = "total_incompleto"
+                    elif total_esperado < cantidad:
+                        registrar_log(
+                            "ℹ️ Se extrajeron más expedientes que los anunciados."
+                        )
 
                 ruta_archivo: Path | None = None
                 if self.guardar_json:
@@ -147,6 +193,8 @@ class VerificadorExpedientesV4(QThread):
                     "limite_paginas": "corte_controlado",
                     "duplicado_encontrado": "corte_controlado",
                     "bucle_detectado": "corte_controlado",
+                    "sin_siguiente": "completo",
+                    "sin_siguiente_habilitado": "corte_controlado",
                 }
                 estado_normalizado = motivos_exitosos.get(motivo, motivo)
 
@@ -160,6 +208,8 @@ class VerificadorExpedientesV4(QThread):
                         motivo_original=(
                             motivo_original if motivo != motivo_original else None
                         ),
+                        duplicados_descartados=duplicados_descartados,
+                        filas_descartadas=filas_descartadas,
                     )
                 )
         except Exception as exc:  # pragma: no cover - logging de errores
@@ -301,12 +351,21 @@ class MonitorExpedientesTray:
             "limite_paginas": "📄 Se alcanzó el tope de páginas configurado para la búsqueda.",
             "duplicado_encontrado": "📎 Se detuvo la extracción al detectar un expediente duplicado (solo si se fuerza detener_en_duplicado=True).",
             "bucle_detectado": "🌀 Se detectó un posible bucle de navegación y la extracción se detuvo de forma segura.",
+            "sin_siguiente": "ℹ️ No se detectó un botón 'Siguiente'; se asumió el final del listado.",
+            "sin_siguiente_habilitado": "ℹ️ El botón 'Siguiente' estaba deshabilitado, por lo que se consideró finalizado el listado.",
             "total_incompleto": "⚠️ Los registros obtenidos no alcanzaron el total informado por el portal.",
         }
 
         registrar_log(f"📦 Estado: {datos.estado}")
         mensaje_estado = mensajes.get(datos.estado, "❓ Estado no reconocido.")
         registrar_log(mensaje_estado)
+
+        duplicados_descartados = datos.duplicados_descartados or 0
+        filas_descartadas = datos.filas_descartadas or 0
+        registrar_log(
+            "🧾 Descartes reportados: "
+            f"{duplicados_descartados} duplicadas / {filas_descartadas} inválidas."
+        )
 
         if datos.motivo:
             mensaje_motivo = mensajes_motivo.get(datos.motivo)
@@ -331,6 +390,11 @@ class MonitorExpedientesTray:
                 )
             else:
                 mensaje_total = f"{datos.cantidad} expedientes actualizados."
+
+            mensaje_total += (
+                " Descartados: "
+                f"{duplicados_descartados} duplicadas / {filas_descartadas} inválidas."
+            )
 
             icono = (
                 QSystemTrayIcon.Warning
