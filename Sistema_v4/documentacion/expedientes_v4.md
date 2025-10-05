@@ -105,3 +105,5 @@ expedientes, motivo = await extraer_expedientes_completos(
 ## Integración con el monitor
 
 El hilo `VerificadorExpedientesV4` definido en `Sistema_v4.monitor.monitor_entradas_expedientes_v4` consume directamente esta función para poblar el monitor de bandeja. Allí se normaliza el `motivo` y se persisten los resultados en JSON cuando corresponde.
+
+> ℹ️ Desde la versión 4, el monitor invoca a `extraer_expedientes_completos` con `detener_en_duplicado=False`. De esta manera, si aparece un expediente repetido (por ejemplo, **FPA 001425/2013**), se omite del resultado pero la paginación continúa hasta completar el recorrido o alcanzar otro límite configurado. El motivo `"duplicado_encontrado"` solo se emite cuando algún consumidor redefine el parámetro a `True`.
