@@ -195,7 +195,6 @@ Aplicación de bandeja del sistema que proporciona monitoreo automatizado de exp
 - **Verificación automática**: Basada en horarios configurables
 - **Notificaciones**: Alertas cuando se detectan cambios
 - **Configuración flexible**: Modos automático, laboral y no laboral
-- **Control de duplicados configurable**: Permite detener o continuar la extracción ante repetidos
 
 ### Configuración por Defecto
 
@@ -209,7 +208,6 @@ DEFAULT_CONFIG = {
         "intervalo_minutos": 30,
     },
     "fuera_horario": {"intervalo_minutos": 240},
-    "detener_en_duplicado": True,
 }
 ```
 
@@ -348,8 +346,7 @@ from pathlib import Path
 verificador = VerificadorExpedientesV4(
     carpeta_salida=Path("mi_carpeta/expedientes"),
     nombre_archivo="expedientes_hoy.json",
-    guardar_json=True,
-    detener_en_duplicado=False,
+    guardar_json=True
 )
 
 # Conectar señal para procesar resultados
@@ -447,11 +444,6 @@ class ResultadoExpedientes:
 
 ### Configuración del Monitor
 
-El archivo `config/config_monitor.json` acepta una clave `detener_en_duplicado`
-para controlar si la extracción se detiene al detectar un expediente repetido.
-El valor por defecto es `true`, manteniendo el mismo comportamiento que la
-extracción manual.
-
 ```python
 {
     "modo": "automatico" | "laboral" | "no_laboral",
@@ -463,8 +455,7 @@ extracción manual.
     },
     "fuera_horario": {
         "intervalo_minutos": int
-    },
-    "detener_en_duplicado": bool
+    }
 }
 ```
 
@@ -507,7 +498,7 @@ Aplicación de bandeja del sistema.
 Hilo de verificación de expedientes.
 
 **Métodos:**
-- `__init__(carpeta_salida, nombre_archivo, guardar_json, *, detener_en_duplicado)`
+- `__init__(carpeta_salida, nombre_archivo, guardar_json)`
 - `run()` - Ejecuta verificación asíncrona
 
 **Señales:**
