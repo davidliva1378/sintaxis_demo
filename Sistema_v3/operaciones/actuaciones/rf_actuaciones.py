@@ -4,6 +4,40 @@ from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 from .actuaciones_utils import limpiar_texto, normalizar_fecha, generar_hash_archivo
 
+
+def construir_nombre_archivo_normalizado(fecha, tipo, hash_val, archivo_url, nombre_descarga=None):
+    """Genera un nombre de archivo normalizado preservando la extensión original."""
+    parsed_url = urlparse(archivo_url) if archivo_url else None
+
+    nombre_origen = nombre_descarga or ""
+    if not nombre_origen and parsed_url:
+        tipo_doc = parse_qs(parsed_url.query).get("tipoDoc", [])
+        if tipo_doc and tipo_doc[0]:
+            nombre_origen = tipo_doc[0]
+
+    if not nombre_origen and parsed_url:
+        nombre_origen = os.path.basename(parsed_url.path)
+
+    if not nombre_origen:
+        nombre_origen = "documento.pdf"
+
+    extension = os.path.splitext(nombre_origen)[1]
+    if not extension and parsed_url:
+        extension = os.path.splitext(parsed_url.path)[1]
+
+    if not extension:
+        extension = ".pdf"
+
+    if not extension.startswith("."):
+        extension = f".{extension}"
+
+    extension = extension.lower()
+    tipo_archivo = extension[1:] if len(extension) > 1 else None
+    nombre_normalizado = f"{fecha}_{tipo}_{hash_val}{extension}" if extension else None
+
+    return nombre_normalizado, tipo_archivo
+
+
 async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indice_inicial=1):
     actuaciones = []
     try:
@@ -64,12 +98,14 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
                     if link:
                         archivo_url = await link.get_attribute("href")
                         if archivo_url:
-                            nombre_archivo = await link.get_attribute("download")
-                            if not nombre_archivo:
-                                parsed = urlparse(archivo_url)
-                                nombre_archivo = parse_qs(parsed.query).get("tipoDoc", ["documento.pdf"])[0]
-                            tipo_archivo = os.path.splitext(nombre_archivo)[1][1:].lower() if nombre_archivo else None
-                            nombre_archivo = f"{fecha}_{tipo}_{hash_val}.pdf"
+                            nombre_descarga = await link.get_attribute("download")
+                            nombre_archivo, tipo_archivo = construir_nombre_archivo_normalizado(
+                                fecha,
+                                tipo,
+                                hash_val,
+                                archivo_url,
+                                nombre_descarga,
+                            )
                         else:
                             archivo_url = None
                             nombre_archivo = None
@@ -170,12 +206,14 @@ async def extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_i
                 if link:
                     archivo_url = await link.get_attribute("href")
                     if archivo_url:
-                        nombre_archivo = await link.get_attribute("download")
-                        if not nombre_archivo:
-                            parsed = urlparse(archivo_url)
-                            nombre_archivo = parse_qs(parsed.query).get("tipoDoc", ["documento.pdf"])[0]
-                        tipo_archivo = os.path.splitext(nombre_archivo)[1][1:].lower() if nombre_archivo else None
-                        nombre_archivo = f"{fecha}_{tipo}_{hash_val}.pdf"
+                        nombre_descarga = await link.get_attribute("download")
+                        nombre_archivo, tipo_archivo = construir_nombre_archivo_normalizado(
+                            fecha,
+                            tipo,
+                            hash_val,
+                            archivo_url,
+                            nombre_descarga,
+                        )
                     else:
                         archivo_url = None
                         nombre_archivo = None
@@ -368,7 +406,13 @@ async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_
 
     for idx, act in enumerate(actuaciones, start=1):
         archivo_url = act.get("Archivo", "N/A")
-        nombre_archivo = act.get("NombreArchivo", f"documento_{idx}.pdf")
+        nombre_archivo = act.get("NombreArchivo")
+        if not nombre_archivo:
+            tipo_archivo = act.get("TipoArchivo")
+            if tipo_archivo and tipo_archivo != "N/A":
+                nombre_archivo = f"documento_{idx}.{tipo_archivo.lower()}"
+            else:
+                nombre_archivo = f"documento_{idx}.pdf"
 
         if archivo_url == "N/A":
             print(f"🚫 Actuación {idx}: sin archivo para descargar.")
