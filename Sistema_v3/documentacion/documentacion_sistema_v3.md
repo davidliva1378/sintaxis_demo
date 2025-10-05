@@ -41,8 +41,8 @@ Listado de funciones encontradas en el módulo `Sistema_v3` con información dis
   Rutina alternativa para extraer expedientes. *Sin docstring.*
 - **`async def extraer_datos_expediente(page)`**  
   Obtiene los datos del expediente actualmente abierto. *Sin docstring.*
-- **`async def abrir_expediente_desde_fila(fila, page)`**  
-  Abre el expediente asociado a la fila seleccionada. *Sin docstring.*
+- **`async def abrir_expediente_desde_fila(fila, page)`**
+  Abre el expediente asociado a la fila seleccionada y retorna los datos obtenidos o `None` si falla. *Docstring disponible.*
 - **`async def mostrar_y_elegir_expediente(page: Page, filas: List) -> Optional[Dict]`**  
   *Docstring:* Muestra los expedientes encontrados y permite elegir uno; retorna un diccionario con los datos extraídos.
 - **`async def buscar_expediente_por_numero(page: Page, numero: str, anio: str, timeout: int = 8000) -> tuple[bool, str]`**  

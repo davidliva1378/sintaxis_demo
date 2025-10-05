@@ -411,9 +411,9 @@ Este archivo solo contiene importaciones y exportaciones, sin definiciones de fu
 - **Parámetros**:
   - `fila`: Handle del elemento fila
   - `page`: Objeto página de Playwright
-- **Retorna**: `bool`
-- **Descripción**: Abre expediente desde una fila específica
-- **Docstring**: Sin docstring
+- **Retorna**: `Optional[Dict]`
+- **Descripción**: Abre expediente desde una fila específica y devuelve los datos extraídos o `None` ante fallos
+- **Docstring**: Describe que abre el expediente desde la fila proporcionada y retorna los datos extraídos o `None`.
 
 #### `mostrar_y_elegir_expediente(page, filas)`
 - **Línea**: 198
