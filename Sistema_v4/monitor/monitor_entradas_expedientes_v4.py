@@ -116,6 +116,8 @@ class VerificadorExpedientesV4(QThread):
                     "limite_fecha": "corte_controlado",
                     "limite_tiempo": "corte_controlado",
                     "limite_paginas": "corte_controlado",
+                    "duplicado_encontrado": "corte_controlado",
+                    "bucle_detectado": "corte_controlado",
                 }
                 estado_normalizado = motivos_exitosos.get(motivo, motivo)
 
@@ -255,20 +257,28 @@ class MonitorExpedientesTray:
     def procesar_resultado_expedientes(self, datos: ResultadoExpedientes) -> None:
         mensajes = {
             "completo": "✅ Extracción finalizada exitosamente.",
-            "corte_controlado": "✅ Extracción detenida por corte planificado ({motivo}).",
+            "corte_controlado": "✅ Extracción detenida de forma controlada.",
             "fallo": "❌ Fallo en la verificación.",
+        }
+
+        mensajes_motivo = {
+            "limite_fecha": "📅 Se alcanzó la fecha límite configurada.",
+            "limite_tiempo": "⏱️ Se cumplió el tiempo máximo de extracción permitido.",
+            "limite_paginas": "📄 Se alcanzó el tope de páginas configurado para la búsqueda.",
+            "duplicado_encontrado": "📎 Se detuvo la extracción al detectar un expediente duplicado, evitando inconsistencias.",
+            "bucle_detectado": "🌀 Se detectó un posible bucle de navegación y la extracción se detuvo de forma segura.",
         }
 
         registrar_log(f"📦 Estado: {datos.estado}")
         mensaje_estado = mensajes.get(datos.estado, "❓ Estado no reconocido.")
-        try:
-            mensaje_estado = mensaje_estado.format(
-                motivo=datos.motivo or "motivo no especificado"
-            )
-        except (KeyError, IndexError, ValueError):
-            # El mensaje no requiere formateo o incluye llaves incompatibles.
-            pass
         registrar_log(mensaje_estado)
+
+        if datos.motivo:
+            mensaje_motivo = mensajes_motivo.get(datos.motivo)
+            if mensaje_motivo:
+                registrar_log(mensaje_motivo)
+            else:
+                registrar_log(f"ℹ️ Motivo recibido: {datos.motivo}")
 
         if datos.cantidad is not None:
             registrar_log(f"📊 Total extraídos: {datos.cantidad}")
