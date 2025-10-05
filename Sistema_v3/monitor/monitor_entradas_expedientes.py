@@ -242,6 +242,7 @@ class MonitorEntradasExpedientes:
         estado = datos.get("estado", "desconocido")
         mensajes = {
             "completo": "✅ Extracción finalizada exitosamente.",
+            "fin_listado": "ℹ️ Se alcanzó el fin del listado sin nuevos expedientes.",
             "repetido_detectado": "⚠️ Se detectó repetición de expedientes.",
             "tiempo_maximo": "⏱ Se alcanzó el tiempo máximo permitido.",
             "tabla_no_disponible": "❌ No se encontró la tabla de expedientes.",
@@ -258,7 +259,7 @@ class MonitorEntradasExpedientes:
         if datos.get("ruta"):
             registrar_log(f"📁 Guardado en: {datos['ruta']}")
 
-        if estado not in ("completo", "corte_fecha"):
+        if estado not in ("completo", "corte_fecha", "fin_listado"):
             self.reintentos_expedientes += 1
             if self.reintentos_expedientes < 5:
                 registrar_log(

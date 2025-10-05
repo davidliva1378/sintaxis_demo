@@ -96,7 +96,7 @@ async def extraer_expedientes_completos(
     fecha_corte: str | None = None,
     tiempo_maximo_segundos: int | None = None,
     orden: str | None = None,
-) -> tuple[list[dict], str]:
+) -> tuple[list[dict], str, dict[str, object]]:
 ```
 
 ### Parámetros de Entrada
@@ -116,10 +116,11 @@ async def extraer_expedientes_completos(
 
 ### Valores de Retorno
 
-La función retorna una tupla `(expedientes, motivo)`:
+La función retorna una tupla `(expedientes, motivo, metadata)`:
 
-- **expedientes**: Lista de diccionarios con datos de expedientes
-- **motivo**: Código que indica por qué se detuvo la extracción
+- **expedientes**: Lista de diccionarios con datos de expedientes.
+- **motivo**: Código que indica por qué se detuvo la extracción.
+- **metadata**: Diccionario con metadatos adicionales. Incluye la clave opcional `"total_esperado"` cuando el portal anuncia la cantidad total de expedientes publicados.
 
 #### Códigos de Motivo
 
@@ -229,6 +230,7 @@ Hilo separado que ejecuta la extracción de expedientes sin bloquear la interfaz
 - **Guardado automático**: Resultados en formato JSON
 - **Manejo de errores**: Captura y reporta excepciones
 - **Señales Qt**: Comunicación thread-safe con la interfaz
+- **Omisión de duplicados**: Invoca al scraper con `detener_en_duplicado=False` para continuar paginando aunque aparezcan expedientes repetidos.
 
 ---
 
@@ -301,7 +303,7 @@ from Sistema_v4.config.urls_pjn import URL_CONSULTAS
 async def ejemplo_basico():
     async with reutilizar_sesion_async() as (page, context, browser):
         await page.goto(URL_CONSULTAS)
-        expedientes, motivo = await extraer_expedientes_completos(page)
+        expedientes, motivo, metadata = await extraer_expedientes_completos(page)
         print(f"Extraídos {len(expedientes)} expedientes. Motivo: {motivo}")
         return expedientes
 ```
@@ -313,7 +315,7 @@ async def ejemplo_avanzado():
     async with reutilizar_sesion_async() as (page, context, browser):
         await page.goto(URL_CONSULTAS)
 
-        expedientes, motivo = await extraer_expedientes_completos(
+        expedientes, motivo, metadata = await extraer_expedientes_completos(
             page,
             max_paginas=50,
             fecha_corte="2024-01-01",
@@ -482,7 +484,7 @@ Función principal de extracción de expedientes.
 - `orden: str | None` - Criterio de orden
 
 **Retorna:**
-- `tuple[list[dict], str]` - (expedientes, motivo)
+- `tuple[list[dict], str, dict[str, object]]` - (expedientes, motivo, metadata)
 
 ### Clases Principales
 

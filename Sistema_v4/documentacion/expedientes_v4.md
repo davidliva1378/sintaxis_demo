@@ -5,7 +5,7 @@ Este documento describe el uso de la corrutina `Sistema_v4.operaciones.expedient
 ## Firma general
 
 ```python
-expedientes, motivo = await extraer_expedientes_completos(
+expedientes, motivo, metadata = await extraer_expedientes_completos(
     page,
     sel_tabla=SEL_TABLA,
     sel_tbody=SEL_TBODY,
@@ -20,10 +20,11 @@ expedientes, motivo = await extraer_expedientes_completos(
 )
 ```
 
-La función siempre devuelve una tupla `(expedientes, motivo)`:
+La función devuelve una tupla `(expedientes, motivo, metadata)`:
 
 * `expedientes` es una lista de diccionarios con las claves `numero`, `dependencia`, `caratula`, `situacion` y `ultima_actuacion` (fecha normalizada a `YYYY-MM-DD` cuando es posible).
 * `motivo` es una cadena que indica por qué se detuvo la extracción.
+* `metadata` es un diccionario con información complementaria. Desde esta versión incluye la clave opcional `"total_esperado"` cuando el portal anuncia la cantidad total de expedientes que deberían listarse.
 
 ## Parámetros posicionales
 
@@ -80,13 +81,13 @@ La función siempre retorna los datos acumulados hasta el instante del evento qu
 ### Extracción básica
 
 ```python
-expedientes, motivo = await extraer_expedientes_completos(page)
+expedientes, motivo, metadata = await extraer_expedientes_completos(page)
 ```
 
 ### Ordenamiento inicial
 
 ```python
-expedientes, motivo = await extraer_expedientes_completos(
+expedientes, motivo, metadata = await extraer_expedientes_completos(
     page,
     orden="fecha",  # también acepta "caratula", "oficina" y "situacion"
 )
@@ -95,7 +96,7 @@ expedientes, motivo = await extraer_expedientes_completos(
 ### Corte por fecha y tiempo máximo
 
 ```python
-expedientes, motivo = await extraer_expedientes_completos(
+expedientes, motivo, metadata = await extraer_expedientes_completos(
     page,
     fecha_corte="2024-01-01",
     tiempo_maximo_segundos=90,
@@ -105,3 +106,5 @@ expedientes, motivo = await extraer_expedientes_completos(
 ## Integración con el monitor
 
 El hilo `VerificadorExpedientesV4` definido en `Sistema_v4.monitor.monitor_entradas_expedientes_v4` consume directamente esta función para poblar el monitor de bandeja. Allí se normaliza el `motivo` y se persisten los resultados en JSON cuando corresponde.
+
+> ℹ️ Desde la versión 4, el monitor invoca a `extraer_expedientes_completos` con `detener_en_duplicado=False`. De esta manera, si aparece un expediente repetido (por ejemplo, **FPA 001425/2013**), se omite del resultado pero la paginación continúa hasta completar el recorrido o alcanzar otro límite configurado. El motivo `"duplicado_encontrado"` solo se emite cuando algún consumidor redefine el parámetro a `True`.

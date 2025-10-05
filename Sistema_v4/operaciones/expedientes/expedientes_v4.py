@@ -27,6 +27,8 @@ SEL_SIGUIENTE = ", ".join(
     ]
 )
 
+EXPEDIENTES_POR_PAGINA = 15
+
 _ORDEN_MAP = {
     "fecha": "FECHA",
     "caratula": "CARATULA",
@@ -122,6 +124,37 @@ async def _tbody_fingerprint(tbody: Locator | ElementHandle) -> str:
     html = await tbody.inner_html()
     return _build_fingerprint(html)
 
+_SEL_TOTAL_EXPEDIENTES = "strong:has-text('Se han encontrado')"
+
+
+async def _extraer_total_esperado(page: Page) -> int | None:
+    """Intenta leer el total anunciado en el encabezado del listado."""
+
+    try:
+        total_locator = page.locator(_SEL_TOTAL_EXPEDIENTES)
+        if await total_locator.count() <= 0:
+            return None
+        texto = await total_locator.first.inner_text()
+    except Error:
+        return None
+
+    coincidencia = re.search(r"total de\s*([\d.,]+)", texto)
+    if not coincidencia:
+        coincidencia = re.search(r"([\d][\d.,]*)", texto)
+
+    if not coincidencia:
+        return None
+
+    numero = re.sub(r"[^\d]", "", coincidencia.group(1))
+    if not numero:
+        return None
+
+    try:
+        return int(numero)
+    except ValueError:
+        return None
+
+
 async def extraer_expedientes_completos(
     page: Page,
     sel_tabla: str = SEL_TABLA,
@@ -134,7 +167,7 @@ async def extraer_expedientes_completos(
     fecha_corte: str | None = None,
     tiempo_maximo_segundos: int | None = None,
     orden: str | None = None,
-) -> tuple[list[dict], str]:
+) -> tuple[list[dict], str, dict[str, object]]:
     """
     Extrae TODAS las páginas del listado de expedientes y devuelve:
     [
@@ -204,10 +237,13 @@ async def extraer_expedientes_completos(
 
     Retorna
     -------
-    tuple[list[dict], str]
-        Una tupla ``(expedientes, motivo)`` donde ``expedientes`` es la lista de
-        diccionarios extraídos y ``motivo`` el código de finalización. Los
-        códigos actuales son:
+    tuple[list[dict], str, dict[str, object]]
+        Una tupla ``(expedientes, motivo, metadata)`` donde ``expedientes`` es la
+        lista de diccionarios extraídos, ``motivo`` el código de finalización y
+        ``metadata`` un diccionario con información adicional recolectada durante
+        la extracción. Actualmente incluye la clave ``"total_esperado"`` cuando
+        el portal anuncia explícitamente el total de expedientes disponibles.
+        Los códigos de motivo actuales son:
 
         * ``"fin_listado"``: se alcanzó el final natural del paginado.
         * ``"limite_paginas"``: se alcanzó ``max_paginas``.
@@ -219,9 +255,23 @@ async def extraer_expedientes_completos(
         * ``"siguiente_deshabilitado"``: el botón se deshabilitó al intentar usarlo.
         * ``"error_click"``: falló el clic en "Siguiente".
         * ``"duplicado_encontrado"``: se detectó un expediente repetido.
+        * ``"bucle_detectado"``: se detectó un ciclo al intentar avanzar.
     """
     resultados: list[dict] = []
     huellas: set[tuple[str, str, str]] = set()
+    paginas_visitadas: dict[str, int] = {}
+    metadata: dict[str, object] = {}
+    paginas_esperadas: int | None = None
+    filas_descartadas = 0
+    duplicados_descartados = 0
+
+    def _finalizar(motivo: str) -> tuple[list[dict], str, dict[str, object]]:
+        metadata["filas_descartadas"] = filas_descartadas
+        metadata["duplicados_descartados"] = duplicados_descartados
+        metadata["paginas_recorridas"] = paginas_recorridas
+        if paginas_esperadas is not None:
+            metadata["paginas_esperadas"] = paginas_esperadas
+        return resultados, motivo, metadata
 
     fecha_corte_dt: datetime | None = None
     if fecha_corte:
@@ -244,6 +294,15 @@ async def extraer_expedientes_completos(
     # Aseguramos presencia de tabla
     tabla = page.locator(sel_tabla)
     await tabla.wait_for(state="visible", timeout=25_000)
+
+    total_esperado = await _extraer_total_esperado(page)
+    if total_esperado is not None:
+        metadata["total_esperado"] = total_esperado
+        if isinstance(total_esperado, int):
+            paginas_esperadas = (
+                (total_esperado + EXPEDIENTES_POR_PAGINA - 1)
+                // EXPEDIENTES_POR_PAGINA
+            )
 
     if orden:
         valor_orden = _resolver_valor_orden(orden)
@@ -273,10 +332,21 @@ async def extraer_expedientes_completos(
     paginas_recorridas = 0
     while True:
         if _excedio_tiempo():
-            return resultados, "limite_tiempo"
+            return _finalizar("limite_tiempo")
 
         paginas_recorridas += 1
         print(f"Procesando página {paginas_recorridas}")
+
+        fingerprint_actual = await _tbody_fingerprint(tbody_locator)
+        if fingerprint_actual in paginas_visitadas:
+            pagina_prev = paginas_visitadas[fingerprint_actual]
+            print(
+                f"🔁 Página {paginas_recorridas} coincide con la ya vista en la "
+                f"página {pagina_prev}. Finalizando para evitar bucles."
+            )
+            return _finalizar("bucle_detectado")
+
+        paginas_visitadas[fingerprint_actual] = paginas_recorridas
 
         # 1) Extraer filas visibles de ESTA página en un solo evaluate
         filas: list[list[str]] = await page.evaluate(
@@ -290,6 +360,7 @@ async def extraer_expedientes_completos(
         # 2) Mapear a dicts usando las 5 columnas útiles
         for cols in filas:
             if len(cols) < 5:
+                filas_descartadas += 1
                 continue
             ultima_actuacion_norm = _norm_fecha(cols[4])
             ultima_dt: datetime | None = None
@@ -309,12 +380,13 @@ async def extraer_expedientes_completos(
             duplicado = huella in huellas
 
             if duplicado and detener_en_duplicado:
-                return resultados, "duplicado_encontrado"
+                return _finalizar("duplicado_encontrado")
 
             if fecha_corte_dt and ultima_dt and ultima_dt < fecha_corte_dt:
-                return resultados, "limite_fecha"
+                return _finalizar("limite_fecha")
 
             if duplicado and omitir_duplicados:
+                duplicados_descartados += 1
                 continue
 
             if not duplicado:
@@ -329,16 +401,16 @@ async def extraer_expedientes_completos(
             })
 
             if _excedio_tiempo():
-                return resultados, "limite_tiempo"
+                return _finalizar("limite_tiempo")
 
         # 3) Intentar ir a la siguiente página; cortar si no hay
         if paginas_recorridas >= max_paginas:
-            return resultados, "limite_paginas"
+            return _finalizar("limite_paginas")
 
         next_btn = page.locator(sel_siguiente)
         btn_count = await next_btn.count()
         if btn_count <= 0:
-            return resultados, "sin_siguiente"  # no hay control de siguiente
+            return _finalizar("sin_siguiente")  # no hay control de siguiente
 
         boton: Locator | None = None
         for idx in range(btn_count):
@@ -348,24 +420,24 @@ async def extraer_expedientes_completos(
                 break
 
         if boton is None:
-            return resultados, "sin_siguiente_habilitado"
+            return _finalizar("sin_siguiente_habilitado")
 
         try:
             await boton.wait_for(state="visible", timeout=10_000)
         except TimeoutError as exc:
             print(f"Botón 'Siguiente' no visible: {exc}")
-            return resultados, "siguiente_timeout"
+            return _finalizar("siguiente_timeout")
 
         if not await _is_locator_enabled(boton):
-            return resultados, "siguiente_deshabilitado"
+            return _finalizar("siguiente_deshabilitado")
 
         # Fingerprint antes del click para confirmar cambio real
-        antes = await _tbody_fingerprint(tbody_locator)
+        antes = fingerprint_actual
         try:
             await boton.click()
         except (TimeoutError, Error) as exc:
             print(f"Fallo al hacer clic en 'Siguiente': {exc}")
-            return resultados, "error_click"
+            return _finalizar("error_click")
 
         # Esperar a que cambie el tbody (evita loops)
         max_wait_ms = 12_000
@@ -385,12 +457,11 @@ async def extraer_expedientes_completos(
 
         if not fingerprint_cambio:
             # No cambió el contenido → estamos al final
-            return resultados, "fin_listado"
+            return _finalizar("fin_listado")
 
         if _excedio_tiempo():
-            return resultados, "limite_tiempo"
-
-    return resultados, "fin_listado"
+            return _finalizar("limite_tiempo")
+    return _finalizar("fin_listado")
 
 
 async def extraer_datos_expediente(page: Page) -> dict[str, str] | None:

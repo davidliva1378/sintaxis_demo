@@ -56,9 +56,11 @@ except ImportError:  # pragma: no cover - compatibilidad con Sistema_v3
 class ResultadoExpedientes:
     estado: str
     cantidad: int | None = None
+    total_esperado: int | None = None
     ruta: str | None = None
     error: str | None = None
     motivo: str | None = None
+    motivo_original: str | None = None
 
 
 CONFIG_PATH = Path("config/config_monitor.json")
@@ -103,9 +105,36 @@ class VerificadorExpedientesV4(QThread):
                     return
 
                 await page.goto(URL_CONSULTAS)
-                expedientes, motivo = await extraer_expedientes_completos(
-                    page, orden="fecha",
+                (
+                    expedientes,
+                    motivo,
+                    metadata,
+                ) = await extraer_expedientes_completos(
+                    page,
+                    orden="fecha",
+                    detener_en_duplicado=False
                 )
+
+                total_esperado = None
+                if isinstance(metadata, dict):
+                    total_meta = metadata.get("total_esperado")
+                    if isinstance(total_meta, int):
+                        total_esperado = total_meta
+
+                motivo_original = motivo
+                if total_esperado is not None:
+                    registrar_log(
+                        f"📈 Total anunciado por el portal: {total_esperado} expedientes"
+                    )
+
+                if (
+                    total_esperado is not None
+                    and total_esperado > len(expedientes)
+                ):
+                    registrar_log(
+                        "⚠️ La cantidad recopilada es menor al total anunciado."
+                    )
+                    motivo = "total_incompleto"
 
                 ruta_archivo: Path | None = None
                 if self.guardar_json:
@@ -126,8 +155,12 @@ class VerificadorExpedientesV4(QThread):
                     ResultadoExpedientes(
                         estado=estado_resultado,
                         cantidad=len(expedientes),
+                        total_esperado=total_esperado,
                         ruta=str(ruta_archivo) if ruta_archivo else None,
                         motivo=motivo,
+                        motivo_original=(
+                            motivo_original if motivo != motivo_original else None
+                        ),
                     )
                 )
         except Exception as exc:  # pragma: no cover - logging de errores
@@ -263,21 +296,55 @@ class MonitorExpedientesTray:
             "limite_tiempo": "✅ Extracción detenida al alcanzar el límite de tiempo configurado.",
             "duplicado_encontrado": "✅ Extracción detenida tras detectar un expediente duplicado.",
             "fallo": "❌ Fallo en la verificación.",
+            "total_incompleto": "⚠️ Resultados incompletos respecto al total anunciado.",
+        }
+
+        mensajes_motivo = {
+            "limite_fecha": "📅 Se alcanzó la fecha límite configurada.",
+            "limite_tiempo": "⏱️ Se cumplió el tiempo máximo de extracción permitido.",
+            "limite_paginas": "📄 Se alcanzó el tope de páginas configurado para la búsqueda.",
+            "duplicado_encontrado": "📎 Se detuvo la extracción al detectar un expediente duplicado (solo si se fuerza detener_en_duplicado=True).",
+            "total_incompleto": "⚠️ Los registros obtenidos no alcanzaron el total informado por el portal.",
         }
 
         registrar_log(f"📦 Estado: {datos.estado}")
         registrar_log(mensajes.get(datos.estado, "❓ Estado no reconocido."))
 
-        if datos.motivo and datos.motivo != datos.estado:
-            mensaje_motivo = mensajes.get(datos.motivo)
+        if datos.motivo:
+            mensaje_motivo = mensajes_motivo.get(datos.motivo)
             if mensaje_motivo:
                 registrar_log(mensaje_motivo)
+            elif datos.motivo != datos.estado:
+                registrar_log(f"ℹ️ Motivo recibido: {datos.motivo}")
+
+        if datos.motivo_original:
+            registrar_log(f"ℹ️ Motivo original reportado: {datos.motivo_original}")
 
         if datos.cantidad is not None:
-            registrar_log(f"📊 Total extraídos: {datos.cantidad}")
+            if datos.total_esperado is not None:
+                registrar_log(
+                    f"📊 Expedientes recopilados: {datos.cantidad} / {datos.total_esperado} esperados"
+                )
+            else:
+                registrar_log(f"📊 Total extraídos: {datos.cantidad}")
+
+            if datos.total_esperado is not None:
+                mensaje_total = (
+                    f"{datos.cantidad} de {datos.total_esperado} expedientes actualizados."
+                )
+            else:
+                mensaje_total = f"{datos.cantidad} expedientes actualizados."
+
+            icono = (
+                QSystemTrayIcon.Warning
+                if datos.motivo == "total_incompleto"
+                else QSystemTrayIcon.Information
+            )
+
             self.tray.showMessage(
                 "📥 Expedientes",
-                f"{datos.cantidad} expedientes actualizados.",
+                mensaje_total,
+                icono,
             )
         if datos.ruta:
             registrar_log(f"📁 Guardado en: {datos.ruta}")

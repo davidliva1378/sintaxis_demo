@@ -56,9 +56,15 @@ except ImportError:  # pragma: no cover - compatibilidad con Sistema_v3
 class ResultadoExpedientes:
     estado: str
     cantidad: int | None = None
+    total_esperado: int | None = None
     ruta: str | None = None
     error: str | None = None
     motivo: str | None = None
+    motivo_original: str | None = None
+    duplicados_descartados: int | None = None
+    filas_descartadas: int | None = None
+    paginas_recorridas: int | None = None
+    paginas_esperadas: int | None = None
 
 
 CONFIG_PATH = Path("config/config_monitor.json")
@@ -103,9 +109,108 @@ class VerificadorExpedientesV4(QThread):
                     return
 
                 await page.goto(URL_CONSULTAS)
-                expedientes, motivo = await extraer_expedientes_completos(
-                    page, orden="fecha"
+                (
+                    expedientes,
+                    motivo,
+                    metadata,
+                ) = await extraer_expedientes_completos(
+                    page,
+                    orden="fecha",
+                    detener_en_duplicado=False,
                 )
+
+                total_esperado = None
+                duplicados_descartados = 0
+                filas_descartadas = 0
+                paginas_recorridas = None
+                paginas_esperadas = None
+                if isinstance(metadata, dict):
+                    total_meta = metadata.get("total_esperado")
+                    if isinstance(total_meta, int):
+                        total_esperado = total_meta
+                    duplicados_meta = metadata.get("duplicados_descartados")
+                    if isinstance(duplicados_meta, int):
+                        duplicados_descartados = max(0, duplicados_meta)
+                    filas_meta = metadata.get("filas_descartadas")
+                    if isinstance(filas_meta, int):
+                        filas_descartadas = max(0, filas_meta)
+                    paginas_meta = metadata.get("paginas_recorridas")
+                    if isinstance(paginas_meta, int):
+                        paginas_recorridas = max(0, paginas_meta)
+                    paginas_esp_meta = metadata.get("paginas_esperadas")
+                    if isinstance(paginas_esp_meta, int):
+                        paginas_esperadas = max(0, paginas_esp_meta)
+
+                motivo_original = motivo
+                cantidad = len(expedientes)
+                if total_esperado is not None:
+                    registrar_log(
+                        f"📈 Total anunciado por el portal: {total_esperado} expedientes"
+                    )
+
+                registrar_log(
+                    "🧹 Filas descartadas durante la extracción: "
+                    f"{duplicados_descartados} duplicadas / {filas_descartadas} inválidas."
+                )
+
+                if paginas_recorridas is not None:
+                    esperado_log = (
+                        str(paginas_esperadas)
+                        if paginas_esperadas is not None
+                        else "?"
+                    )
+                    registrar_log(
+                        f"📄 Paginación: {paginas_recorridas} / {esperado_log}"
+                    )
+
+                if total_esperado is not None:
+                    if total_esperado > cantidad:
+                        total_descartado = duplicados_descartados + filas_descartadas
+                        diferencia = total_esperado - cantidad
+                        if total_esperado == cantidad + total_descartado:
+                            detalle_descartes = []
+                            if duplicados_descartados:
+                                detalle_descartes.append(
+                                    f"{duplicados_descartados} duplicadas"
+                                )
+                            if filas_descartadas:
+                                detalle_descartes.append(
+                                    f"{filas_descartadas} inválidas"
+                                )
+                            detalle = ", ".join(detalle_descartes) or "sin descartes registrados"
+                            registrar_log(
+                                "⚠️ El portal informó más expedientes de los que se "
+                                "guardaron, pero la diferencia se explicó por "
+                                f"{detalle} (total descartado: {total_descartado}; "
+                                f"diferencia informada: {diferencia})."
+                            )
+                        else:
+                            registrar_log(
+                                "⚠️ La cantidad recopilada es menor al total anunciado "
+                                f"por {diferencia} expedientes."
+                            )
+                            if total_descartado:
+                                registrar_log(
+                                    "🧮 Descartes registrados: "
+                                    f"{duplicados_descartados} duplicadas / "
+                                    f"{filas_descartadas} inválidas (total "
+                                    f"{total_descartado})."
+                                )
+                            motivo = "total_incompleto"
+                    elif total_esperado < cantidad:
+                        registrar_log(
+                            "ℹ️ Se extrajeron más expedientes que los anunciados."
+                        )
+
+                if (
+                    paginas_recorridas is not None
+                    and paginas_esperadas is not None
+                    and paginas_recorridas < paginas_esperadas
+                ):
+                    registrar_log(
+                        "⚠️ No se alcanzó la cantidad de páginas anunciadas por el portal."
+                    )
+                    motivo = "paginas_incompletas"
 
                 ruta_archivo: Path | None = None
                 if self.guardar_json:
@@ -116,6 +221,11 @@ class VerificadorExpedientesV4(QThread):
                     "limite_fecha": "corte_controlado",
                     "limite_tiempo": "corte_controlado",
                     "limite_paginas": "corte_controlado",
+                    "duplicado_encontrado": "corte_controlado",
+                    "bucle_detectado": "corte_controlado",
+                    "sin_siguiente": "completo",
+                    "sin_siguiente_habilitado": "corte_controlado",
+                    "paginas_incompletas": "total_incompleto",
                 }
                 estado_normalizado = motivos_exitosos.get(motivo, motivo)
 
@@ -123,8 +233,16 @@ class VerificadorExpedientesV4(QThread):
                     ResultadoExpedientes(
                         estado=estado_normalizado,
                         cantidad=len(expedientes),
+                        total_esperado=total_esperado,
                         ruta=str(ruta_archivo) if ruta_archivo else None,
                         motivo=motivo,
+                        motivo_original=(
+                            motivo_original if motivo != motivo_original else None
+                        ),
+                        duplicados_descartados=duplicados_descartados,
+                        filas_descartadas=filas_descartadas,
+                        paginas_recorridas=paginas_recorridas,
+                        paginas_esperadas=paginas_esperadas,
                     )
                 )
         except Exception as exc:  # pragma: no cover - logging de errores
@@ -255,26 +373,99 @@ class MonitorExpedientesTray:
     def procesar_resultado_expedientes(self, datos: ResultadoExpedientes) -> None:
         mensajes = {
             "completo": "✅ Extracción finalizada exitosamente.",
-            "corte_controlado": "✅ Extracción detenida por corte planificado ({motivo}).",
+            "corte_controlado": "✅ Extracción detenida de forma controlada.",
             "fallo": "❌ Fallo en la verificación.",
+            "total_incompleto": "⚠️ Resultados incompletos respecto al total anunciado.",
+        }
+
+        mensajes_motivo = {
+            "limite_fecha": "📅 Se alcanzó la fecha límite configurada.",
+            "limite_tiempo": "⏱️ Se cumplió el tiempo máximo de extracción permitido.",
+            "limite_paginas": "📄 Se alcanzó el tope de páginas configurado para la búsqueda.",
+            "duplicado_encontrado": "📎 Se detuvo la extracción al detectar un expediente duplicado (solo si se fuerza detener_en_duplicado=True).",
+            "bucle_detectado": "🌀 Se detectó un posible bucle de navegación y la extracción se detuvo de forma segura.",
+            "sin_siguiente": "ℹ️ No se detectó un botón 'Siguiente'; se asumió el final del listado.",
+            "sin_siguiente_habilitado": "ℹ️ El botón 'Siguiente' estaba deshabilitado, por lo que se consideró finalizado el listado.",
+            "total_incompleto": "⚠️ Los registros obtenidos no alcanzaron el total informado por el portal.",
+            "paginas_incompletas": "⚠️ No se recorrieron todas las páginas anunciadas por el portal; se reintentará la extracción.",
         }
 
         registrar_log(f"📦 Estado: {datos.estado}")
         mensaje_estado = mensajes.get(datos.estado, "❓ Estado no reconocido.")
-        try:
-            mensaje_estado = mensaje_estado.format(
-                motivo=datos.motivo or "motivo no especificado"
-            )
-        except (KeyError, IndexError, ValueError):
-            # El mensaje no requiere formateo o incluye llaves incompatibles.
-            pass
         registrar_log(mensaje_estado)
 
+        duplicados_descartados = datos.duplicados_descartados or 0
+        filas_descartadas = datos.filas_descartadas or 0
+        registrar_log(
+            "🧾 Descartes reportados: "
+            f"{duplicados_descartados} duplicadas / {filas_descartadas} inválidas."
+        )
+
+        if datos.motivo:
+            mensaje_motivo = mensajes_motivo.get(datos.motivo)
+            if mensaje_motivo:
+                registrar_log(mensaje_motivo)
+            else:
+                registrar_log(f"ℹ️ Motivo recibido: {datos.motivo}")
+        if datos.motivo_original:
+            registrar_log(f"ℹ️ Motivo original reportado: {datos.motivo_original}")
+
+        paginas_recorridas = datos.paginas_recorridas
+        paginas_esperadas = datos.paginas_esperadas
+        if paginas_recorridas is not None:
+            esperado_log = (
+                str(paginas_esperadas)
+                if paginas_esperadas is not None
+                else "?"
+            )
+            registrar_log(f"📄 Paginación reportada: {paginas_recorridas} / {esperado_log}")
+
         if datos.cantidad is not None:
-            registrar_log(f"📊 Total extraídos: {datos.cantidad}")
+            if datos.total_esperado is not None:
+                registrar_log(
+                    f"📊 Expedientes recopilados: {datos.cantidad} / {datos.total_esperado} esperados"
+                )
+            else:
+                registrar_log(f"📊 Total extraídos: {datos.cantidad}")
+
+            if datos.total_esperado is not None:
+                mensaje_total = (
+                    f"{datos.cantidad} de {datos.total_esperado} expedientes actualizados."
+                )
+            else:
+                mensaje_total = f"{datos.cantidad} expedientes actualizados."
+
+            mensaje_total += (
+                " Descartados: "
+                f"{duplicados_descartados} duplicadas / {filas_descartadas} inválidas."
+            )
+
+            if paginas_recorridas is not None:
+                esperado_mensaje = (
+                    str(paginas_esperadas)
+                    if paginas_esperadas is not None
+                    else "?"
+                )
+                mensaje_total += (
+                    f" Paginación: {paginas_recorridas} / {esperado_mensaje}."
+                )
+                if (
+                    paginas_esperadas is not None
+                    and paginas_recorridas < paginas_esperadas
+                ):
+                    mensaje_total += (
+                        " Se detectaron páginas pendientes; se reintentará la extracción."
+                    )
+
+            icono = (
+                QSystemTrayIcon.Warning
+                if datos.estado == "total_incompleto"
+                else QSystemTrayIcon.Information
+            )
             self.tray.showMessage(
                 "📥 Expedientes",
-                f"{datos.cantidad} expedientes actualizados.",
+                mensaje_total,
+                icono,
             )
         if datos.ruta:
             registrar_log(f"📁 Guardado en: {datos.ruta}")
