@@ -76,6 +76,37 @@ _FORM_CONTROL_TAGS = {
 }
 
 
+_SEL_TOTAL_EXPEDIENTES = "strong:has-text('Se han encontrado')"
+
+
+async def _extraer_total_esperado(page: Page) -> int | None:
+    """Devuelve el total anunciado en el encabezado si está disponible."""
+
+    try:
+        total_locator = page.locator(_SEL_TOTAL_EXPEDIENTES)
+        if await total_locator.count() <= 0:
+            return None
+        texto = await total_locator.first.inner_text()
+    except Error:
+        return None
+
+    coincidencia = re.search(r"total de\s*([\d.,]+)", texto)
+    if not coincidencia:
+        coincidencia = re.search(r"([\d][\d.,]*)", texto)
+
+    if not coincidencia:
+        return None
+
+    numero = re.sub(r"[^\d]", "", coincidencia.group(1))
+    if not numero:
+        return None
+
+    try:
+        return int(numero)
+    except ValueError:
+        return None
+
+
 async def _is_locator_enabled(locator: Locator) -> bool:
     """Determina si un locator corresponde a un control habilitado."""
 
@@ -129,7 +160,7 @@ async def extraer_expedientes_completos(
     fecha_corte: str | None = None,
     tiempo_maximo_segundos: int | None = None,
     orden: str | None = None,
-) -> tuple[list[dict], str]:
+) -> tuple[list[dict], str, dict[str, object]]:
     """
     Extrae TODAS las páginas del listado de expedientes y devuelve:
     [
@@ -190,9 +221,11 @@ async def extraer_expedientes_completos(
 
     Retorna
     -------
-    tuple[list[dict], str]
-        La lista de expedientes junto con un código que indica por qué se
-        detuvo el recorrido. Los posibles valores actuales son:
+    tuple[list[dict], str, dict[str, object]]
+        La lista de expedientes, el código que indica por qué se detuvo el
+        recorrido y un diccionario con metadatos adicionales. Cuando el portal
+        muestra el total esperado de resultados se expone mediante la clave
+        ``"total_esperado"``. Los posibles valores actuales del motivo son:
 
         * ``"fin_listado"``: se alcanzó el final natural del paginado.
         * ``"limite_paginas"``: se alcanzó ``max_paginas``.
@@ -207,6 +240,7 @@ async def extraer_expedientes_completos(
     """
     resultados: list[dict] = []
     huellas: set[tuple[str, str, str]] = set()
+    metadata: dict[str, object] = {}
 
     fecha_corte_dt: datetime | None = None
     if fecha_corte:
@@ -229,6 +263,10 @@ async def extraer_expedientes_completos(
     # Aseguramos presencia de tabla
     tabla = page.locator(sel_tabla)
     await tabla.wait_for(state="visible", timeout=25_000)
+
+    total_esperado = await _extraer_total_esperado(page)
+    if total_esperado is not None:
+        metadata["total_esperado"] = total_esperado
 
     if orden:
         valor_orden = _resolver_valor_orden(orden)
@@ -258,7 +296,7 @@ async def extraer_expedientes_completos(
     paginas_recorridas = 0
     while True:
         if _excedio_tiempo():
-            return resultados, "limite_tiempo"
+            return resultados, "limite_tiempo", metadata
 
         paginas_recorridas += 1
         print(f"Procesando página {paginas_recorridas}")
@@ -293,10 +331,10 @@ async def extraer_expedientes_completos(
             duplicado = huella in huellas
 
             if duplicado and detener_en_duplicado:
-                return resultados, "duplicado_encontrado"
+                return resultados, "duplicado_encontrado", metadata
 
             if fecha_corte_dt and ultima_dt and ultima_dt < fecha_corte_dt:
-                return resultados, "limite_fecha"
+                return resultados, "limite_fecha", metadata
 
             if duplicado and omitir_duplicados:
                 continue
@@ -313,16 +351,16 @@ async def extraer_expedientes_completos(
             })
 
             if _excedio_tiempo():
-                return resultados, "limite_tiempo"
+                return resultados, "limite_tiempo", metadata
 
         # 3) Intentar ir a la siguiente página; cortar si no hay
         if paginas_recorridas >= max_paginas:
-            return resultados, "limite_paginas"
+            return resultados, "limite_paginas", metadata
 
         next_btn = page.locator(sel_siguiente)
         btn_count = await next_btn.count()
         if btn_count <= 0:
-            return resultados, "sin_siguiente"  # no hay control de siguiente
+            return resultados, "sin_siguiente", metadata  # no hay control de siguiente
 
         boton: Locator | None = None
         for idx in range(btn_count):
@@ -332,16 +370,16 @@ async def extraer_expedientes_completos(
                 break
 
         if boton is None:
-            return resultados, "sin_siguiente_habilitado"
+            return resultados, "sin_siguiente_habilitado", metadata
 
         try:
             await boton.wait_for(state="visible", timeout=10_000)
         except TimeoutError as exc:
             print(f"Botón 'Siguiente' no visible: {exc}")
-            return resultados, "siguiente_timeout"
+            return resultados, "siguiente_timeout", metadata
 
         if not await _is_locator_enabled(boton):
-            return resultados, "siguiente_deshabilitado"
+            return resultados, "siguiente_deshabilitado", metadata
 
         # Fingerprint antes del click para confirmar cambio real
         antes = await _tbody_fingerprint(tbody_locator)
@@ -349,7 +387,7 @@ async def extraer_expedientes_completos(
             await boton.click()
         except (TimeoutError, Error) as exc:
             print(f"Fallo al hacer clic en 'Siguiente': {exc}")
-            return resultados, "error_click"
+            return resultados, "error_click", metadata
 
         # Esperar a que cambie el tbody (evita loops)
         max_wait_ms = 12_000
@@ -369,9 +407,9 @@ async def extraer_expedientes_completos(
 
         if not fingerprint_cambio:
             # No cambió el contenido → estamos al final
-            return resultados, "fin_listado"
+            return resultados, "fin_listado", metadata
 
         if _excedio_tiempo():
-            return resultados, "limite_tiempo"
+            return resultados, "limite_tiempo", metadata
 
-    return resultados, "fin_listado"
+    return resultados, "fin_listado", metadata
