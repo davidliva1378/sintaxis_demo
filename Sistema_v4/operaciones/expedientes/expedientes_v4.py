@@ -1,4 +1,5 @@
 import re
+from collections.abc import Callable
 from datetime import datetime
 from time import perf_counter
 
@@ -387,3 +388,64 @@ async def extraer_expedientes_completos(
             return resultados, "limite_tiempo"
 
     return resultados, "fin_listado"
+
+
+async def extraer_datos_expediente(page: Page) -> dict[str, str] | None:
+    """Extrae los campos principales del expediente actualmente abierto."""
+
+    try:
+        await page.wait_for_load_state("load")
+        await page.wait_for_timeout(2_000)
+
+        numero = await page.query_selector("span[style='color:#000000;']")
+        caratula = await page.query_selector(r"#expediente\:j_idt96\:detailCover")
+        dependencia = await page.query_selector(r"#expediente\:j_idt96\:detailDependencia")
+        jurisdiccion = await page.query_selector(r"#expediente\:j_idt96\:detailCamera")
+        situacion = await page.query_selector(r"#expediente\:j_idt96\:detailSituation")
+
+        return {
+            "numero": await numero.inner_text() if numero else "No encontrado",
+            "caratula": await caratula.inner_text() if caratula else "No encontrada",
+            "dependencia": await dependencia.inner_text() if dependencia else "No encontrada",
+            "jurisdiccion": await jurisdiccion.inner_text() if jurisdiccion else "No encontrada",
+            "situacion": await situacion.inner_text() if situacion else "No encontrada",
+        }
+    except Exception as exc:  # noqa: BLE001 - queremos loguear cualquier falla
+        print(f"⚠️ Error al extraer datos del expediente: {exc}")
+        return None
+
+
+async def abrir_expediente_desde_fila(
+    fila: ElementHandle | Locator | None, page: Page
+) -> dict[str, str] | None:
+    """
+    Abre el expediente asociado a ``fila`` y devuelve los datos extraídos.
+
+    Estas utilidades complementan a ``extraer_expedientes_completos`` y se
+    mantienen para compatibilidad con flujos que operan fila a fila.
+    """
+
+    if not fila:
+        print("❌ No se proporcionó ninguna fila válida.")
+        return None
+
+    enlace = await fila.query_selector("a")
+    if not enlace:
+        print("⚠️ No se encontró enlace para abrir el expediente en la fila.")
+        return None
+
+    print("👁 Haciendo clic para abrir el expediente...")
+    await enlace.click()
+    await page.wait_for_load_state("load")
+    await page.wait_for_timeout(2_000)
+
+    datos = await extraer_datos_expediente(page)
+    if datos:
+        print("✅ Datos del expediente extraídos correctamente.")
+        return datos
+
+    print("⚠️ No se pudieron extraer datos. Posible error de apertura.")
+    return None
+
+
+SeleccionEstrategia = Callable[[list[dict[str, str]]], int | None]
