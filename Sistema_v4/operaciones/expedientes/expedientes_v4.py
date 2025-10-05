@@ -219,9 +219,11 @@ async def extraer_expedientes_completos(
         * ``"siguiente_deshabilitado"``: el botón se deshabilitó al intentar usarlo.
         * ``"error_click"``: falló el clic en "Siguiente".
         * ``"duplicado_encontrado"``: se detectó un expediente repetido.
+        * ``"bucle_detectado"``: se detectó un ciclo al intentar avanzar.
     """
     resultados: list[dict] = []
     huellas: set[tuple[str, str, str]] = set()
+    paginas_visitadas: dict[str, int] = {}
 
     fecha_corte_dt: datetime | None = None
     if fecha_corte:
@@ -277,6 +279,17 @@ async def extraer_expedientes_completos(
 
         paginas_recorridas += 1
         print(f"Procesando página {paginas_recorridas}")
+
+        fingerprint_actual = await _tbody_fingerprint(tbody_locator)
+        if fingerprint_actual in paginas_visitadas:
+            pagina_prev = paginas_visitadas[fingerprint_actual]
+            print(
+                f"🔁 Página {paginas_recorridas} coincide con la ya vista en la "
+                f"página {pagina_prev}. Finalizando para evitar bucles."
+            )
+            return resultados, "bucle_detectado"
+
+        paginas_visitadas[fingerprint_actual] = paginas_recorridas
 
         # 1) Extraer filas visibles de ESTA página en un solo evaluate
         filas: list[list[str]] = await page.evaluate(
@@ -360,7 +373,7 @@ async def extraer_expedientes_completos(
             return resultados, "siguiente_deshabilitado"
 
         # Fingerprint antes del click para confirmar cambio real
-        antes = await _tbody_fingerprint(tbody_locator)
+        antes = fingerprint_actual
         try:
             await boton.click()
         except (TimeoutError, Error) as exc:
