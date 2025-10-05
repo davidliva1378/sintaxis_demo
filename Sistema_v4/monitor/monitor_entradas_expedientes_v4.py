@@ -193,6 +193,8 @@ class VerificadorExpedientesV4(QThread):
                     "limite_paginas": "corte_controlado",
                     "duplicado_encontrado": "corte_controlado",
                     "bucle_detectado": "corte_controlado",
+                    "sin_siguiente": "completo",
+                    "sin_siguiente_habilitado": "corte_controlado",
                 }
                 estado_normalizado = motivos_exitosos.get(motivo, motivo)
 
@@ -349,6 +351,8 @@ class MonitorExpedientesTray:
             "limite_paginas": "📄 Se alcanzó el tope de páginas configurado para la búsqueda.",
             "duplicado_encontrado": "📎 Se detuvo la extracción al detectar un expediente duplicado (solo si se fuerza detener_en_duplicado=True).",
             "bucle_detectado": "🌀 Se detectó un posible bucle de navegación y la extracción se detuvo de forma segura.",
+            "sin_siguiente": "ℹ️ No se detectó un botón 'Siguiente'; se asumió el final del listado.",
+            "sin_siguiente_habilitado": "ℹ️ El botón 'Siguiente' estaba deshabilitado, por lo que se consideró finalizado el listado.",
             "total_incompleto": "⚠️ Los registros obtenidos no alcanzaron el total informado por el portal.",
         }
 
