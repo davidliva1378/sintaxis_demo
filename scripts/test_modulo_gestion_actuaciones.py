@@ -2,7 +2,10 @@ import asyncio
 from playwright.async_api import async_playwright
 from urls_pjn import URL_LOGIN, URL_CONSULTAS
 from panel_pjn.acciones_pjn.gestion_expedientes.bk.buscar_y_abrir_expediente_1 import buscar_y_abrir_expediente
-from panel_pjn.acciones_pjn.gestion_actuaciones import obtener_actuaciones_todas_paginas_async, descargar_archivos_actuaciones
+from Sistema_v4.actuaciones.actuaciones_v4 import (
+    obtener_actuaciones_todas_paginas_async,
+    descargar_archivos_actuaciones,
+)
 
 async def prueba_modulo_gestion_actuaciones():
     numero = input("📥 Ingrese número de expediente (solo números): ").strip()
@@ -36,11 +39,20 @@ async def prueba_modulo_gestion_actuaciones():
         print(f"✅ Expediente abierto: {expediente_datos['numero']}")
 
         print("🔁 Extrayendo actuaciones con el módulo gestion_actuaciones...")
-        actuaciones = await obtener_actuaciones_todas_paginas_async(page_expediente, expediente_datos)
-
         carpeta_destino = f"Actuaciones/{expediente_datos['numero'].replace('/', '_')}"
+        actuaciones, error, carpeta = await obtener_actuaciones_todas_paginas_async(
+            page_expediente,
+            expediente_datos,
+            carpeta_destino=carpeta_destino,
+        )
+        if error:
+            print(error)
+            await browser.close()
+            return
+
+        carpeta_descargas = carpeta or carpeta_destino
         print("📦 Descargando archivos adjuntos...")
-        await descargar_archivos_actuaciones(page_expediente, actuaciones, carpeta_destino)
+        await descargar_archivos_actuaciones(page_expediente, actuaciones, carpeta_descargas)
 
         await browser.close()
 
