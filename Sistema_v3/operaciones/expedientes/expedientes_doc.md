@@ -21,9 +21,11 @@ Extrae todos los expedientes visibles desde la tabla del portal. Soporta ordenam
 Donde `estado_final` puede ser:
 - `"completo"` → extracción finalizada normalmente.
 - `"corte_fecha"` → se alcanzó la fecha de corte.
-- `"repetido_detectado"` → se encontraron duplicados y se detuvo.
+- `"fin_listado"` → no hubo expedientes nuevos en la página actual y se asumió fin natural del listado.
 - `"tiempo_maximo"` → se alcanzó el tiempo máximo configurado.
 - `"tabla_no_disponible"` → no se encontró la tabla de expedientes.
+
+> 🆕 A partir de esta versión la detección de filas repetidas ya no corta la extracción inmediatamente. Se continúa recorriendo el paginado y solo se finaliza con `"fin_listado"` cuando una página entera no aporta novedades. Además, se calcula un *fingerprint* del `<tbody>` tras cada clic en "Siguiente" para confirmar que la tabla haya cambiado efectivamente.
 
 **Estructura de cada expediente:**
 ```json
