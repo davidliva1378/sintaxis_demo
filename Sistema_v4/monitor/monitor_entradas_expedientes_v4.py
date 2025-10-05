@@ -1,9 +1,9 @@
-"""Monitor de expedientes basado en bandeja del sistema.
+"""Monitor de expedientes y entradas basado en la bandeja del sistema.
 
-Este módulo es una versión simplificada enfocada exclusivamente en la
-verificación periódica de expedientes del PJN. Las utilidades
-adicionales disponibles en versiones previas (entradas, comparación,
-respaldos, etc.) se reincorporarán en iteraciones futuras.
+Originalmente esta versión se enfocaba exclusivamente en la verificación
+periódica de expedientes del PJN. En esta iteración se reincorpora el
+módulo de entradas (notificaciones y despachos) manteniendo pendiente el
+resto de utilidades avanzadas (comparaciones, respaldos, etc.).
 """
 
 from __future__ import annotations
@@ -40,6 +40,15 @@ except ImportError:  # pragma: no cover - compatibilidad con Sistema_v3
     )
 
 try:
+    from Sistema_v4.operaciones.entradas.extractor_entradas import (  # type: ignore[import-not-found]
+        extraer_entradas_pjn,
+    )
+except ImportError:  # pragma: no cover - compatibilidad con Sistema_v3
+    from Sistema_v3.operaciones.entradas.extractor_entradas import (
+        extraer_entradas_pjn,
+    )
+
+try:
     from Sistema_v4.utils.logging import registrar_log  # type: ignore[import-not-found]
 except ImportError:  # pragma: no cover - compatibilidad con Sistema_v3
     from Sistema_v3.utils.logging import registrar_log
@@ -65,6 +74,15 @@ class ResultadoExpedientes:
     filas_descartadas: int | None = None
     paginas_recorridas: int | None = None
     paginas_esperadas: int | None = None
+
+
+@dataclass
+class ResultadoEntradas:
+    nuevas: int | None
+    base_dir: Path | None = None
+    historial_json: Path | None = None
+    historial_csv: Path | None = None
+    error: str | None = None
 
 
 CONFIG_PATH = Path("config/config_monitor.json")
@@ -259,6 +277,62 @@ class VerificadorExpedientesV4(QThread):
         return ruta
 
 
+class VerificadorEntradasV4(QThread):
+    """Hilo encargado de recuperar las entradas del portal del PJN."""
+
+    resultado = Signal(object)
+
+    def __init__(self, destino: Path | str) -> None:
+        super().__init__()
+        self.destino = Path(destino)
+
+    def run(self) -> None:  # type: ignore[override]
+        import asyncio
+
+        asyncio.run(self._verificar_async())
+
+    async def _verificar_async(self) -> None:
+        base_dir = self.destino
+        base_dir.mkdir(parents=True, exist_ok=True)
+        historial_json = base_dir / "historial_notificaciones.json"
+        historial_csv = base_dir / "historial_notificaciones.csv"
+
+        try:
+            async with reutilizar_sesion_async() as (page, _context, _browser):
+                if not page:
+                    self.resultado.emit(
+                        ResultadoEntradas(
+                            nuevas=None,
+                            base_dir=base_dir,
+                            historial_json=historial_json,
+                            historial_csv=historial_csv,
+                            error="sesion_no_disponible",
+                        )
+                    )
+                    return
+
+                nuevas = await extraer_entradas_pjn(page, destino=str(base_dir))
+                self.resultado.emit(
+                    ResultadoEntradas(
+                        nuevas=nuevas,
+                        base_dir=base_dir,
+                        historial_json=historial_json,
+                        historial_csv=historial_csv,
+                    )
+                )
+        except Exception as exc:  # pragma: no cover - logging de errores
+            registrar_log(f"❌ Error en verificación de entradas: {exc}")
+            self.resultado.emit(
+                ResultadoEntradas(
+                    nuevas=None,
+                    base_dir=base_dir,
+                    historial_json=historial_json,
+                    historial_csv=historial_csv,
+                    error=str(exc),
+                )
+            )
+
+
 class MonitorExpedientesTray:
     """Crea un icono en la bandeja del sistema para monitorear expedientes."""
 
@@ -272,12 +346,16 @@ class MonitorExpedientesTray:
             sys.exit(1)
 
         self.tray = QSystemTrayIcon(self._crear_icono())
-        self.tray.setToolTip("Monitor de Expedientes PJN")
+        self.tray.setToolTip("Monitor de Expedientes y Entradas PJN")
         self.tray.setVisible(True)
 
         self.menu = QMenu()
         self.menu.addAction("📥 Verificar Expedientes").triggered.connect(
             self.verificar_expedientes
+        )
+
+        self.menu.addAction("📤 Verificar Entradas").triggered.connect(
+            self.verificar_entradas
         )
 
         # Espacio reservado para herramientas adicionales. Se reintroducirán
@@ -292,11 +370,17 @@ class MonitorExpedientesTray:
 
         self.config = self.cargar_config()
         self.hilo_expedientes: VerificadorExpedientesV4 | None = None
+        self.hilo_entradas: VerificadorEntradasV4 | None = None
         self.ejecutando_expedientes = False
+        self.ejecutando_entradas = False
         self.reintentos_expedientes = 0
+        self.reintentos_entradas = 0
 
         self.timer_expedientes = QTimer()
         self.timer_expedientes.timeout.connect(self.verificar_expedientes)
+
+        self.timer_entradas = QTimer()
+        self.timer_entradas.timeout.connect(self.verificar_entradas)
 
         self.iniciar_temporizador()
         sys.exit(self.app.exec())
@@ -350,7 +434,9 @@ class MonitorExpedientesTray:
     def iniciar_temporizador(self) -> None:
         intervalo = self.obtener_intervalo()
         self.timer_expedientes.start(intervalo * 60 * 1000)
+        self.timer_entradas.start(intervalo * 60 * 1000)
         self.verificar_expedientes()
+        self.verificar_entradas()
 
     def verificar_expedientes(self) -> None:
         if self.ejecutando_expedientes:
@@ -369,6 +455,24 @@ class MonitorExpedientesTray:
             self.hilo_expedientes.deleteLater()
             self.hilo_expedientes = None
         self.ejecutando_expedientes = False
+
+    def verificar_entradas(self) -> None:
+        if self.ejecutando_entradas:
+            registrar_log("⏳ Verificación de entradas ya en curso.")
+            return
+
+        self.ejecutando_entradas = True
+        carpeta = Path(os.getcwd()) / "datos_extraidos" / "monitoreo"
+        self.hilo_entradas = VerificadorEntradasV4(destino=carpeta)
+        self.hilo_entradas.resultado.connect(self.procesar_resultado_entradas)
+        self.hilo_entradas.finished.connect(self._limpiar_hilo_entradas)
+        self.hilo_entradas.start()
+
+    def _limpiar_hilo_entradas(self) -> None:
+        if self.hilo_entradas:
+            self.hilo_entradas.deleteLater()
+            self.hilo_entradas = None
+        self.ejecutando_entradas = False
 
     def procesar_resultado_expedientes(self, datos: ResultadoExpedientes) -> None:
         mensajes = {
@@ -487,6 +591,48 @@ class MonitorExpedientesTray:
                 )
         else:
             self.reintentos_expedientes = 0
+
+    def procesar_resultado_entradas(self, datos: ResultadoEntradas) -> None:
+        if datos.nuevas is None:
+            self.reintentos_entradas += 1
+            registrar_log("❌ No se pudieron verificar las entradas.")
+            if datos.error == "sesion_no_disponible":
+                registrar_log("ℹ️ Sesión no disponible al intentar extraer entradas.")
+            elif datos.error:
+                registrar_log(f"🛑 Error reportado: {datos.error}")
+            if self.reintentos_entradas < 5:
+                registrar_log(
+                    f"🔁 Reintentando entradas ({self.reintentos_entradas}/5) en 5 segundos..."
+                )
+                QTimer.singleShot(5000, self.verificar_entradas)
+            else:
+                registrar_log("❌ Se alcanzó el límite de reintentos de entradas.")
+            self.tray.showMessage(
+                "📤 Entradas",
+                "No fue posible completar la extracción de entradas.",
+                QSystemTrayIcon.Critical,
+            )
+            return
+
+        self.reintentos_entradas = 0
+        nuevas = datos.nuevas
+
+        if nuevas > 0:
+            mensaje = f"{nuevas} nuevas entradas registradas."
+            icono = QSystemTrayIcon.Information
+        else:
+            mensaje = "Sin nuevas entradas detectadas."
+            icono = QSystemTrayIcon.Information
+
+        registrar_log(f"📤 Resultado entradas: {mensaje}")
+        if datos.base_dir:
+            registrar_log(f"📁 Carpeta de monitoreo: {datos.base_dir}")
+        if datos.historial_json:
+            registrar_log(f"📄 Historial JSON: {datos.historial_json}")
+        if datos.historial_csv:
+            registrar_log(f"📄 Historial CSV: {datos.historial_csv}")
+
+        self.tray.showMessage("📤 Entradas", mensaje, icono)
 
     def salir(self) -> None:
         self.tray.hide()
