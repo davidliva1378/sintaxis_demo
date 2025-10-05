@@ -11,61 +11,164 @@ from playwright.async_api import Page, TimeoutError
 from .actuaciones_utils import generar_hash_archivo, limpiar_texto, normalizar_fecha
 
 
+EXTENSIONES_CONOCIDAS = {
+    "7z": ".7z",
+    "avi": ".avi",
+    "bak": ".bak",
+    "bmp": ".bmp",
+    "cer": ".cer",
+    "csv": ".csv",
+    "der": ".der",
+    "doc": ".doc",
+    "docm": ".docm",
+    "docx": ".docx",
+    "eml": ".eml",
+    "epub": ".epub",
+    "gif": ".gif",
+    "gz": ".gz",
+    "heic": ".heic",
+    "heif": ".heif",
+    "htm": ".htm",
+    "html": ".html",
+    "ics": ".ics",
+    "jpeg": ".jpeg",
+    "jpg": ".jpg",
+    "json": ".json",
+    "log": ".log",
+    "m4a": ".m4a",
+    "mkv": ".mkv",
+    "mov": ".mov",
+    "mp3": ".mp3",
+    "mp4": ".mp4",
+    "msg": ".msg",
+    "odt": ".odt",
+    "ogg": ".ogg",
+    "pdf": ".pdf",
+    "pdfa": ".pdf",
+    "pfx": ".pfx",
+    "p12": ".p12",
+    "p7m": ".p7m",
+    "p7s": ".p7s",
+    "png": ".png",
+    "ppt": ".ppt",
+    "pptx": ".pptx",
+    "pps": ".pps",
+    "ppsx": ".ppsx",
+    "rar": ".rar",
+    "rtf": ".rtf",
+    "svg": ".svg",
+    "tar": ".tar",
+    "tif": ".tif",
+    "tiff": ".tiff",
+    "txt": ".txt",
+    "wav": ".wav",
+    "webm": ".webm",
+    "xls": ".xls",
+    "xlsx": ".xlsx",
+    "xml": ".xml",
+    "xps": ".xps",
+    "zip": ".zip",
+}
+
+EXTENSIONES_ALIAS = {
+    "pkcs7": "p7m",
+    "smime": "p7m",
+    "s-mime": "p7m",
+    "pkcs12": "p12",
+}
+
+EXTENSIONES_GENERICAS = {".seam", ".jsp", ".do", ".php", ".aspx", ".ashx"}
+
+
+def obtener_extension_valida(valor):
+    if valor is None:
+        return None
+
+    valor = str(valor).strip().lower()
+    if not valor:
+        return None
+
+    candidatos = []
+
+    def agregar_candidato(texto):
+        if not texto:
+            return
+        texto = texto.strip().lower()
+        if not texto:
+            return
+        if texto.startswith("."):
+            texto = texto[1:]
+        if texto and texto not in candidatos:
+            candidatos.append(texto)
+
+    agregar_candidato(valor)
+
+    for separador in ("/", ".", "-", "_", " "):
+        if separador in valor:
+            for parte in valor.split(separador):
+                agregar_candidato(parte)
+
+    for candidato in candidatos:
+        base = EXTENSIONES_ALIAS.get(candidato, candidato)
+        if base in EXTENSIONES_CONOCIDAS:
+            return EXTENSIONES_CONOCIDAS[base]
+
+    return None
+
+
 def construir_nombre_archivo_normalizado(fecha, tipo, hash_val, archivo_url, nombre_descarga=None):
     """Genera un nombre de archivo normalizado preservando la extensión original."""
-
-    def normalizar_extension(valor):
-        if not valor:
-            return None
-        valor = valor.strip().lower()
-        if not valor:
-            return None
-        if not valor.startswith("."):
-            valor = f".{valor}"
-        return valor
 
     parsed_url = urlparse(archivo_url) if archivo_url else None
 
     nombre_origen = nombre_descarga or ""
-    extension = normalizar_extension(os.path.splitext(nombre_origen)[1])
-    extension_tipo_doc = None
+    extension_candidatas = []
+    tipo_doc_indico_fallback = False
+
+    extension_nombre = obtener_extension_valida(os.path.splitext(nombre_origen)[1])
+    if extension_nombre:
+        extension_candidatas.append(extension_nombre)
 
     if parsed_url:
         tipo_doc = parse_qs(parsed_url.query).get("tipoDoc", [])
         if tipo_doc and tipo_doc[0]:
             tipo_doc_valor = tipo_doc[0].strip()
             if tipo_doc_valor:
+                extension_tipo_doc = None
                 if "." in tipo_doc_valor:
                     if not nombre_origen:
                         nombre_origen = tipo_doc_valor
-                    extension_tipo_doc = normalizar_extension(os.path.splitext(tipo_doc_valor)[1])
-                    if not extension:
-                        extension = extension_tipo_doc
+                    extension_tipo_doc = obtener_extension_valida(os.path.splitext(tipo_doc_valor)[1])
                 else:
-                    extension_tipo_doc = normalizar_extension(tipo_doc_valor.lower())
-                    if not extension:
-                        extension = extension_tipo_doc
+                    extension_tipo_doc = obtener_extension_valida(tipo_doc_valor)
+
+                if extension_tipo_doc:
+                    extension_candidatas.append(extension_tipo_doc)
+                else:
+                    tipo_doc_indico_fallback = True
 
     if not nombre_origen and parsed_url:
         nombre_origen = os.path.basename(parsed_url.path)
-        if not extension:
-            extension = normalizar_extension(os.path.splitext(nombre_origen)[1])
+        extension_desde_nombre = obtener_extension_valida(os.path.splitext(nombre_origen)[1])
+        if extension_desde_nombre:
+            extension_candidatas.append(extension_desde_nombre)
 
-    if parsed_url and not extension:
-        extension = normalizar_extension(os.path.splitext(parsed_url.path)[1])
+    if parsed_url:
+        extension_desde_url = obtener_extension_valida(os.path.splitext(parsed_url.path)[1])
+        if extension_desde_url:
+            extension_candidatas.append(extension_desde_url)
 
-    extensiones_genericas = {".seam", ".jsp", ".do", ".php", ".aspx", ".ashx"}
-    if (extension in extensiones_genericas or not extension) and extension_tipo_doc:
-        extension = extension_tipo_doc
+    extension = None
+    for candidata in extension_candidatas:
+        if candidata and candidata not in EXTENSIONES_GENERICAS:
+            extension = candidata
+            break
+
+    if not extension and tipo_doc_indico_fallback:
+        extension = ".pdf"
 
     if not extension:
         extension = ".pdf"
-
-    extension = normalizar_extension(extension)
-
-    if extension in extensiones_genericas:
-        extension = extension_tipo_doc or ".pdf"
-        extension = normalizar_extension(extension)
 
     tipo_archivo = extension[1:] if len(extension) > 1 else None
     nombre_normalizado = f"{fecha}_{tipo}_{hash_val}{extension}" if extension else None
@@ -444,50 +547,42 @@ async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_
             continue
 
         nombre_archivo = act.get("NombreArchivo")
-        tipo_archivo = act.get("TipoArchivo")
+        tipo_archivo_valor = act.get("TipoArchivo")
 
-        if nombre_archivo == "N/A":
+        if not nombre_archivo or nombre_archivo == "N/A":
             nombre_archivo = None
 
-        if tipo_archivo == "N/A":
-            tipo_archivo = None
-
-        extensiones_genericas = {".seam", ".jsp", ".do", ".php", ".aspx", ".ashx"}
+        if not tipo_archivo_valor or tipo_archivo_valor == "N/A":
+            tipo_archivo_valor = None
 
         base_nombre = None
-        extension_actual = None
+        extension_desde_nombre = None
         if nombre_archivo:
-            base_nombre, extension_actual = os.path.splitext(nombre_archivo)
-            extension_actual = extension_actual.lower()
-            if extension_actual in extensiones_genericas:
-                extension_actual = None
+            base_nombre, extension_extraida = os.path.splitext(nombre_archivo)
+            extension_desde_nombre = obtener_extension_valida(extension_extraida)
+            base_nombre = base_nombre.strip().rstrip(".")
+            if not base_nombre:
+                base_nombre = None
 
-        extension_desde_tipo = f".{tipo_archivo.lower()}" if tipo_archivo else None
-        if extension_desde_tipo in extensiones_genericas:
-            extension_desde_tipo = None
-            tipo_archivo = None
+        extension_desde_tipo = obtener_extension_valida(tipo_archivo_valor)
 
         extension_final = None
-        if extension_desde_tipo:
-            extension_final = extension_desde_tipo
-        elif extension_actual:
-            extension_final = extension_actual
+        for candidata in (extension_desde_tipo, extension_desde_nombre):
+            if candidata and candidata not in EXTENSIONES_GENERICAS:
+                extension_final = candidata
+                break
 
         if not extension_final:
-            if tipo_archivo:
-                extension_final = f".{tipo_archivo.lower()}"
-            else:
-                tipo_archivo = "pdf"
-                extension_final = ".pdf"
+            extension_final = ".pdf"
 
         if not base_nombre:
             base_nombre = f"documento_{idx}"
 
         nombre_archivo = f"{base_nombre}{extension_final}"
-        tipo_archivo = extension_final.lstrip(".")
+        tipo_archivo_normalizado = extension_final[1:] if extension_final.startswith(".") else extension_final
 
         act["NombreArchivo"] = nombre_archivo
-        act["TipoArchivo"] = tipo_archivo
+        act["TipoArchivo"] = tipo_archivo_normalizado
 
         ruta_archivo = os.path.join(carpeta_destino, nombre_archivo)
 
