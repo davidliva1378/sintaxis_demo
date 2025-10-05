@@ -5,13 +5,11 @@ import os
 
 from playwright.async_api import Page, async_playwright
 
-from panel_pjn.acciones_pjn.gestion_actuaciones.descarga_v2 import (
+from panel_pjn.acciones_pjn.urls_pjn import URL_CONSULTAS, URL_LOGIN
+from Sistema_v4.actuaciones.actuaciones_v4 import (
     descargar_archivos_de_json,
-)
-from panel_pjn.acciones_pjn.gestion_actuaciones.extraccion_completa import (
     extraer_actuaciones_completas,
 )
-from panel_pjn.acciones_pjn.urls_pjn import URL_CONSULTAS, URL_LOGIN
 from Sistema_v4.operaciones.expedientes.expedientes_v4 import (
     SeleccionEstrategia,
     buscar_expedientes,
