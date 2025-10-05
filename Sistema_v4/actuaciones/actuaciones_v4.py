@@ -13,31 +13,60 @@ from .actuaciones_utils import generar_hash_archivo, limpiar_texto, normalizar_f
 
 def construir_nombre_archivo_normalizado(fecha, tipo, hash_val, archivo_url, nombre_descarga=None):
     """Genera un nombre de archivo normalizado preservando la extensión original."""
+
+    def normalizar_extension(valor):
+        if not valor:
+            return None
+        valor = valor.strip().lower()
+        if not valor:
+            return None
+        if not valor.startswith("."):
+            valor = f".{valor}"
+        return valor
+
     parsed_url = urlparse(archivo_url) if archivo_url else None
 
     nombre_origen = nombre_descarga or ""
-    if not nombre_origen and parsed_url:
+    extension = normalizar_extension(os.path.splitext(nombre_origen)[1])
+    extension_tipo_doc = None
+
+    if parsed_url:
         tipo_doc = parse_qs(parsed_url.query).get("tipoDoc", [])
         if tipo_doc and tipo_doc[0]:
-            nombre_origen = tipo_doc[0]
+            tipo_doc_valor = tipo_doc[0].strip()
+            if tipo_doc_valor:
+                if "." in tipo_doc_valor:
+                    if not nombre_origen:
+                        nombre_origen = tipo_doc_valor
+                    extension_tipo_doc = normalizar_extension(os.path.splitext(tipo_doc_valor)[1])
+                    if not extension:
+                        extension = extension_tipo_doc
+                else:
+                    extension_tipo_doc = normalizar_extension(tipo_doc_valor.lower())
+                    if not extension:
+                        extension = extension_tipo_doc
 
     if not nombre_origen and parsed_url:
         nombre_origen = os.path.basename(parsed_url.path)
+        if not extension:
+            extension = normalizar_extension(os.path.splitext(nombre_origen)[1])
 
-    if not nombre_origen:
-        nombre_origen = "documento.pdf"
+    if parsed_url and not extension:
+        extension = normalizar_extension(os.path.splitext(parsed_url.path)[1])
 
-    extension = os.path.splitext(nombre_origen)[1]
-    if not extension and parsed_url:
-        extension = os.path.splitext(parsed_url.path)[1]
+    extensiones_genericas = {".seam", ".jsp", ".do", ".php", ".aspx", ".ashx"}
+    if (extension in extensiones_genericas or not extension) and extension_tipo_doc:
+        extension = extension_tipo_doc
 
     if not extension:
         extension = ".pdf"
 
-    if not extension.startswith("."):
-        extension = f".{extension}"
+    extension = normalizar_extension(extension)
 
-    extension = extension.lower()
+    if extension in extensiones_genericas:
+        extension = extension_tipo_doc or ".pdf"
+        extension = normalizar_extension(extension)
+
     tipo_archivo = extension[1:] if len(extension) > 1 else None
     nombre_normalizado = f"{fecha}_{tipo}_{hash_val}{extension}" if extension else None
 
@@ -410,17 +439,55 @@ async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_
 
     for idx, act in enumerate(actuaciones, start=1):
         archivo_url = act.get("Archivo", "N/A")
-        nombre_archivo = act.get("NombreArchivo")
-        if not nombre_archivo:
-            tipo_archivo = act.get("TipoArchivo")
-            if tipo_archivo and tipo_archivo != "N/A":
-                nombre_archivo = f"documento_{idx}.{tipo_archivo.lower()}"
-            else:
-                nombre_archivo = f"documento_{idx}.pdf"
-
-        if archivo_url == "N/A":
+        if not archivo_url or archivo_url == "N/A":
             print(f"🚫 Actuación {idx}: sin archivo para descargar.")
             continue
+
+        nombre_archivo = act.get("NombreArchivo")
+        tipo_archivo = act.get("TipoArchivo")
+
+        if nombre_archivo == "N/A":
+            nombre_archivo = None
+
+        if tipo_archivo == "N/A":
+            tipo_archivo = None
+
+        extensiones_genericas = {".seam", ".jsp", ".do", ".php", ".aspx", ".ashx"}
+
+        base_nombre = None
+        extension_actual = None
+        if nombre_archivo:
+            base_nombre, extension_actual = os.path.splitext(nombre_archivo)
+            extension_actual = extension_actual.lower()
+            if extension_actual in extensiones_genericas:
+                extension_actual = None
+
+        extension_desde_tipo = f".{tipo_archivo.lower()}" if tipo_archivo else None
+        if extension_desde_tipo in extensiones_genericas:
+            extension_desde_tipo = None
+            tipo_archivo = None
+
+        extension_final = None
+        if extension_desde_tipo:
+            extension_final = extension_desde_tipo
+        elif extension_actual:
+            extension_final = extension_actual
+
+        if not extension_final:
+            if tipo_archivo:
+                extension_final = f".{tipo_archivo.lower()}"
+            else:
+                tipo_archivo = "pdf"
+                extension_final = ".pdf"
+
+        if not base_nombre:
+            base_nombre = f"documento_{idx}"
+
+        nombre_archivo = f"{base_nombre}{extension_final}"
+        tipo_archivo = extension_final.lstrip(".")
+
+        act["NombreArchivo"] = nombre_archivo
+        act["TipoArchivo"] = tipo_archivo
 
         ruta_archivo = os.path.join(carpeta_destino, nombre_archivo)
 
