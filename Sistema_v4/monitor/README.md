@@ -63,5 +63,10 @@ La acción “⚠️ Forzar nuevo login” elimina `SESSION_FILE` cuando existe 
    1. Separar las configuraciones de intervalo/reintentos entre expedientes y entradas.
    2. Permitir parámetros de reintento en `config_monitor.json` (intentos máximos, backoff).
    3. Adaptar el log para reflejar la nueva estrategia y alinearla con los escenarios heredados.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L412-L465】【F:core/modulos_monitor/general/monitor_general.py†L153-L199】
+7. **Incorporar filtro por fecha de corte en la bandeja v4**
+   1. Reutilizar `obtener_fecha_corte` del monitor heredado para exponer un bloque `filtro_expedientes` en `config_monitor.json`, documentando los modos (`hoy`, `ultimo_dia_habil`, `dias_atras`, combinados) y validaciones actuales.【F:core/modulos_monitor/expedientes_modular/verificacion_expedientes.py†L19-L70】
+   2. Al iniciar `VerificadorExpedientesV4`, resolver la fecha de corte y convertirla al formato esperado antes de invocar el hilo Playwright, replicando la traducción a `DD/MM/AAAA` que hoy realiza el monitor general.【F:core/modulos_monitor/expedientes_modular/verificacion_expedientes.py†L96-L158】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L138-L219】
+   3. Propagar la fecha al flujo asincrónico de expedientes v4 para que detenga el barrido con motivo `limite_fecha/corte_fecha`, registrando totales y motivos igual que en v2/v3.【F:Sistema_v4/operaciones/expedientes/expedientes_v4.py†L217-L407】【F:Sistema_v3/operaciones/expedientes/expedientes_v4.py†L197-L360】
+   4. Exponer en la interfaz (tooltip, notificación o diálogo) el motivo `corte_fecha` cuando el hilo se detenga por el umbral, manteniendo paridad con el mensaje usado por la bandeja heredada.【F:core/modulos_monitor/general/monitor_general.py†L120-L158】
 
 Completar estas tareas en orden desbloquea dependencias graduales y garantiza que el monitor v4 recupere las capacidades críticas del monitor general v2 antes de que el legado sea descartado.
