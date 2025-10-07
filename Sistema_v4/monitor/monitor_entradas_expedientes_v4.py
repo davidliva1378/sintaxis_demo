@@ -94,6 +94,52 @@ except ImportError:  # pragma: no cover - ejecución directa
         obtener_fecha_corte,
     )
 
+ComparadorExpedientes = Callable[..., "ResultadoComparacion"]
+
+if TYPE_CHECKING:  # pragma: no cover - hints para herramientas de tipo
+    try:
+        from .comparacion_expedientes import ResultadoComparacion
+    except ImportError:  # pragma: no cover - ejecución directa
+        from comparacion_expedientes import ResultadoComparacion  # type: ignore[import-not-found]
+
+try:
+    from .comparacion_expedientes import comparar_expedientes as _comparar_expedientes
+except ImportError:  # pragma: no cover - ejecución directa
+    try:
+        from comparacion_expedientes import comparar_expedientes as _comparar_expedientes
+    except ImportError:  # pragma: no cover - entorno sin comparación disponible
+        comparar_expedientes: Optional[ComparadorExpedientes] = None
+    else:
+        comparar_expedientes = _comparar_expedientes
+else:
+    comparar_expedientes = _comparar_expedientes
+
+try:
+    from .respaldo_historico import (
+        ARCHIVOS_PREDETERMINADOS,
+        generar_respaldo_monitoreo,
+    )
+except ImportError:  # pragma: no cover - ejecución directa
+    from respaldo_historico import (  # type: ignore[import-not-found]
+        ARCHIVOS_PREDETERMINADOS,
+        generar_respaldo_monitoreo,
+    )
+
+try:
+    from .configuracion_modo import (
+        MODOS_VALIDOS,
+        actualizar_modo_monitor,
+        cargar_config_monitor,
+        obtener_fecha_corte,
+    )
+except ImportError:  # pragma: no cover - ejecución directa
+    from configuracion_modo import (
+        MODOS_VALIDOS,
+        actualizar_modo_monitor,
+        cargar_config_monitor,
+        obtener_fecha_corte,
+    )
+
 try:
     from .icono_base64 import ICONO_BASE64
 except ImportError:  # pragma: no cover - ejecución directa
