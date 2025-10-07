@@ -990,6 +990,9 @@ class MonitorExpedientesTray:
 
         resultado: ResultadoComparacion = comparar_expedientes()
 
+        for aviso in getattr(resultado, "avisos", []):
+            registrar_log(f"ℹ️ Comparación {origen}: {aviso}")
+
         if resultado.faltantes:
             for mensaje in resultado.mensajes_faltantes():
                 registrar_log(f"⚠️ Comparación {origen}: {mensaje}")
