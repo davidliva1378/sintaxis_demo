@@ -68,10 +68,14 @@ except ImportError:  # pragma: no cover - compatibilidad con Sistema_v3
 
 try:
     from Sistema_v4.web.auto_login import (  # type: ignore[import-not-found]
+        SESSION_FILE,
         reutilizar_sesion_async,
     )
 except ImportError:  # pragma: no cover - compatibilidad con Sistema_v3
-    from Sistema_v3.web.auto_login import reutilizar_sesion_async
+    from Sistema_v3.web.auto_login import (  # type: ignore[import-not-found]
+        SESSION_FILE,
+        reutilizar_sesion_async,
+    )
 
 
 @dataclass
@@ -370,11 +374,16 @@ class MonitorExpedientesTray:
             self.acciones_modo[modo] = accion
         self.menu.addMenu(self.submenu_modo)
 
-        # Espacio reservado para herramientas adicionales. Se reintroducirán
-        # en futuras versiones una vez finalizada la migración a v4.
-        placeholder = QAction("🛠️ Utilidades adicionales (próximamente)")
+        self.submenu_utilidades = QMenu("🧰 Utilidades")
+        accion_estado = self.submenu_utilidades.addAction("🔐 Estado de sesión")
+        accion_estado.triggered.connect(self.mostrar_estado_sesion)
+        accion_forzar = self.submenu_utilidades.addAction("⚠️ Forzar nuevo login")
+        accion_forzar.triggered.connect(self.forzar_login)
+        self.submenu_utilidades.addSeparator()
+        placeholder = QAction("Más herramientas próximamente")
         placeholder.setEnabled(False)
-        self.menu.addAction(placeholder)
+        self.submenu_utilidades.addAction(placeholder)
+        self.menu.addMenu(self.submenu_utilidades)
 
         self.menu.addSeparator()
         self.menu.addAction("🛑 Salir").triggered.connect(self.salir)
@@ -690,6 +699,72 @@ class MonitorExpedientesTray:
             registrar_log(f"📄 Historial CSV: {datos.historial_csv}")
 
         self.tray.showMessage("📤 Entradas", mensaje, icono)
+
+    def mostrar_estado_sesion(self) -> None:
+        estado = "❌ Archivo de sesión no encontrado"
+        detalles_archivo = ""
+        try:
+            with SESSION_FILE.open("r", encoding="utf-8") as archivo:
+                datos = json.load(archivo)
+            cookies = datos.get("cookies", []) if isinstance(datos, dict) else []
+            if any("pjn.gov.ar" in str(cookie.get("domain", "")) for cookie in cookies):
+                estado = "🟢 Sesión activa y válida"
+            else:
+                estado = "⚠️ Sesión incompleta o caducada"
+            try:
+                marca_tiempo = datetime.fromtimestamp(SESSION_FILE.stat().st_mtime)
+                detalles_archivo = (
+                    f"\n📅 Última actualización del archivo: {marca_tiempo:%Y-%m-%d %H:%M:%S}"
+                )
+            except OSError:
+                detalles_archivo = ""
+        except FileNotFoundError:
+            estado = "❌ No se encontró una sesión guardada"
+        except json.JSONDecodeError:
+            estado = "❌ Archivo de sesión ilegible"
+        except Exception as exc:  # pragma: no cover - diagnóstico en ejecución real
+            estado = f"❌ Error inesperado al leer la sesión: {exc}"
+
+        modo = self.config.get("modo", "automatico").replace("_", " ").capitalize()
+        intervalo = self.obtener_intervalo()
+        ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            ruta_sesion = SESSION_FILE.resolve()
+        except Exception:  # pragma: no cover - rutas en entornos heterogéneos
+            ruta_sesion = SESSION_FILE
+
+        mensaje = (
+            f"📅 Fecha y hora actual: {ahora}\n"
+            f"🕒 Modo de trabajo: {modo}\n"
+            f"⏱ Intervalo configurado: {intervalo} minutos\n"
+            f"{estado}"
+            f"{detalles_archivo}"
+            f"\n📁 Archivo: {ruta_sesion}"
+        )
+
+        registrar_log(f"🔐 Estado de sesión consultado: {estado}")
+        QMessageBox.information(None, "Estado de sesión", mensaje)
+
+    def forzar_login(self) -> None:
+        try:
+            if SESSION_FILE.exists():
+                SESSION_FILE.unlink()
+                registrar_log("⚠️ Se eliminó el archivo de sesión para forzar un nuevo login.")
+                self.tray.showMessage(
+                    "⚠️ Forzar login", "✅ Se eliminó la sesión guardada.", QSystemTrayIcon.Information
+                )
+            else:
+                registrar_log("ℹ️ Se solicitó forzar login pero no había sesión guardada.")
+                self.tray.showMessage(
+                    "⚠️ Forzar login", "ℹ️ No se encontró una sesión previa.", QSystemTrayIcon.Information
+                )
+        except Exception as exc:  # pragma: no cover - manejo defensivo
+            registrar_log(f"❌ Error al eliminar la sesión: {exc}")
+            self.tray.showMessage(
+                "⚠️ Forzar login",
+                f"❌ No se pudo eliminar la sesión: {exc}",
+                QSystemTrayIcon.Critical,
+            )
 
     def salir(self) -> None:
         self.tray.hide()
