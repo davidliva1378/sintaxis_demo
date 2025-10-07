@@ -9,6 +9,7 @@ Este módulo implementa la bandeja de sistema que automatiza la verificación de
 * Se restableció el hilo de entradas (`VerificadorEntradasV4`) que guarda historiales JSON/CSV dentro de la carpeta configurada para el monitoreo.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L263-L339】
 * El submenú “🧰 Utilidades” incorpora las acciones “🔐 Estado de sesión” y “⚠️ Forzar nuevo login”, reutilizando `SESSION_FILE` para diagnosticar la cookie guardada y permitir su limpieza desde la bandeja.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L324-L346】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L573-L667】
 * Se reactivó la comparación automática y manual de expedientes mediante el helper `comparar_expedientes`, notificando cambios desde la bandeja y registrando los informes generados en `datos_extraidos/monitoreo/reportes`. Si el helper no está disponible en la instalación, la acción queda deshabilitada y se informa al operador.【F:Sistema_v4/monitor/comparacion_expedientes.py†L1-L89】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L351-L361】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L523-L570】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L796-L813】
+* El submenú “🧰 Utilidades” incorpora un respaldo guiado que copia los resultados recientes (expedientes y notificaciones) a una carpeta histórica con sello de tiempo configurable desde `config_monitor.json`, registrando archivos copiados y ausentes.【F:Sistema_v4/monitor/respaldo_historico.py†L1-L72】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L372-L430】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L675-L725】
 
 ## Capacidades del monitor general anterior (Sistema v2/core)
 
@@ -50,10 +51,10 @@ La acción “⚠️ Forzar nuevo login” elimina `SESSION_FILE` cuando existe 
    1. Encapsular el flujo de comparación en un servicio reutilizable (auto/manual).
    2. Invocar el servicio al cierre exitoso de una verificación.
    3. Añadir una acción manual que permita relanzar la comparación bajo demanda.【F:Sistema_v4/monitor/comparacion_expedientes.py†L1-L89】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L348-L351】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L488-L570】
-4. **Añadir respaldos históricos guiados**
-   1. Implementar un helper que copie los últimos JSON/CSV a una carpeta con timestamp.
-   2. Permitir seleccionar la ubicación de respaldo desde la configuración.
-   3. Exponer la acción en el menú y notificar el resultado al usuario.【F:core/modulos_monitor/general/monitor_general.py†L202-L222】
+4. ✅ **Añadir respaldos históricos guiados**
+   1. `respaldo_historico.py` encapsula la copia de resultados a carpetas con timestamp reutilizando la lista de archivos monitoreados.【F:Sistema_v4/monitor/respaldo_historico.py†L1-L72】
+   2. La configuración admite `respaldo.destino` para personalizar el directorio histórico, manteniendo un valor por defecto en `DEFAULT_CONFIG`.【F:Sistema_v4/monitor/configuracion_modo.py†L11-L23】
+   3. La acción “🗄️ Respaldar últimos resultados” notifica los archivos copiados o ausentes y registra los detalles en el log de la bandeja.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L372-L430】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L675-L725】
 5. **Completar el placeholder de utilidades**
    1. Incorporar las acciones anteriores dentro del menú reservado.
    2. Evaluar utilidades adicionales (abrir carpeta de resultados, ejecutar informes) y documentarlas.

@@ -43,16 +43,14 @@ else:
     comparar_expedientes = _comparar_expedientes
 
 try:
-    from .configuracion_modo import (
-        MODOS_VALIDOS,
-        actualizar_modo_monitor,
-        cargar_config_monitor,
+    from .respaldo_historico import (
+        ARCHIVOS_PREDETERMINADOS,
+        generar_respaldo_monitoreo,
     )
 except ImportError:  # pragma: no cover - ejecución directa
-    from configuracion_modo import (
-        MODOS_VALIDOS,
-        actualizar_modo_monitor,
-        cargar_config_monitor,
+    from respaldo_historico import (  # type: ignore[import-not-found]
+        ARCHIVOS_PREDETERMINADOS,
+        generar_respaldo_monitoreo,
     )
 
 try:
@@ -422,6 +420,10 @@ class MonitorExpedientesTray:
         accion_estado.triggered.connect(self.mostrar_estado_sesion)
         accion_forzar = self.submenu_utilidades.addAction("⚠️ Forzar nuevo login")
         accion_forzar.triggered.connect(self.forzar_login)
+        accion_respaldo = self.submenu_utilidades.addAction(
+            "🗄️ Respaldar últimos resultados"
+        )
+        accion_respaldo.triggered.connect(self.respaldar_resultados)
         self.submenu_utilidades.addSeparator()
         placeholder = QAction("Más herramientas próximamente")
         placeholder.setEnabled(False)
@@ -748,6 +750,68 @@ class MonitorExpedientesTray:
             registrar_log(f"📄 Historial CSV: {datos.historial_csv}")
 
         self.tray.showMessage("📤 Entradas", mensaje, icono)
+
+    def respaldar_resultados(self) -> None:
+        base_monitoreo = Path(os.getcwd()) / "datos_extraidos" / "monitoreo"
+        configuracion_respaldo = self.config.get("respaldo", {})
+        destino_config = None
+        archivos_config = None
+
+        if isinstance(configuracion_respaldo, dict):
+            destino_config = configuracion_respaldo.get("destino")
+            archivos_config = configuracion_respaldo.get("archivos")
+
+        destino_base = Path(destino_config or "datos_extraidos/monitoreo/historico")
+        archivos = None
+        if isinstance(archivos_config, (list, tuple)):
+            archivos = [str(archivo) for archivo in archivos_config]
+
+        try:
+            resultado = generar_respaldo_monitoreo(
+                origen=base_monitoreo,
+                destino_base=destino_base,
+                archivos=archivos,
+            )
+        except Exception as error:  # pragma: no cover - logging y notificaciones
+            registrar_log(f"❌ Error al generar el respaldo histórico: {error}")
+            self.tray.showMessage(
+                "🗄️ Respaldo histórico",
+                "No fue posible completar el respaldo. Revisa el log para más detalles.",
+                QSystemTrayIcon.Critical,
+            )
+            return
+
+        for archivo in resultado.copiados:
+            registrar_log(f"✅ Respaldado: {archivo}")
+
+        if resultado.omitidos:
+            for origen, motivo in resultado.omitidos:
+                if motivo == "no_encontrado":
+                    registrar_log(f"⚠️ Archivo no encontrado para respaldo: {origen}")
+                else:
+                    registrar_log(
+                        "⚠️ No se pudo respaldar {origen}: {motivo}".format(
+                            origen=origen, motivo=motivo
+                        )
+                    )
+
+        if resultado.copiados:
+            mensaje = (
+                "Se creó un respaldo con "
+                f"{len(resultado.copiados)} archivo(s) en {resultado.destino}."
+            )
+            icono = QSystemTrayIcon.Information
+        else:
+            archivos_esperados = (
+                archivos if archivos else [str(nombre) for nombre in ARCHIVOS_PREDETERMINADOS]
+            )
+            mensaje = (
+                "No se copiaron archivos. Verifica que existan los resultados esperados: "
+                + ", ".join(archivos_esperados)
+            )
+            icono = QSystemTrayIcon.Warning
+
+        self.tray.showMessage("🗄️ Respaldo histórico", mensaje, icono)
 
     def mostrar_estado_sesion(self) -> None:
         estado = "❌ Archivo de sesión no encontrado"

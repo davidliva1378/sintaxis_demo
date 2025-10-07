@@ -17,6 +17,9 @@ DEFAULT_CONFIG = {
         "intervalo_minutos": 30,
     },
     "fuera_horario": {"intervalo_minutos": 240},
+    "respaldo": {
+        "destino": "datos_extraidos/monitoreo/historico",
+    },
 }
 
 MODOS_VALIDOS: tuple[str, ...] = ("automatico", "laboral", "no_laboral")
