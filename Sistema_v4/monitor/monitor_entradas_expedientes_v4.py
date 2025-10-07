@@ -12,15 +12,87 @@ import base64
 import json
 import os
 import sys
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 from typing import TYPE_CHECKING, Callable, Optional
 
-from PySide6.QtCore import QThread, QTimer, Signal
+from PySide6.QtCore import QThread, QTimer, Signal, QTime
 from PySide6.QtGui import QAction, QIcon, QPixmap
-from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
+from PySide6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMenu,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QSpinBox,
+    QSystemTrayIcon,
+    QTabWidget,
+    QTimeEdit,
+    QVBoxLayout,
+    QWidget,
+)
+
+ComparadorExpedientes = Callable[..., "ResultadoComparacion"]
+
+if TYPE_CHECKING:  # pragma: no cover - hints para herramientas de tipo
+    try:
+        from .comparacion_expedientes import ResultadoComparacion
+    except ImportError:  # pragma: no cover - ejecución directa
+        from comparacion_expedientes import ResultadoComparacion  # type: ignore[import-not-found]
+
+try:
+    from .comparacion_expedientes import comparar_expedientes as _comparar_expedientes
+except ImportError:  # pragma: no cover - ejecución directa
+    try:
+        from comparacion_expedientes import comparar_expedientes as _comparar_expedientes
+    except ImportError:  # pragma: no cover - entorno sin comparación disponible
+        comparar_expedientes: Optional[ComparadorExpedientes] = None
+    else:
+        comparar_expedientes = _comparar_expedientes
+else:
+    comparar_expedientes = _comparar_expedientes
+
+try:
+    from .respaldo_historico import (
+        ARCHIVOS_PREDETERMINADOS,
+        generar_respaldo_monitoreo,
+    )
+except ImportError:  # pragma: no cover - ejecución directa
+    from respaldo_historico import (  # type: ignore[import-not-found]
+        ARCHIVOS_PREDETERMINADOS,
+        generar_respaldo_monitoreo,
+    )
+
+try:
+    from .configuracion_modo import (
+        DEFAULT_CONFIG,
+        MODOS_VALIDOS,
+        actualizar_modo_monitor,
+        cargar_config_monitor,
+        guardar_config_monitor,
+        obtener_fecha_corte,
+    )
+except ImportError:  # pragma: no cover - ejecución directa
+    from configuracion_modo import (
+        DEFAULT_CONFIG,
+        MODOS_VALIDOS,
+        actualizar_modo_monitor,
+        cargar_config_monitor,
+        guardar_config_monitor,
+        obtener_fecha_corte,
+    )
 
 ComparadorExpedientes = Callable[..., "ResultadoComparacion"]
 
@@ -137,6 +209,455 @@ class ResultadoEntradas:
     error: str | None = None
 
 
+class ConfiguracionDialog(QDialog):
+    """Diálogo para editar los parámetros del monitor desde la bandeja."""
+
+    def __init__(self, config: dict, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Configuración del monitor")
+        self._config = deepcopy(config) if isinstance(config, dict) else {}
+        self._resultado: dict | None = None
+        self._crear_ui()
+        self._cargar_datos()
+
+    def _crear_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        self.tabs = QTabWidget(self)
+        layout.addWidget(self.tabs)
+
+        self._crear_tab_general()
+        self._crear_tab_intervalos()
+        self._crear_tab_filtro()
+        self._crear_tab_reintentos()
+        self._crear_tab_respaldo()
+        self._crear_tab_notificaciones()
+
+        botones = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel, parent=self)
+        botones.accepted.connect(self.accept)
+        botones.rejected.connect(self.reject)
+        layout.addWidget(botones)
+
+        self.resize(560, 540)
+
+    def _crear_tab_general(self) -> None:
+        pagina = QWidget(self)
+        formulario = QFormLayout(pagina)
+
+        self.modo_combo = QComboBox(pagina)
+        for modo in MODOS_VALIDOS:
+            texto = modo.replace("_", " ").capitalize()
+            self.modo_combo.addItem(texto, modo)
+        formulario.addRow("Modo de trabajo", self.modo_combo)
+
+        self.monitoreo_edit = QLineEdit(pagina)
+        self.monitoreo_boton = QPushButton("Seleccionar…", pagina)
+        self.monitoreo_boton.clicked.connect(self._seleccionar_monitoreo)
+        formulario.addRow(
+            "Carpeta de monitoreo",
+            self._crear_contenedor_ruta(self.monitoreo_edit, self.monitoreo_boton),
+        )
+
+        self.comparacion_modo_combo = QComboBox(pagina)
+        self.comparacion_modo_combo.addItem(
+            "Parcial (usa fecha de corte)", "parcial"
+        )
+        self.comparacion_modo_combo.addItem(
+            "Total (base completa)", "total"
+        )
+        formulario.addRow("Modo de comparación", self.comparacion_modo_combo)
+
+        self.comparacion_auto_check = QCheckBox(
+            "Ejecutar comparación automática tras cada verificación exitosa",
+            pagina,
+        )
+        formulario.addRow(self.comparacion_auto_check)
+
+        self.tabs.addTab(pagina, "General")
+
+    def _crear_tab_intervalos(self) -> None:
+        pagina = QWidget(self)
+        formulario = QFormLayout(pagina)
+
+        self.dias_laborales_edit = QLineEdit(pagina)
+        formulario.addRow("Días laborales", self.dias_laborales_edit)
+
+        self.hora_inicio_edit = QTimeEdit(pagina)
+        self.hora_inicio_edit.setDisplayFormat("HH:mm")
+        formulario.addRow("Hora de inicio", self.hora_inicio_edit)
+
+        self.hora_fin_edit = QTimeEdit(pagina)
+        self.hora_fin_edit.setDisplayFormat("HH:mm")
+        formulario.addRow("Hora de fin", self.hora_fin_edit)
+
+        self.intervalo_laboral_spin = QSpinBox(pagina)
+        self.intervalo_laboral_spin.setRange(1, 1440)
+        formulario.addRow("Intervalo laboral (min)", self.intervalo_laboral_spin)
+
+        self.intervalo_no_laboral_spin = QSpinBox(pagina)
+        self.intervalo_no_laboral_spin.setRange(1, 1440)
+        formulario.addRow("Intervalo fuera de horario (min)", self.intervalo_no_laboral_spin)
+
+        self.tabs.addTab(pagina, "Intervalos")
+
+    def _crear_tab_filtro(self) -> None:
+        pagina = QWidget(self)
+        formulario = QFormLayout(pagina)
+
+        self.filtro_modo_combo = QComboBox(pagina)
+        opciones = [
+            ("Sin corte explícito", "sin_corte"),
+            ("Hoy", "hoy"),
+            ("Último día hábil", "ultimo_dia_habil"),
+            ("Días hacia atrás", "dias_atras"),
+            ("Hoy + Último día hábil", "hoy+ultimo_dia_habil"),
+            ("Completo", "completo"),
+        ]
+        for etiqueta, valor in opciones:
+            self.filtro_modo_combo.addItem(etiqueta, valor)
+        formulario.addRow("Modo de filtro", self.filtro_modo_combo)
+
+        self.filtro_dias_spin = QSpinBox(pagina)
+        self.filtro_dias_spin.setRange(0, 365)
+        formulario.addRow("Días hacia atrás", self.filtro_dias_spin)
+
+        self.filtro_orden_edit = QLineEdit(pagina)
+        formulario.addRow("Orden de extracción", self.filtro_orden_edit)
+
+        self.tabs.addTab(pagina, "Filtro")
+
+    def _crear_tab_reintentos(self) -> None:
+        pagina = QWidget(self)
+        formulario = QFormLayout(pagina)
+
+        self.reintentos_expedientes_spin = QSpinBox(pagina)
+        self.reintentos_expedientes_spin.setRange(0, 20)
+        formulario.addRow(
+            "Reintentos expedientes",
+            self.reintentos_expedientes_spin,
+        )
+
+        self.espera_expedientes_spin = QSpinBox(pagina)
+        self.espera_expedientes_spin.setRange(0, 3600)
+        formulario.addRow(
+            "Espera entre reintentos de expedientes (seg)",
+            self.espera_expedientes_spin,
+        )
+
+        self.reintentos_entradas_spin = QSpinBox(pagina)
+        self.reintentos_entradas_spin.setRange(0, 20)
+        formulario.addRow("Reintentos entradas", self.reintentos_entradas_spin)
+
+        self.espera_entradas_spin = QSpinBox(pagina)
+        self.espera_entradas_spin.setRange(0, 3600)
+        formulario.addRow(
+            "Espera entre reintentos de entradas (seg)",
+            self.espera_entradas_spin,
+        )
+
+        self.tabs.addTab(pagina, "Reintentos")
+
+    def _crear_tab_respaldo(self) -> None:
+        pagina = QWidget(self)
+        formulario = QFormLayout(pagina)
+
+        self.respaldo_destino_edit = QLineEdit(pagina)
+        self.respaldo_destino_boton = QPushButton("Seleccionar…", pagina)
+        self.respaldo_destino_boton.clicked.connect(self._seleccionar_respaldo)
+        formulario.addRow(
+            "Destino de respaldos",
+            self._crear_contenedor_ruta(
+                self.respaldo_destino_edit, self.respaldo_destino_boton
+            ),
+        )
+
+        self.respaldo_archivos_edit = QPlainTextEdit(pagina)
+        self.respaldo_archivos_edit.setPlaceholderText(
+            "Un archivo por línea (por ejemplo: expedientes_monitor.json)"
+        )
+        formulario.addRow(QLabel("Archivos a respaldar"), self.respaldo_archivos_edit)
+
+        self.tabs.addTab(pagina, "Respaldo")
+
+    def _crear_tab_notificaciones(self) -> None:
+        pagina = QWidget(self)
+        layout = QVBoxLayout(pagina)
+
+        self.notif_respaldo_check = QCheckBox(
+            "Mostrar notificaciones al completar un respaldo",
+            pagina,
+        )
+        self.notif_comparacion_sin_cambios_check = QCheckBox(
+            "Notificar comparaciones sin cambios",
+            pagina,
+        )
+        self.notif_comparacion_faltantes_check = QCheckBox(
+            "Notificar faltantes en la comparación",
+            pagina,
+        )
+
+        layout.addWidget(self.notif_respaldo_check)
+        layout.addWidget(self.notif_comparacion_sin_cambios_check)
+        layout.addWidget(self.notif_comparacion_faltantes_check)
+        layout.addStretch(1)
+
+        self.tabs.addTab(pagina, "Notificaciones")
+
+    def _crear_contenedor_ruta(
+        self, edit: QLineEdit, boton: QPushButton
+    ) -> QWidget:
+        contenedor = QWidget(self)
+        layout = QHBoxLayout(contenedor)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(edit)
+        layout.addWidget(boton)
+        return contenedor
+
+    def _cargar_datos(self) -> None:
+        config = deepcopy(self._config)
+
+        modo_actual = config.get("modo", DEFAULT_CONFIG["modo"])
+        indice = self.modo_combo.findData(modo_actual)
+        if indice >= 0:
+            self.modo_combo.setCurrentIndex(indice)
+
+        rutas = config.get("rutas", {})
+        if isinstance(rutas, dict):
+            self.monitoreo_edit.setText(str(rutas.get("monitoreo", "")))
+
+        comparacion = config.get("comparacion", {})
+        if isinstance(comparacion, dict):
+            modo_comparacion = comparacion.get(
+                "modo", DEFAULT_CONFIG["comparacion"]["modo"]
+            )
+            indice = self.comparacion_modo_combo.findData(modo_comparacion)
+            if indice >= 0:
+                self.comparacion_modo_combo.setCurrentIndex(indice)
+            self.comparacion_auto_check.setChecked(
+                bool(comparacion.get("auto", DEFAULT_CONFIG["comparacion"]["auto"]))
+            )
+
+        horario = config.get("horario_laboral", {})
+        dias = horario.get("dias", DEFAULT_CONFIG["horario_laboral"]["dias"])
+        if isinstance(dias, (list, tuple)):
+            self.dias_laborales_edit.setText(
+                ", ".join(str(dia) for dia in dias if dia)
+            )
+        inicio = horario.get(
+            "hora_inicio", DEFAULT_CONFIG["horario_laboral"]["hora_inicio"]
+        )
+        fin = horario.get("hora_fin", DEFAULT_CONFIG["horario_laboral"]["hora_fin"])
+        self._set_time_edit(self.hora_inicio_edit, inicio)
+        self._set_time_edit(self.hora_fin_edit, fin)
+        self.intervalo_laboral_spin.setValue(
+            int(horario.get(
+                "intervalo_minutos", DEFAULT_CONFIG["horario_laboral"]["intervalo_minutos"]
+            ))
+        )
+
+        fuera_horario = config.get("fuera_horario", {})
+        self.intervalo_no_laboral_spin.setValue(
+            int(
+                fuera_horario.get(
+                    "intervalo_minutos",
+                    DEFAULT_CONFIG["fuera_horario"]["intervalo_minutos"],
+                )
+            )
+        )
+
+        filtro = config.get("filtro_expedientes", {})
+        if isinstance(filtro, dict):
+            modo_filtro = filtro.get(
+                "modo", DEFAULT_CONFIG["filtro_expedientes"]["modo"]
+            )
+            indice = self.filtro_modo_combo.findData(modo_filtro)
+            if indice >= 0:
+                self.filtro_modo_combo.setCurrentIndex(indice)
+            self.filtro_dias_spin.setValue(
+                int(filtro.get(
+                    "dias_atras", DEFAULT_CONFIG["filtro_expedientes"]["dias_atras"]
+                ))
+            )
+            orden = filtro.get(
+                "orden", DEFAULT_CONFIG["filtro_expedientes"]["orden"]
+            )
+            if isinstance(orden, str):
+                self.filtro_orden_edit.setText(orden)
+
+        reintentos = config.get("reintentos", {})
+        exp_conf = reintentos.get("expedientes", {})
+        ent_conf = reintentos.get("entradas", {})
+        self.reintentos_expedientes_spin.setValue(
+            int(exp_conf.get("maximos", DEFAULT_CONFIG["reintentos"]["expedientes"]["maximos"]))
+        )
+        self.espera_expedientes_spin.setValue(
+            int(
+                exp_conf.get(
+                    "espera_segundos",
+                    DEFAULT_CONFIG["reintentos"]["expedientes"]["espera_segundos"],
+                )
+            )
+        )
+        self.reintentos_entradas_spin.setValue(
+            int(ent_conf.get("maximos", DEFAULT_CONFIG["reintentos"]["entradas"]["maximos"]))
+        )
+        self.espera_entradas_spin.setValue(
+            int(
+                ent_conf.get(
+                    "espera_segundos",
+                    DEFAULT_CONFIG["reintentos"]["entradas"]["espera_segundos"],
+                )
+            )
+        )
+
+        respaldo = config.get("respaldo", {})
+        if isinstance(respaldo, dict):
+            destino = respaldo.get(
+                "destino", DEFAULT_CONFIG["respaldo"]["destino"]
+            )
+            if isinstance(destino, str):
+                self.respaldo_destino_edit.setText(destino)
+            archivos = respaldo.get("archivos", [])
+            if isinstance(archivos, (list, tuple)):
+                texto = "\n".join(str(archivo) for archivo in archivos if archivo)
+                self.respaldo_archivos_edit.setPlainText(texto)
+
+        notificaciones = config.get("notificaciones", {})
+        self.notif_respaldo_check.setChecked(
+            bool(
+                notificaciones.get(
+                    "respaldo", DEFAULT_CONFIG["notificaciones"]["respaldo"]
+                )
+            )
+        )
+        self.notif_comparacion_sin_cambios_check.setChecked(
+            bool(
+                notificaciones.get(
+                    "comparacion_sin_cambios",
+                    DEFAULT_CONFIG["notificaciones"]["comparacion_sin_cambios"],
+                )
+            )
+        )
+        self.notif_comparacion_faltantes_check.setChecked(
+            bool(
+                notificaciones.get(
+                    "comparacion_faltantes",
+                    DEFAULT_CONFIG["notificaciones"]["comparacion_faltantes"],
+                )
+            )
+        )
+
+    def _set_time_edit(self, widget: QTimeEdit, valor: object) -> None:
+        texto = valor if isinstance(valor, str) else ""
+        hora = QTime.fromString(texto, "HH:mm")
+        if not hora.isValid():
+            defecto = QTime.fromString("07:00", "HH:mm")
+            hora = defecto if defecto.isValid() else QTime(7, 0)
+        widget.setTime(hora)
+
+    def _seleccionar_monitoreo(self) -> None:
+        inicio = self.monitoreo_edit.text().strip() or str(
+            Path.cwd() / DEFAULT_CONFIG["rutas"]["monitoreo"]
+        )
+        ruta = QFileDialog.getExistingDirectory(
+            self, "Seleccionar carpeta de monitoreo", inicio
+        )
+        if ruta:
+            self.monitoreo_edit.setText(ruta)
+
+    def _seleccionar_respaldo(self) -> None:
+        inicio = self.respaldo_destino_edit.text().strip() or str(
+            Path.cwd() / DEFAULT_CONFIG["respaldo"]["destino"]
+        )
+        ruta = QFileDialog.getExistingDirectory(
+            self, "Seleccionar destino de respaldos", inicio
+        )
+        if ruta:
+            self.respaldo_destino_edit.setText(ruta)
+
+    def accept(self) -> None:  # type: ignore[override]
+        try:
+            config = self._recopilar_configuracion()
+        except ValueError as error:
+            QMessageBox.warning(self, "Configuración inválida", str(error))
+            return
+
+        self._resultado = config
+        super().accept()
+
+    def _recopilar_configuracion(self) -> dict:
+        config = deepcopy(DEFAULT_CONFIG)
+        if isinstance(self._config, dict):
+            for clave, valor in self._config.items():
+                if clave not in config:
+                    config[clave] = deepcopy(valor)
+
+        config["modo"] = self.modo_combo.currentData() or DEFAULT_CONFIG["modo"]
+
+        rutas = config.setdefault("rutas", {})
+        monitoreo = self.monitoreo_edit.text().strip()
+        rutas["monitoreo"] = monitoreo or DEFAULT_CONFIG["rutas"]["monitoreo"]
+
+        comparacion = config.setdefault("comparacion", {})
+        comparacion["modo"] = (
+            self.comparacion_modo_combo.currentData()
+            or DEFAULT_CONFIG["comparacion"]["modo"]
+        )
+        comparacion["auto"] = self.comparacion_auto_check.isChecked()
+
+        horario = config.setdefault("horario_laboral", {})
+        dias_texto = self.dias_laborales_edit.text()
+        dias = [
+            dia.strip().lower()
+            for dia in dias_texto.split(",")
+            if dia.strip()
+        ]
+        horario["dias"] = dias or DEFAULT_CONFIG["horario_laboral"]["dias"]
+        horario["hora_inicio"] = self.hora_inicio_edit.time().toString("HH:mm")
+        horario["hora_fin"] = self.hora_fin_edit.time().toString("HH:mm")
+        horario["intervalo_minutos"] = self.intervalo_laboral_spin.value()
+
+        fuera_horario = config.setdefault("fuera_horario", {})
+        fuera_horario["intervalo_minutos"] = self.intervalo_no_laboral_spin.value()
+
+        filtro = config.setdefault("filtro_expedientes", {})
+        filtro_modo = self.filtro_modo_combo.currentData()
+        if filtro_modo == "sin_corte":
+            filtro_modo = ""
+        filtro["modo"] = filtro_modo or DEFAULT_CONFIG["filtro_expedientes"]["modo"]
+        filtro["dias_atras"] = self.filtro_dias_spin.value()
+        filtro["orden"] = self.filtro_orden_edit.text().strip() or DEFAULT_CONFIG["filtro_expedientes"]["orden"]
+
+        reintentos = config.setdefault("reintentos", {})
+        exp_conf = reintentos.setdefault("expedientes", {})
+        exp_conf["maximos"] = self.reintentos_expedientes_spin.value()
+        exp_conf["espera_segundos"] = self.espera_expedientes_spin.value()
+        ent_conf = reintentos.setdefault("entradas", {})
+        ent_conf["maximos"] = self.reintentos_entradas_spin.value()
+        ent_conf["espera_segundos"] = self.espera_entradas_spin.value()
+
+        respaldo = config.setdefault("respaldo", {})
+        destino_respaldo = self.respaldo_destino_edit.text().strip()
+        respaldo["destino"] = (
+            destino_respaldo or DEFAULT_CONFIG["respaldo"]["destino"]
+        )
+        archivos_texto = self.respaldo_archivos_edit.toPlainText().splitlines()
+        respaldo["archivos"] = [
+            archivo.strip() for archivo in archivos_texto if archivo.strip()
+        ]
+
+        notificaciones = config.setdefault("notificaciones", {})
+        notificaciones["respaldo"] = self.notif_respaldo_check.isChecked()
+        notificaciones[
+            "comparacion_sin_cambios"
+        ] = self.notif_comparacion_sin_cambios_check.isChecked()
+        notificaciones[
+            "comparacion_faltantes"
+        ] = self.notif_comparacion_faltantes_check.isChecked()
+
+        return config
+
+    def obtener_configuracion(self) -> dict | None:
+        return deepcopy(self._resultado) if isinstance(self._resultado, dict) else None
 class VerificadorExpedientesV4(QThread):
     """Hilo encargado de recuperar el listado completo de expedientes."""
 
@@ -469,11 +990,26 @@ class MonitorExpedientesTray:
         self.submenu_utilidades.addAction(placeholder)
         self.menu.addMenu(self.submenu_utilidades)
 
+        accion_configuracion = self.menu.addAction("⚙️ Configuración…")
+        accion_configuracion.triggered.connect(self.abrir_configuracion)
+
         self.menu.addSeparator()
         self.menu.addAction("🛑 Salir").triggered.connect(self.salir)
         self.tray.setContextMenu(self.menu)
 
+        self.directorio_monitoreo = (
+            Path(os.getcwd()) / DEFAULT_CONFIG["rutas"]["monitoreo"]
+        ).resolve()
+        self.reintentos_config: dict[str, dict[str, int]] = deepcopy(
+            DEFAULT_CONFIG["reintentos"]
+        )
+        self.notificaciones_config: dict[str, bool] = deepcopy(
+            DEFAULT_CONFIG["notificaciones"]
+        )
+        self.comparacion_auto: bool = DEFAULT_CONFIG["comparacion"]["auto"]
+
         self.config = self.cargar_config()
+        self._aplicar_configuracion(self.config)
         self.actualizar_modo_seleccionado()
         self.actualizar_tooltip()
         self.hilo_expedientes: VerificadorExpedientesV4 | None = None
@@ -502,6 +1038,77 @@ class MonitorExpedientesTray:
 
     def cargar_config(self) -> dict:
         return cargar_config_monitor()
+
+    def _aplicar_configuracion(self, config: dict) -> None:
+        self.directorio_monitoreo = self._resolver_directorio_monitoreo(config)
+        self.reintentos_config = self._resolver_reintentos(config)
+        self.notificaciones_config = self._resolver_notificaciones(config)
+
+        comparacion = config.get("comparacion")
+        if isinstance(comparacion, dict):
+            self.comparacion_auto = bool(
+                comparacion.get("auto", DEFAULT_CONFIG["comparacion"]["auto"])
+            )
+        else:
+            self.comparacion_auto = DEFAULT_CONFIG["comparacion"]["auto"]
+
+    def _resolver_directorio_monitoreo(self, config: dict) -> Path:
+        rutas = config.get("rutas")
+        if isinstance(rutas, dict):
+            destino = rutas.get("monitoreo")
+            if isinstance(destino, str) and destino.strip():
+                ruta = Path(destino).expanduser()
+                if not ruta.is_absolute():
+                    return (Path(os.getcwd()) / destino).resolve()
+                return ruta.resolve()
+
+        por_defecto = DEFAULT_CONFIG["rutas"]["monitoreo"]
+        ruta = Path(por_defecto).expanduser()
+        if ruta.is_absolute():
+            return ruta.resolve()
+        return (Path(os.getcwd()) / ruta).resolve()
+
+    def _resolver_reintentos(self, config: dict) -> dict[str, dict[str, int]]:
+        resultado = deepcopy(DEFAULT_CONFIG["reintentos"])
+        reintentos = config.get("reintentos")
+        if not isinstance(reintentos, dict):
+            return resultado
+
+        for clave in ("expedientes", "entradas"):
+            valores = reintentos.get(clave)
+            if not isinstance(valores, dict):
+                continue
+            maximos = valores.get("maximos")
+            espera = valores.get("espera_segundos")
+            if isinstance(maximos, (int, float)):
+                resultado[clave]["maximos"] = max(0, int(maximos))
+            if isinstance(espera, (int, float)):
+                resultado[clave]["espera_segundos"] = max(0, int(espera))
+        return resultado
+
+    def _resolver_notificaciones(self, config: dict) -> dict[str, bool]:
+        resultado = deepcopy(DEFAULT_CONFIG["notificaciones"])
+        notificaciones = config.get("notificaciones")
+        if not isinstance(notificaciones, dict):
+            return resultado
+
+        for clave in resultado:
+            valor = notificaciones.get(clave)
+            if isinstance(valor, bool):
+                resultado[clave] = valor
+        return resultado
+
+    def _obtener_config_reintentos(self, tipo: str) -> tuple[int, int]:
+        configuracion = self.reintentos_config.get(tipo, {})
+        maximos = int(configuracion.get("maximos", 0))
+        espera = int(configuracion.get("espera_segundos", 0))
+        return maximos, espera
+
+    def _should_notify(self, clave: str, default: bool) -> bool:
+        valor = self.notificaciones_config.get(clave)
+        if isinstance(valor, bool):
+            return valor
+        return default
 
     def esta_en_horario_laboral(self) -> bool:
         ahora = datetime.now()
@@ -573,6 +1180,7 @@ class MonitorExpedientesTray:
             self.actualizar_modo_seleccionado()
             return
 
+        self._aplicar_configuracion(self.config)
         self.actualizar_modo_seleccionado()
         self.actualizar_tooltip()
         self.reiniciar_temporizadores()
@@ -594,7 +1202,7 @@ class MonitorExpedientesTray:
             return
 
         self.ejecutando_expedientes = True
-        carpeta = Path(os.getcwd()) / "datos_extraidos" / "monitoreo"
+        carpeta = self.directorio_monitoreo
         fecha_corte_resuelta: str | None = None
         try:
             fecha_corte_iso = obtener_fecha_corte(self.config)
@@ -648,7 +1256,7 @@ class MonitorExpedientesTray:
             return
 
         self.ejecutando_entradas = True
-        carpeta = Path(os.getcwd()) / "datos_extraidos" / "monitoreo"
+        carpeta = self.directorio_monitoreo
         self.hilo_entradas = VerificadorEntradasV4(destino=carpeta)
         self.hilo_entradas.resultado.connect(self.procesar_resultado_entradas)
         self.hilo_entradas.finished.connect(self._limpiar_hilo_entradas)
@@ -772,23 +1380,46 @@ class MonitorExpedientesTray:
 
         if datos.estado not in estados_exitosos:
             self.reintentos_expedientes += 1
-            if self.reintentos_expedientes < 5:
+            max_reintentos, espera_segundos = self._obtener_config_reintentos(
+                "expedientes"
+            )
+            if max_reintentos <= 0:
                 registrar_log(
-                    f"🔁 Reintentando verificación ({self.reintentos_expedientes}/5) en 5 segundos..."
+                    "ℹ️ Reintentos de expedientes desactivados en la configuración."
                 )
-                QTimer.singleShot(5000, self.verificar_expedientes)
+            elif self.reintentos_expedientes <= max_reintentos:
+                registrar_log(
+                    "🔁 Reintentando verificación (%s/%s) en %s segundo(s)..."
+                    % (
+                        self.reintentos_expedientes,
+                        max_reintentos,
+                        espera_segundos,
+                    )
+                )
+                QTimer.singleShot(
+                    max(0, espera_segundos) * 1000, self.verificar_expedientes
+                )
             else:
                 registrar_log(
-                    "❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación."
+                    "❌ Se alcanzó el límite de reintentos configurado para expedientes."
                 )
         else:
             self.reintentos_expedientes = 0
-            self._comparar_expedientes(
-                origen="automática",
-                notificar=True,
-                notificar_sin_cambios=False,
-                notificar_faltantes=False,
-            )
+            if self.comparacion_auto:
+                self._comparar_expedientes(
+                    origen="automática",
+                    notificar=True,
+                    notificar_sin_cambios=self._should_notify(
+                        "comparacion_sin_cambios", False
+                    ),
+                    notificar_faltantes=self._should_notify(
+                        "comparacion_faltantes", True
+                    ),
+                )
+            else:
+                registrar_log(
+                    "ℹ️ Comparación automática desactivada; no se ejecutará tras la verificación."
+                )
 
     def procesar_resultado_entradas(self, datos: ResultadoEntradas) -> None:
         if datos.nuevas is None:
@@ -798,13 +1429,27 @@ class MonitorExpedientesTray:
                 registrar_log("ℹ️ Sesión no disponible al intentar extraer entradas.")
             elif datos.error:
                 registrar_log(f"🛑 Error reportado: {datos.error}")
-            if self.reintentos_entradas < 5:
+            max_reintentos, espera_segundos = self._obtener_config_reintentos(
+                "entradas"
+            )
+            if max_reintentos <= 0:
                 registrar_log(
-                    f"🔁 Reintentando entradas ({self.reintentos_entradas}/5) en 5 segundos..."
+                    "ℹ️ Reintentos de entradas desactivados en la configuración."
                 )
-                QTimer.singleShot(5000, self.verificar_entradas)
+            elif self.reintentos_entradas <= max_reintentos:
+                registrar_log(
+                    "🔁 Reintentando entradas (%s/%s) en %s segundo(s)..."
+                    % (
+                        self.reintentos_entradas,
+                        max_reintentos,
+                        espera_segundos,
+                    )
+                )
+                QTimer.singleShot(
+                    max(0, espera_segundos) * 1000, self.verificar_entradas
+                )
             else:
-                registrar_log("❌ Se alcanzó el límite de reintentos de entradas.")
+                registrar_log("❌ Se alcanzó el límite de reintentos de entradas configurado.")
             self.tray.showMessage(
                 "📤 Entradas",
                 "No fue posible completar la extracción de entradas.",
@@ -833,7 +1478,7 @@ class MonitorExpedientesTray:
         self.tray.showMessage("📤 Entradas", mensaje, icono)
 
     def respaldar_resultados(self) -> None:
-        base_monitoreo = Path(os.getcwd()) / "datos_extraidos" / "monitoreo"
+        base_monitoreo = self.directorio_monitoreo
         configuracion_respaldo = self.config.get("respaldo", {})
         destino_config = None
         archivos_config = None
@@ -842,7 +1487,16 @@ class MonitorExpedientesTray:
             destino_config = configuracion_respaldo.get("destino")
             archivos_config = configuracion_respaldo.get("archivos")
 
-        destino_base = Path(destino_config or "datos_extraidos/monitoreo/historico")
+        destino_texto = (
+            destino_config
+            if isinstance(destino_config, str) and destino_config.strip()
+            else DEFAULT_CONFIG["respaldo"]["destino"]
+        )
+        destino_base = Path(destino_texto).expanduser()
+        if not destino_base.is_absolute():
+            destino_base = (Path(os.getcwd()) / destino_texto).resolve()
+        else:
+            destino_base = destino_base.resolve()
         archivos = None
         if isinstance(archivos_config, (list, tuple)):
             archivos = [str(archivo) for archivo in archivos_config]
@@ -892,7 +1546,8 @@ class MonitorExpedientesTray:
             )
             icono = QSystemTrayIcon.Warning
 
-        self.tray.showMessage("🗄️ Respaldo histórico", mensaje, icono)
+        if self._should_notify("respaldo", True):
+            self.tray.showMessage("🗄️ Respaldo histórico", mensaje, icono)
 
     def mostrar_estado_sesion(self) -> None:
         estado = "❌ Archivo de sesión no encontrado"
@@ -964,8 +1619,12 @@ class MonitorExpedientesTray:
         self._comparar_expedientes(
             origen="manual",
             notificar=True,
-            notificar_sin_cambios=True,
-            notificar_faltantes=True,
+            notificar_sin_cambios=self._should_notify(
+                "comparacion_sin_cambios", False
+            ),
+            notificar_faltantes=self._should_notify(
+                "comparacion_faltantes", True
+            ),
         )
 
     def _comparar_expedientes(
@@ -988,7 +1647,10 @@ class MonitorExpedientesTray:
                 )
             return
 
-        resultado: ResultadoComparacion = comparar_expedientes(config=self.config)
+        resultado: ResultadoComparacion = comparar_expedientes(
+            base_dir=self.directorio_monitoreo,
+            config=self.config,
+        )
 
         for aviso in getattr(resultado, "avisos", []):
             registrar_log(f"ℹ️ Comparación {origen}: {aviso}")
@@ -1042,6 +1704,38 @@ class MonitorExpedientesTray:
     def salir(self) -> None:
         self.tray.hide()
         self.app.quit()
+
+    def abrir_configuracion(self) -> None:
+        dialogo = ConfiguracionDialog(self.config, parent=self.menu)
+        if dialogo.exec() != QDialog.Accepted:
+            return
+
+        nueva_config = dialogo.obtener_configuracion()
+        if not isinstance(nueva_config, dict):
+            return
+
+        try:
+            guardar_config_monitor(nueva_config)
+        except Exception as error:  # pragma: no cover - persistencia en ejecución real
+            registrar_log(f"❌ No se pudo guardar la configuración: {error}")
+            QMessageBox.critical(
+                None,
+                "Error al guardar configuración",
+                f"No fue posible guardar los cambios: {error}",
+            )
+            return
+
+        self.config = cargar_config_monitor()
+        self._aplicar_configuracion(self.config)
+        self.actualizar_modo_seleccionado()
+        self.actualizar_tooltip()
+        self.reiniciar_temporizadores()
+        registrar_log("⚙️ Configuración del monitor actualizada desde la bandeja.")
+        self.tray.showMessage(
+            "Configuración actualizada",
+            "Los parámetros del monitor se guardaron correctamente.",
+            QSystemTrayIcon.Information,
+        )
 
 
 if __name__ == "__main__":

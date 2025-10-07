@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from pathlib import Path
 from typing import Iterable
 
@@ -69,10 +69,12 @@ class ResultadoComparacion:
         return [f"No se encontró: {detalle}" for detalle in self.faltantes]
 
 
-def obtener_rutas(base_dir: Path | None = None) -> RutasComparacion:
+def obtener_rutas(
+    base_dir: Path | None = None, config: dict | None = None
+) -> RutasComparacion:
     """Resuelve las rutas estándar utilizadas por el monitor."""
 
-    base = Path(base_dir) if base_dir is not None else Path.cwd() / "datos_extraidos" / "monitoreo"
+    base = _resolver_base_monitoreo(base_dir, config)
     return RutasComparacion(
         archivo_actual=base / "expedientes_monitor.json",
         archivo_base=base / "expedientes_monitor - base.json",
@@ -85,7 +87,7 @@ def comparar_expedientes(
 ) -> ResultadoComparacion:
     """Ejecuta la comparación y captura errores habituales."""
 
-    rutas = obtener_rutas(base_dir)
+    rutas = obtener_rutas(base_dir, config=config)
 
     avisos: list[str] = []
     config_resuelta = _resolver_config_general(config)
@@ -239,6 +241,27 @@ def _resolver_modo_comparacion(config: dict | None) -> tuple[str, list[str]]:
         )
 
     return modo, avisos
+
+
+def _resolver_base_monitoreo(
+    base_dir: Path | None, config: dict | None
+) -> Path:
+    """Determina la carpeta base a utilizar para la comparación."""
+
+    if base_dir is not None:
+        return Path(base_dir)
+
+    if isinstance(config, dict):
+        rutas = config.get("rutas")
+        if isinstance(rutas, dict):
+            destino = rutas.get("monitoreo")
+            if isinstance(destino, str) and destino.strip():
+                ruta = Path(destino).expanduser()
+                if not ruta.is_absolute():
+                    return (Path.cwd() / ruta).resolve()
+                return ruta.resolve()
+
+    return (Path.cwd() / "datos_extraidos" / "monitoreo").resolve()
 
 
 def _resolver_fecha_corte(config: dict | None = None) -> date | None:

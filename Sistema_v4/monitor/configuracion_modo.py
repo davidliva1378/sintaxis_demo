@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
 
@@ -31,24 +32,47 @@ DEFAULT_CONFIG = {
     },
     "comparacion": {
         "modo": "parcial",
+        "auto": True,
     },
     "respaldo": {
         "destino": "datos_extraidos/monitoreo/historico",
+        "archivos": [],
+    },
+    "rutas": {
+        "monitoreo": "datos_extraidos/monitoreo",
+    },
+    "reintentos": {
+        "expedientes": {"maximos": 5, "espera_segundos": 5},
+        "entradas": {"maximos": 5, "espera_segundos": 5},
+    },
+    "notificaciones": {
+        "respaldo": True,
+        "comparacion_sin_cambios": False,
+        "comparacion_faltantes": True,
     },
 }
 
 MODOS_VALIDOS: tuple[str, ...] = ("automatico", "laboral", "no_laboral")
 
 
+def _mezclar_dicts(base: dict, override: Mapping) -> dict:
+    """Mezcla dos diccionarios de manera recursiva preservando defaults."""
+
+    for clave, valor in override.items():
+        valor_base = base.get(clave)
+        if isinstance(valor_base, dict) and isinstance(valor, Mapping):
+            base[clave] = _mezclar_dicts(valor_base, valor)
+        else:
+            base[clave] = deepcopy(valor)
+    return base
+
+
 def _inyectar_defaults(config: dict) -> dict:
     """Completa el diccionario recibido con los valores por defecto."""
 
     resultado = deepcopy(DEFAULT_CONFIG)
-    for clave, valor in config.items():
-        if isinstance(valor, dict) and isinstance(resultado.get(clave), dict):
-            resultado[clave].update(valor)
-        else:
-            resultado[clave] = valor
+    if isinstance(config, Mapping):
+        resultado = _mezclar_dicts(resultado, config)
     return resultado
 
 
