@@ -58,12 +58,14 @@ try:
         MODOS_VALIDOS,
         actualizar_modo_monitor,
         cargar_config_monitor,
+        obtener_fecha_corte,
     )
 except ImportError:  # pragma: no cover - ejecución directa
     from configuracion_modo import (
         MODOS_VALIDOS,
         actualizar_modo_monitor,
         cargar_config_monitor,
+        obtener_fecha_corte,
     )
 
 try:
@@ -145,11 +147,16 @@ class VerificadorExpedientesV4(QThread):
         carpeta_salida: str | Path = "datos_extraidos/monitoreo",
         nombre_archivo: str = "expedientes_monitor.json",
         guardar_json: bool = True,
+        *,
+        fecha_corte: str | None = None,
+        orden: str | None = "fecha",
     ) -> None:
         super().__init__()
         self.carpeta_salida = Path(carpeta_salida)
         self.nombre_archivo = nombre_archivo
         self.guardar_json = guardar_json
+        self.fecha_corte = fecha_corte
+        self.orden = orden
 
     def run(self) -> None:  # type: ignore[override]
         import asyncio
@@ -170,8 +177,9 @@ class VerificadorExpedientesV4(QThread):
                     metadata,
                 ) = await extraer_expedientes_completos(
                     page,
-                    orden="fecha",
+                    orden=self.orden,
                     detener_en_duplicado=False,
+                    fecha_corte=self.fecha_corte,
                 )
 
                 total_esperado = None
@@ -556,7 +564,43 @@ class MonitorExpedientesTray:
 
         self.ejecutando_expedientes = True
         carpeta = Path(os.getcwd()) / "datos_extraidos" / "monitoreo"
-        self.hilo_expedientes = VerificadorExpedientesV4(carpeta_salida=carpeta)
+        fecha_corte_resuelta: str | None = None
+        try:
+            fecha_corte_iso = obtener_fecha_corte(self.config)
+        except ImportError:
+            registrar_log(
+                "⚠️ No se pudo resolver la fecha de corte: helper heredado no disponible."
+            )
+        except Exception as exc:  # pragma: no cover - logging defensivo
+            registrar_log(f"⚠️ Error al resolver fecha de corte: {exc}")
+        else:
+            if fecha_corte_iso:
+                try:
+                    fecha_corte_resuelta = datetime.strptime(
+                        fecha_corte_iso, "%Y-%m-%d"
+                    ).strftime("%d/%m/%Y")
+                except ValueError as exc:
+                    registrar_log(
+                        "⚠️ Fecha de corte inválida en configuración: "
+                        f"{fecha_corte_iso} → {exc}"
+                    )
+                else:
+                    registrar_log(
+                        f"📆 Fecha de corte aplicada para la extracción: {fecha_corte_resuelta}"
+                    )
+
+        filtro_config = self.config.get("filtro_expedientes", {})
+        orden_config = filtro_config.get("orden", "fecha") if filtro_config else "fecha"
+        if isinstance(orden_config, str):
+            orden_filtrado = orden_config.strip() or "fecha"
+        else:
+            orden_filtrado = "fecha"
+
+        self.hilo_expedientes = VerificadorExpedientesV4(
+            carpeta_salida=carpeta,
+            fecha_corte=fecha_corte_resuelta,
+            orden=orden_filtrado,
+        )
         self.hilo_expedientes.resultado.connect(self.procesar_resultado_expedientes)
         self.hilo_expedientes.finished.connect(self._limpiar_hilo_expedientes)
         self.hilo_expedientes.start()
