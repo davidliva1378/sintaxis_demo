@@ -7,7 +7,8 @@ Este módulo implementa la bandeja de sistema que automatiza la verificación de
 * La bandeja crea accesos rápidos para ejecutar la verificación de expedientes y de entradas, mostrando mensajes y registrando métricas detalladas (totales esperados, descartes, paginación, rutas de guardado, etc.).【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L168-L247】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L357-L433】
 * La configuración lee `config/config_monitor.json`, soporta modos `automatico`, `laboral` y `no_laboral` y ahora puede modificarse desde el submenú “🛠️ Modo de trabajo”, que actualiza la configuración y reinicia los temporizadores al vuelo.【F:Sistema_v4/monitor/configuracion_modo.py†L8-L69】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L330-L414】
 * Se restableció el hilo de entradas (`VerificadorEntradasV4`) que guarda historiales JSON/CSV dentro de la carpeta configurada para el monitoreo.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L263-L339】
-* El submenú “🧰 Utilidades” incorpora las acciones “🔐 Estado de sesión” y “⚠️ Forzar nuevo login”, reutilizando `SESSION_FILE` para diagnosticar la cookie guardada y permitir su limpieza desde la bandeja.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L314-L336】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L563-L657】
+* El submenú “🧰 Utilidades” incorpora las acciones “🔐 Estado de sesión” y “⚠️ Forzar nuevo login”, reutilizando `SESSION_FILE` para diagnosticar la cookie guardada y permitir su limpieza desde la bandeja.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L324-L346】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L573-L667】
+* Se reactivó la comparación automática y manual de expedientes mediante el helper `comparar_expedientes`, notificando cambios desde la bandeja y registrando los informes generados en `datos_extraidos/monitoreo/reportes`. Si el helper no está disponible en la instalación, la acción queda deshabilitada y se informa al operador.【F:Sistema_v4/monitor/comparacion_expedientes.py†L1-L89】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L351-L361】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L523-L570】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L796-L813】
 
 ## Capacidades del monitor general anterior (Sistema v2/core)
 
@@ -31,6 +32,12 @@ Para facilitar la ejecución iterativa, las tareas se ordenan de menor a mayor d
 * `mostrar_estado_sesion` lee `SESSION_FILE`, diagnostica la validez de la cookie y expone información contextual (modo, intervalo, ruta y marca de tiempo), gestionando las excepciones heredadas para evitar cierres inesperados.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L703-L740】
 * `forzar_login` elimina la cookie persistida, registra el resultado y notifica tanto éxito como fallos o ausencia de sesión, alineándose con el comportamiento del monitor legado.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L742-L757】
 
+### Verificación del punto 3
+
+* El menú principal incorpora la acción “🧪 Comparar expedientes”, que reutiliza el helper compartido para ejecutar el diff desde la bandeja.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L348-L351】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L523-L570】
+* Tras cada verificación exitosa se dispara una comparación automática, registrando el resultado y evitando notificaciones invasivas cuando faltan archivos base.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L488-L570】
+* `comparacion_expedientes.py` centraliza la resolución de rutas, el manejo de faltantes y la detección del informe generado, permitiendo reutilizar la lógica desde distintas acciones.【F:Sistema_v4/monitor/comparacion_expedientes.py†L1-L89】
+
 ### Utilidades de sesión en la bandeja v4
 
 El submenú “🧰 Utilidades” replica el flujo del monitor legado: al pulsar “🔐 Estado de sesión” se intenta leer `SESSION_FILE` y se muestran mensajes diferenciados para sesión activa, incompleta o inexistente, junto con el modo actual, el intervalo configurado y la fecha de última actualización del archivo cuando está disponible.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L563-L626】
@@ -39,10 +46,10 @@ Se capturan explícitamente los errores `FileNotFoundError`, `JSONDecodeError` y
 
 La acción “⚠️ Forzar nuevo login” elimina `SESSION_FILE` cuando existe y notifica al operador si no se encontró una sesión previa o si ocurrió un error durante la eliminación, dejando registro en el log en todos los casos.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L628-L657】
 
-3. **Reactivar la comparación de expedientes**
+3. ✅ **Reactivar la comparación de expedientes**
    1. Encapsular el flujo de comparación en un servicio reutilizable (auto/manual).
    2. Invocar el servicio al cierre exitoso de una verificación.
-   3. Añadir una acción manual que permita relanzar la comparación bajo demanda.【F:core/modulos_monitor/general/monitor_general.py†L162-L198】【F:core/modulos_monitor/general/monitor_general.py†L282-L298】
+   3. Añadir una acción manual que permita relanzar la comparación bajo demanda.【F:Sistema_v4/monitor/comparacion_expedientes.py†L1-L89】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L348-L351】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L488-L570】
 4. **Añadir respaldos históricos guiados**
    1. Implementar un helper que copie los últimos JSON/CSV a una carpeta con timestamp.
    2. Permitir seleccionar la ubicación de respaldo desde la configuración.

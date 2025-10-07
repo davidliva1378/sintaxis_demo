@@ -16,9 +16,44 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from typing import TYPE_CHECKING, Callable, Optional
+
 from PySide6.QtCore import QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QIcon, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
+
+ComparadorExpedientes = Callable[[], "ResultadoComparacion"]
+
+if TYPE_CHECKING:  # pragma: no cover - hints para herramientas de tipo
+    try:
+        from .comparacion_expedientes import ResultadoComparacion
+    except ImportError:  # pragma: no cover - ejecución directa
+        from comparacion_expedientes import ResultadoComparacion  # type: ignore[import-not-found]
+
+try:
+    from .comparacion_expedientes import comparar_expedientes as _comparar_expedientes
+except ImportError:  # pragma: no cover - ejecución directa
+    try:
+        from comparacion_expedientes import comparar_expedientes as _comparar_expedientes
+    except ImportError:  # pragma: no cover - entorno sin comparación disponible
+        comparar_expedientes: Optional[ComparadorExpedientes] = None
+    else:
+        comparar_expedientes = _comparar_expedientes
+else:
+    comparar_expedientes = _comparar_expedientes
+
+try:
+    from .configuracion_modo import (
+        MODOS_VALIDOS,
+        actualizar_modo_monitor,
+        cargar_config_monitor,
+    )
+except ImportError:  # pragma: no cover - ejecución directa
+    from configuracion_modo import (
+        MODOS_VALIDOS,
+        actualizar_modo_monitor,
+        cargar_config_monitor,
+    )
 
 try:
     from .configuracion_modo import (
@@ -362,6 +397,14 @@ class MonitorExpedientesTray:
             self.verificar_entradas
         )
 
+        self.accion_comparar = self.menu.addAction("🧪 Comparar expedientes")
+        self.accion_comparar.triggered.connect(self.comparar_expedientes_manual)
+        if comparar_expedientes is None:
+            self.accion_comparar.setEnabled(False)
+            self.accion_comparar.setToolTip(
+                "Instala comparacion_expedientes.py para habilitar esta función."
+            )
+
         self.submenu_modo = QMenu("🛠️ Modo de trabajo")
         self.acciones_modo: dict[str, QAction] = {}
         for modo in MODOS_VALIDOS:
@@ -657,6 +700,12 @@ class MonitorExpedientesTray:
                 )
         else:
             self.reintentos_expedientes = 0
+            self._comparar_expedientes(
+                origen="automática",
+                notificar=True,
+                notificar_sin_cambios=False,
+                notificar_faltantes=False,
+            )
 
     def procesar_resultado_entradas(self, datos: ResultadoEntradas) -> None:
         if datos.nuevas is None:
@@ -764,6 +813,82 @@ class MonitorExpedientesTray:
                 "⚠️ Forzar login",
                 f"❌ No se pudo eliminar la sesión: {exc}",
                 QSystemTrayIcon.Critical,
+            )
+
+    def comparar_expedientes_manual(self) -> None:
+        self._comparar_expedientes(
+            origen="manual",
+            notificar=True,
+            notificar_sin_cambios=True,
+            notificar_faltantes=True,
+        )
+
+    def _comparar_expedientes(
+        self,
+        *,
+        origen: str,
+        notificar: bool,
+        notificar_sin_cambios: bool,
+        notificar_faltantes: bool,
+    ) -> None:
+        if comparar_expedientes is None:
+            registrar_log(
+                "ℹ️ Comparación de expedientes no disponible: faltan dependencias."
+            )
+            if notificar:
+                self.tray.showMessage(
+                    "📊 Comparación de expedientes",
+                    "ℹ️ La comparación no está disponible en esta instalación.",
+                    QSystemTrayIcon.Information,
+                )
+            return
+
+        resultado: ResultadoComparacion = comparar_expedientes()
+
+        if resultado.faltantes:
+            for mensaje in resultado.mensajes_faltantes():
+                registrar_log(f"⚠️ Comparación {origen}: {mensaje}")
+            if notificar and notificar_faltantes:
+                self.tray.showMessage(
+                    "📊 Comparación de expedientes",
+                    "⚠️ No se encontraron los archivos necesarios para comparar.",
+                    QSystemTrayIcon.Warning,
+                )
+            return
+
+        if resultado.excepcion:
+            registrar_log(
+                f"❌ Comparación {origen}: error al comparar expedientes: {resultado.excepcion}"
+            )
+            if notificar:
+                self.tray.showMessage(
+                    "📊 Comparación de expedientes",
+                    f"❌ Error al comparar: {resultado.excepcion}",
+                    QSystemTrayIcon.Critical,
+                )
+            return
+
+        total = resultado.total_cambios
+        if total > 0:
+            registrar_log(
+                f"🧪 Comparación {origen}: {total} cambios detectados en expedientes."
+            )
+            if resultado.informe:
+                registrar_log(f"📄 Informe de comparación: {resultado.informe}")
+            if notificar:
+                self.tray.showMessage(
+                    "📊 Comparación de expedientes",
+                    f"{total} cambios detectados.",
+                    QSystemTrayIcon.Information,
+                )
+            return
+
+        registrar_log("🧪 Comparación %s: sin cambios detectados." % origen)
+        if notificar and notificar_sin_cambios:
+            self.tray.showMessage(
+                "📊 Comparación de expedientes",
+                "Sin cambios detectados.",
+                QSystemTrayIcon.Information,
             )
 
     def salir(self) -> None:
