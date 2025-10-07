@@ -11,9 +11,16 @@ from core.utils.logging import registrar_log
 from core.gestion_expedientes.comparar_expedientes_monitor import comparar_expedientes_monitor
 from core.modulos_monitor.notificaciones_modular.verificacion_notificaciones import VerificadorNotificaciones
 
-
-
-CONFIG_PATH = "config/config_monitor.json"
+try:
+    from Sistema_v4.monitor.configuracion_modo import (
+        actualizar_modo_monitor,
+        cargar_config_monitor,
+    )
+except ImportError:  # pragma: no cover - compatibilidad en entornos aislados
+    from monitor.configuracion_modo import (  # type: ignore[import-not-found]
+        actualizar_modo_monitor,
+        cargar_config_monitor,
+    )
 
 
 class MonitorGeneral:
@@ -66,22 +73,7 @@ class MonitorGeneral:
         sys.exit(self.app.exec())
 
     def cargar_config(self):
-        try:
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            return {
-                "modo": "automatico",
-                "horario_laboral": {
-                    "dias": ["lunes", "martes", "miércoles", "jueves", "viernes"],
-                    "hora_inicio": "07:00",
-                    "hora_fin": "20:00",
-                    "intervalo_minutos": 30
-                },
-                "fuera_horario": {
-                    "intervalo_minutos": 240
-                }
-            }
+        return cargar_config_monitor()
 
     def esta_en_horario_laboral(self):
         ahora = datetime.now()
@@ -221,9 +213,7 @@ class MonitorGeneral:
                 print(f"⚠️ Archivo no encontrado: {origen}")
 
     def cambiar_modo(self, nuevo_modo):
-        self.config["modo"] = nuevo_modo
-        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(self.config, f, indent=2)
+        self.config = actualizar_modo_monitor(nuevo_modo)
         self.actualizar_modo_seleccionado()
         self.timer_expedientes.stop()
         self.timer_notificaciones.stop()
