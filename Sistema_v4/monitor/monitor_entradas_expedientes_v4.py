@@ -16,17 +16,31 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from typing import TYPE_CHECKING, Callable, Optional
+
 from PySide6.QtCore import QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QIcon, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
+ComparadorExpedientes = Callable[[], "ResultadoComparacion"]
+
+if TYPE_CHECKING:  # pragma: no cover - hints para herramientas de tipo
+    try:
+        from .comparacion_expedientes import ResultadoComparacion
+    except ImportError:  # pragma: no cover - ejecución directa
+        from comparacion_expedientes import ResultadoComparacion  # type: ignore[import-not-found]
+
 try:
-    from .comparacion_expedientes import (  # type: ignore[attr-defined]
-        ResultadoComparacion,
-        comparar_expedientes,
-    )
+    from .comparacion_expedientes import comparar_expedientes as _comparar_expedientes
 except ImportError:  # pragma: no cover - ejecución directa
-    from comparacion_expedientes import ResultadoComparacion, comparar_expedientes
+    try:
+        from comparacion_expedientes import comparar_expedientes as _comparar_expedientes
+    except ImportError:  # pragma: no cover - entorno sin comparación disponible
+        comparar_expedientes: Optional[ComparadorExpedientes] = None
+    else:
+        comparar_expedientes = _comparar_expedientes
+else:
+    comparar_expedientes = _comparar_expedientes
 
 try:
     from .configuracion_modo import (
@@ -370,9 +384,13 @@ class MonitorExpedientesTray:
             self.verificar_entradas
         )
 
-        self.menu.addAction("🧪 Comparar expedientes").triggered.connect(
-            self.comparar_expedientes_manual
-        )
+        self.accion_comparar = self.menu.addAction("🧪 Comparar expedientes")
+        self.accion_comparar.triggered.connect(self.comparar_expedientes_manual)
+        if comparar_expedientes is None:
+            self.accion_comparar.setEnabled(False)
+            self.accion_comparar.setToolTip(
+                "Instala comparacion_expedientes.py para habilitar esta función."
+            )
 
         self.submenu_modo = QMenu("🛠️ Modo de trabajo")
         self.acciones_modo: dict[str, QAction] = {}
@@ -800,6 +818,18 @@ class MonitorExpedientesTray:
         notificar_sin_cambios: bool,
         notificar_faltantes: bool,
     ) -> None:
+        if comparar_expedientes is None:
+            registrar_log(
+                "ℹ️ Comparación de expedientes no disponible: faltan dependencias."
+            )
+            if notificar:
+                self.tray.showMessage(
+                    "📊 Comparación de expedientes",
+                    "ℹ️ La comparación no está disponible en esta instalación.",
+                    QSystemTrayIcon.Information,
+                )
+            return
+
         resultado: ResultadoComparacion = comparar_expedientes()
 
         if resultado.faltantes:
