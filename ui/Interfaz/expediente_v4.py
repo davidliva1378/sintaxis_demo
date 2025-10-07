@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QLineEdit, QScrollArea, QFrame, QTabWidget,
     QListWidget, QListWidgetItem, QStackedWidget, QDialog, QTextEdit,
-    QSplitter, QToolButton, QShortcut
+    QSplitter, QToolButton
 )
 from PySide6.QtCore import (
     Qt, QTimer, QSettings, QSize, Signal, QPropertyAnimation,
@@ -35,7 +35,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import (
     QColor, QPalette, QFont, QIcon, QKeySequence, QPainter,
-    QBrush, QPen, QLinearGradient
+    QBrush, QPen, QLinearGradient, QShortcut
 )
 
 
@@ -83,8 +83,8 @@ class ThemeManager:
         bg_elevated="#252525",
 
         # Textos - Contraste WCAG AAA
-        text_primary="#e4e4e7",  # Ratio 13.4:1
-        text_secondary="#a1a1aa",  # Ratio 5.8:1
+        text_primary="#e4e4e7",     # Ratio 13.4:1
+        text_secondary="#a1a1aa",   # Ratio 5.8:1
         text_tertiary="#71717a",
 
         # Bordes
@@ -151,7 +151,7 @@ class ThemeManager:
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 font-size: 13px;
             }}
-
+            
             QLineEdit, QTextEdit {{
                 background-color: {theme.bg_secondary};
                 color: {theme.text_primary};
@@ -159,11 +159,11 @@ class ThemeManager:
                 border-radius: 4px;
                 padding: 6px 8px;
             }}
-
+            
             QLineEdit:focus, QTextEdit:focus {{
                 border-color: {theme.accent_blue};
             }}
-
+            
             QPushButton {{
                 background-color: {theme.bg_secondary};
                 color: {theme.text_primary};
@@ -172,20 +172,20 @@ class ThemeManager:
                 padding: 6px 12px;
                 font-weight: 500;
             }}
-
+            
             QPushButton:hover {{
                 background-color: {theme.bg_tertiary};
             }}
-
+            
             QPushButton:pressed {{
                 background-color: {theme.bg_primary};
             }}
-
+            
             QTabWidget::pane {{
                 border: 1px solid {theme.border_primary};
                 background-color: {theme.bg_primary};
             }}
-
+            
             QTabBar::tab {{
                 background-color: {theme.bg_primary};
                 color: {theme.text_secondary};
@@ -194,48 +194,48 @@ class ThemeManager:
                 padding: 8px 16px;
                 margin-right: 2px;
             }}
-
+            
             QTabBar::tab:selected {{
                 color: {theme.text_primary};
                 border-bottom: 2px solid {theme.accent_blue};
             }}
-
+            
             QTabBar::tab:hover {{
                 color: {theme.text_primary};
             }}
-
+            
             QScrollBar:vertical {{
                 background-color: {theme.bg_primary};
                 width: 12px;
                 border-radius: 6px;
             }}
-
+            
             QScrollBar::handle:vertical {{
                 background-color: {theme.border_primary};
                 border-radius: 6px;
                 min-height: 20px;
             }}
-
+            
             QScrollBar::handle:vertical:hover {{
                 background-color: {theme.text_tertiary};
             }}
-
+            
             QListWidget {{
                 background-color: {theme.bg_primary};
                 border: 1px solid {theme.border_primary};
                 outline: none;
             }}
-
+            
             QListWidget::item {{
                 padding: 12px;
                 border-bottom: 1px solid {theme.border_secondary};
             }}
-
+            
             QListWidget::item:selected {{
                 background-color: {theme.bg_tertiary};
                 color: {theme.text_primary};
             }}
-
+            
             QListWidget::item:hover {{
                 background-color: {theme.bg_secondary};
             }}
@@ -428,33 +428,33 @@ def crear_datos_mock():
 
     actuaciones = [
         Actuacion("a1", "proveido", "Se corre traslado a la demandada",
-                  hoy - timedelta(days=12), fojas="155"),
+                 hoy - timedelta(days=12), fojas="155"),
         Actuacion("a2", "informe", "Informe DIRSAF",
-                  hoy - timedelta(days=10), fojas="212/214",
-                  tiene_adjunto=True, requiere_accion=True),
+                 hoy - timedelta(days=10), fojas="212/214",
+                 tiene_adjunto=True, requiere_accion=True),
         Actuacion("a3", "presentacion", "Memorial de agravios demandada",
-                  hoy - timedelta(days=9), fojas="215/221", tiene_adjunto=True),
+                 hoy - timedelta(days=9), fojas="215/221", tiene_adjunto=True),
         Actuacion("a4", "cedula", "Notificación electrónica a CENTINELA",
-                  hoy - timedelta(days=7), deo="19269540", tiene_adjunto=True),
+                 hoy - timedelta(days=7), deo="19269540", tiene_adjunto=True),
         Actuacion("a5", "sentencia", "Cámara confirma en lo principal",
-                  hoy - timedelta(days=120), fojas="181/188",
-                  notas=["Interés: tasa pasiva BCRA"]),
+                 hoy - timedelta(days=120), fojas="181/188",
+                 notas=["Interés: tasa pasiva BCRA"]),
     ]
 
     notificaciones = [
         Notificacion("n1", "Cédula – Traslado impugnación de liquidación",
-                     hoy + timedelta(days=3), "alta", False),
+                    hoy + timedelta(days=3), "alta", False),
         Notificacion("n2", "Aviso PJN – Nuevo documento adjunto",
-                     hoy + timedelta(days=10), "media", True),
+                    hoy + timedelta(days=10), "media", True),
     ]
 
     documentos = [
         Documento("d1", "Liquidación base TRIGO.pdf", "escrito",
-                  hoy - timedelta(days=90), "complete", 412),
+                 hoy - timedelta(days=90), "complete", 412),
         Documento("d2", "Informe DIRSAF (fs. 212-214).pdf", "informe",
-                  hoy - timedelta(days=10), "warning", 1296),
+                 hoy - timedelta(days=10), "warning", 1296),
         Documento("d3", "Cédula electrónica DEO 19269540.pdf", "cedula",
-                  hoy - timedelta(days=7), "pending", 380),
+                 hoy - timedelta(days=7), "pending", 380),
     ]
 
     return kpis, actuaciones, notificaciones, documentos
@@ -652,8 +652,7 @@ class HeaderWidget(QFrame):
             venc_label.setStyleSheet(f"color: {self.theme.text_secondary}; font-size: 11px;")
             meta_layout.addWidget(venc_label)
 
-        riesgo_colors = {"bajo": self.theme.accent_green, "medio": self.theme.accent_yellow,
-                         "alto": self.theme.accent_red}
+        riesgo_colors = {"bajo": self.theme.accent_green, "medio": self.theme.accent_yellow, "alto": self.theme.accent_red}
         riesgo_label = QLabel(f"Riesgo: {self.kpis.riesgo.upper()}")
         riesgo_label.setStyleSheet(f"color: {riesgo_colors[self.kpis.riesgo]}; font-size: 11px; font-weight: 600;")
         meta_layout.addWidget(riesgo_label)
@@ -773,8 +772,8 @@ class TimelineWidget(QWidget):
 
             if act:
                 matches_search = search_text in act.titulo.lower() or \
-                                 search_text in (act.deo or "").lower() or \
-                                 search_text in (act.fojas or "").lower()
+                                search_text in (act.deo or "").lower() or \
+                                search_text in (act.fojas or "").lower()
                 matches_filter = not only_action or act.requiere_accion
 
                 item.setHidden(not (matches_search and matches_filter))
@@ -831,12 +830,10 @@ class InspectorWidget(QWidget):
         elif isinstance(item, Notificacion):
             self.title_label.setText(item.titulo)
             dias = (item.vencimiento - datetime.now()).days
-            self.details_label.setText(
-                f"Vence: {item.vencimiento.strftime('%d/%m/%Y')} ({dias} días)\nCriticidad: {item.criticidad.upper()}")
+            self.details_label.setText(f"Vence: {item.vencimiento.strftime('%d/%m/%Y')} ({dias} días)\nCriticidad: {item.criticidad.upper()}")
         elif isinstance(item, Documento):
             self.title_label.setText(item.nombre)
-            self.details_label.setText(
-                f"Fecha: {item.fecha.strftime('%d/%m/%Y')}\nTipo: {item.etiqueta}\nTamaño: {item.size_kb} KB")
+            self.details_label.setText(f"Fecha: {item.fecha.strftime('%d/%m/%Y')}\nTipo: {item.etiqueta}\nTamaño: {item.size_kb} KB")
 
 
 # ===== VENTANA PRINCIPAL =====
@@ -1012,7 +1009,7 @@ class MainWindow(QMainWindow):
     def show_break_reminder(self):
         """Muestra recordatorio de pausa"""
         self.show_toast("🫖 Hora de un descanso. Llevás 52 minutos trabajando. Descansá 17 minutos.",
-                        ToastType.INFO)
+                       ToastType.INFO)
 
     def show_toast(self, message: str, toast_type: ToastType):
         """Muestra un toast"""
