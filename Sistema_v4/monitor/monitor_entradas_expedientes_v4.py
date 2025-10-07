@@ -22,7 +22,7 @@ from PySide6.QtCore import QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QIcon, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
-ComparadorExpedientes = Callable[[], "ResultadoComparacion"]
+ComparadorExpedientes = Callable[..., "ResultadoComparacion"]
 
 if TYPE_CHECKING:  # pragma: no cover - hints para herramientas de tipo
     try:
@@ -988,7 +988,7 @@ class MonitorExpedientesTray:
                 )
             return
 
-        resultado: ResultadoComparacion = comparar_expedientes()
+        resultado: ResultadoComparacion = comparar_expedientes(config=self.config)
 
         for aviso in getattr(resultado, "avisos", []):
             registrar_log(f"ℹ️ Comparación {origen}: {aviso}")

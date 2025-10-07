@@ -18,12 +18,24 @@ except ImportError:  # pragma: no cover - compatibilidad con versiones anteriore
     guardar_comparacion_json = None  # type: ignore[assignment]
 
 try:
-    from .configuracion_modo import obtener_fecha_corte
+    from .configuracion_modo import cargar_config_monitor, obtener_fecha_corte
 except ImportError:  # pragma: no cover - ejecución directa
     try:  # type: ignore[no-redef]
-        from configuracion_modo import obtener_fecha_corte  # type: ignore[import-not-found]
+        from configuracion_modo import (  # type: ignore[import-not-found]
+            cargar_config_monitor,
+            obtener_fecha_corte,
+        )
     except ImportError:  # pragma: no cover - helper opcional
         obtener_fecha_corte = None  # type: ignore[assignment]
+        cargar_config_monitor = None  # type: ignore[assignment]
+
+
+MODO_COMPARACION_PARCIAL = "parcial"
+MODO_COMPARACION_TOTAL = "total"
+MODOS_COMPARACION_VALIDOS: tuple[str, ...] = (
+    MODO_COMPARACION_PARCIAL,
+    MODO_COMPARACION_TOTAL,
+)
 
 
 @dataclass(frozen=True)
@@ -68,10 +80,25 @@ def obtener_rutas(base_dir: Path | None = None) -> RutasComparacion:
     )
 
 
-def comparar_expedientes(base_dir: Path | None = None) -> ResultadoComparacion:
+def comparar_expedientes(
+    base_dir: Path | None = None, *, config: dict | None = None
+) -> ResultadoComparacion:
     """Ejecuta la comparación y captura errores habituales."""
 
     rutas = obtener_rutas(base_dir)
+
+    avisos: list[str] = []
+    config_resuelta = _resolver_config_general(config)
+    modo_comparacion, avisos_config = _resolver_modo_comparacion(config_resuelta)
+    avisos.extend(avisos_config)
+    if modo_comparacion == MODO_COMPARACION_PARCIAL:
+        avisos.append(
+            "Modo de comparación seleccionado: parcial (filtra la base según la fecha de corte)."
+        )
+    else:
+        avisos.append(
+            "Modo de comparación seleccionado: total (se compara contra toda la base histórica)."
+        )
 
     faltantes: list[str] = []
     if not rutas.archivo_actual.exists():
@@ -80,7 +107,9 @@ def comparar_expedientes(base_dir: Path | None = None) -> ResultadoComparacion:
         faltantes.append(str(rutas.archivo_base))
 
     if faltantes:
-        return ResultadoComparacion([], [], [], None, faltantes=faltantes)
+        return ResultadoComparacion(
+            [], [], [], None, faltantes=faltantes, avisos=avisos
+        )
 
     if comparar_con_base is None or guardar_comparacion_json is None:
         return ResultadoComparacion(
@@ -91,6 +120,7 @@ def comparar_expedientes(base_dir: Path | None = None) -> ResultadoComparacion:
             excepcion=ImportError(
                 "Dependencias de comparación no disponibles en esta instalación."
             ),
+            avisos=avisos,
         )
 
     try:
@@ -99,7 +129,7 @@ def comparar_expedientes(base_dir: Path | None = None) -> ResultadoComparacion:
         with rutas.archivo_base.open("r", encoding="utf-8") as archivo:
             expedientes_base = json.load(archivo)
     except Exception as exc:  # pragma: no cover - lectura defensiva
-        return ResultadoComparacion([], [], [], None, excepcion=exc)
+        return ResultadoComparacion([], [], [], None, excepcion=exc, avisos=avisos)
 
     if not isinstance(expedientes_actuales, list) or not isinstance(
         expedientes_base, list
@@ -112,10 +142,17 @@ def comparar_expedientes(base_dir: Path | None = None) -> ResultadoComparacion:
             excepcion=ValueError(
                 "Los archivos de expedientes deben contener listas JSON válidas."
             ),
+            avisos=avisos,
         )
 
-    avisos: list[str] = []
-    fecha_corte = _resolver_fecha_corte()
+    fecha_corte = None
+    if modo_comparacion == MODO_COMPARACION_PARCIAL:
+        fecha_corte = _resolver_fecha_corte(config_resuelta)
+        if fecha_corte is None:
+            avisos.append(
+                "No se obtuvo una fecha de corte válida; la comparación parcial usará la base completa."
+            )
+
     if fecha_corte is not None:
         expedientes_base_filtrados = _filtrar_por_fecha(expedientes_base, fecha_corte)
         descartados = len(expedientes_base) - len(expedientes_base_filtrados)
@@ -133,7 +170,7 @@ def comparar_expedientes(base_dir: Path | None = None) -> ResultadoComparacion:
             expedientes_actuales, expedientes_base
         )
     except Exception as exc:  # pragma: no cover - manejo defensivo
-        return ResultadoComparacion([], [], [], None, excepcion=exc)
+        return ResultadoComparacion([], [], [], None, excepcion=exc, avisos=avisos)
 
     informe = None
     if nuevos or modificados or eliminados:
@@ -156,14 +193,62 @@ def comparar_expedientes(base_dir: Path | None = None) -> ResultadoComparacion:
     )
 
 
-def _resolver_fecha_corte() -> date | None:
+def _resolver_config_general(config: dict | None) -> dict | None:
+    """Obtiene la configuración completa si está disponible."""
+
+    if isinstance(config, dict):
+        return config
+
+    if cargar_config_monitor is None:
+        return None
+
+    try:
+        return cargar_config_monitor()
+    except Exception:  # pragma: no cover - lectura defensiva
+        return None
+
+
+def _resolver_modo_comparacion(config: dict | None) -> tuple[str, list[str]]:
+    """Determina el modo de comparación configurado y avisos asociados."""
+
+    avisos: list[str] = []
+    modo = MODO_COMPARACION_PARCIAL
+
+    comparacion_config = None
+    if isinstance(config, dict):
+        comparacion_config = config.get("comparacion")
+
+    if isinstance(comparacion_config, dict):
+        modo_config = comparacion_config.get("modo")
+        if isinstance(modo_config, str):
+            normalizado = modo_config.strip().lower()
+            if normalizado in MODOS_COMPARACION_VALIDOS:
+                modo = normalizado
+            elif normalizado:
+                avisos.append(
+                    "Modo de comparación '%s' no reconocido; se utilizará 'parcial'."
+                    % modo_config
+                )
+        elif modo_config is not None:
+            avisos.append(
+                "Modo de comparación con formato inválido; se utilizará 'parcial'."
+            )
+    elif comparacion_config is not None:
+        avisos.append(
+            "Bloque de configuración 'comparacion' inválido; se utilizará 'parcial'."
+        )
+
+    return modo, avisos
+
+
+def _resolver_fecha_corte(config: dict | None = None) -> date | None:
     """Obtiene la fecha de corte configurada como objeto ``date``."""
 
     if obtener_fecha_corte is None:
         return None
 
     try:
-        fecha_iso = obtener_fecha_corte()
+        fecha_iso = obtener_fecha_corte(config)
     except Exception:  # pragma: no cover - helper opcional
         return None
 

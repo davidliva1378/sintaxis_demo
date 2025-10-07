@@ -29,6 +29,9 @@ DEFAULT_CONFIG = {
         "dias_atras": 1,
         "orden": "fecha",
     },
+    "comparacion": {
+        "modo": "parcial",
+    },
     "respaldo": {
         "destino": "datos_extraidos/monitoreo/historico",
     },
