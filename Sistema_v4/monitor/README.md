@@ -25,6 +25,12 @@ Para facilitar la ejecución iterativa, las tareas se ordenan de menor a mayor d
 1. ✅ **Reintroducir la gestión interactiva del modo de trabajo**. El helper `configuracion_modo.py` centraliza la lectura/escritura de `config_monitor.json`, el submenú “🛠️ Modo de trabajo” expone las opciones disponibles y cada cambio reinicia los temporizadores y tooltips para reflejar el nuevo intervalo.【F:Sistema_v4/monitor/configuracion_modo.py†L8-L69】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L330-L462】
 2. ✅ **Portar las utilidades de sesión**. Se reutiliza `SESSION_FILE` para informar el estado desde la bandeja, capturando errores de lectura y permitiendo eliminar la cookie persistida mediante las acciones del submenú de utilidades.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L314-L336】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L563-L657】
 
+### Verificación del punto 2
+
+* El submenú “🧰 Utilidades” crea las acciones “🔐 Estado de sesión” y “⚠️ Forzar nuevo login” conectándolas con los handlers `mostrar_estado_sesion` y `forzar_login` respectivamente.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L377-L401】
+* `mostrar_estado_sesion` lee `SESSION_FILE`, diagnostica la validez de la cookie y expone información contextual (modo, intervalo, ruta y marca de tiempo), gestionando las excepciones heredadas para evitar cierres inesperados.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L703-L740】
+* `forzar_login` elimina la cookie persistida, registra el resultado y notifica tanto éxito como fallos o ausencia de sesión, alineándose con el comportamiento del monitor legado.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L742-L757】
+
 ### Utilidades de sesión en la bandeja v4
 
 El submenú “🧰 Utilidades” replica el flujo del monitor legado: al pulsar “🔐 Estado de sesión” se intenta leer `SESSION_FILE` y se muestran mensajes diferenciados para sesión activa, incompleta o inexistente, junto con el modo actual, el intervalo configurado y la fecha de última actualización del archivo cuando está disponible.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L563-L626】
