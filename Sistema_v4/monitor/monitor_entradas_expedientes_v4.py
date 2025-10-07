@@ -21,6 +21,19 @@ from PySide6.QtGui import QAction, QIcon, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
 try:
+    from .configuracion_modo import (
+        MODOS_VALIDOS,
+        actualizar_modo_monitor,
+        cargar_config_monitor,
+    )
+except ImportError:  # pragma: no cover - ejecución directa
+    from configuracion_modo import (
+        MODOS_VALIDOS,
+        actualizar_modo_monitor,
+        cargar_config_monitor,
+    )
+
+try:
     from .icono_base64 import ICONO_BASE64
 except ImportError:  # pragma: no cover - ejecución directa
     from icono_base64 import ICONO_BASE64
@@ -83,19 +96,6 @@ class ResultadoEntradas:
     historial_json: Path | None = None
     historial_csv: Path | None = None
     error: str | None = None
-
-
-CONFIG_PATH = Path("config/config_monitor.json")
-DEFAULT_CONFIG = {
-    "modo": "automatico",
-    "horario_laboral": {
-        "dias": ["lunes", "martes", "miércoles", "jueves", "viernes"],
-        "hora_inicio": "07:00",
-        "hora_fin": "20:00",
-        "intervalo_minutos": 30,
-    },
-    "fuera_horario": {"intervalo_minutos": 240},
-}
 
 
 class VerificadorExpedientesV4(QThread):
@@ -350,13 +350,25 @@ class MonitorExpedientesTray:
         self.tray.setVisible(True)
 
         self.menu = QMenu()
-        self.menu.addAction("📥 Verificar Expedientes").triggered.connect(
+        self.menu.addAction("📥 Verificar expedientes").triggered.connect(
             self.verificar_expedientes
         )
 
-        self.menu.addAction("📤 Verificar Entradas").triggered.connect(
+        self.menu.addAction("📤 Verificar entradas").triggered.connect(
             self.verificar_entradas
         )
+
+        self.submenu_modo = QMenu("🛠️ Modo de trabajo")
+        self.acciones_modo: dict[str, QAction] = {}
+        for modo in MODOS_VALIDOS:
+            texto = modo.replace("_", " ").capitalize()
+            accion = QAction(texto, checkable=True)
+            accion.triggered.connect(
+                lambda checked, valor=modo: self._manejar_cambio_modo(valor, checked)
+            )
+            self.submenu_modo.addAction(accion)
+            self.acciones_modo[modo] = accion
+        self.menu.addMenu(self.submenu_modo)
 
         # Espacio reservado para herramientas adicionales. Se reintroducirán
         # en futuras versiones una vez finalizada la migración a v4.
@@ -369,6 +381,8 @@ class MonitorExpedientesTray:
         self.tray.setContextMenu(self.menu)
 
         self.config = self.cargar_config()
+        self.actualizar_modo_seleccionado()
+        self.actualizar_tooltip()
         self.hilo_expedientes: VerificadorExpedientesV4 | None = None
         self.hilo_entradas: VerificadorEntradasV4 | None = None
         self.ejecutando_expedientes = False
@@ -394,16 +408,7 @@ class MonitorExpedientesTray:
         return QIcon(pixmap)
 
     def cargar_config(self) -> dict:
-        try:
-            with CONFIG_PATH.open("r", encoding="utf-8") as archivo:
-                datos = json.load(archivo)
-        except Exception:
-            datos = json.loads(json.dumps(DEFAULT_CONFIG))
-
-        datos.setdefault("modo", DEFAULT_CONFIG["modo"])
-        datos.setdefault("horario_laboral", DEFAULT_CONFIG["horario_laboral"])
-        datos.setdefault("fuera_horario", DEFAULT_CONFIG["fuera_horario"])
-        return datos
+        return cargar_config_monitor()
 
     def esta_en_horario_laboral(self) -> bool:
         ahora = datetime.now()
@@ -437,6 +442,58 @@ class MonitorExpedientesTray:
         self.timer_entradas.start(intervalo * 60 * 1000)
         self.verificar_expedientes()
         self.verificar_entradas()
+
+    def reiniciar_temporizadores(self) -> None:
+        self.timer_expedientes.stop()
+        self.timer_entradas.stop()
+        self.iniciar_temporizador()
+
+    def actualizar_tooltip(self) -> None:
+        modo = self.config.get("modo", "automatico").replace("_", " ").capitalize()
+        intervalo = self.obtener_intervalo()
+        tooltip = (
+            "Monitor de Expedientes y Entradas PJN\n"
+            f"Modo: {modo} · Intervalo: {intervalo} minutos"
+        )
+        self.tray.setToolTip(tooltip)
+
+    def actualizar_modo_seleccionado(self) -> None:
+        modo_actual = self.config.get("modo", "automatico")
+        for modo, accion in self.acciones_modo.items():
+            accion.blockSignals(True)
+            accion.setChecked(modo == modo_actual)
+            accion.blockSignals(False)
+
+    def _manejar_cambio_modo(self, modo: str, checked: bool) -> None:
+        if not checked:
+            return
+        self.cambiar_modo(modo)
+
+    def cambiar_modo(self, nuevo_modo: str) -> None:
+        if nuevo_modo == self.config.get("modo"):
+            registrar_log("ℹ️ El modo seleccionado ya está activo.")
+            return
+        try:
+            self.config = actualizar_modo_monitor(nuevo_modo)
+        except ValueError as error:
+            registrar_log(f"❌ No se pudo actualizar el modo: {error}")
+            self.actualizar_modo_seleccionado()
+            return
+
+        self.actualizar_modo_seleccionado()
+        self.actualizar_tooltip()
+        self.reiniciar_temporizadores()
+
+        modo_legible = nuevo_modo.replace("_", " ").capitalize()
+        intervalo = self.obtener_intervalo()
+        registrar_log(
+            "⚙️ Modo de trabajo actualizado a "
+            f"{modo_legible} ({intervalo} minutos)."
+        )
+        self.tray.showMessage(
+            "Modo de trabajo actualizado",
+            f"{modo_legible} · Intervalo: {intervalo} minutos",
+        )
 
     def verificar_expedientes(self) -> None:
         if self.ejecutando_expedientes:
