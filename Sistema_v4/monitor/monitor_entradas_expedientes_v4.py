@@ -56,6 +56,19 @@ except ImportError:  # pragma: no cover - ejecución directa
     )
 
 try:
+    from .configuracion_modo import (
+        MODOS_VALIDOS,
+        actualizar_modo_monitor,
+        cargar_config_monitor,
+    )
+except ImportError:  # pragma: no cover - ejecución directa
+    from configuracion_modo import (
+        MODOS_VALIDOS,
+        actualizar_modo_monitor,
+        cargar_config_monitor,
+    )
+
+try:
     from .icono_base64 import ICONO_BASE64
 except ImportError:  # pragma: no cover - ejecución directa
     from icono_base64 import ICONO_BASE64
