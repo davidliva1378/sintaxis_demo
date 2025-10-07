@@ -6,6 +6,13 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
+try:
+    from core.modulos_monitor.expedientes_modular.verificacion_expedientes import (
+        obtener_fecha_corte as _obtener_fecha_corte_legacy,
+    )
+except ImportError:  # pragma: no cover - ejecución directa fuera del paquete
+    _obtener_fecha_corte_legacy = None
+
 CONFIG_PATH = Path("config/config_monitor.json")
 
 DEFAULT_CONFIG = {
@@ -17,6 +24,11 @@ DEFAULT_CONFIG = {
         "intervalo_minutos": 30,
     },
     "fuera_horario": {"intervalo_minutos": 240},
+    "filtro_expedientes": {
+        "modo": "ultimo_dia_habil",
+        "dias_atras": 1,
+        "orden": "fecha",
+    },
     "respaldo": {
         "destino": "datos_extraidos/monitoreo/historico",
     },
@@ -77,6 +89,20 @@ def es_modo_valido(modo: str) -> bool:
     return modo in MODOS_VALIDOS
 
 
+def obtener_fecha_corte(config: dict | None = None, path: Path | None = None) -> str | None:
+    """Resuelve la fecha de corte reutilizando el helper del monitor heredado."""
+
+    if _obtener_fecha_corte_legacy is None:
+        raise ImportError(
+            "El helper 'obtener_fecha_corte' no está disponible en esta instalación."
+        )
+
+    if config is None:
+        config = cargar_config_monitor(path)
+
+    return _obtener_fecha_corte_legacy(config)
+
+
 __all__ = [
     "CONFIG_PATH",
     "DEFAULT_CONFIG",
@@ -85,4 +111,5 @@ __all__ = [
     "cargar_config_monitor",
     "es_modo_valido",
     "guardar_config_monitor",
+    "obtener_fecha_corte",
 ]

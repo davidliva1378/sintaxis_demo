@@ -5,7 +5,7 @@ Este módulo implementa la bandeja de sistema que automatiza la verificación de
 ## Estado actual
 
 * La bandeja crea accesos rápidos para ejecutar la verificación de expedientes y de entradas, mostrando mensajes y registrando métricas detalladas (totales esperados, descartes, paginación, rutas de guardado, etc.).【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L168-L247】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L357-L433】
-* La configuración lee `config/config_monitor.json`, soporta modos `automatico`, `laboral` y `no_laboral` y ahora puede modificarse desde el submenú “🛠️ Modo de trabajo”, que actualiza la configuración y reinicia los temporizadores al vuelo.【F:Sistema_v4/monitor/configuracion_modo.py†L8-L69】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L330-L414】
+* La configuración lee `config/config_monitor.json`, soporta modos `automatico`, `laboral` y `no_laboral`, expone un bloque `filtro_expedientes` con las opciones heredadas (`hoy`, `ultimo_dia_habil`, `dias_atras`, combinadas) y ahora puede modificarse desde el submenú “🛠️ Modo de trabajo”, que actualiza la configuración y reinicia los temporizadores al vuelo.【F:Sistema_v4/monitor/configuracion_modo.py†L8-L97】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L330-L414】
 * Se restableció el hilo de entradas (`VerificadorEntradasV4`) que guarda historiales JSON/CSV dentro de la carpeta configurada para el monitoreo.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L263-L339】
 * El submenú “🧰 Utilidades” incorpora las acciones “🔐 Estado de sesión” y “⚠️ Forzar nuevo login”, reutilizando `SESSION_FILE` para diagnosticar la cookie guardada y permitir su limpieza desde la bandeja.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L324-L346】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L573-L667】
 * Se reactivó la comparación automática y manual de expedientes mediante el helper `comparar_expedientes`, notificando cambios desde la bandeja y registrando los informes generados en `datos_extraidos/monitoreo/reportes`. Si el helper no está disponible en la instalación, la acción queda deshabilitada y se informa al operador.【F:Sistema_v4/monitor/comparacion_expedientes.py†L1-L89】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L351-L361】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L523-L570】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L796-L813】
@@ -64,9 +64,19 @@ La acción “⚠️ Forzar nuevo login” elimina `SESSION_FILE` cuando existe 
    2. Permitir parámetros de reintento en `config_monitor.json` (intentos máximos, backoff).
    3. Adaptar el log para reflejar la nueva estrategia y alinearla con los escenarios heredados.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L412-L465】【F:core/modulos_monitor/general/monitor_general.py†L153-L199】
 7. **Incorporar filtro por fecha de corte en la bandeja v4**
-   1. Reutilizar `obtener_fecha_corte` del monitor heredado para exponer un bloque `filtro_expedientes` en `config_monitor.json`, documentando los modos (`hoy`, `ultimo_dia_habil`, `dias_atras`, combinados) y validaciones actuales.【F:core/modulos_monitor/expedientes_modular/verificacion_expedientes.py†L19-L70】
+   1. ✅ Reutilizar `obtener_fecha_corte` del monitor heredado para exponer un bloque `filtro_expedientes` en `config_monitor.json`, documentando los modos (`hoy`, `ultimo_dia_habil`, `dias_atras`, combinados) y validaciones actuales.【F:Sistema_v4/monitor/configuracion_modo.py†L8-L97】【F:core/modulos_monitor/expedientes_modular/verificacion_expedientes.py†L19-L70】
    2. Al iniciar `VerificadorExpedientesV4`, resolver la fecha de corte y convertirla al formato esperado antes de invocar el hilo Playwright, replicando la traducción a `DD/MM/AAAA` que hoy realiza el monitor general.【F:core/modulos_monitor/expedientes_modular/verificacion_expedientes.py†L96-L158】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L138-L219】
    3. Propagar la fecha al flujo asincrónico de expedientes v4 para que detenga el barrido con motivo `limite_fecha/corte_fecha`, registrando totales y motivos igual que en v2/v3.【F:Sistema_v4/operaciones/expedientes/expedientes_v4.py†L217-L407】【F:Sistema_v3/operaciones/expedientes/expedientes_v4.py†L197-L360】
    4. Exponer en la interfaz (tooltip, notificación o diálogo) el motivo `corte_fecha` cuando el hilo se detenga por el umbral, manteniendo paridad con el mensaje usado por la bandeja heredada.【F:core/modulos_monitor/general/monitor_general.py†L120-L158】
+
+### Configuración del filtro de expedientes
+
+El bloque `filtro_expedientes` de `config_monitor.json` replica los modos soportados en el monitor heredado y permite ajustar el comportamiento del hilo sin editar código. Los campos disponibles son:
+
+* `modo`: acepta `hoy`, `ultimo_dia_habil`, `dias_atras`, `hoy+ultimo_dia_habil`, `completo`/`sin_corte`/`none` y cadenas vacías para desactivar el filtro. El valor por defecto es `ultimo_dia_habil`.
+* `dias_atras`: entero utilizado cuando `modo` es `dias_atras` para restar días a partir de la fecha actual. El helper heredado ignora valores no numéricos y omite el corte si se ingresa un dato inválido.
+* `orden`: ordenamiento a solicitar al backend de expedientes (por ejemplo, `fecha` como valor predeterminado).
+
+La función `obtener_fecha_corte` del módulo `configuracion_modo` delega en el helper compartido del monitor legado, garantizando que cualquier ajuste de configuración se traduzca en fechas ISO (`YYYY-MM-DD`) compatibles con los hilos existentes.【F:Sistema_v4/monitor/configuracion_modo.py†L8-L97】【F:core/modulos_monitor/expedientes_modular/verificacion_expedientes.py†L19-L70】
 
 Completar estas tareas en orden desbloquea dependencias graduales y garantiza que el monitor v4 recupere las capacidades críticas del monitor general v2 antes de que el legado sea descartado.
