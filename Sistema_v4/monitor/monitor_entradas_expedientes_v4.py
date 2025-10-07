@@ -205,6 +205,18 @@ class VerificadorExpedientesV4(QThread):
                         paginas_esperadas = max(0, paginas_esp_meta)
 
                 motivo_original = motivo
+                motivos_corte_controlado = {
+                    "limite_fecha",
+                    "limite_tiempo",
+                    "limite_paginas",
+                    "duplicado_encontrado",
+                    "bucle_detectado",
+                    "sin_siguiente_habilitado",
+                }
+                extraccion_detencion_controlada = (
+                    motivo_original in motivos_corte_controlado
+                    or self.fecha_corte is not None
+                )
                 cantidad = len(expedientes)
                 if total_esperado is not None:
                     registrar_log(
@@ -247,6 +259,19 @@ class VerificadorExpedientesV4(QThread):
                                 f"{detalle} (total descartado: {total_descartado}; "
                                 f"diferencia informada: {diferencia})."
                             )
+                        elif extraccion_detencion_controlada:
+                            if motivo_original == "limite_fecha" and self.fecha_corte:
+                                registrar_log(
+                                    "ℹ️ La extracción finalizó por la fecha de corte "
+                                    f"{self.fecha_corte}; es esperable obtener menos "
+                                    "expedientes que el total anunciado."
+                                )
+                            else:
+                                registrar_log(
+                                    "ℹ️ La extracción se detuvo de forma controlada "
+                                    "antes de alcanzar el total anunciado; se omitirá "
+                                    "el ajuste por diferencia."
+                                )
                         else:
                             registrar_log(
                                 "⚠️ La cantidad recopilada es menor al total anunciado "
@@ -260,20 +285,26 @@ class VerificadorExpedientesV4(QThread):
                                     f"{total_descartado})."
                                 )
                             motivo = "total_incompleto"
-                    elif total_esperado < cantidad:
-                        registrar_log(
-                            "ℹ️ Se extrajeron más expedientes que los anunciados."
-                        )
+                elif total_esperado < cantidad:
+                    registrar_log(
+                        "ℹ️ Se extrajeron más expedientes que los anunciados."
+                    )
 
                 if (
                     paginas_recorridas is not None
                     and paginas_esperadas is not None
                     and paginas_recorridas < paginas_esperadas
                 ):
-                    registrar_log(
-                        "⚠️ No se alcanzó la cantidad de páginas anunciadas por el portal."
-                    )
-                    motivo = "paginas_incompletas"
+                    if extraccion_detencion_controlada:
+                        registrar_log(
+                            "ℹ️ La extracción se detuvo antes de recorrer todas las páginas "
+                            "debido al límite configurado."
+                        )
+                    else:
+                        registrar_log(
+                            "⚠️ No se alcanzó la cantidad de páginas anunciadas por el portal."
+                        )
+                        motivo = "paginas_incompletas"
 
                 ruta_archivo: Path | None = None
                 if self.guardar_json:
@@ -712,9 +743,15 @@ class MonitorExpedientesTray:
                     paginas_esperadas is not None
                     and paginas_recorridas < paginas_esperadas
                 ):
-                    mensaje_total += (
-                        " Se detectaron páginas pendientes; se reintentará la extracción."
-                    )
+                    if datos.estado == "corte_controlado":
+                        mensaje_total += (
+                            " La extracción se detuvo por el límite configurado antes de "
+                            "recorrer todas las páginas."
+                        )
+                    else:
+                        mensaje_total += (
+                            " Se detectaron páginas pendientes; se reintentará la extracción."
+                        )
 
             icono = (
                 QSystemTrayIcon.Warning
