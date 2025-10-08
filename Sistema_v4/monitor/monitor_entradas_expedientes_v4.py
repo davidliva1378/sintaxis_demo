@@ -77,16 +77,28 @@ if TYPE_CHECKING:  # pragma: no cover - hints para herramientas de tipo
         from comparacion_expedientes import ResultadoComparacion  # type: ignore[import-not-found]
 
 try:
-    from .comparacion_expedientes import comparar_expedientes as _comparar_expedientes
+    from .comparacion_expedientes import (
+        MODO_COMPARACION_TOTAL as _MODO_COMPARACION_TOTAL,
+        comparar_expedientes as _comparar_expedientes,
+    )
 except ImportError:  # pragma: no cover - ejecución directa
     try:
-        from comparacion_expedientes import comparar_expedientes as _comparar_expedientes
+        from comparacion_expedientes import (
+            MODO_COMPARACION_TOTAL as _MODO_COMPARACION_TOTAL,
+            comparar_expedientes as _comparar_expedientes,
+        )
     except ImportError:  # pragma: no cover - entorno sin comparación disponible
         comparar_expedientes: Optional[ComparadorExpedientes] = None
+        _MODO_COMPARACION_TOTAL = "total"
     else:
         comparar_expedientes = _comparar_expedientes
+        MODO_COMPARACION_TOTAL = _MODO_COMPARACION_TOTAL
 else:
     comparar_expedientes = _comparar_expedientes
+    MODO_COMPARACION_TOTAL = _MODO_COMPARACION_TOTAL
+
+if "MODO_COMPARACION_TOTAL" not in globals():  # pragma: no cover - fallback defensivo
+    MODO_COMPARACION_TOTAL = "total"
 
 try:
     from .respaldo_historico import (
@@ -1292,29 +1304,45 @@ class MonitorExpedientesTray:
         self.ejecutando_expedientes = True
         carpeta = self.directorio_monitoreo
         fecha_corte_resuelta: str | None = None
-        try:
-            fecha_corte_iso = obtener_fecha_corte(self.config)
-        except ImportError:
+
+        comparacion_config = self.config.get("comparacion")
+        modo_comparacion = None
+        if isinstance(comparacion_config, dict):
+            valor = comparacion_config.get("modo")
+            if isinstance(valor, str):
+                modo_comparacion = valor.strip().lower()
+
+        omitir_fecha_corte = modo_comparacion == MODO_COMPARACION_TOTAL
+        if omitir_fecha_corte:
             registrar_log(
-                "⚠️ No se pudo resolver la fecha de corte: helper heredado no disponible."
+                "📊 Comparación configurada en modo total: se omitirá la fecha de corte "
+                "durante la extracción."
             )
-        except Exception as exc:  # pragma: no cover - logging defensivo
-            registrar_log(f"⚠️ Error al resolver fecha de corte: {exc}")
         else:
-            if fecha_corte_iso:
-                try:
-                    fecha_corte_resuelta = datetime.strptime(
-                        fecha_corte_iso, "%Y-%m-%d"
-                    ).strftime("%d/%m/%Y")
-                except ValueError as exc:
-                    registrar_log(
-                        "⚠️ Fecha de corte inválida en configuración: "
-                        f"{fecha_corte_iso} → {exc}"
-                    )
-                else:
-                    registrar_log(
-                        f"📆 Fecha de corte aplicada para la extracción: {fecha_corte_resuelta}"
-                    )
+            try:
+                fecha_corte_iso = obtener_fecha_corte(self.config)
+            except ImportError:
+                registrar_log(
+                    "⚠️ No se pudo resolver la fecha de corte: helper heredado no disponible."
+                )
+            except Exception as exc:  # pragma: no cover - logging defensivo
+                registrar_log(f"⚠️ Error al resolver fecha de corte: {exc}")
+            else:
+                if fecha_corte_iso:
+                    try:
+                        fecha_corte_resuelta = datetime.strptime(
+                            fecha_corte_iso, "%Y-%m-%d"
+                        ).strftime("%d/%m/%Y")
+                    except ValueError as exc:
+                        registrar_log(
+                            "⚠️ Fecha de corte inválida en configuración: "
+                            f"{fecha_corte_iso} → {exc}"
+                        )
+                    else:
+                        registrar_log(
+                            "📆 Fecha de corte aplicada para la extracción: "
+                            f"{fecha_corte_resuelta}"
+                        )
 
         filtro_config = self.config.get("filtro_expedientes", {})
         orden_config = filtro_config.get("orden", "fecha") if filtro_config else "fecha"

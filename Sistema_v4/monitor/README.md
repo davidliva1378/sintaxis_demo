@@ -86,7 +86,7 @@ El monitor v4 traduce automáticamente esa fecha al formato `DD/MM/AAAA` antes d
 
 El bloque `comparacion` de `config_monitor.json` permite elegir la estrategia aplicada por `comparar_expedientes` al contrastar contra la base histórica:
 
-* `modo`: acepta `parcial` (valor predeterminado) para filtrar la base con la fecha de corte resuelta o `total` para comparar contra todos los expedientes sin aplicar recortes temporales. Cualquier otro valor o tipo se normaliza a `parcial`, registrando avisos en el log del monitor.【F:Sistema_v4/monitor/configuracion_modo.py†L8-L97】【F:Sistema_v4/monitor/comparacion_expedientes.py†L83-L222】
+* `modo`: acepta `parcial` (valor predeterminado) para filtrar la base con la fecha de corte resuelta o `total` para comparar contra todos los expedientes sin aplicar recortes temporales. Cuando el modo es `total`, el monitor también omite la fecha de corte al lanzar la extracción para mantener consistencia entre los conjuntos de datos. Cualquier otro valor o tipo se normaliza a `parcial`, registrando avisos en el log del monitor.【F:Sistema_v4/monitor/configuracion_modo.py†L8-L97】【F:Sistema_v4/monitor/comparacion_expedientes.py†L83-L222】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L1274-L1341】
 
 El monitor envía su configuración en cada comparación (automática o manual), de modo que los avisos registrados en el log dejan constancia del modo seleccionado y del filtrado aplicado o descartado antes de delegar en `comparar_con_base`.【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L34-L105】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L1497-L1779】【F:Sistema_v4/monitor/comparacion_expedientes.py†L83-L222】
 
