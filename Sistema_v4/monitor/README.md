@@ -2,6 +2,8 @@
 
 Este módulo implementa la bandeja de sistema que automatiza la verificación de expedientes y entradas del PJN utilizando Qt/PySide. Actualmente concentra la lógica en `monitor_entradas_expedientes_v4.py` y mantiene un icono embebido en `icono_base64.py`.
 
+Para una descripción completa de arquitectura, flujos, configuración y operaciones auxiliares, consulta la [documentación exhaustiva del monitor](../../Documentacion/documentacion_monitor_v4.md).
+
 ## Estado actual
 
 * La bandeja crea accesos rápidos para ejecutar la verificación de expedientes y de entradas, mostrando mensajes y registrando métricas detalladas (totales esperados, descartes, paginación, rutas de guardado, etc.).【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L1359-L1480】【F:Sistema_v4/monitor/monitor_entradas_expedientes_v4.py†L1512-L1566】
