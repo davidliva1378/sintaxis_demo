@@ -23,8 +23,12 @@ DEFAULT_CONFIG = {
         "hora_inicio": "07:00",
         "hora_fin": "20:00",
         "intervalo_minutos": 30,
+        "intervalo_minutos_entradas": 30,
     },
-    "fuera_horario": {"intervalo_minutos": 240},
+    "fuera_horario": {
+        "intervalo_minutos": 240,
+        "intervalo_minutos_entradas": 240,
+    },
     "filtro_expedientes": {
         "modo": "ultimo_dia_habil",
         "dias_atras": 1,

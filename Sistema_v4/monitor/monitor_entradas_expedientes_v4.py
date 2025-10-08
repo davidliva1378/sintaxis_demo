@@ -12,6 +12,7 @@ import base64
 import json
 import os
 import sys
+import unicodedata
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
@@ -46,6 +47,29 @@ from PySide6.QtWidgets import (
 
 ComparadorExpedientes = Callable[..., "ResultadoComparacion"]
 
+_DIAS_EN_A_ESP = {
+    "monday": "lunes",
+    "tuesday": "martes",
+    "wednesday": "miercoles",
+    "thursday": "jueves",
+    "friday": "viernes",
+    "saturday": "sabado",
+    "sunday": "domingo",
+}
+
+
+def _normalizar_dia_semana(valor: object) -> str:
+    """Normaliza un nombre de día quitando tildes y homogeneizando idioma."""
+
+    if not isinstance(valor, str):
+        return ""
+
+    texto = unicodedata.normalize("NFD", valor.strip().lower())
+    texto_sin_tildes = "".join(
+        caracter for caracter in texto if unicodedata.category(caracter) != "Mn"
+    )
+    return _DIAS_EN_A_ESP.get(texto_sin_tildes, texto_sin_tildes)
+
 if TYPE_CHECKING:  # pragma: no cover - hints para herramientas de tipo
     try:
         from .comparacion_expedientes import ResultadoComparacion
@@ -91,52 +115,6 @@ except ImportError:  # pragma: no cover - ejecución directa
         actualizar_modo_monitor,
         cargar_config_monitor,
         guardar_config_monitor,
-        obtener_fecha_corte,
-    )
-
-ComparadorExpedientes = Callable[..., "ResultadoComparacion"]
-
-if TYPE_CHECKING:  # pragma: no cover - hints para herramientas de tipo
-    try:
-        from .comparacion_expedientes import ResultadoComparacion
-    except ImportError:  # pragma: no cover - ejecución directa
-        from comparacion_expedientes import ResultadoComparacion  # type: ignore[import-not-found]
-
-try:
-    from .comparacion_expedientes import comparar_expedientes as _comparar_expedientes
-except ImportError:  # pragma: no cover - ejecución directa
-    try:
-        from comparacion_expedientes import comparar_expedientes as _comparar_expedientes
-    except ImportError:  # pragma: no cover - entorno sin comparación disponible
-        comparar_expedientes: Optional[ComparadorExpedientes] = None
-    else:
-        comparar_expedientes = _comparar_expedientes
-else:
-    comparar_expedientes = _comparar_expedientes
-
-try:
-    from .respaldo_historico import (
-        ARCHIVOS_PREDETERMINADOS,
-        generar_respaldo_monitoreo,
-    )
-except ImportError:  # pragma: no cover - ejecución directa
-    from respaldo_historico import (  # type: ignore[import-not-found]
-        ARCHIVOS_PREDETERMINADOS,
-        generar_respaldo_monitoreo,
-    )
-
-try:
-    from .configuracion_modo import (
-        MODOS_VALIDOS,
-        actualizar_modo_monitor,
-        cargar_config_monitor,
-        obtener_fecha_corte,
-    )
-except ImportError:  # pragma: no cover - ejecución directa
-    from configuracion_modo import (
-        MODOS_VALIDOS,
-        actualizar_modo_monitor,
-        cargar_config_monitor,
         obtener_fecha_corte,
     )
 
@@ -289,13 +267,32 @@ class ConfiguracionDialog(QDialog):
         self.hora_fin_edit.setDisplayFormat("HH:mm")
         formulario.addRow("Hora de fin", self.hora_fin_edit)
 
-        self.intervalo_laboral_spin = QSpinBox(pagina)
-        self.intervalo_laboral_spin.setRange(1, 1440)
-        formulario.addRow("Intervalo laboral (min)", self.intervalo_laboral_spin)
+        self.intervalo_laboral_expedientes_spin = QSpinBox(pagina)
+        self.intervalo_laboral_expedientes_spin.setRange(1, 1440)
+        formulario.addRow(
+            "Intervalo laboral expedientes (min)",
+            self.intervalo_laboral_expedientes_spin,
+        )
 
-        self.intervalo_no_laboral_spin = QSpinBox(pagina)
-        self.intervalo_no_laboral_spin.setRange(1, 1440)
-        formulario.addRow("Intervalo fuera de horario (min)", self.intervalo_no_laboral_spin)
+        self.intervalo_laboral_entradas_spin = QSpinBox(pagina)
+        self.intervalo_laboral_entradas_spin.setRange(1, 1440)
+        formulario.addRow(
+            "Intervalo laboral entradas (min)", self.intervalo_laboral_entradas_spin
+        )
+
+        self.intervalo_no_laboral_expedientes_spin = QSpinBox(pagina)
+        self.intervalo_no_laboral_expedientes_spin.setRange(1, 1440)
+        formulario.addRow(
+            "Intervalo fuera de horario expedientes (min)",
+            self.intervalo_no_laboral_expedientes_spin,
+        )
+
+        self.intervalo_no_laboral_entradas_spin = QSpinBox(pagina)
+        self.intervalo_no_laboral_entradas_spin.setRange(1, 1440)
+        formulario.addRow(
+            "Intervalo fuera de horario entradas (min)",
+            self.intervalo_no_laboral_entradas_spin,
+        )
 
         self.tabs.addTab(pagina, "Intervalos")
 
@@ -437,6 +434,8 @@ class ConfiguracionDialog(QDialog):
             )
 
         horario = config.get("horario_laboral", {})
+        if not isinstance(horario, dict):
+            horario = {}
         dias = horario.get("dias", DEFAULT_CONFIG["horario_laboral"]["dias"])
         if isinstance(dias, (list, tuple)):
             self.dias_laborales_edit.setText(
@@ -448,20 +447,33 @@ class ConfiguracionDialog(QDialog):
         fin = horario.get("hora_fin", DEFAULT_CONFIG["horario_laboral"]["hora_fin"])
         self._set_time_edit(self.hora_inicio_edit, inicio)
         self._set_time_edit(self.hora_fin_edit, fin)
-        self.intervalo_laboral_spin.setValue(
-            int(horario.get(
-                "intervalo_minutos", DEFAULT_CONFIG["horario_laboral"]["intervalo_minutos"]
-            ))
+        intervalo_laboral = horario.get(
+            "intervalo_minutos", DEFAULT_CONFIG["horario_laboral"]["intervalo_minutos"]
+        )
+        intervalo_laboral_entradas = horario.get(
+            "intervalo_minutos_entradas",
+            DEFAULT_CONFIG["horario_laboral"]["intervalo_minutos_entradas"],
+        )
+        self.intervalo_laboral_expedientes_spin.setValue(int(intervalo_laboral))
+        self.intervalo_laboral_entradas_spin.setValue(
+            int(intervalo_laboral_entradas)
         )
 
         fuera_horario = config.get("fuera_horario", {})
-        self.intervalo_no_laboral_spin.setValue(
-            int(
-                fuera_horario.get(
-                    "intervalo_minutos",
-                    DEFAULT_CONFIG["fuera_horario"]["intervalo_minutos"],
-                )
-            )
+        if not isinstance(fuera_horario, dict):
+            fuera_horario = {}
+        intervalo_no_laboral = fuera_horario.get(
+            "intervalo_minutos", DEFAULT_CONFIG["fuera_horario"]["intervalo_minutos"]
+        )
+        intervalo_no_laboral_entradas = fuera_horario.get(
+            "intervalo_minutos_entradas",
+            DEFAULT_CONFIG["fuera_horario"]["intervalo_minutos_entradas"],
+        )
+        self.intervalo_no_laboral_expedientes_spin.setValue(
+            int(intervalo_no_laboral)
+        )
+        self.intervalo_no_laboral_entradas_spin.setValue(
+            int(intervalo_no_laboral_entradas)
         )
 
         filtro = config.get("filtro_expedientes", {})
@@ -584,27 +596,36 @@ class ConfiguracionDialog(QDialog):
         self._resultado = config
         super().accept()
 
+    def _asegurar_dict(self, destino: dict, clave: str, default: dict) -> dict:
+        existente = destino.get(clave)
+        if not isinstance(existente, dict):
+            existente = deepcopy(default)
+            destino[clave] = existente
+        return existente
+
     def _recopilar_configuracion(self) -> dict:
-        config = deepcopy(DEFAULT_CONFIG)
-        if isinstance(self._config, dict):
-            for clave, valor in self._config.items():
-                if clave not in config:
-                    config[clave] = deepcopy(valor)
+        config = deepcopy(self._config) if isinstance(self._config, dict) else {}
+        if not isinstance(config, dict):  # defensa ante valores no mapeables
+            config = {}
 
         config["modo"] = self.modo_combo.currentData() or DEFAULT_CONFIG["modo"]
 
-        rutas = config.setdefault("rutas", {})
+        rutas = self._asegurar_dict(config, "rutas", DEFAULT_CONFIG["rutas"])
         monitoreo = self.monitoreo_edit.text().strip()
         rutas["monitoreo"] = monitoreo or DEFAULT_CONFIG["rutas"]["monitoreo"]
 
-        comparacion = config.setdefault("comparacion", {})
+        comparacion = self._asegurar_dict(
+            config, "comparacion", DEFAULT_CONFIG["comparacion"]
+        )
         comparacion["modo"] = (
             self.comparacion_modo_combo.currentData()
             or DEFAULT_CONFIG["comparacion"]["modo"]
         )
         comparacion["auto"] = self.comparacion_auto_check.isChecked()
 
-        horario = config.setdefault("horario_laboral", {})
+        horario = self._asegurar_dict(
+            config, "horario_laboral", DEFAULT_CONFIG["horario_laboral"]
+        )
         dias_texto = self.dias_laborales_edit.text()
         dias = [
             dia.strip().lower()
@@ -614,12 +635,24 @@ class ConfiguracionDialog(QDialog):
         horario["dias"] = dias or DEFAULT_CONFIG["horario_laboral"]["dias"]
         horario["hora_inicio"] = self.hora_inicio_edit.time().toString("HH:mm")
         horario["hora_fin"] = self.hora_fin_edit.time().toString("HH:mm")
-        horario["intervalo_minutos"] = self.intervalo_laboral_spin.value()
+        horario["intervalo_minutos"] = self.intervalo_laboral_expedientes_spin.value()
+        horario["intervalo_minutos_entradas"] = (
+            self.intervalo_laboral_entradas_spin.value()
+        )
 
-        fuera_horario = config.setdefault("fuera_horario", {})
-        fuera_horario["intervalo_minutos"] = self.intervalo_no_laboral_spin.value()
+        fuera_horario = self._asegurar_dict(
+            config, "fuera_horario", DEFAULT_CONFIG["fuera_horario"]
+        )
+        fuera_horario["intervalo_minutos"] = (
+            self.intervalo_no_laboral_expedientes_spin.value()
+        )
+        fuera_horario["intervalo_minutos_entradas"] = (
+            self.intervalo_no_laboral_entradas_spin.value()
+        )
 
-        filtro = config.setdefault("filtro_expedientes", {})
+        filtro = self._asegurar_dict(
+            config, "filtro_expedientes", DEFAULT_CONFIG["filtro_expedientes"]
+        )
         filtro_modo = self.filtro_modo_combo.currentData()
         if filtro_modo == "sin_corte":
             filtro_modo = ""
@@ -627,15 +660,21 @@ class ConfiguracionDialog(QDialog):
         filtro["dias_atras"] = self.filtro_dias_spin.value()
         filtro["orden"] = self.filtro_orden_edit.text().strip() or DEFAULT_CONFIG["filtro_expedientes"]["orden"]
 
-        reintentos = config.setdefault("reintentos", {})
-        exp_conf = reintentos.setdefault("expedientes", {})
+        reintentos = self._asegurar_dict(
+            config, "reintentos", DEFAULT_CONFIG["reintentos"]
+        )
+        exp_conf = self._asegurar_dict(
+            reintentos, "expedientes", DEFAULT_CONFIG["reintentos"]["expedientes"]
+        )
         exp_conf["maximos"] = self.reintentos_expedientes_spin.value()
         exp_conf["espera_segundos"] = self.espera_expedientes_spin.value()
-        ent_conf = reintentos.setdefault("entradas", {})
+        ent_conf = self._asegurar_dict(
+            reintentos, "entradas", DEFAULT_CONFIG["reintentos"]["entradas"]
+        )
         ent_conf["maximos"] = self.reintentos_entradas_spin.value()
         ent_conf["espera_segundos"] = self.espera_entradas_spin.value()
 
-        respaldo = config.setdefault("respaldo", {})
+        respaldo = self._asegurar_dict(config, "respaldo", DEFAULT_CONFIG["respaldo"])
         destino_respaldo = self.respaldo_destino_edit.text().strip()
         respaldo["destino"] = (
             destino_respaldo or DEFAULT_CONFIG["respaldo"]["destino"]
@@ -645,7 +684,9 @@ class ConfiguracionDialog(QDialog):
             archivo.strip() for archivo in archivos_texto if archivo.strip()
         ]
 
-        notificaciones = config.setdefault("notificaciones", {})
+        notificaciones = self._asegurar_dict(
+            config, "notificaciones", DEFAULT_CONFIG["notificaciones"]
+        )
         notificaciones["respaldo"] = self.notif_respaldo_check.isChecked()
         notificaciones[
             "comparacion_sin_cambios"
@@ -1110,36 +1151,76 @@ class MonitorExpedientesTray:
             return valor
         return default
 
-    def esta_en_horario_laboral(self) -> bool:
-        ahora = datetime.now()
-        dia_actual = ahora.strftime("%A").lower()
-        dias = [d.lower() for d in self.config["horario_laboral"]["dias"]]
-        hora_inicio = datetime.strptime(
-            self.config["horario_laboral"]["hora_inicio"], "%H:%M"
-        ).time()
-        hora_fin = datetime.strptime(
-            self.config["horario_laboral"]["hora_fin"], "%H:%M"
-        ).time()
-        return dia_actual in dias and hora_inicio <= ahora.time() <= hora_fin
+    def _resolver_intervalo_config(self, bloque: str, tipo: str) -> int:
+        configuracion = self.config.get(bloque)
+        if not isinstance(configuracion, dict):
+            configuracion = {}
 
-    def obtener_intervalo(self) -> int:
-        modo = self.config.get("modo", "automatico")
-        if modo == "laboral":
-            return self.config["horario_laboral"]["intervalo_minutos"]
-        if modo == "no_laboral":
-            return self.config["fuera_horario"]["intervalo_minutos"]
-        if modo == "automatico":
-            return (
-                self.config["horario_laboral"]["intervalo_minutos"]
-                if self.esta_en_horario_laboral()
-                else self.config["fuera_horario"]["intervalo_minutos"]
-            )
+        base = DEFAULT_CONFIG.get(bloque, {})
+        if not isinstance(base, dict):
+            base = {}
+
+        clave_especifica = (
+            "intervalo_minutos_entradas" if tipo == "entradas" else "intervalo_minutos"
+        )
+        candidatos = [
+            configuracion.get(clave_especifica),
+            configuracion.get("intervalo_minutos"),
+            base.get(clave_especifica),
+            base.get("intervalo_minutos"),
+        ]
+
+        for candidato in candidatos:
+            if isinstance(candidato, (int, float)):
+                valor = int(candidato)
+                return max(1, valor)
+
         return 60
 
+    def esta_en_horario_laboral(self) -> bool:
+        ahora = datetime.now()
+        dia_actual = _normalizar_dia_semana(ahora.strftime("%A"))
+
+        horario = self.config.get("horario_laboral")
+        if not isinstance(horario, dict):
+            horario = DEFAULT_CONFIG["horario_laboral"]
+
+        dias_config = horario.get("dias", DEFAULT_CONFIG["horario_laboral"]["dias"])
+        if not isinstance(dias_config, (list, tuple, set)):
+            dias_config = DEFAULT_CONFIG["horario_laboral"]["dias"]
+        dias_normalizados: set[str] = set()
+        for dia in dias_config:
+            normalizado = _normalizar_dia_semana(dia)
+            if normalizado:
+                dias_normalizados.add(normalizado)
+
+        hora_inicio_texto = horario.get(
+            "hora_inicio", DEFAULT_CONFIG["horario_laboral"]["hora_inicio"]
+        )
+        hora_fin_texto = horario.get(
+            "hora_fin", DEFAULT_CONFIG["horario_laboral"]["hora_fin"]
+        )
+
+        hora_inicio = datetime.strptime(hora_inicio_texto, "%H:%M").time()
+        hora_fin = datetime.strptime(hora_fin_texto, "%H:%M").time()
+        return dia_actual in dias_normalizados and hora_inicio <= ahora.time() <= hora_fin
+
+    def obtener_intervalo(self, tipo: str = "expedientes") -> int:
+        modo = self.config.get("modo", "automatico")
+        if modo == "laboral":
+            return self._resolver_intervalo_config("horario_laboral", tipo)
+        if modo == "no_laboral":
+            return self._resolver_intervalo_config("fuera_horario", tipo)
+        if modo == "automatico":
+            bloque = "horario_laboral" if self.esta_en_horario_laboral() else "fuera_horario"
+            return self._resolver_intervalo_config(bloque, tipo)
+        return self._resolver_intervalo_config("fuera_horario", tipo)
+
     def iniciar_temporizador(self) -> None:
-        intervalo = self.obtener_intervalo()
-        self.timer_expedientes.start(intervalo * 60 * 1000)
-        self.timer_entradas.start(intervalo * 60 * 1000)
+        intervalo_expedientes = self.obtener_intervalo("expedientes")
+        intervalo_entradas = self.obtener_intervalo("entradas")
+        self.timer_expedientes.start(intervalo_expedientes * 60 * 1000)
+        self.timer_entradas.start(intervalo_entradas * 60 * 1000)
         self.verificar_expedientes()
         self.verificar_entradas()
 
@@ -1150,10 +1231,12 @@ class MonitorExpedientesTray:
 
     def actualizar_tooltip(self) -> None:
         modo = self.config.get("modo", "automatico").replace("_", " ").capitalize()
-        intervalo = self.obtener_intervalo()
+        intervalo_expedientes = self.obtener_intervalo("expedientes")
+        intervalo_entradas = self.obtener_intervalo("entradas")
         tooltip = (
             "Monitor de Expedientes y Entradas PJN\n"
-            f"Modo: {modo} · Intervalo: {intervalo} minutos"
+            f"Modo: {modo} · Intervalos: {intervalo_expedientes} min (expedientes) / "
+            f"{intervalo_entradas} min (entradas)"
         )
         self.tray.setToolTip(tooltip)
 
@@ -1186,14 +1269,19 @@ class MonitorExpedientesTray:
         self.reiniciar_temporizadores()
 
         modo_legible = nuevo_modo.replace("_", " ").capitalize()
-        intervalo = self.obtener_intervalo()
+        intervalo_expedientes = self.obtener_intervalo("expedientes")
+        intervalo_entradas = self.obtener_intervalo("entradas")
         registrar_log(
             "⚙️ Modo de trabajo actualizado a "
-            f"{modo_legible} ({intervalo} minutos)."
+            f"{modo_legible} (expedientes {intervalo_expedientes} min, "
+            f"entradas {intervalo_entradas} min)."
         )
         self.tray.showMessage(
             "Modo de trabajo actualizado",
-            f"{modo_legible} · Intervalo: {intervalo} minutos",
+            (
+                f"{modo_legible} · Expedientes: {intervalo_expedientes} min · "
+                f"Entradas: {intervalo_entradas} min"
+            ),
         )
 
     def verificar_expedientes(self) -> None:
@@ -1575,7 +1663,8 @@ class MonitorExpedientesTray:
             estado = f"❌ Error inesperado al leer la sesión: {exc}"
 
         modo = self.config.get("modo", "automatico").replace("_", " ").capitalize()
-        intervalo = self.obtener_intervalo()
+        intervalo_expedientes = self.obtener_intervalo("expedientes")
+        intervalo_entradas = self.obtener_intervalo("entradas")
         ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         try:
             ruta_sesion = SESSION_FILE.resolve()
@@ -1585,7 +1674,9 @@ class MonitorExpedientesTray:
         mensaje = (
             f"📅 Fecha y hora actual: {ahora}\n"
             f"🕒 Modo de trabajo: {modo}\n"
-            f"⏱ Intervalo configurado: {intervalo} minutos\n"
+            "⏱ Intervalos configurados: "
+            f"expedientes {intervalo_expedientes} min / "
+            f"entradas {intervalo_entradas} min\n"
             f"{estado}"
             f"{detalles_archivo}"
             f"\n📁 Archivo: {ruta_sesion}"
