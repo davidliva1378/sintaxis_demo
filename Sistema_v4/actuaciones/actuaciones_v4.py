@@ -232,6 +232,74 @@ def construir_nombre_archivo_normalizado(fecha, tipo, hash_val, archivo_url, nom
 
 
 
+def _escape_selector_for_css(selector: str) -> str:
+    """Escapa los dos puntos presentes en un selector CSS para Playwright."""
+
+    return re.sub(r"(?<!\\):", r"\\:", selector)
+
+
+def _escape_selector_for_js(selector: str) -> str:
+    """Escapa los dos puntos presentes en un selector CSS para ejecutarlo en JS."""
+
+    return re.sub(r"(?<!\\):", r"\\\\:", selector)
+
+
+async def _obtener_paginador_activo(page: Page, tabla_id: str) -> tuple[str | None, str | None]:
+    """Obtiene el selector y el número de página activo de un datatable PrimeFaces."""
+
+    sufijos = ("_paginator_bottom", "_paginator_top")
+    for sufijo in sufijos:
+        selector_base = f"#{tabla_id}{sufijo} .ui-paginator-page.ui-state-active"
+        selector_css = _escape_selector_for_css(selector_base)
+        elemento = await page.query_selector(selector_css)
+        if elemento:
+            pagina_activa = (await elemento.inner_text() or "").strip()
+            selector_js = _escape_selector_for_js(selector_base)
+            return selector_js, pagina_activa
+    return None, None
+
+
+async def _esperar_cambio_pagina(
+    page: Page,
+    tabla_id: str,
+    html_anterior: str,
+    paginador_selector_js: str | None,
+    pagina_anterior: str | None,
+) -> None:
+    """Espera a que se actualice la tabla tras navegar a otra página."""
+
+    if paginador_selector_js and pagina_anterior:
+        try:
+            await page.wait_for_function(
+                r"""
+                ({ selector, paginaAnterior }) => {
+                    const elemento = document.querySelector(selector);
+                    return elemento && elemento.textContent.trim() !== paginaAnterior;
+                }
+                """,
+                arg={"selector": paginador_selector_js, "paginaAnterior": pagina_anterior},
+                timeout=8000,
+            )
+            return
+        except TimeoutError:
+            # Si el paginador no cambia, reintentamos comparando el contenido de la tabla.
+            pass
+
+    await page.wait_for_function(
+        r"""
+        ({ selector, htmlPrevio }) => {
+            const tabla = document.querySelector(selector);
+            return tabla && tabla.innerHTML !== htmlPrevio;
+        }
+        """,
+        arg={
+            "selector": _escape_selector_for_js(f"#{tabla_id}"),
+            "htmlPrevio": html_anterior,
+        },
+        timeout=8000,
+    )
+
+
 async def construir_actuacion_desde_fila(
     page_expediente: Page,
     fila,
@@ -326,12 +394,13 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
 
         pagina = 1
         indice_actual = indice_inicial
+        tabla_id = "expediente:action-historic-table"
+        tabla_selector_css = _escape_selector_for_css(f"#{tabla_id}")
+        filas_selector = f"{tabla_selector_css} tbody tr"
         while True:
             print(f"Página {pagina} (históricas): extrayendo...")
 
-            filas = await page_expediente.query_selector_all(
-                r"#expediente\:action-historic-table tbody tr"
-            )
+            filas = await page_expediente.query_selector_all(filas_selector)
             if not filas:
                 print("No se encontraron filas en actuaciones históricas.")
                 break
@@ -353,26 +422,20 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
             )
             if boton_siguiente:
                 try:
-                    fila_primera = await page_expediente.query_selector(
-                        r"#expediente\:action-historic-table tbody tr td:nth-child(3)"
+                    html_anterior = await page_expediente.inner_html(tabla_selector_css)
+                    paginador_selector_js, pagina_activa = await _obtener_paginador_activo(
+                        page_expediente, tabla_id
                     )
-                    fecha_antes = await fila_primera.inner_text() if fila_primera else ""
-
                     await boton_siguiente.click()
                     pagina += 1
 
-                    await page_expediente.wait_for_selector(
-                        r"#expediente\:action-historic-table tbody tr", timeout=8000
-                    )
-                    await page_expediente.wait_for_function(
-                        r"""
-                        ({ fechaAntes }) => {
-                            const celda = document.querySelector('#expediente\:action-historic-table tbody tr td:nth-child(3)');
-                            return celda && celda.innerText.trim() !== fechaAntes;
-                        }
-                        """,
-                        arg={"fechaAntes": fecha_antes.strip()},
-                        timeout=8000,
+                    await page_expediente.wait_for_selector(filas_selector, timeout=8000)
+                    await _esperar_cambio_pagina(
+                        page_expediente,
+                        tabla_id,
+                        html_anterior,
+                        paginador_selector_js,
+                        pagina_activa,
                     )
 
                 except Exception as e:
@@ -420,6 +483,8 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
     pagina = 1
     indice_actual = 1
 
+    tabla_id = "expediente:action-table"
+    tabla_selector_css = _escape_selector_for_css(f"#{tabla_id}")
     while True:
         print(f"📄 Página {pagina}: extrayendo...")
         nuevas, error = await extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_actual)
@@ -437,19 +502,19 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
             break
 
         try:
-            html_anterior = await page_expediente.inner_html(r"#expediente\:action-table")
+            html_anterior = await page_expediente.inner_html(tabla_selector_css)
+            paginador_selector_js, pagina_activa = await _obtener_paginador_activo(
+                page_expediente, tabla_id
+            )
             await boton_siguiente.click()
             await page_expediente.wait_for_load_state("domcontentloaded")
             await asyncio.sleep(2)
-            await page_expediente.wait_for_function(
-                """
-                ({ selector, htmlPrevio }) => {
-                    const tabla = document.querySelector(selector);
-                    return tabla && tabla.innerHTML !== htmlPrevio;
-                }
-                """,
-                arg={"selector": "#expediente\\:action-table", "htmlPrevio": html_anterior},
-                timeout=8000,
+            await _esperar_cambio_pagina(
+                page_expediente,
+                tabla_id,
+                html_anterior,
+                paginador_selector_js,
+                pagina_activa,
             )
             pagina += 1
         except TimeoutError:
