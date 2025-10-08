@@ -20,7 +20,7 @@ from pathlib import Path
 
 from typing import TYPE_CHECKING, Callable, Optional
 
-from PySide6.QtCore import QThread, QTimer, Signal, QTime
+from PySide6.QtCore import Qt, QThread, QTimer, Signal, QTime
 from PySide6.QtGui import QAction, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -44,6 +45,7 @@ from PySide6.QtWidgets import (
     QTimeEdit,
     QVBoxLayout,
     QWidget,
+    QSizePolicy,
 )
 
 ComparadorExpedientes = Callable[..., "ResultadoComparacion"]
@@ -243,6 +245,7 @@ class ConfiguracionDialog(QDialog):
     def _crear_tab_general(self) -> None:
         pagina = QWidget(self)
         formulario = QFormLayout(pagina)
+        formulario.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         descripcion = self._crear_label_descriptivo(
             "Seleccioná el modo de trabajo y la carpeta base donde se guardan los "
@@ -382,10 +385,19 @@ class ConfiguracionDialog(QDialog):
         self.filtro_orden_edit = QLineEdit(pagina)
         formulario.addRow("Orden de extracción", self.filtro_orden_edit)
 
-        self.filtro_preview_label = QLabel("", pagina)
+        self.filtro_preview_group = QGroupBox("Vista previa", pagina)
+        preview_layout = QVBoxLayout(self.filtro_preview_group)
+        preview_layout.setContentsMargins(12, 8, 12, 8)
+        self.filtro_preview_label = QLabel("", self.filtro_preview_group)
         self.filtro_preview_label.setWordWrap(True)
         self.filtro_preview_label.setStyleSheet("color: #555;")
-        formulario.addRow("Vista previa", self.filtro_preview_label)
+        self.filtro_preview_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.filtro_preview_label.setMinimumHeight(48)
+        self.filtro_preview_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        preview_layout.addWidget(self.filtro_preview_label)
+        formulario.addRow(self.filtro_preview_group)
 
         self.tabs.addTab(pagina, "Filtro")
 
