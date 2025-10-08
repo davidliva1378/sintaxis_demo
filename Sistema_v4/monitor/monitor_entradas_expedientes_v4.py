@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -222,16 +223,33 @@ class ConfiguracionDialog(QDialog):
         self._crear_tab_respaldo()
         self._crear_tab_notificaciones()
 
+        self.boton_restaurar = QPushButton("Restaurar valores predeterminados", self)
+        self.boton_restaurar.clicked.connect(self._restaurar_defaults)
+        layout.addWidget(self.boton_restaurar)
+
+        self.estado_label = QLabel("", self)
+        self.estado_label.setWordWrap(True)
+        self.estado_label.setStyleSheet("color: #555;")
+        layout.addWidget(self.estado_label)
+
         botones = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel, parent=self)
         botones.accepted.connect(self.accept)
         botones.rejected.connect(self.reject)
         layout.addWidget(botones)
 
         self.resize(560, 540)
+        self._conectar_eventos()
 
     def _crear_tab_general(self) -> None:
         pagina = QWidget(self)
         formulario = QFormLayout(pagina)
+
+        descripcion = self._crear_label_descriptivo(
+            "Seleccioná el modo de trabajo y la carpeta base donde se guardan los "
+            "resultados del monitoreo. También podés decidir si la comparación se "
+            "ejecuta automáticamente tras cada verificación."
+        )
+        formulario.addRow(descripcion)
 
         self.modo_combo = QComboBox(pagina)
         for modo in MODOS_VALIDOS:
@@ -268,8 +286,34 @@ class ConfiguracionDialog(QDialog):
         pagina = QWidget(self)
         formulario = QFormLayout(pagina)
 
-        self.dias_laborales_edit = QLineEdit(pagina)
-        formulario.addRow("Días laborales", self.dias_laborales_edit)
+        descripcion = self._crear_label_descriptivo(
+            "Elegí en qué días aplica el horario laboral y definí los intervalos "
+            "tanto dentro como fuera de ese rango. Los días no seleccionados "
+            "utilizarán automáticamente el intervalo fuera de horario."
+        )
+        formulario.addRow(descripcion)
+
+        dias_widget = QWidget(pagina)
+        dias_layout = QGridLayout(dias_widget)
+        dias_layout.setContentsMargins(0, 0, 0, 0)
+        dias_layout.setHorizontalSpacing(12)
+        dias_layout.setVerticalSpacing(4)
+        self.dias_laborales_checks: list[tuple[str, str, QCheckBox]] = []
+        dias_formateados = [
+            ("lunes", "Lunes"),
+            ("martes", "Martes"),
+            ("miércoles", "Miércoles"),
+            ("jueves", "Jueves"),
+            ("viernes", "Viernes"),
+            ("sábado", "Sábado"),
+            ("domingo", "Domingo"),
+        ]
+        for indice, (valor, etiqueta) in enumerate(dias_formateados):
+            casilla = QCheckBox(etiqueta, pagina)
+            fila, columna = divmod(indice, 4)
+            dias_layout.addWidget(casilla, fila, columna)
+            self.dias_laborales_checks.append((valor, _normalizar_dia_semana(valor), casilla))
+        formulario.addRow("Días laborales", dias_widget)
 
         self.hora_inicio_edit = QTimeEdit(pagina)
         self.hora_inicio_edit.setDisplayFormat("HH:mm")
@@ -312,6 +356,12 @@ class ConfiguracionDialog(QDialog):
         pagina = QWidget(self)
         formulario = QFormLayout(pagina)
 
+        descripcion = self._crear_label_descriptivo(
+            "Determiná cómo se calcula la fecha de corte para expedientes. La vista "
+            "previa muestra el resultado estimado según los valores actuales."
+        )
+        formulario.addRow(descripcion)
+
         self.filtro_modo_combo = QComboBox(pagina)
         opciones = [
             ("Sin corte explícito", "sin_corte"),
@@ -332,11 +382,22 @@ class ConfiguracionDialog(QDialog):
         self.filtro_orden_edit = QLineEdit(pagina)
         formulario.addRow("Orden de extracción", self.filtro_orden_edit)
 
+        self.filtro_preview_label = QLabel("", pagina)
+        self.filtro_preview_label.setWordWrap(True)
+        self.filtro_preview_label.setStyleSheet("color: #555;")
+        formulario.addRow("Vista previa", self.filtro_preview_label)
+
         self.tabs.addTab(pagina, "Filtro")
 
     def _crear_tab_reintentos(self) -> None:
         pagina = QWidget(self)
         formulario = QFormLayout(pagina)
+
+        descripcion = self._crear_label_descriptivo(
+            "Definí cuántos reintentos realiza el monitor y cuánto espera entre "
+            "cada intento para expedientes y entradas."
+        )
+        formulario.addRow(descripcion)
 
         self.reintentos_expedientes_spin = QSpinBox(pagina)
         self.reintentos_expedientes_spin.setRange(0, 20)
@@ -369,6 +430,12 @@ class ConfiguracionDialog(QDialog):
         pagina = QWidget(self)
         formulario = QFormLayout(pagina)
 
+        descripcion = self._crear_label_descriptivo(
+            "Elegí dónde se guardarán los respaldos históricos y qué archivos se "
+            "copiarán en cada ejecución."
+        )
+        formulario.addRow(descripcion)
+
         self.respaldo_destino_edit = QLineEdit(pagina)
         self.respaldo_destino_boton = QPushButton("Seleccionar…", pagina)
         self.respaldo_destino_boton.clicked.connect(self._seleccionar_respaldo)
@@ -390,6 +457,11 @@ class ConfiguracionDialog(QDialog):
     def _crear_tab_notificaciones(self) -> None:
         pagina = QWidget(self)
         layout = QVBoxLayout(pagina)
+
+        descripcion = self._crear_label_descriptivo(
+            "Activá o desactivá los avisos en la bandeja según tus necesidades."
+        )
+        layout.addWidget(descripcion)
 
         self.notif_respaldo_check = QCheckBox(
             "Mostrar notificaciones al completar un respaldo",
@@ -421,6 +493,24 @@ class ConfiguracionDialog(QDialog):
         layout.addWidget(boton)
         return contenedor
 
+    def _crear_label_descriptivo(self, texto: str) -> QLabel:
+        etiqueta = QLabel(texto, self)
+        etiqueta.setWordWrap(True)
+        etiqueta.setStyleSheet("color: #555;")
+        return etiqueta
+
+    def _conectar_eventos(self) -> None:
+        self.filtro_modo_combo.currentIndexChanged.connect(self._actualizar_preview_fecha)
+        self.filtro_dias_spin.valueChanged.connect(self._actualizar_preview_fecha)
+        self.filtro_orden_edit.textChanged.connect(self._actualizar_preview_fecha)
+        self.comparacion_modo_combo.currentIndexChanged.connect(self._actualizar_preview_fecha)
+        self.monitoreo_edit.editingFinished.connect(
+            lambda: self._validar_ruta(self.monitoreo_edit, "carpeta de monitoreo")
+        )
+        self.respaldo_destino_edit.editingFinished.connect(
+            lambda: self._validar_ruta(self.respaldo_destino_edit, "destino de respaldos")
+        )
+
     def _cargar_datos(self) -> None:
         config = deepcopy(self._config)
 
@@ -449,10 +539,13 @@ class ConfiguracionDialog(QDialog):
         if not isinstance(horario, dict):
             horario = {}
         dias = horario.get("dias", DEFAULT_CONFIG["horario_laboral"]["dias"])
-        if isinstance(dias, (list, tuple)):
-            self.dias_laborales_edit.setText(
-                ", ".join(str(dia) for dia in dias if dia)
-            )
+        seleccionados = {
+            _normalizar_dia_semana(dia)
+            for dia in dias
+            if isinstance(dia, str) and dia
+        }
+        for _, normalizado, casilla in self.dias_laborales_checks:
+            casilla.setChecked(normalizado in seleccionados)
         inicio = horario.get(
             "hora_inicio", DEFAULT_CONFIG["horario_laboral"]["hora_inicio"]
         )
@@ -506,6 +599,8 @@ class ConfiguracionDialog(QDialog):
             )
             if isinstance(orden, str):
                 self.filtro_orden_edit.setText(orden)
+
+        self._actualizar_preview_fecha()
 
         reintentos = config.get("reintentos", {})
         exp_conf = reintentos.get("expedientes", {})
@@ -600,7 +695,7 @@ class ConfiguracionDialog(QDialog):
 
     def accept(self) -> None:  # type: ignore[override]
         try:
-            config = self._recopilar_configuracion()
+            config = self._recopilar_configuracion(validar=True)
         except ValueError as error:
             QMessageBox.warning(self, "Configuración inválida", str(error))
             return
@@ -615,7 +710,7 @@ class ConfiguracionDialog(QDialog):
             destino[clave] = existente
         return existente
 
-    def _recopilar_configuracion(self) -> dict:
+    def _recopilar_configuracion(self, validar: bool = False) -> dict:
         config = deepcopy(self._config) if isinstance(self._config, dict) else {}
         if not isinstance(config, dict):  # defensa ante valores no mapeables
             config = {}
@@ -638,11 +733,10 @@ class ConfiguracionDialog(QDialog):
         horario = self._asegurar_dict(
             config, "horario_laboral", DEFAULT_CONFIG["horario_laboral"]
         )
-        dias_texto = self.dias_laborales_edit.text()
         dias = [
-            dia.strip().lower()
-            for dia in dias_texto.split(",")
-            if dia.strip()
+            valor
+            for valor, _, casilla in self.dias_laborales_checks
+            if casilla.isChecked()
         ]
         horario["dias"] = dias or DEFAULT_CONFIG["horario_laboral"]["dias"]
         horario["hora_inicio"] = self.hora_inicio_edit.time().toString("HH:mm")
@@ -707,10 +801,115 @@ class ConfiguracionDialog(QDialog):
             "comparacion_faltantes"
         ] = self.notif_comparacion_faltantes_check.isChecked()
 
+        if validar:
+            self._validar_configuracion(config)
+
         return config
 
     def obtener_configuracion(self) -> dict | None:
         return deepcopy(self._resultado) if isinstance(self._resultado, dict) else None
+
+    def _validar_configuracion(self, config: dict) -> None:
+        rutas = config.get("rutas", {})
+        respaldo = config.get("respaldo", {})
+
+        if isinstance(rutas, dict):
+            ruta_monitoreo = Path(rutas.get("monitoreo", ""))
+            if not ruta_monitoreo:
+                raise ValueError("Definí una carpeta de monitoreo válida.")
+            ruta_monitoreo.mkdir(parents=True, exist_ok=True)
+
+        if isinstance(respaldo, dict):
+            destino = Path(respaldo.get("destino", ""))
+            if not destino:
+                raise ValueError("Definí un destino de respaldos válido.")
+            destino.mkdir(parents=True, exist_ok=True)
+
+        horario = config.get("horario_laboral", {})
+        if isinstance(horario, dict):
+            dias = horario.get("dias")
+            if not dias:
+                raise ValueError("Seleccioná al menos un día laboral.")
+
+    def _validar_ruta(self, edit: QLineEdit, descripcion: str) -> None:
+        texto = edit.text().strip()
+        if not texto:
+            self._mostrar_estado(
+                f"Se usará la ruta predeterminada para la {descripcion}.", "info"
+            )
+            return
+
+        ruta = Path(texto)
+        try:
+            ruta.mkdir(parents=True, exist_ok=True)
+        except Exception as error:  # pragma: no cover - validación visual
+            self._mostrar_estado(
+                f"No se pudo preparar la {descripcion}: {error}.", "error"
+            )
+        else:
+            self._mostrar_estado(
+                f"La {descripcion} está configurada en {ruta.resolve()}", "ok"
+            )
+
+    def _actualizar_preview_fecha(self) -> None:
+        modo_comparacion = self.comparacion_modo_combo.currentData()
+        modo_filtro = self.filtro_modo_combo.currentData()
+        if modo_comparacion == MODO_COMPARACION_TOTAL:
+            self.filtro_preview_label.setText(
+                "La comparación total omite el corte temporal; la extracción "
+                "recorrerá la base completa."
+            )
+            return
+
+        if modo_filtro in ("sin_corte", "", None):
+            self.filtro_preview_label.setText(
+                "No se aplicará un corte temporal; se recorrerán todas las páginas disponibles."
+            )
+            return
+
+        try:
+            configuracion = self._recopilar_configuracion(validar=False)
+        except ValueError:
+            self.filtro_preview_label.setText(
+                "La configuración actual no es válida para calcular la vista previa."
+            )
+            return
+
+        try:
+            fecha_iso = obtener_fecha_corte(configuracion)
+        except Exception as error:  # pragma: no cover - entornos sin helper
+            self.filtro_preview_label.setText(
+                f"No fue posible calcular la fecha de corte: {error}."
+            )
+            return
+
+        if not fecha_iso:
+            self.filtro_preview_label.setText(
+                "No se obtuvo una fecha de corte con la configuración actual."
+            )
+            return
+
+        try:
+            fecha = datetime.fromisoformat(str(fecha_iso))
+        except ValueError:
+            self.filtro_preview_label.setText(f"Fecha obtenida: {fecha_iso}.")
+            return
+
+        self.filtro_preview_label.setText(
+            "La extracción se detendrá al alcanzar el {:%d/%m/%Y}.".format(fecha)
+        )
+
+    def _restaurar_defaults(self) -> None:
+        self._config = deepcopy(DEFAULT_CONFIG)
+        self._cargar_datos()
+        self._mostrar_estado(
+            "Se restauraron los valores predeterminados del monitor.", "info"
+        )
+
+    def _mostrar_estado(self, mensaje: str, tipo: str = "info") -> None:
+        colores = {"info": "#555", "ok": "#2e7d32", "error": "#b71c1c"}
+        self.estado_label.setStyleSheet(f"color: {colores.get(tipo, '#555')};")
+        self.estado_label.setText(mensaje)
 class VerificadorExpedientesV4(QThread):
     """Hilo encargado de recuperar el listado completo de expedientes."""
 
