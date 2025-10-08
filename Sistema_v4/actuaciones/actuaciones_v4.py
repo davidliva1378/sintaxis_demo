@@ -307,7 +307,7 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
         # Esperamos que aparezca la tabla o el mensaje de "no posee actuaciones"
         try:
             await page_expediente.wait_for_selector(
-                "#expediente\:action-historic-table tbody tr, div.alert.white-panel",
+                r"#expediente\:action-historic-table tbody tr, div.alert.white-panel",
                 timeout=8000,
             )
         except Exception:
@@ -330,7 +330,7 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
             print(f"Página {pagina} (históricas): extrayendo...")
 
             filas = await page_expediente.query_selector_all(
-                "#expediente\:action-historic-table tbody tr"
+                r"#expediente\:action-historic-table tbody tr"
             )
             if not filas:
                 print("No se encontraron filas en actuaciones históricas.")
@@ -354,7 +354,7 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
             if boton_siguiente:
                 try:
                     fila_primera = await page_expediente.query_selector(
-                        "#expediente\:action-historic-table tbody tr td:nth-child(3)"
+                        r"#expediente\:action-historic-table tbody tr td:nth-child(3)"
                     )
                     fecha_antes = await fila_primera.inner_text() if fila_primera else ""
 
@@ -362,10 +362,10 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
                     pagina += 1
 
                     await page_expediente.wait_for_selector(
-                        "#expediente\:action-historic-table tbody tr", timeout=8000
+                        r"#expediente\:action-historic-table tbody tr", timeout=8000
                     )
                     await page_expediente.wait_for_function(
-                        """
+                        r"""
                         ({ fechaAntes }) => {
                             const celda = document.querySelector('#expediente\:action-historic-table tbody tr td:nth-child(3)');
                             return celda && celda.innerText.trim() !== fechaAntes;
