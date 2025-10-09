@@ -287,13 +287,13 @@ async def _esperar_cambio_pagina(
 
     await page.wait_for_function(
         r"""
-        ({ selector, htmlPrevio }) => {
-            const tabla = document.querySelector(selector);
+        ({ tablaId, htmlPrevio }) => {
+            const tabla = document.getElementById(tablaId);
             return tabla && tabla.innerHTML !== htmlPrevio;
         }
         """,
         arg={
-            "selector": _escape_selector_for_js(f"#{tabla_id}"),
+            "tablaId": tabla_id,
             "htmlPrevio": html_anterior,
         },
         timeout=8000,
