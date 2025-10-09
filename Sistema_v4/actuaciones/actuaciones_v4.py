@@ -592,6 +592,155 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
     return todas, None, carpeta_actuaciones
 
 
+async def actualizar_actuaciones_desde_json(
+    page_expediente: Page,
+    expediente_datos: dict,
+    ruta_json_existente: str,
+) -> tuple[int, dict | None, str | None]:
+    """Actualiza un JSON existente incorporando solo las actuaciones nuevas.
+
+    Retorna una tupla con la cantidad de actuaciones agregadas, la estructura
+    actualizada (o ``None`` si hubo error) y un mensaje de error en caso de fallos.
+    """
+
+    if not ruta_json_existente or not os.path.exists(ruta_json_existente):
+        return 0, None, "El archivo de actuaciones especificado no existe."
+
+    try:
+        with open(ruta_json_existente, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:  # noqa: BLE001
+        return 0, None, f"No se pudo leer el JSON existente: {type(e).__name__}: {str(e)}"
+
+    actuaciones_existentes = data.get("Actuaciones")
+    if not isinstance(actuaciones_existentes, list):
+        actuaciones_existentes = []
+
+    encabezado_existente = data.get("Expediente")
+    if not isinstance(encabezado_existente, dict):
+        encabezado_existente = {}
+
+    hashes_existentes = {
+        act.get("Hash")
+        for act in actuaciones_existentes
+        if isinstance(act, dict) and act.get("Hash")
+    }
+
+    nuevas_actuaciones = []
+    pagina = 1
+    indice_actual = 1
+    tabla_id = "expediente:action-table"
+    tabla_selector_css = _escape_selector_for_css(f"#{tabla_id}")
+
+    while True:
+        nuevas, error = await extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_actual)
+        if error:
+            return 0, None, f"Error al obtener la página {pagina}: {error}"
+
+        if not nuevas:
+            break
+
+        detener = False
+        for actuacion in nuevas:
+            hash_act = actuacion.get("Hash")
+            if hash_act and hash_act in hashes_existentes:
+                detener = True
+                break
+            nuevas_actuaciones.append(actuacion)
+
+        if detener:
+            break
+
+        indice_actual += len(nuevas)
+
+        boton_siguiente = await page_expediente.query_selector(
+            "a:has(span[title='Siguiente']):not(.ui-state-disabled)"
+        )
+        if not boton_siguiente:
+            break
+
+        try:
+            html_anterior = await page_expediente.inner_html(tabla_selector_css)
+            paginador_selector_js, pagina_activa = await _obtener_paginador_activo(
+                page_expediente, tabla_id
+            )
+            await boton_siguiente.click()
+            await page_expediente.wait_for_load_state("domcontentloaded")
+            await _esperar_cambio_pagina(
+                page_expediente,
+                tabla_id,
+                html_anterior,
+                paginador_selector_js,
+                pagina_activa,
+            )
+            pagina += 1
+        except TimeoutError:
+            return 0, None, f"⏳ Timeout al intentar avanzar a la página {pagina + 1}"
+        except Exception as e:  # noqa: BLE001
+            return 0, None, (
+                "⚠️ Error inesperado al avanzar a la página "
+                f"{pagina + 1}: {type(e).__name__}: {str(e)}"
+            )
+
+    if not nuevas_actuaciones:
+        print("ℹ️ No se detectaron actuaciones nuevas.")
+        return 0, data, None
+
+    print(f"✨ Se encontraron {len(nuevas_actuaciones)} actuaciones nuevas.")
+
+    actuaciones_actuales_existentes = [
+        act
+        for act in actuaciones_existentes
+        if isinstance(act, dict) and not act.get("EsHistorica", False)
+    ]
+    actuaciones_historicas_existentes = [
+        act
+        for act in actuaciones_existentes
+        if isinstance(act, dict) and act.get("EsHistorica", False)
+    ]
+
+    actuaciones_actualizadas = list(nuevas_actuaciones) + actuaciones_actuales_existentes
+
+    for idx, actuacion in enumerate(actuaciones_actualizadas, start=1):
+        actuacion["Indice"] = idx
+        actuacion["EsHistorica"] = False
+
+    indice_historico = len(actuaciones_actualizadas) + 1
+    for actuacion in actuaciones_historicas_existentes:
+        if not isinstance(actuacion, dict):
+            continue
+        actuacion["Indice"] = indice_historico
+        actuacion["EsHistorica"] = True
+        indice_historico += 1
+
+    todas_actuaciones = actuaciones_actualizadas + actuaciones_historicas_existentes
+
+    expediente_para_encabezado = dict(encabezado_existente)
+    expediente_para_encabezado.update(expediente_datos or {})
+
+    timestamp_generacion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    encabezado_actualizado = construir_encabezado_actuaciones(
+        expediente_para_encabezado,
+        actuaciones_actuales=actuaciones_actualizadas,
+        actuaciones_historicas=actuaciones_historicas_existentes,
+        incluye_historicas=bool(actuaciones_historicas_existentes),
+        timestamp_generacion=timestamp_generacion,
+    )
+
+    nuevo_payload = dict(data)
+    nuevo_payload["Expediente"] = encabezado_actualizado
+    nuevo_payload["Actuaciones"] = todas_actuaciones
+    actualizar_metricas_descargas_en_json(nuevo_payload)
+
+    try:
+        with open(ruta_json_existente, "w", encoding="utf-8") as f:
+            json.dump(nuevo_payload, f, indent=2, ensure_ascii=False)
+    except Exception as e:  # noqa: BLE001
+        return 0, None, f"No se pudo actualizar el JSON: {type(e).__name__}: {str(e)}"
+
+    return len(nuevas_actuaciones), nuevo_payload, None
+
+
 async def extraer_actuaciones_completas(
     page_expediente,
     expediente_datos: dict,

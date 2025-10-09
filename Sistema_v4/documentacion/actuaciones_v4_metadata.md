@@ -24,6 +24,12 @@ Cada archivo generado incluye un encabezado enriquecido bajo la clave `Expedient
 
 Los campos existentes `Cantidad de Actuaciones Obtenidas` y `Cantidad de Archivos Descargados` se preservan para mantener compatibilidad hacia atrás, pero ahora el segundo contabiliza únicamente los adjuntos que ya poseen `Descargado = true`.
 
+## Actualización incremental de actuaciones
+- Se incorporó la corrutina `actualizar_actuaciones_desde_json`, pensada para reutilizar el JSON existente y consultar solo las páginas necesarias hasta encontrar una actuación previamente registrada.
+  - Usa los hashes (`Hash`) presentes en el archivo para cortar la paginación y evita recorrer todas las hojas cuando no hay novedades.
+  - Inserta las actuaciones nuevas al inicio, reindexa tanto las actuales como las históricas y recalcula los metadatos del encabezado (`fecha_extraccion`, totales, descargas pendientes, etc.).
+  - Devuelve la cantidad de actuaciones agregadas junto con la estructura actualizada para facilitar su consumo por otras rutinas.
+
 ## Consideraciones operativas
 - Los valores de fechas provenientes del expediente se normalizan a `YYYY-MM-DD` antes de incorporarse al encabezado.
 - Los totales se recalculan automáticamente cada vez que se regeneran las actuaciones (actuales o completas), evitando dependencias de datos intermedios.
