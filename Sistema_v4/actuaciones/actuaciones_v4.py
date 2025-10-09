@@ -14,6 +14,18 @@ from .actuaciones_utils import generar_hash_archivo, limpiar_texto, normalizar_f
 FORMATO_JSON_VERSION = "1.1"
 
 
+def normalizar_numero_expediente(valor, *, valor_por_defecto: str = "expediente") -> str:
+    """Normaliza un número de expediente para usarlo en nombres de carpetas/archivos."""
+    if valor is None:
+        numero = valor_por_defecto
+    else:
+        numero = str(valor).strip()
+        if not numero:
+            numero = valor_por_defecto
+
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", numero)
+
+
 def construir_encabezado_actuaciones(
     expediente_datos: dict,
     actuaciones_actuales: list,
@@ -388,8 +400,9 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
                 print("El expediente no posee actuaciones históricas.")
                 return [], None
 
-        expediente_numero = expediente_datos.get("numero", "desconocido")
-        expediente_numero = re.sub(r"[^a-zA-Z0-9_-]", "_", expediente_numero)
+        expediente_numero = normalizar_numero_expediente(
+            expediente_datos.get("numero"), valor_por_defecto="desconocido"
+        )
         timestamp_extraccion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         pagina = 1
@@ -459,8 +472,9 @@ async def extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_i
         if not filas:
             return [], None
 
-        expediente_numero = expediente_datos.get("numero", "desconocido")
-        expediente_numero = re.sub(r"[^a-zA-Z0-9_-]", "_", expediente_numero)
+        expediente_numero = normalizar_numero_expediente(
+            expediente_datos.get("numero"), valor_por_defecto="desconocido"
+        )
 
         timestamp_extraccion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -508,7 +522,6 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
             )
             await boton_siguiente.click()
             await page_expediente.wait_for_load_state("domcontentloaded")
-            await asyncio.sleep(2)
             await _esperar_cambio_pagina(
                 page_expediente,
                 tabla_id,
@@ -522,7 +535,7 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
         except Exception as e:
             return todas, f"⚠️ Error inesperado al avanzar a la página {pagina + 1}: {type(e).__name__}: {str(e)}", None
 
-    expediente_numero = (expediente_datos.get("numero") or "expediente").replace("/", "_")
+    expediente_numero = normalizar_numero_expediente(expediente_datos.get("numero"))
     timestamp_generacion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     encabezado = construir_encabezado_actuaciones(
         expediente_datos,
@@ -558,8 +571,7 @@ async def extraer_actuaciones_completas(
     actuaciones_historicas = []
 
     try:
-        numero_original = expediente_datos['numero']
-        numero_normalizado = numero_original.replace('/', '_')
+        numero_normalizado = normalizar_numero_expediente(expediente_datos.get("numero"))
         carpeta_expte = os.path.join(directorio_base, numero_normalizado)
 
         # Actuaciones actuales
@@ -734,6 +746,12 @@ async def descargar_archivos_de_json(page, carpeta_destino: str):
     y descarga los archivos vinculados usando Playwright.
     Marca las actuaciones descargadas como "Descargado": true.
     """
+    if not carpeta_destino:
+        print("⚠️ Carpeta destino no proporcionada para las descargas.")
+        return
+
+    os.makedirs(carpeta_destino, exist_ok=True)
+
     archivos_json = [f for f in os.listdir(carpeta_destino) if f.startswith("actuaciones-") and f.endswith(".json")]
     if archivos_json:
         ruta_json = os.path.join(carpeta_destino, archivos_json[0])
