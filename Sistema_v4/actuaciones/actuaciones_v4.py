@@ -388,8 +388,12 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
                 print("El expediente no posee actuaciones históricas.")
                 return [], None
 
-        expediente_numero = expediente_datos.get("numero", "desconocido")
-        expediente_numero = re.sub(r"[^a-zA-Z0-9_-]", "_", expediente_numero)
+        expediente_numero = expediente_datos.get("numero")
+        if not expediente_numero:
+            expediente_numero = "desconocido"
+        expediente_numero = re.sub(
+            r"[^a-zA-Z0-9_-]", "_", str(expediente_numero)
+        )
         timestamp_extraccion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         pagina = 1
@@ -508,7 +512,6 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
             )
             await boton_siguiente.click()
             await page_expediente.wait_for_load_state("domcontentloaded")
-            await asyncio.sleep(2)
             await _esperar_cambio_pagina(
                 page_expediente,
                 tabla_id,
@@ -522,7 +525,10 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
         except Exception as e:
             return todas, f"⚠️ Error inesperado al avanzar a la página {pagina + 1}: {type(e).__name__}: {str(e)}", None
 
-    expediente_numero = (expediente_datos.get("numero") or "expediente").replace("/", "_")
+    expediente_numero = expediente_datos.get("numero")
+    if not expediente_numero:
+        expediente_numero = "expediente"
+    expediente_numero = re.sub(r"[^a-zA-Z0-9_-]", "_", str(expediente_numero))
     timestamp_generacion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     encabezado = construir_encabezado_actuaciones(
         expediente_datos,
@@ -558,8 +564,10 @@ async def extraer_actuaciones_completas(
     actuaciones_historicas = []
 
     try:
-        numero_original = expediente_datos['numero']
-        numero_normalizado = numero_original.replace('/', '_')
+        numero_original = expediente_datos.get("numero")
+        if not numero_original:
+            numero_original = "expediente"
+        numero_normalizado = re.sub(r"[^a-zA-Z0-9_-]", "_", str(numero_original))
         carpeta_expte = os.path.join(directorio_base, numero_normalizado)
 
         # Actuaciones actuales
