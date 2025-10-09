@@ -156,12 +156,19 @@ async def main() -> None:
         f"📆 Año del expediente para buscar [{anio_sugerido or ''}]: "
     ).strip() or (anio_sugerido or "")
 
-    caratula_busqueda = (
-        input(
-            f"📝 Carátula exacta (opcional) [{caratula_original or ''}]: "
-        ).strip()
-        or (caratula_original or None)
-    )
+    caratula_prompt = "📝 Carátula exacta (opcional, dejar vacío para no filtrar)"
+    if caratula_original:
+        caratula_prompt += f" [{caratula_original}]"
+    caratula_prompt += ": "
+
+    caratula_ingresada = input(caratula_prompt).strip()
+    if not caratula_ingresada:
+        caratula_busqueda = None
+    elif caratula_ingresada == "=" and caratula_original:
+        # Atajo para reutilizar la carátula registrada en el JSON sin escribirla completa.
+        caratula_busqueda = caratula_original
+    else:
+        caratula_busqueda = caratula_ingresada
 
     if not numero_busqueda or not anio_busqueda:
         print("❌ Debe proporcionar el número y el año del expediente para continuar.")
@@ -177,7 +184,28 @@ async def main() -> None:
 
         await page.goto(URL_CONSULTAS)
 
-        filas = await buscar_expedientes(page, numero_busqueda, anio_busqueda, caratula_busqueda)
+        intentos_busqueda = 3
+        filas = []
+        for intento in range(1, intentos_busqueda + 1):
+            filas = await buscar_expedientes(page, numero_busqueda, anio_busqueda, caratula_busqueda)
+            if filas:
+                break
+            if intento < intentos_busqueda:
+                print("⏳ Resultados aún no disponibles, reintentando en 2 segundos...")
+                await asyncio.sleep(2)
+
+        if not filas and caratula_busqueda:
+            print(
+                "⚠️ No se hallaron coincidencias exactas para la carátula indicada. "
+                "Reintentando sin filtro de carátula para mostrar todas las opciones."
+            )
+            for intento in range(1, intentos_busqueda + 1):
+                filas = await buscar_expedientes(page, numero_busqueda, anio_busqueda, None)
+                if filas:
+                    break
+                if intento < intentos_busqueda:
+                    print("⏳ Sin resultados todavía, nuevo intento en 2 segundos...")
+                    await asyncio.sleep(2)
         if not filas:
             print("❌ No se encontraron expedientes que coincidan con la búsqueda.")
             await navegador.close()
