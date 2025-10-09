@@ -14,6 +14,44 @@ from .actuaciones_utils import generar_hash_archivo, limpiar_texto, normalizar_f
 FORMATO_JSON_VERSION = "1.1"
 
 
+def _calcular_metricas_descargas(actuaciones: list[dict]) -> tuple[int, int, int]:
+    """Devuelve (total_con_archivo, total_descargados, pendientes)."""
+
+    total_con_archivo = 0
+    total_descargados = 0
+
+    for act in actuaciones:
+        if not act or not isinstance(act, dict):
+            continue
+
+        if act.get("TieneArchivo"):
+            total_con_archivo += 1
+            if act.get("Descargado"):
+                total_descargados += 1
+
+    pendientes = max(total_con_archivo - total_descargados, 0)
+    return total_con_archivo, total_descargados, pendientes
+
+
+def actualizar_metricas_descargas_en_json(payload: dict) -> None:
+    """Recalcula los contadores de descargas dentro de la estructura JSON."""
+
+    if not payload or not isinstance(payload, dict):
+        return
+
+    encabezado = payload.get("Expediente")
+    actuaciones = payload.get("Actuaciones")
+
+    if not isinstance(encabezado, dict) or not isinstance(actuaciones, list):
+        return
+
+    total_con_archivo, total_descargados, pendientes = _calcular_metricas_descargas(actuaciones)
+
+    encabezado["Cantidad de Archivos Descargados"] = total_descargados
+    encabezado["total_archivos_con_enlace"] = total_con_archivo
+    encabezado["descargas_pendientes"] = pendientes
+
+
 def normalizar_numero_expediente(valor, *, valor_por_defecto: str = "expediente") -> str:
     """Normaliza un número de expediente para usarlo en nombres de carpetas/archivos."""
     if valor is None:
@@ -50,10 +88,7 @@ def construir_encabezado_actuaciones(
     total_actuales = len(actuaciones_actuales)
     total_historicas = len(actuaciones_historicas)
     todas = list(actuaciones_actuales) + list(actuaciones_historicas)
-    total_con_archivo = sum(1 for act in todas if act.get("TieneArchivo"))
-    descargas_pendientes = sum(
-        1 for act in todas if act.get("TieneArchivo") and not act.get("Descargado")
-    )
+    total_con_archivo, total_descargados, descargas_pendientes = _calcular_metricas_descargas(todas)
 
     ultimo_hash_actual = actuaciones_actuales[0]["Hash"] if actuaciones_actuales else None
     ultima_fecha_actual = actuaciones_actuales[0]["Fecha"] if actuaciones_actuales else None
@@ -61,7 +96,7 @@ def construir_encabezado_actuaciones(
     campos_base.update(
         {
             "Cantidad de Actuaciones Obtenidas": total_actuales + total_historicas,
-            "Cantidad de Archivos Descargados": total_con_archivo,
+            "Cantidad de Archivos Descargados": total_descargados,
             "version_formato": FORMATO_JSON_VERSION,
             "fecha_extraccion": timestamp_generacion,
             "incluye_historicas": incluye_historicas,
@@ -778,6 +813,8 @@ async def descargar_archivos_de_json(page, carpeta_destino: str):
                 print("✅ Todos los archivos ya existen.")
 
         # Guardar archivo actualizado
+        actualizar_metricas_descargas_en_json(data)
+
         with open(ruta_json, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         print("📝 JSON actualizado con estado de descarga.")

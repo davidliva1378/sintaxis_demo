@@ -17,16 +17,17 @@ Cada archivo generado incluye un encabezado enriquecido bajo la clave `Expedient
 | `total_actuales` | Cantidad de actuaciones presentes en la pestaña actual al momento de la captura. |
 | `total_historicas` | Cantidad de actuaciones históricas incorporadas. |
 | `total_actuaciones` | Suma de actuaciones actuales e históricas disponibles en el archivo. |
-| `total_archivos_con_enlace` | Número de actuaciones con archivos adjuntos detectados. |
-| `descargas_pendientes` | Actuaciones con archivo cuyo atributo `Descargado` es falso o inexistente. Útil para reintentos de descarga. |
+| `total_archivos_con_enlace` | Número de actuaciones con archivos adjuntos detectados. Se actualiza tras cada descarga diferida. |
+| `descargas_pendientes` | Actuaciones con archivo cuyo atributo `Descargado` es falso o inexistente. Se recalcula automáticamente luego de ejecutar el downloader. |
 | `ultimo_hash_actual` | Hash de la actuación más reciente (primer elemento de la lista de actuales). Facilita cortes tempranos en procesos incrementales. |
 | `ultima_fecha_actual` | Fecha normalizada de la última actuación actual registrada. |
 
-Los campos existentes `Cantidad de Actuaciones Obtenidas` y `Cantidad de Archivos Descargados` se preservan para mantener compatibilidad hacia atrás.
+Los campos existentes `Cantidad de Actuaciones Obtenidas` y `Cantidad de Archivos Descargados` se preservan para mantener compatibilidad hacia atrás, pero ahora el segundo contabiliza únicamente los adjuntos que ya poseen `Descargado = true`.
 
 ## Consideraciones operativas
 - Los valores de fechas provenientes del expediente se normalizan a `YYYY-MM-DD` antes de incorporarse al encabezado.
 - Los totales se recalculan automáticamente cada vez que se regeneran las actuaciones (actuales o completas), evitando dependencias de datos intermedios.
+- Tras ejecutar `descargar_archivos_de_json`, el encabezado se actualiza en disco para reflejar la cantidad de archivos descargados y los pendientes restantes.
 - La estructura sigue guardándose en `Actuaciones/<numero>/actuaciones-<numero>.json` o en la carpeta del expediente dentro de `ActuacionesCompletas/` según el flujo utilizado.
 - La normalización del número de expediente para construir rutas se encapsuló en `normalizar_numero_expediente`, evitando diferencias entre scripts auxiliares y rutinas de extracción.
 - Durante la descarga diferida de adjuntos, la carpeta del expediente se crea automáticamente si no existiera, evitando errores de ruta ausente y permitiendo ejecutar el flujo sólo con conocer el número de expediente.
