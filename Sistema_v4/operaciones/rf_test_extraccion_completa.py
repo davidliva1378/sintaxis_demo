@@ -9,6 +9,7 @@ from panel_pjn.acciones_pjn.urls_pjn import URL_CONSULTAS, URL_LOGIN
 from Sistema_v4.actuaciones.actuaciones_v4 import (
     descargar_archivos_de_json,
     extraer_actuaciones_completas,
+    normalizar_numero_expediente,
 )
 from Sistema_v4.operaciones.expedientes.expedientes_v4 import (
     SeleccionEstrategia,
@@ -121,7 +122,7 @@ async def main() -> None:
         else:
             print(f"✅ Se extrajeron {len(actuales)} actuaciones actuales.")
             print(f"📜 Se extrajeron {len(historicas)} actuaciones históricas.")
-            numero_normalizado = datos_expediente["numero"].replace("/", "_")
+            numero_normalizado = normalizar_numero_expediente(datos_expediente.get("numero"))
             carpeta = os.path.join("ActuacionesCompletas", numero_normalizado)
             print(f"📁 JSONs guardados en: {carpeta}")
 
