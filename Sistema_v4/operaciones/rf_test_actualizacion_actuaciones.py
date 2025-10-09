@@ -12,7 +12,6 @@ from panel_pjn.acciones_pjn.urls_pjn import URL_CONSULTAS, URL_LOGIN
 from Sistema_v4.actuaciones.actuaciones_v4 import (
     actualizar_actuaciones_desde_json,
     descargar_archivos_de_json,
-    normalizar_numero_expediente,
 )
 from Sistema_v4.operaciones.expedientes.expedientes_v4 import (
     SeleccionEstrategia,
@@ -81,8 +80,29 @@ async def login_portal(page: Page) -> bool:
         return False
 
 
-def _cargar_json_existente(ruta: str) -> tuple[dict, dict]:
-    ruta_normalizada = Path(ruta).expanduser().resolve()
+def _resolver_ruta_json(ruta: str) -> Path:
+    """Devuelve una ruta existente admitiendo atajos relativos comunes."""
+
+    cruda = Path(ruta).expanduser()
+
+    candidatos: list[Path]
+    if cruda.is_absolute():
+        candidatos = [cruda]
+    else:
+        base_script = Path(__file__).resolve().parents[1]
+        repo_root = base_script.parent
+        candidatos = [Path.cwd() / cruda, base_script / cruda, repo_root / cruda]
+
+    for candidato in candidatos:
+        if candidato.exists():
+            return candidato.resolve()
+
+    # Si ninguno existe, devolver la ruta normalizada del primer candidato para el mensaje.
+    return (candidatos[0] if candidatos else cruda).resolve()
+
+
+def _cargar_json_existente(ruta: str) -> tuple[dict, dict, Path]:
+    ruta_normalizada = _resolver_ruta_json(ruta)
     if not ruta_normalizada.exists():
         raise FileNotFoundError(f"El archivo {ruta_normalizada} no existe.")
 
@@ -96,7 +116,7 @@ def _cargar_json_existente(ruta: str) -> tuple[dict, dict]:
     if not isinstance(encabezado, dict):
         encabezado = {}
 
-    return data, encabezado
+    return data, encabezado, ruta_normalizada
 
 
 def _sugerir_anio(numero_expediente: str | None) -> str | None:
@@ -114,7 +134,7 @@ async def main() -> None:
         return
 
     try:
-        _payload, encabezado = _cargar_json_existente(ruta_json)
+        _payload, encabezado, ruta_normalizada = _cargar_json_existente(ruta_json)
     except Exception as exc:  # noqa: BLE001
         print(f"❌ No se pudo leer el JSON proporcionado: {exc}")
         return
@@ -178,7 +198,7 @@ async def main() -> None:
         conteo, actualizado, error = await actualizar_actuaciones_desde_json(
             page,
             {**encabezado, **datos_expediente},
-            str(Path(ruta_json).expanduser().resolve()),
+            str(ruta_normalizada),
         )
 
         if error:
@@ -190,11 +210,8 @@ async def main() -> None:
             else:
                 encabezado_resultado = encabezado
 
-            numero_normalizado = normalizar_numero_expediente(
-                encabezado_resultado.get("numero")
-            )
-            carpeta = os.path.join("ActuacionesCompletas", numero_normalizado)
-            print(f"📁 JSON actualizado en: {ruta_json}")
+            carpeta = str(ruta_normalizada.parent)
+            print(f"📁 JSON actualizado en: {ruta_normalizada}")
             if isinstance(actualizado, dict):
                 exp_meta = actualizado.get("Expediente", {})
                 total_actuaciones = exp_meta.get("total_actuaciones", "?")
