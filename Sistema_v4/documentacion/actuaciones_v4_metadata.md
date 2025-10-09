@@ -4,7 +4,7 @@
 - Se creó la rutina asíncrona `construir_actuacion_desde_fila` que concentra la extracción y normalización de datos de cada fila de la tabla de actuaciones.
   - Reduce la duplicidad de lógica entre `extraer_actuaciones_pagina` y `extraer_actuaciones_historicas`.
   - Garantiza el mismo tratamiento de hashes, banderas de archivo y marca temporal en ambos contextos.
-- Las esperas al avanzar de página ahora comparan el HTML previo mediante parámetros (`wait_for_function`) evitando interpolaciones de cadenas que podían romperse con comillas en el markup.
+- Las esperas al avanzar de página ahora comparan el HTML previo mediante parámetros (`wait_for_function`) evitando interpolaciones de cadenas que podían romperse con comillas en el markup y, si el paginador no refleja el cambio, recurren a `document.getElementById` para verificar el refresco de la tabla.
 
 ## Metadatos ampliados en el JSON de actuaciones
 Cada archivo generado incluye un encabezado enriquecido bajo la clave `Expediente` con los siguientes campos adicionales:
@@ -28,6 +28,7 @@ Los campos existentes `Cantidad de Actuaciones Obtenidas` y `Cantidad de Archivo
 - Los valores de fechas provenientes del expediente se normalizan a `YYYY-MM-DD` antes de incorporarse al encabezado.
 - Los totales se recalculan automáticamente cada vez que se regeneran las actuaciones (actuales o completas), evitando dependencias de datos intermedios.
 - La estructura sigue guardándose en `Actuaciones/<numero>/actuaciones-<numero>.json` o en la carpeta del expediente dentro de `ActuacionesCompletas/` según el flujo utilizado.
+- Durante la descarga diferida de adjuntos, la carpeta del expediente se crea automáticamente si no existiera, evitando errores de ruta ausente y permitiendo ejecutar el flujo sólo con conocer el número de expediente.
 
 ## Próximos pasos sugeridos
 - Aprovechar `ultimo_hash_actual` y `descargas_pendientes` para implementar la actualización incremental sin releer páginas ya procesadas.
