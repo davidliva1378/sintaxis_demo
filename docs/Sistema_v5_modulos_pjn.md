@@ -64,5 +64,9 @@ Esta subdivisión mantiene módulos pequeños, testeables y cohesivos, facilita 
    auxiliares (`obtener_actuaciones_todas_paginas_modelos_async`,
    `extraer_expedientes_completos_modelos`, `extraer_entradas_pjn_modelos`).
 5. Añadir pruebas unitarias por módulo (parsers y services) y pruebas de integración con el portal (con *fixtures* controladas).
+   ✅ En progreso: se incorporaron pruebas unitarias para las utilidades de
+   scraping (normalización, métricas de descargas y filtros de entradas).
+   Resta preparar *fixtures* controladas para validar la interacción con el
+   portal real y los futuros servicios de orquestación.
 
 Esta organización minimiza dependencias circulares, centraliza la interacción con el PJN y prepara el proyecto para una futura migración a servicios externos o APIs oficiales si estuvieran disponibles.
