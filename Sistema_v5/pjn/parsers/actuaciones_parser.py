@@ -74,6 +74,9 @@ EXTENSIONES_CONOCIDAS = {
 }
 
 
+EXTENSIONES_GENERICAS = {".seam", ".jsp", ".do", ".php", ".aspx", ".ashx"}
+
+
 def obtener_extension_valida(valor: str | None) -> str | None:
     if not valor:
         return None

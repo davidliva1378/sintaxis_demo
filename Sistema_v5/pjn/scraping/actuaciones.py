@@ -11,6 +11,7 @@ from playwright.async_api import ElementHandle, Page, TimeoutError
 
 from ..models import Actuacion, ActuacionesArchivo
 from ..parsers.actuaciones_parser import (
+    EXTENSIONES_GENERICAS,
     construir_actuaciones_archivo,
     construir_encabezado_actuaciones as parser_construir_encabezado_actuaciones,
     construir_nombre_archivo_normalizado,

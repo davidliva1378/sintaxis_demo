@@ -7,6 +7,7 @@ from .actuaciones_parser import (
     normalizar_nombre_expediente,
     obtener_extension_valida,
     parse_actuacion_row,
+    EXTENSIONES_GENERICAS,
 )
 from .expedientes_parser import parse_expediente_resumen
 from .entradas_parser import parse_entrada
@@ -18,6 +19,7 @@ __all__ = [
     "normalizar_nombre_expediente",
     "obtener_extension_valida",
     "parse_actuacion_row",
+    "EXTENSIONES_GENERICAS",
     "parse_expediente_resumen",
     "parse_entrada",
 ]
