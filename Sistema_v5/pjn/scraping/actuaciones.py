@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlparse
 from playwright.async_api import Page, TimeoutError
 
 from .actuaciones_utils import generar_hash_archivo, limpiar_texto, normalizar_fecha
+from .base import normalizar_numero_expediente
 
 
 FORMATO_JSON_VERSION = "1.1"
@@ -50,18 +51,6 @@ def actualizar_metricas_descargas_en_json(payload: dict) -> None:
     encabezado["Cantidad de Archivos Descargados"] = total_descargados
     encabezado["total_archivos_con_enlace"] = total_con_archivo
     encabezado["descargas_pendientes"] = pendientes
-
-
-def normalizar_numero_expediente(valor, *, valor_por_defecto: str = "expediente") -> str:
-    """Normaliza un número de expediente para usarlo en nombres de carpetas/archivos."""
-    if valor is None:
-        numero = valor_por_defecto
-    else:
-        numero = str(valor).strip()
-        if not numero:
-            numero = valor_por_defecto
-
-    return re.sub(r"[^a-zA-Z0-9_-]", "_", numero)
 
 
 def construir_encabezado_actuaciones(

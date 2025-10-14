@@ -9,10 +9,11 @@ import os
 import re
 import csv
 import json
-import unicodedata
 from datetime import datetime, date
 from typing import Optional, Iterable, Tuple, Dict, Any
 from playwright.async_api import Page
+
+from .base import limpiar_texto, normalizar_texto
 
 # ===== Selectores del PJN (ajusta si cambian) =====
 SELEC_TABLA = "div.MuiTableContainer-root tr"
@@ -26,13 +27,6 @@ RE_LOADING = re.compile(r"Cargando m[aá]s eventos", re.I)
 # Evento por aria-label del Avatar
 RE_EVENTO_NOTIF = re.compile(r"evento\s+notificaci[oó]n", re.I)
 RE_EVENTO_DESP  = re.compile(r"evento\s+despacho", re.I)
-
-# ===== Utilidades =====
-def limpiar_texto(texto: str) -> str:
-    return texto.replace("\n\n", " ").replace("\n", " ").strip()
-
-def normalizar_texto(t: str) -> str:
-    return unicodedata.normalize("NFKD", t.strip().lower()).encode("ascii", "ignore").decode("utf-8")
 
 def _to_iso(fecha_str: str) -> Optional[str]:
     """Acepta 'YYYY-MM-DD' o 'DD/MM/YYYY' y devuelve 'YYYY-MM-DD'."""

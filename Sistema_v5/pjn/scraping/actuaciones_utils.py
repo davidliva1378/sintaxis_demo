@@ -1,19 +1,38 @@
+from __future__ import annotations
+
 import re
-import hashlib
-from datetime import datetime
 
-def limpiar_texto(texto: str) -> str:
-    if not texto:
+from .base import generar_hash_identificador, limpiar_texto as _limpiar_texto_base
+from .base import normalizar_fecha as _normalizar_fecha_base
+
+_PREFIXES = re.compile(
+    r"^(?:Oficina:|Fecha:|Tipo actuacion:|Detalle:|Foja:)\s*",
+    re.IGNORECASE,
+)
+
+
+def limpiar_texto(texto: str | None) -> str:
+    """Normaliza texto de celdas de actuaciones removiendo etiquetas iniciales."""
+
+    base = _limpiar_texto_base(texto)
+    if not base:
         return ""
-    return re.sub(r'^(Oficina:|Fecha:|Tipo actuacion:|Detalle:|Foja:)?\s*', '', texto.strip().replace("\n", " "))
+    return _PREFIXES.sub("", base, count=1)
 
-def normalizar_fecha(texto: str) -> str:
-    try:
-        return datetime.strptime(texto, "%d/%m/%Y").strftime("%Y-%m-%d")
-    except Exception:
-        return texto
 
-def generar_hash_archivo(fecha: str, tipo: str, detalle: str, longitud: int = 6) -> str:
-    base_str = f"{fecha}_{tipo}_{detalle}"
-    return hashlib.sha256(base_str.encode("utf-8")).hexdigest()[:longitud]
+def normalizar_fecha(texto: str | None) -> str:
+    """Adapta fechas dd/mm/YYYY al formato ISO, manteniendo valores originales."""
+
+    normalizada = _normalizar_fecha_base(texto)
+    if normalizada is None:
+        return ""
+    return normalizada
+
+
+def generar_hash_archivo(
+    fecha: str | None, tipo: str | None, detalle: str | None, longitud: int = 6
+) -> str:
+    """Genera un hash corto para identificar actuaciones con archivo adjunto."""
+
+    return generar_hash_identificador(fecha, tipo, detalle, longitud=longitud)
 

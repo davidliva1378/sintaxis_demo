@@ -54,7 +54,7 @@ Esta subdivisión mantiene módulos pequeños, testeables y cohesivos, facilita 
 
 ## Refactor incremental sugerido
 1. Mover el código existente a la nueva jerarquía sin cambios funcionales.
-2. Extraer utilidades comunes (sesiones HTTP, manejo de *captcha*, `BeautifulSoup` wrappers) a `pjn/scraping/base.py`.
+2. Extraer utilidades comunes (sesiones HTTP, manejo de *captcha*, `BeautifulSoup` wrappers) a `pjn/scraping/base.py`. ✅ Implementado: módulo `base.py` con helpers de autenticación Playwright, normalización de texto/fechas y generación de identificadores compartidos.
 3. Crear modelos de dominio reutilizables en `pjn/models/`.
 4. Reescribir gradualmente las funciones de scraping para que retornen modelos, delegando a los parsers la responsabilidad de interpretar HTML.
 5. Añadir pruebas unitarias por módulo (parsers y services) y pruebas de integración con el portal (con *fixtures* controladas).
