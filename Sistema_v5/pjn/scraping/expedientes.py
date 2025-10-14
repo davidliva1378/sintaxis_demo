@@ -2,6 +2,7 @@ import re
 from collections.abc import Callable
 from datetime import datetime
 from time import perf_counter
+from typing import Mapping, Sequence, TypeVar
 
 from playwright.async_api import (
     ElementHandle,
@@ -10,6 +11,9 @@ from playwright.async_api import (
     Page,
     TimeoutError,
 )
+
+from ..models import ExpedienteResumen
+from ..parsers.expedientes_parser import parse_expediente_resumen
 
 # --- Config por defecto (ajustables por parámetro) ---
 SEL_TABLA = "table.table-striped"
@@ -38,6 +42,9 @@ _ORDEN_MAP = {
 
 _SEL_ORDEN_SELECT = "#j_idt150\\:order_by_form\\:camara"
 _SEL_ORDENAR_LINK = "a:has-text('Ordenar')"
+
+
+TResumen = TypeVar("TResumen")
 
 
 def _resolver_valor_orden(orden: str | None) -> str | None:
@@ -167,7 +174,8 @@ async def extraer_expedientes_completos(
     fecha_corte: str | None = None,
     tiempo_maximo_segundos: int | None = None,
     orden: str | None = None,
-) -> tuple[list[dict], str, dict[str, object]]:
+    mapper: Callable[[ExpedienteResumen], TResumen] | None = None,
+) -> tuple[list[TResumen], str, dict[str, object]]:
     """
     Extrae TODAS las páginas del listado de expedientes y devuelve:
     [
@@ -257,7 +265,7 @@ async def extraer_expedientes_completos(
         * ``"duplicado_encontrado"``: se detectó un expediente repetido.
         * ``"bucle_detectado"``: se detectó un ciclo al intentar avanzar.
     """
-    resultados: list[dict] = []
+    resultados: list[TResumen] = []
     huellas: set[tuple[str, str, str]] = set()
     paginas_visitadas: dict[str, int] = {}
     metadata: dict[str, object] = {}
@@ -265,13 +273,51 @@ async def extraer_expedientes_completos(
     filas_descartadas = 0
     duplicados_descartados = 0
 
+    resumen_mapper: Callable[[ExpedienteResumen], TResumen]
+    if mapper is None:
+        resumen_mapper = lambda resumen: resumen.to_dict()  # type: ignore[return-value]
+    else:
+        resumen_mapper = mapper
+
     def _finalizar(motivo: str) -> tuple[list[dict], str, dict[str, object]]:
         metadata["filas_descartadas"] = filas_descartadas
         metadata["duplicados_descartados"] = duplicados_descartados
         metadata["paginas_recorridas"] = paginas_recorridas
         if paginas_esperadas is not None:
             metadata["paginas_esperadas"] = paginas_esperadas
-        return resultados, motivo, metadata
+    return resultados, motivo, metadata
+
+
+async def extraer_expedientes_completos_modelos(
+    page: Page,
+    sel_tabla: str = SEL_TABLA,
+    sel_tbody: str = SEL_TBODY,
+    sel_siguiente: str = SEL_SIGUIENTE,
+    max_paginas: int = 200,
+    omitir_duplicados: bool = True,
+    detener_en_duplicado: bool = True,
+    *,
+    fecha_corte: str | None = None,
+    tiempo_maximo_segundos: int | None = None,
+    orden: str | None = None,
+) -> tuple[list[ExpedienteResumen], str, dict[str, object]]:
+    """Versión que devuelve :class:`ExpedienteResumen` en lugar de dicts."""
+
+    mapper = lambda resumen: resumen
+    resultados, motivo, metadata = await extraer_expedientes_completos(
+        page,
+        sel_tabla=sel_tabla,
+        sel_tbody=sel_tbody,
+        sel_siguiente=sel_siguiente,
+        max_paginas=max_paginas,
+        omitir_duplicados=omitir_duplicados,
+        detener_en_duplicado=detener_en_duplicado,
+        fecha_corte=fecha_corte,
+        tiempo_maximo_segundos=tiempo_maximo_segundos,
+        orden=orden,
+        mapper=mapper,
+    )
+    return resultados, motivo, metadata
 
     fecha_corte_dt: datetime | None = None
     if fecha_corte:
@@ -357,24 +403,24 @@ async def extraer_expedientes_completos(
             sel_tbody,
         )
 
-        # 2) Mapear a dicts usando las 5 columnas útiles
+        # 2) Mapear a objetos usando las columnas útiles
         for cols in filas:
-            if len(cols) < 5:
+            resumen = parse_expediente_resumen(cols)
+            if resumen is None:
                 filas_descartadas += 1
                 continue
-            ultima_actuacion_norm = _norm_fecha(cols[4])
+
+            ultima_actuacion_norm = resumen.ultima_actuacion
             ultima_dt: datetime | None = None
             if ultima_actuacion_norm:
                 try:
-                    ultima_dt = datetime.strptime(
-                        ultima_actuacion_norm, "%Y-%m-%d"
-                    )
+                    ultima_dt = datetime.strptime(ultima_actuacion_norm, "%Y-%m-%d")
                 except ValueError:
                     ultima_dt = None
 
-            numero = cols[0]
-            dependencia = cols[1]
-            caratula = cols[2]
+            numero = resumen.numero
+            dependencia = resumen.dependencia
+            caratula = resumen.caratula
 
             huella = (numero, caratula, dependencia)
             duplicado = huella in huellas
@@ -392,13 +438,7 @@ async def extraer_expedientes_completos(
             if not duplicado:
                 huellas.add(huella)
 
-            resultados.append({
-                "numero":           numero,
-                "dependencia":      dependencia,
-                "caratula":         caratula,
-                "situacion":        cols[3],
-                "ultima_actuacion": ultima_actuacion_norm,
-            })
+            resultados.append(resumen_mapper(resumen))
 
             if _excedio_tiempo():
                 return _finalizar("limite_tiempo")

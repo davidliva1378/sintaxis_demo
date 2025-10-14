@@ -25,6 +25,7 @@ class Actuacion:
     hash: str | None = None
     extraida_en: str | None = None
     es_historica: bool = False
+    descargado: bool = False
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "Actuacion":
@@ -55,6 +56,9 @@ class Actuacion:
             es_historica=coerce_bool(
                 get_first(data, "EsHistorica", "es_historica"), default=False
             ),
+            descargado=coerce_bool(
+                get_first(data, "Descargado", "descargado"), default=False
+            ),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -75,6 +79,7 @@ class Actuacion:
             "Hash": self.hash,
             "ExtraidaEn": self.extraida_en,
             "EsHistorica": self.es_historica,
+            "Descargado": self.descargado,
         }
 
     def to_json_ready(self) -> dict[str, Any]:

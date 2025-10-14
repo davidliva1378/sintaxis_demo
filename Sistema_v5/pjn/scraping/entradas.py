@@ -10,10 +10,12 @@ import re
 import csv
 import json
 from datetime import datetime, date
-from typing import Optional, Iterable, Tuple, Dict, Any
+from typing import Optional, Iterable, Tuple, Dict, Any, List
 from playwright.async_api import Page
 
 from .base import limpiar_texto, normalizar_texto
+from ..models import Entrada
+from ..parsers.entradas_parser import parse_entrada
 
 # ===== Selectores del PJN (ajusta si cambian) =====
 SELEC_TABLA = "div.MuiTableContainer-root tr"
@@ -129,6 +131,7 @@ async def extraer_entradas_pjn(
     fechas: Optional[Iterable[str]] = None,
     fecha_desde: Optional[str] = None,
     fecha_hasta: Optional[str] = None,
+    coleccion_modelos: Optional[List[Entrada]] = None,
 ) -> int:
     """
     Recorre la lista del PJN y persiste JSON/CSV.
@@ -252,15 +255,18 @@ async def extraer_entradas_pjn(
                     if rango_hasta and f > rango_hasta:
                         continue
 
-                item = {
-                    "numero": numero,
-                    "caratula": caratula,
-                    "fecha": fecha_iso,
-                    "evento": evento,
-                    "tipo_evento": tipo_evento,
-                    "leida": False,
-                    "extraida_en": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                }
+                entrada_modelo = parse_entrada(
+                    numero=numero,
+                    caratula=caratula,
+                    fecha=fecha_iso,
+                    evento=evento,
+                    tipo_evento=tipo_evento,
+                    leida=False,
+                    extraida_en=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                )
+                item = entrada_modelo.to_dict()
+                if coleccion_modelos is not None:
+                    coleccion_modelos.append(entrada_modelo)
 
                 if duplicados:
                     nuevas_run.append(item)
@@ -352,3 +358,28 @@ async def extraer_entradas_pjn(
     print(f"✅ Listo. Nuevas agregadas en esta corrida: {nuevas_count}")
     print(f"   Carpeta: {os.path.abspath(base_dir)}")
     return nuevas_count
+
+
+async def extraer_entradas_pjn_modelos(
+    page: Page,
+    destino: Optional[str] = None,
+    duplicados: bool = False,
+    incluir_tipos: tuple[str, ...] = ("N", "D"),
+    fechas: Optional[Iterable[str]] = None,
+    fecha_desde: Optional[str] = None,
+    fecha_hasta: Optional[str] = None,
+) -> tuple[int, List[Entrada]]:
+    """Devuelve también los modelos :class:`Entrada` generados."""
+
+    modelos: List[Entrada] = []
+    cantidad = await extraer_entradas_pjn(
+        page,
+        destino=destino,
+        duplicados=duplicados,
+        incluir_tipos=incluir_tipos,
+        fechas=fechas,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        coleccion_modelos=modelos,
+    )
+    return cantidad, modelos

@@ -3,31 +3,49 @@ import json
 import os
 import re
 from contextlib import suppress
-from datetime import date, datetime
+from datetime import datetime
+from typing import Awaitable, Callable, Iterable, Mapping, TypeVar
 from urllib.parse import parse_qs, urlparse
 
-from playwright.async_api import Page, TimeoutError
+from playwright.async_api import ElementHandle, Page, TimeoutError
 
-from .actuaciones_utils import generar_hash_archivo, limpiar_texto, normalizar_fecha
+from ..models import Actuacion, ActuacionesArchivo
+from ..parsers.actuaciones_parser import (
+    construir_actuaciones_archivo,
+    construir_encabezado_actuaciones as parser_construir_encabezado_actuaciones,
+    construir_nombre_archivo_normalizado,
+    obtener_extension_valida,
+    parse_actuacion_row,
+)
 from .base import normalizar_numero_expediente
 
 
-FORMATO_JSON_VERSION = "1.1"
+TActuacion = TypeVar("TActuacion")
+
+ActuacionBuilder = Callable[
+    [Page, ElementHandle, int, str, bool], Awaitable[TActuacion | None]
+]
 
 
-def _calcular_metricas_descargas(actuaciones: list[dict]) -> tuple[int, int, int]:
-    """Devuelve (total_con_archivo, total_descargados, pendientes)."""
+def _calcular_metricas_descargas(
+    actuaciones: Iterable[Actuacion | Mapping[str, object]]
+) -> tuple[int, int, int]:
+    """Devuelve ``(total_con_archivo, total_descargados, pendientes)``."""
 
     total_con_archivo = 0
     total_descargados = 0
 
     for act in actuaciones:
-        if not act or not isinstance(act, dict):
+        if isinstance(act, Actuacion):
+            modelo = act
+        elif isinstance(act, Mapping):
+            modelo = Actuacion.from_dict(act)
+        else:
             continue
 
-        if act.get("TieneArchivo"):
+        if modelo.tiene_archivo:
             total_con_archivo += 1
-            if act.get("Descargado"):
+            if modelo.descargado:
                 total_descargados += 1
 
     pendientes = max(total_con_archivo - total_descargados, 0)
@@ -54,218 +72,30 @@ def actualizar_metricas_descargas_en_json(payload: dict) -> None:
 
 
 def construir_encabezado_actuaciones(
-    expediente_datos: dict,
-    actuaciones_actuales: list,
-    actuaciones_historicas: list,
+    expediente_datos: Mapping[str, object] | dict,
+    actuaciones_actuales: Iterable[Actuacion | Mapping[str, object]],
+    actuaciones_historicas: Iterable[Actuacion | Mapping[str, object]],
     incluye_historicas: bool,
     timestamp_generacion: str,
-):
+) -> dict[str, object]:
     """Genera los metadatos enriquecidos para el archivo JSON de actuaciones."""
 
-    campos_base = {
-        "numero": expediente_datos.get("numero"),
-        "caratula": expediente_datos.get("caratula"),
-        "dependencia": expediente_datos.get("dependencia"),
-        "jurisdiccion": expediente_datos.get("jurisdiccion"),
-        "situacion": expediente_datos.get("situacion"),
-    }
+    actuales_modelo = [
+        act if isinstance(act, Actuacion) else Actuacion.from_dict(act)
+        for act in actuaciones_actuales
+    ]
+    historicas_modelo = [
+        act if isinstance(act, Actuacion) else Actuacion.from_dict(act)
+        for act in actuaciones_historicas
+    ]
 
-    for clave, valor in list(campos_base.items()):
-        if isinstance(valor, (date, datetime)):
-            campos_base[clave] = valor.strftime("%Y-%m-%d")
-
-    total_actuales = len(actuaciones_actuales)
-    total_historicas = len(actuaciones_historicas)
-    todas = list(actuaciones_actuales) + list(actuaciones_historicas)
-    total_con_archivo, total_descargados, descargas_pendientes = _calcular_metricas_descargas(todas)
-
-    ultimo_hash_actual = actuaciones_actuales[0]["Hash"] if actuaciones_actuales else None
-    ultima_fecha_actual = actuaciones_actuales[0]["Fecha"] if actuaciones_actuales else None
-
-    campos_base.update(
-        {
-            "Cantidad de Actuaciones Obtenidas": total_actuales + total_historicas,
-            "Cantidad de Archivos Descargados": total_descargados,
-            "version_formato": FORMATO_JSON_VERSION,
-            "fecha_extraccion": timestamp_generacion,
-            "incluye_historicas": incluye_historicas,
-            "total_actuales": total_actuales,
-            "total_historicas": total_historicas,
-            "total_actuaciones": total_actuales + total_historicas,
-            "total_archivos_con_enlace": total_con_archivo,
-            "descargas_pendientes": descargas_pendientes,
-            "ultimo_hash_actual": ultimo_hash_actual,
-            "ultima_fecha_actual": ultima_fecha_actual,
-        }
+    return parser_construir_encabezado_actuaciones(
+        expediente_datos,
+        actuales_modelo,
+        historicas_modelo,
+        incluye_historicas=incluye_historicas,
+        timestamp_generacion=timestamp_generacion,
     )
-
-    return campos_base
-
-
-EXTENSIONES_CONOCIDAS = {
-    "7z": ".7z",
-    "avi": ".avi",
-    "bak": ".bak",
-    "bmp": ".bmp",
-    "cer": ".cer",
-    "csv": ".csv",
-    "der": ".der",
-    "doc": ".doc",
-    "docm": ".docm",
-    "docx": ".docx",
-    "eml": ".eml",
-    "epub": ".epub",
-    "gif": ".gif",
-    "gz": ".gz",
-    "heic": ".heic",
-    "heif": ".heif",
-    "htm": ".htm",
-    "html": ".html",
-    "ics": ".ics",
-    "jpeg": ".jpeg",
-    "jpg": ".jpg",
-    "json": ".json",
-    "log": ".log",
-    "m4a": ".m4a",
-    "mkv": ".mkv",
-    "mov": ".mov",
-    "mp3": ".mp3",
-    "mp4": ".mp4",
-    "msg": ".msg",
-    "odt": ".odt",
-    "ogg": ".ogg",
-    "pdf": ".pdf",
-    "pdfa": ".pdf",
-    "pfx": ".pfx",
-    "p12": ".p12",
-    "p7m": ".p7m",
-    "p7s": ".p7s",
-    "png": ".png",
-    "ppt": ".ppt",
-    "pptx": ".pptx",
-    "pps": ".pps",
-    "ppsx": ".ppsx",
-    "rar": ".rar",
-    "rtf": ".rtf",
-    "svg": ".svg",
-    "tar": ".tar",
-    "tif": ".tif",
-    "tiff": ".tiff",
-    "txt": ".txt",
-    "wav": ".wav",
-    "webm": ".webm",
-    "xls": ".xls",
-    "xlsx": ".xlsx",
-    "xml": ".xml",
-    "xps": ".xps",
-    "zip": ".zip",
-}
-
-EXTENSIONES_ALIAS = {
-    "pkcs7": "p7m",
-    "smime": "p7m",
-    "s-mime": "p7m",
-    "pkcs12": "p12",
-}
-
-EXTENSIONES_GENERICAS = {".seam", ".jsp", ".do", ".php", ".aspx", ".ashx"}
-
-
-def obtener_extension_valida(valor):
-    if valor is None:
-        return None
-
-    valor = str(valor).strip().lower()
-    if not valor:
-        return None
-
-    candidatos = []
-
-    def agregar_candidato(texto):
-        if not texto:
-            return
-        texto = texto.strip().lower()
-        if not texto:
-            return
-        if texto.startswith("."):
-            texto = texto[1:]
-        if texto and texto not in candidatos:
-            candidatos.append(texto)
-
-    agregar_candidato(valor)
-
-    for separador in ("/", ".", "-", "_", " "):
-        if separador in valor:
-            for parte in valor.split(separador):
-                agregar_candidato(parte)
-
-    for candidato in candidatos:
-        base = EXTENSIONES_ALIAS.get(candidato, candidato)
-        if base in EXTENSIONES_CONOCIDAS:
-            return EXTENSIONES_CONOCIDAS[base]
-
-    return None
-
-
-def construir_nombre_archivo_normalizado(fecha, tipo, hash_val, archivo_url, nombre_descarga=None):
-    """Genera un nombre de archivo normalizado preservando la extensión original."""
-
-    parsed_url = urlparse(archivo_url) if archivo_url else None
-
-    nombre_origen = nombre_descarga or ""
-    extension_candidatas = []
-    tipo_doc_indico_fallback = False
-
-    extension_nombre = obtener_extension_valida(os.path.splitext(nombre_origen)[1])
-    if extension_nombre:
-        extension_candidatas.append(extension_nombre)
-
-    if parsed_url:
-        tipo_doc = parse_qs(parsed_url.query).get("tipoDoc", [])
-        if tipo_doc and tipo_doc[0]:
-            tipo_doc_valor = tipo_doc[0].strip()
-            if tipo_doc_valor:
-                extension_tipo_doc = None
-                if "." in tipo_doc_valor:
-                    if not nombre_origen:
-                        nombre_origen = tipo_doc_valor
-                    extension_tipo_doc = obtener_extension_valida(os.path.splitext(tipo_doc_valor)[1])
-                else:
-                    extension_tipo_doc = obtener_extension_valida(tipo_doc_valor)
-
-                if extension_tipo_doc:
-                    extension_candidatas.append(extension_tipo_doc)
-                else:
-                    tipo_doc_indico_fallback = True
-
-    if not nombre_origen and parsed_url:
-        nombre_origen = os.path.basename(parsed_url.path)
-        extension_desde_nombre = obtener_extension_valida(os.path.splitext(nombre_origen)[1])
-        if extension_desde_nombre:
-            extension_candidatas.append(extension_desde_nombre)
-
-    if parsed_url:
-        extension_desde_url = obtener_extension_valida(os.path.splitext(parsed_url.path)[1])
-        if extension_desde_url:
-            extension_candidatas.append(extension_desde_url)
-
-    extension = None
-    for candidata in extension_candidatas:
-        if candidata and candidata not in EXTENSIONES_GENERICAS:
-            extension = candidata
-            break
-
-    if not extension and tipo_doc_indico_fallback:
-        extension = ".pdf"
-
-    if not extension:
-        extension = ".pdf"
-
-    tipo_archivo = extension[1:] if len(extension) > 1 else None
-    nombre_normalizado = f"{fecha}_{tipo}_{hash_val}{extension}" if extension else None
-
-    return nombre_normalizado, tipo_archivo
-
 
 
 def _escape_selector_for_css(selector: str) -> str:
@@ -336,71 +166,40 @@ async def _esperar_cambio_pagina(
     )
 
 
+async def construir_actuacion_modelo_desde_fila(
+    page_expediente: Page,
+    fila: ElementHandle,
+    indice: int,
+    timestamp_extraccion: str,
+    *,
+    es_historica: bool = False,
+) -> Actuacion | None:
+    """Construye un modelo :class:`Actuacion` a partir de la fila HTML."""
+
+    return await parse_actuacion_row(
+        page_expediente,
+        fila,
+        indice,
+        timestamp_extraccion,
+        es_historica=es_historica,
+    )
+
+
 async def construir_actuacion_desde_fila(
     page_expediente: Page,
-    fila,
+    fila: ElementHandle,
     indice: int,
     timestamp_extraccion: str,
     es_historica: bool = False,
 ):
-    celdas = await fila.query_selector_all("td")
-    if len(celdas) < 6:
-        return None
-
-    oficina = limpiar_texto(await celdas[1].inner_text())
-    oficina_completa = await celdas[1].get_attribute("title") or oficina
-    fecha_cruda = limpiar_texto(await celdas[2].inner_text())
-    fecha = normalizar_fecha(fecha_cruda)
-    tipo = limpiar_texto(await celdas[3].inner_text()).replace(" ", "_").upper()
-    detalle = limpiar_texto(await celdas[4].inner_text())
-    foja = limpiar_texto(await celdas[5].inner_text())
-
-    archivo_url = None
-    nombre_archivo = None
-    tipo_archivo = None
-    hash_val = generar_hash_archivo(fecha, tipo, detalle)
-
-    icono = await fila.query_selector("i.fa-download")
-    tiene_archivo = bool(icono)
-
-    if icono:
-        link = await page_expediente.evaluate_handle("(el) => el.closest('a')", icono)
-        if link:
-            archivo_url = await link.get_attribute("href")
-            if archivo_url:
-                nombre_descarga = await link.get_attribute("download")
-                nombre_archivo, tipo_archivo = construir_nombre_archivo_normalizado(
-                    fecha,
-                    tipo,
-                    hash_val,
-                    archivo_url,
-                    nombre_descarga,
-                )
-            else:
-                archivo_url = None
-                nombre_archivo = None
-                tipo_archivo = None
-        else:
-            archivo_url = None
-            nombre_archivo = None
-            tipo_archivo = None
-
-    return {
-        "Indice": indice,
-        "Oficina": oficina,
-        "OficinaCompleta": oficina_completa,
-        "Fecha": fecha,
-        "Tipo": tipo,
-        "Detalle": detalle,
-        "Foja": foja,
-        "Archivo": archivo_url if archivo_url else "N/A",
-        "NombreArchivo": nombre_archivo if archivo_url else "N/A",
-        "TieneArchivo": tiene_archivo,
-        "TipoArchivo": tipo_archivo if tipo_archivo else "N/A",
-        "Hash": hash_val,
-        "ExtraidaEn": timestamp_extraccion,
-        "EsHistorica": es_historica,
-    }
+    modelo = await construir_actuacion_modelo_desde_fila(
+        page_expediente,
+        fila,
+        indice,
+        timestamp_extraccion,
+        es_historica=es_historica,
+    )
+    return modelo.to_dict() if modelo else None
 
 
 async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indice_inicial=1):
@@ -488,33 +287,66 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
         return [], f"Error al extraer históricas: {type(e).__name__}: {str(e)}"
 
 
-async def extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_inicial=1):
-    actuaciones = []
+async def _extraer_actuaciones_pagina_generico(
+    page_expediente: Page,
+    expediente_datos: Mapping[str, object] | dict,
+    indice_inicial: int,
+    builder: ActuacionBuilder[TActuacion],
+) -> tuple[list[TActuacion], str | None]:
+    actuaciones: list[TActuacion] = []
     try:
-        await page_expediente.wait_for_selector(r"#expediente\:action-table tbody tr", timeout=8000)
-        filas = await page_expediente.query_selector_all(r"#expediente\:action-table tbody tr")
+        await page_expediente.wait_for_selector(
+            r"#expediente\:action-table tbody tr", timeout=8000
+        )
+        filas = await page_expediente.query_selector_all(
+            r"#expediente\:action-table tbody tr"
+        )
         if not filas:
             return [], None
 
-        expediente_numero = normalizar_numero_expediente(
+        normalizar_numero_expediente(
             expediente_datos.get("numero"), valor_por_defecto="desconocido"
         )
 
         timestamp_extraccion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         for idx, fila in enumerate(filas, start=indice_inicial):
-            actuacion = await construir_actuacion_desde_fila(
+            actuacion = await builder(
                 page_expediente,
                 fila,
                 idx,
                 timestamp_extraccion,
-                es_historica=False,
+                False,
             )
             if actuacion:
                 actuaciones.append(actuacion)
         return actuaciones, None
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return [], f"{type(e).__name__}: {str(e)}"
+
+
+async def extraer_actuaciones_pagina(
+    page_expediente, expediente_datos, indice_inicial=1
+):
+    return await _extraer_actuaciones_pagina_generico(
+        page_expediente,
+        expediente_datos,
+        indice_inicial,
+        construir_actuacion_desde_fila,
+    )
+
+
+async def extraer_actuaciones_pagina_modelos(
+    page_expediente: Page,
+    expediente_datos: Mapping[str, object] | dict,
+    indice_inicial: int = 1,
+) -> tuple[list[Actuacion], str | None]:
+    return await _extraer_actuaciones_pagina_generico(
+        page_expediente,
+        expediente_datos,
+        indice_inicial,
+        construir_actuacion_modelo_desde_fila,
+    )
 
 async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_datos, carpeta_destino="Actuaciones"):
     todas = []
@@ -579,6 +411,36 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
     print(f"✅ Archivo JSON guardado: {json_path}")
     print(f"📂 Total de actuaciones: {len(todas)}")
     return todas, None, carpeta_actuaciones
+
+
+async def obtener_actuaciones_todas_paginas_modelos_async(
+    page_expediente: Page,
+    expediente_datos: Mapping[str, object] | dict,
+    carpeta_destino: str = "Actuaciones",
+) -> tuple[ActuacionesArchivo | None, str | None, str | None]:
+    """Obtiene las actuaciones en formato de modelos dataclass."""
+
+    actuaciones_dicts, error, carpeta = await obtener_actuaciones_todas_paginas_async(
+        page_expediente, expediente_datos, carpeta_destino
+    )
+    if error:
+        return None, error, carpeta
+
+    actuaciones_modelo = [
+        Actuacion.from_dict(act)
+        for act in actuaciones_dicts
+        if isinstance(act, Mapping)
+    ]
+
+    timestamp_generacion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    archivo = construir_actuaciones_archivo(
+        expediente_datos,
+        actuaciones_modelo,
+        [],
+        incluye_historicas=False,
+        timestamp_generacion=timestamp_generacion,
+    )
+    return archivo, None, carpeta
 
 
 async def actualizar_actuaciones_desde_json(

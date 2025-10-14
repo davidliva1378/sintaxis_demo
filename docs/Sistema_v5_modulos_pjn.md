@@ -59,6 +59,10 @@ Esta subdivisión mantiene módulos pequeños, testeables y cohesivos, facilita 
    `ExpedienteResumen`, `ExpedienteIdentificacion` y `Entrada` con helpers de
    serialización compatibles con los JSON históricos.
 4. Reescribir gradualmente las funciones de scraping para que retornen modelos, delegando a los parsers la responsabilidad de interpretar HTML.
+   ✅ Iniciado: los scrapers de actuaciones, expedientes y entradas instancian
+   dataclasses mediante los nuevos módulos de parsers y exponen funciones
+   auxiliares (`obtener_actuaciones_todas_paginas_modelos_async`,
+   `extraer_expedientes_completos_modelos`, `extraer_entradas_pjn_modelos`).
 5. Añadir pruebas unitarias por módulo (parsers y services) y pruebas de integración con el portal (con *fixtures* controladas).
 
 Esta organización minimiza dependencias circulares, centraliza la interacción con el PJN y prepara el proyecto para una futura migración a servicios externos o APIs oficiales si estuvieran disponibles.
