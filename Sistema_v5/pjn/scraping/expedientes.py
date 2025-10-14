@@ -272,6 +272,7 @@ async def extraer_expedientes_completos(
     paginas_esperadas: int | None = None
     filas_descartadas = 0
     duplicados_descartados = 0
+    paginas_recorridas = 0
 
     resumen_mapper: Callable[[ExpedienteResumen], TResumen]
     if mapper is None:
@@ -285,7 +286,7 @@ async def extraer_expedientes_completos(
         metadata["paginas_recorridas"] = paginas_recorridas
         if paginas_esperadas is not None:
             metadata["paginas_esperadas"] = paginas_esperadas
-    return resultados, motivo, metadata
+        return resultados, motivo, metadata
 
 
 async def extraer_expedientes_completos_modelos(
@@ -375,7 +376,6 @@ async def extraer_expedientes_completos_modelos(
 
     tbody_locator = page.locator(sel_tbody)
 
-    paginas_recorridas = 0
     while True:
         if _excedio_tiempo():
             return _finalizar("limite_tiempo")
