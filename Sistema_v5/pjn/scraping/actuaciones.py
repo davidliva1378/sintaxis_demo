@@ -14,6 +14,7 @@ from ..exceptions import (
     ActuacionesNoDisponibles,
     DescargaFallida,
     ExtraccionError,
+    PJNError,
     TimeoutExtraccion,
 )
 from ..models import Actuacion, ActuacionesArchivo
@@ -64,9 +65,51 @@ def _calcular_metricas_descargas(
     return total_con_archivo, total_descargados, pendientes
 
 
-def actualizar_metricas_descargas_en_json(payload: dict) -> None:
-    """Recalcula los contadores de descargas dentro de la estructura JSON."""
+def calcular_metricas_descargas_json(payload: dict) -> dict:
+    """Recalcula los contadores de descargas y retorna una COPIA actualizada del payload.
 
+    Args:
+        payload: Estructura JSON con Expediente y Actuaciones.
+
+    Returns:
+        dict: Nueva copia del payload con métricas actualizadas.
+
+    Note:
+        Esta función NO modifica el payload original (sin side effects).
+    """
+    import copy
+
+    if not payload or not isinstance(payload, dict):
+        return payload
+
+    # Crear copia profunda para evitar mutaciones
+    nuevo_payload = copy.deepcopy(payload)
+
+    encabezado = nuevo_payload.get("Expediente")
+    actuaciones = nuevo_payload.get("Actuaciones")
+
+    if not isinstance(encabezado, dict) or not isinstance(actuaciones, list):
+        return nuevo_payload
+
+    total_con_archivo, total_descargados, pendientes = _calcular_metricas_descargas(actuaciones)
+
+    encabezado["Cantidad de Archivos Descargados"] = total_descargados
+    encabezado["total_archivos_con_enlace"] = total_con_archivo
+    encabezado["descargas_pendientes"] = pendientes
+
+    return nuevo_payload
+
+
+def actualizar_metricas_descargas_en_json(payload: dict) -> None:
+    """Recalcula los contadores de descargas dentro de la estructura JSON.
+
+    Deprecated:
+        Esta función modifica el payload in-place (side effect).
+        Usar calcular_metricas_descargas_json() que retorna una copia.
+
+    Warning:
+        Esta función MUTA el argumento payload.
+    """
     if not payload or not isinstance(payload, dict):
         return
 
@@ -78,6 +121,7 @@ def actualizar_metricas_descargas_en_json(payload: dict) -> None:
 
     total_con_archivo, total_descargados, pendientes = _calcular_metricas_descargas(actuaciones)
 
+    # SIDE EFFECT: Modifica el dict original
     encabezado["Cantidad de Archivos Descargados"] = total_descargados
     encabezado["total_archivos_con_enlace"] = total_con_archivo
     encabezado["descargas_pendientes"] = pendientes
@@ -324,7 +368,7 @@ async def _extraer_actuaciones_pagina_generico(
                 fila,
                 idx,
                 timestamp_extraccion,
-                False,
+                es_historica=False,
             )
             if actuacion:
                 actuaciones.append(actuacion)
@@ -600,86 +644,249 @@ async def actualizar_actuaciones_desde_json(
     return len(nuevas_actuaciones), nuevo_payload, None
 
 
+async def extraer_actuaciones_datos(
+    page_expediente: Page,
+    expediente_datos: Mapping[str, object] | dict,
+    incluir_historicas: bool = True,
+) -> ActuacionesArchivo:
+    """Extrae actuaciones actuales e históricas (opcional) y retorna modelo estructurado.
+
+    Esta es la versión "pura" que NO guarda archivos. Útil para:
+    - Procesamiento en memoria
+    - Integración con otras rutinas
+    - Testing
+
+    Args:
+        page_expediente: Página de Playwright con el expediente abierto.
+        expediente_datos: Datos del expediente (número, carátula, etc.).
+        incluir_historicas: Si True, incluye actuaciones históricas.
+
+    Returns:
+        ActuacionesArchivo: Modelo con encabezado y actuaciones.
+
+    Raises:
+        ExtraccionError: Si falla la extracción de actuaciones.
+        ActuacionesNoDisponibles: Si no hay actuaciones disponibles.
+    """
+    # Extraer actuaciones actuales
+    actuaciones_actuales_modelo: list[Actuacion] = []
+    pagina = 1
+    indice_actual = 1
+    tabla_id = "expediente:action-table"
+    tabla_selector_css = _escape_selector_for_css(f"#{tabla_id}")
+
+    try:
+        await page_expediente.wait_for_selector(
+            r"#expediente\:action-table tbody tr", timeout=8000
+        )
+    except PlaywrightTimeout as exc:
+        raise ActuacionesNoDisponibles(
+            "No se encontró la tabla de actuaciones en el tiempo esperado"
+        ) from exc
+
+    while True:
+        logger.info("📄 Página %d: extrayendo actuaciones actuales...", pagina)
+        nuevas, error = await extraer_actuaciones_pagina_modelos(
+            page_expediente, expediente_datos, indice_actual
+        )
+        if error:
+            raise ExtraccionError(f"Error en página {pagina}: {error}")
+        if not nuevas:
+            break
+
+        actuaciones_actuales_modelo.extend(nuevas)
+        indice_actual += len(nuevas)
+
+        boton_siguiente = await page_expediente.query_selector(
+            "a:has(span[title='Siguiente']):not(.ui-state-disabled)"
+        )
+        if not boton_siguiente:
+            break
+
+        try:
+            html_anterior = await page_expediente.inner_html(tabla_selector_css)
+            paginador_selector_js, pagina_activa = await _obtener_paginador_activo(
+                page_expediente, tabla_id
+            )
+            await boton_siguiente.click()
+            await page_expediente.wait_for_load_state("domcontentloaded")
+            await _esperar_cambio_pagina(
+                page_expediente,
+                tabla_id,
+                html_anterior,
+                paginador_selector_js,
+                pagina_activa,
+            )
+            pagina += 1
+        except PlaywrightTimeout as exc:
+            raise TimeoutExtraccion(
+                f"Timeout al intentar avanzar a la página {pagina + 1}"
+            ) from exc
+        except Exception as exc:
+            raise ExtraccionError(
+                f"Error inesperado al avanzar a la página {pagina + 1}: {type(exc).__name__}: {str(exc)}"
+            ) from exc
+
+    # Marcar como actuales y sin descargar
+    for act in actuaciones_actuales_modelo:
+        act.es_historica = False
+        if act.tiene_archivo:
+            act.descargado = False
+
+    # Extraer históricas si corresponde
+    actuaciones_historicas_modelo: list[Actuacion] = []
+    if incluir_historicas:
+        indice_base = len(actuaciones_actuales_modelo) + 1
+        try:
+            await page_expediente.click("a:has-text('Ver históricas')")
+            await page_expediente.wait_for_selector(
+                r"#expediente\:action-historic-table tbody tr, div.alert.white-panel",
+                timeout=8000,
+            )
+        except PlaywrightTimeout as exc:
+            raise TimeoutExtraccion(
+                "Timeout esperando tabla o mensaje de actuaciones históricas"
+            ) from exc
+
+        mensaje = await page_expediente.query_selector("div.alert.white-panel")
+        if mensaje:
+            texto = await mensaje.inner_text()
+            texto_lower = texto.lower()
+            if "no posee actuaciones históricas" in texto_lower or "no posee actuaciones" in texto_lower:
+                logger.info("El expediente no posee actuaciones históricas.")
+            else:
+                logger.warning(
+                    "Mensaje inesperado en actuaciones históricas: '%s'. "
+                    "Continuando sin extraer históricas.",
+                    texto.strip()
+                )
+                # No lanzar error, solo continuar sin históricas
+        else:
+            # Extraer históricas paginadas
+            timestamp_extraccion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            pagina_hist = 1
+            indice_hist = indice_base
+            tabla_hist_id = "expediente:action-historic-table"
+            tabla_hist_selector_css = _escape_selector_for_css(f"#{tabla_hist_id}")
+            filas_selector = f"{tabla_hist_selector_css} tbody tr"
+
+            while True:
+                logger.info("📄 Página %d (históricas): extrayendo...", pagina_hist)
+                filas = await page_expediente.query_selector_all(filas_selector)
+                if not filas:
+                    break
+
+                for fila in filas:
+                    actuacion = await construir_actuacion_modelo_desde_fila(
+                        page_expediente,
+                        fila,
+                        indice_hist,
+                        timestamp_extraccion,
+                        es_historica=True,
+                    )
+                    if actuacion:
+                        actuacion.descargado = False if actuacion.tiene_archivo else None
+                        actuaciones_historicas_modelo.append(actuacion)
+                        indice_hist += 1
+
+                boton_siguiente_hist = await page_expediente.query_selector(
+                    "a[id^='expediente:j_idt']:not(.ui-state-disabled):has-text('Siguiente')"
+                )
+                if not boton_siguiente_hist:
+                    break
+
+                try:
+                    html_anterior_hist = await page_expediente.inner_html(tabla_hist_selector_css)
+                    paginador_selector_js_hist, pagina_activa_hist = await _obtener_paginador_activo(
+                        page_expediente, tabla_hist_id
+                    )
+                    await boton_siguiente_hist.click()
+                    pagina_hist += 1
+                    await page_expediente.wait_for_selector(filas_selector, timeout=8000)
+                    await _esperar_cambio_pagina(
+                        page_expediente,
+                        tabla_hist_id,
+                        html_anterior_hist,
+                        paginador_selector_js_hist,
+                        pagina_activa_hist,
+                    )
+                except Exception as exc:
+                    logger.error("❌ No se pudo avanzar de página histórica: %s", exc)
+                    break
+
+    # Construir modelo final
+    timestamp_generacion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    archivo = construir_actuaciones_archivo(
+        expediente_datos,
+        actuaciones_actuales_modelo,
+        actuaciones_historicas_modelo,
+        incluye_historicas=bool(actuaciones_historicas_modelo),
+        timestamp_generacion=timestamp_generacion,
+    )
+
+    return archivo
+
+
 async def extraer_actuaciones_completas(
-    page_expediente,
+    page_expediente: Page,
     expediente_datos: dict,
     incluir_historicas: bool = True,
     directorio_base: str = "ActuacionesCompletas"
 ) -> tuple[list[dict], list[dict], str | None]:
-    """
-    Extrae actuaciones actuales e históricas (opcional) de un expediente y las guarda como JSON.
-    También genera un único archivo con estructura detallada, campo EsHistorica y Descargado.
-    """
-    actuaciones_actuales = []
-    actuaciones_historicas = []
+    """Extrae actuaciones y las guarda como JSON (versión con persistencia).
 
+    NOTA: Esta función mantiene compatibilidad con código existente.
+    Para uso desde otras rutinas, considere usar extraer_actuaciones_datos()
+    que no guarda archivos automáticamente.
+
+    Args:
+        page_expediente: Página de Playwright con el expediente abierto.
+        expediente_datos: Datos del expediente (número, carátula, etc.).
+        incluir_historicas: Si True, incluye actuaciones históricas.
+        directorio_base: Carpeta base donde guardar los archivos.
+
+    Returns:
+        tuple: (actuaciones_actuales, actuaciones_historicas, error)
+            - Si error es None, la extracción fue exitosa
+            - Si error es str, contiene el mensaje de error
+
+    Deprecated:
+        Esta función será deprecada en favor de extraer_actuaciones_datos()
+        + guardar_actuaciones_json() por separado.
+    """
     try:
-        numero_normalizado = normalizar_numero_expediente(expediente_datos.get("numero"))
-        carpeta_expte = os.path.join(directorio_base, numero_normalizado)
-
-        # Actuaciones actuales
-        actuaciones_actuales, error_actuales, carpeta_final = await obtener_actuaciones_todas_paginas_async(
+        # Usar la versión pura
+        archivo = await extraer_actuaciones_datos(
             page_expediente,
             expediente_datos,
-            carpeta_destino=carpeta_expte
+            incluir_historicas=incluir_historicas,
         )
-        if error_actuales:
-            return [], [], f"Error al extraer actuaciones actuales: {error_actuales}"
-        if not carpeta_final:
-            return [], [], "No se pudo determinar la carpeta de salida para las actuaciones actuales."
 
-        for act in actuaciones_actuales:
-            act["EsHistorica"] = False
-            if act.get("TieneArchivo"):
-                act["Descargado"] = False
+        # Guardar a disco
+        numero_normalizado = normalizar_numero_expediente(expediente_datos.get("numero"))
+        carpeta_expte = os.path.join(directorio_base, numero_normalizado)
+        os.makedirs(carpeta_expte, exist_ok=True)
 
-        indice_base = len(actuaciones_actuales) + 1
-
-        # Actuaciones históricas (si corresponde)
-        if incluir_historicas:
-            actuaciones_historicas, error_hist = await extraer_actuaciones_historicas(
-                page_expediente, expediente_datos, indice_base
-            )
-            if error_hist:
-                return actuaciones_actuales, [], f"Error al extraer actuaciones históricas: {error_hist}"
-
-            for act in actuaciones_historicas:
-                act["EsHistorica"] = True
-                if act.get("TieneArchivo"):
-                    act["Descargado"] = False
-        else:
-            actuaciones_historicas = []
-
+        # Separar actuales de históricas y convertir a dicts para compatibilidad
+        actuaciones_actuales = [act.to_dict() for act in archivo.actuaciones if not act.es_historica]
+        actuaciones_historicas = [act.to_dict() for act in archivo.actuaciones if act.es_historica]
         todas = actuaciones_actuales + actuaciones_historicas
 
-        if actuaciones_historicas:
-            indice_historico_esperado = len(actuaciones_actuales) + 1
-            primer_indice_historico = actuaciones_historicas[0].get("Indice")
-            if primer_indice_historico != indice_historico_esperado:
-                logger.warning(
-                    "⚠️ Verificar numeración histórica: se esperaba que iniciara en "
-                    "%d, pero comenzó en %d.", indice_historico_esperado, primer_indice_historico
-                )
+        estructura_json = {"Expediente": archivo.encabezado, "Actuaciones": todas}
 
-        timestamp_generacion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        encabezado = construir_encabezado_actuaciones(
-            expediente_datos,
-            actuaciones_actuales=actuaciones_actuales,
-            actuaciones_historicas=actuaciones_historicas,
-            incluye_historicas=bool(actuaciones_historicas),
-            timestamp_generacion=timestamp_generacion,
-        )
-
-        estructura_json = {"Expediente": encabezado, "Actuaciones": todas}
-
-        json_path = os.path.join(carpeta_final, f"actuaciones-{numero_normalizado}.json")
+        json_path = os.path.join(carpeta_expte, f"actuaciones-{numero_normalizado}.json")
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(estructura_json, f, indent=2, ensure_ascii=False)
         logger.info("📄 JSON generado: %s", json_path)
 
         return actuaciones_actuales, actuaciones_historicas, None
 
+    except PJNError as e:
+        # Excepciones de negocio esperadas
+        return [], [], f"{type(e).__name__}: {str(e)}"
     except Exception as e:
+        # Excepciones inesperadas
+        logger.exception("Error inesperado extrayendo actuaciones")
         return [], [], f"Error general: {type(e).__name__}: {str(e)}"
 
 
@@ -688,7 +895,126 @@ async def aviso_si_tarda(idx, segundos):
     await asyncio.sleep(segundos)
     logger.warning("⏳ Descarga en curso para actuación %d... lleva más de %d segundos.", idx, segundos)
 
+async def descargar_archivos_actuaciones_modelos(
+    page: Page,
+    actuaciones: list[Actuacion],
+    carpeta_destino: str
+) -> list[Actuacion]:
+    """Descarga archivos y retorna lista actualizada de actuaciones (sin side effects).
+
+    Args:
+        page: Página de Playwright autenticada.
+        actuaciones: Lista de modelos Actuacion.
+        carpeta_destino: Carpeta donde guardar los archivos.
+
+    Returns:
+        list[Actuacion]: Nueva lista con actuaciones actualizadas (marca descargado=True).
+
+    Note:
+        Esta función NO modifica la lista original.
+    """
+    import copy
+
+    if not actuaciones:
+        logger.warning("⚠️ No se proporcionaron actuaciones para descargar.")
+        return actuaciones
+
+    logger.info("📥 Iniciando descarga de archivos (%d actuaciones)...", len(actuaciones))
+    os.makedirs(carpeta_destino, exist_ok=True)
+
+    # Crear copias para evitar mutaciones
+    actuaciones_actualizadas = [copy.copy(act) for act in actuaciones]
+
+    for idx, act in enumerate(actuaciones_actualizadas, start=1):
+        if not act.archivo or act.archivo == "N/A":
+            logger.debug("🚫 Actuación %d: sin archivo para descargar.", idx)
+            continue
+
+        # Resolver nombre de archivo
+        nombre_archivo = construir_nombre_archivo_normalizado(
+            act.nombre_archivo,
+            act.tipo_archivo,
+            idx
+        )
+
+        act.nombre_archivo = nombre_archivo
+        # Actualizar tipo si se normalizó
+        if nombre_archivo and "." in nombre_archivo:
+            extension = os.path.splitext(nombre_archivo)[1]
+            act.tipo_archivo = extension[1:] if extension.startswith(".") else extension
+
+        ruta_archivo = os.path.join(carpeta_destino, nombre_archivo)
+
+        if os.path.exists(ruta_archivo):
+            logger.info("⏭️ Archivo ya existe: %s", nombre_archivo)
+            act.descargado = True
+            continue
+
+        # Intentar descarga
+        ultimo_error = None
+        descarga_exitosa = False
+        for intento in range(3):
+            advertencia = None
+            try:
+                async with page.expect_download() as download_info:
+                    await page.evaluate("""
+                        (url) => {
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.target = '_blank';
+                            a.rel = 'noopener';
+                            a.click();
+                        }
+                    """, act.archivo)
+
+                download = await download_info.value
+                advertencia = asyncio.create_task(aviso_si_tarda(idx, 30))
+                await download.save_as(ruta_archivo)
+
+                logger.info("✅ Archivo descargado: %s", nombre_archivo)
+                act.descargado = True
+                descarga_exitosa = True
+                break
+            except (PlaywrightTimeout, asyncio.TimeoutError) as e:
+                ultimo_error = e
+                if intento == 2:
+                    logger.error("❌ Timeout en descarga tras 3 intentos para actuación %d", idx)
+                else:
+                    logger.warning("⚠️ Timeout en actuación %d, reintentando (%d/3)...", idx, intento + 1)
+                    await asyncio.sleep(4)
+            except (OSError, IOError) as e:
+                logger.error("❌ Error de I/O al guardar archivo %s: %s", nombre_archivo, e)
+                ultimo_error = e
+                break
+            except Exception as e:
+                ultimo_error = e
+                if intento == 2:
+                    logger.error("❌ Error inesperado tras 3 intentos para actuación %d: %s", idx, e)
+                else:
+                    logger.warning("⚠️ Error en actuación %d, reintentando (%d/3)...", idx, intento + 1)
+                    await asyncio.sleep(4)
+            finally:
+                if advertencia is not None:
+                    advertencia.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await advertencia
+
+        if not descarga_exitosa:
+            act.descargado = False
+
+    return actuaciones_actualizadas
+
+
 async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_destino: str):
+    """Descarga archivos de actuaciones (versión con side effects).
+
+    Deprecated:
+        Esta función modifica la lista de actuaciones in-place.
+        Usar descargar_archivos_actuaciones_modelos() que retorna una copia.
+
+    Warning:
+        Esta función MUTA los elementos de la lista actuaciones.
+    """
     if not actuaciones:
         logger.warning("⚠️ No se proporcionaron actuaciones para descargar.")
         return
@@ -737,6 +1063,7 @@ async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_
         nombre_archivo = f"{base_nombre}{extension_final}"
         tipo_archivo_normalizado = extension_final[1:] if extension_final.startswith(".") else extension_final
 
+        # SIDE EFFECT: Modifica el dict original
         act["NombreArchivo"] = nombre_archivo
         act["TipoArchivo"] = tipo_archivo_normalizado
 

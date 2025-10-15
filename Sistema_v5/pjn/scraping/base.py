@@ -32,16 +32,15 @@ from playwright.async_api import (
     async_playwright,
 )
 
+from ..config import get_config
 from ..exceptions import CredencialesFaltantes, SesionInvalida
 from ..selectores import SEL_AUTH
 
-# === Constantes de autenticación ===
-PJN_LOGIN_URL = "https://portalpjn.pjn.gov.ar/inicio"
-DEFAULT_SESSION_FILE = Path(__file__).with_name("pjn_storage_state.json")
-DEFAULT_BROWSER_ARGS = [
-    "--disable-blink-features=AutomationControlled",
-    "--no-sandbox",
-]
+# === Constantes de autenticación (ahora desde config) ===
+_config = get_config()
+PJN_LOGIN_URL = _config.auth.login_url
+DEFAULT_SESSION_FILE = Path(__file__).with_name(_config.auth.session_file_name)
+DEFAULT_BROWSER_ARGS = list(_config.browser.args)
 
 
 # === Normalización de texto y fechas ===
@@ -169,9 +168,7 @@ async def _crear_contexto(
 
     browser = await playwright.chromium.launch(headless=headless, args=args)
     context = await browser.new_context(storage_state=storage_state)
-    await context.add_init_script(
-        "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
-    )
+    await context.add_init_script(_config.browser.anti_webdriver_script)
     return browser, context
 
 

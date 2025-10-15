@@ -12,12 +12,14 @@ from playwright.async_api import (
     TimeoutError,
 )
 
+from ..config import get_config
 from ..models import ExpedienteResumen
 from ..parsers.expedientes_parser import parse_expediente_resumen
 from ..selectores import SEL_EXPEDIENTES
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
+_config = get_config()
 
 # --- Config por defecto (ajustables por parámetro) ---
 SEL_TABLA = SEL_EXPEDIENTES.TABLA_RESULTADOS
@@ -35,7 +37,7 @@ SEL_SIGUIENTE = ", ".join(
     ]
 )
 
-EXPEDIENTES_POR_PAGINA = 15
+EXPEDIENTES_POR_PAGINA = _config.scraping.expedientes_por_pagina
 
 _ORDEN_MAP = {
     "fecha": "FECHA",
@@ -171,7 +173,7 @@ async def extraer_expedientes_completos(
     sel_tabla: str = SEL_TABLA,
     sel_tbody: str = SEL_TBODY,
     sel_siguiente: str = SEL_SIGUIENTE,
-    max_paginas: int = 200,
+    max_paginas: int | None = None,
     omitir_duplicados: bool = True,
     detener_en_duplicado: bool = True,
     *,
@@ -269,6 +271,10 @@ async def extraer_expedientes_completos(
         * ``"duplicado_encontrado"``: se detectó un expediente repetido.
         * ``"bucle_detectado"``: se detectó un ciclo al intentar avanzar.
     """
+    # Resolver max_paginas desde config si no se especificó
+    if max_paginas is None:
+        max_paginas = _config.scraping.max_paginas_expedientes
+
     resultados: list[TResumen] = []
     huellas: set[tuple[str, str, str]] = set()
     paginas_visitadas: dict[str, int] = {}
@@ -298,7 +304,7 @@ async def extraer_expedientes_completos_modelos(
     sel_tabla: str = SEL_TABLA,
     sel_tbody: str = SEL_TBODY,
     sel_siguiente: str = SEL_SIGUIENTE,
-    max_paginas: int = 200,
+    max_paginas: int | None = None,
     omitir_duplicados: bool = True,
     detener_en_duplicado: bool = True,
     *,

@@ -1,0 +1,237 @@
+# 🗺️ Hoja de Ruta - Mejoras Sistema_v5
+
+**Fecha de inicio:** 2025-10-15
+**Objetivo:** Refactorizar Sistema_v5 para hacer las funciones más reutilizables y llamables desde otras rutinas.
+
+---
+
+## 🔴 Prioridad CRÍTICA
+
+### ✅ Mejora #0: Crear hoja de ruta
+- **Estado:** ✅ COMPLETADA
+- **Fecha:** 2025-10-15
+- **Descripción:** Documentar todas las mejoras priorizadas en ROADMAP.md
+
+---
+
+### ✅ Mejora #1: Separar extracción de datos de persistencia de archivos
+- **Estado:** ✅ COMPLETADA
+- **Fecha:** 2025-10-15
+- **Archivos modificados:**
+  - `pjn/scraping/actuaciones.py`
+  - `pjn/scraping/entradas.py`
+- **Descripción:** Las funciones de extracción SIEMPRE guardan archivos JSON/CSV, imposibilitando su uso desde otras rutinas que solo necesitan datos en memoria.
+- **Solución implementada:**
+  - ✅ Creada `extraer_actuaciones_datos()` que retorna solo `ActuacionesArchivo`
+  - ✅ Creada `extraer_entradas_datos()` que retorna solo `list[Entrada]`
+  - ✅ Refactorizada `extraer_actuaciones_completas()` para usar la versión pura
+  - ✅ Refactorizada `extraer_entradas_pjn()` para usar la versión pura
+  - ✅ Funciones con persistencia marcadas como deprecated
+- **Impacto:** 🔥 MUY ALTO - Desbloquea reutilización del código
+- **Uso nuevo:**
+  ```python
+  # Solo obtener datos en memoria (sin guardar archivos)
+  archivo = await extraer_actuaciones_datos(page, expediente_datos)
+  entradas = await extraer_entradas_datos(page, duplicados=False)
+
+  # Para persistir, usar las funciones existentes (retrocompatibles)
+  await extraer_actuaciones_completas(page, expediente_datos)
+  ```
+
+---
+
+### ⏸️ Mejora #2: Estandarizar manejo de errores
+- **Estado:** ⏸️ PENDIENTE
+- **Archivos afectados:**
+  - `pjn/scraping/expedientes.py`
+  - `pjn/scraping/actuaciones.py`
+- **Descripción:** Inconsistencia en retorno de errores: tuplas `(result, error)` vs excepciones
+- **Solución:**
+  - ⏸️ Estandarizar a usar excepciones para errores esperados
+  - ⏸️ Documentar cuándo se lanzan excepciones en docstrings
+  - ⏸️ Eliminar retornos `tuple[result, str | None]`
+  - ⏸️ Usar las excepciones ya definidas en `exceptions.py`
+- **Impacto:** 🔥 MUY ALTO - Facilita manejo de errores desde código llamador
+- **Nota:** Las nuevas funciones `*_datos()` ya usan excepciones correctamente
+
+---
+
+### ✅ Mejora #3: Eliminar side effects implícitos
+- **Estado:** ✅ COMPLETADA
+- **Fecha:** 2025-10-15
+- **Archivos modificados:**
+  - `pjn/scraping/actuaciones.py:68-127` (`calcular_metricas_descargas_json` + deprecated)
+  - `pjn/scraping/actuaciones.py:892-999` (`descargar_archivos_actuaciones_modelos` + deprecated)
+- **Descripción:** Funciones que modifican estructuras pasadas por referencia sin retornarlas
+- **Solución implementada:**
+  - ✅ Creada `calcular_metricas_descargas_json()` que retorna copia actualizada
+  - ✅ Creada `descargar_archivos_actuaciones_modelos()` que retorna lista actualizada
+  - ✅ Funciones con side effects marcadas como deprecated con warnings explícitos
+- **Impacto:** 🔥 ALTO - Previene bugs sutiles
+- **Uso nuevo:**
+  ```python
+  # Sin side effects (retorna copia)
+  payload_actualizado = calcular_metricas_descargas_json(payload)
+  actuaciones_actualizadas = await descargar_archivos_actuaciones_modelos(page, actuaciones, carpeta)
+
+  # Las funciones viejas siguen funcionando pero están deprecadas
+  actualizar_metricas_descargas_en_json(payload)  # deprecated
+  ```
+
+---
+
+## 🟠 Prioridad ALTA
+
+### ✅ Mejora #4: Extraer configuraciones hardcodeadas
+- **Estado:** ✅ COMPLETADA
+- **Fecha:** 2025-10-15
+- **Archivos modificados:**
+  - `pjn/config.py` (NUEVO)
+  - `pjn/scraping/base.py`
+  - `pjn/scraping/expedientes.py`
+- **Descripción:** Valores mágicos repetidos en múltiples lugares
+- **Solución implementada:**
+  - ✅ Creado `pjn/config.py` con dataclasses completas (`ScrapingConfig`, `BrowserConfig`, `AuthConfig`, `ArchivosConfig`)
+  - ✅ Migradas constantes: `EXPEDIENTES_POR_PAGINA`, `max_paginas`, timeouts, URLs
+  - ✅ Implementado override vía variables de entorno (`PJN_MAX_PAGINAS`, etc.)
+  - ✅ Añadido singleton lazy loading con `get_config()` / `set_config()`
+  - ✅ Añadida configuración para testing (`Config.for_testing()`)
+- **Impacto:** 🟠 ALTO - Facilita ajustes y testing
+- **Uso nuevo:**
+  ```python
+  from pjn.config import get_config
+  config = get_config()
+  timeout = config.scraping.timeout_default
+
+  # Override para testing
+  from pjn.config import set_config, Config
+  set_config(Config.for_testing())
+  ```
+
+---
+
+### ✅ Mejora #5: Separar lógica de descarga de archivos
+- **Estado:** ✅ COMPLETADA (parcial)
+- **Fecha:** 2025-10-15
+- **Archivos creados:**
+  - `pjn/persistence/__init__.py` (NUEVO)
+  - `pjn/persistence/actuaciones.py` (NUEVO)
+- **Descripción:** Función mezcla lectura JSON, filtrado, descarga y actualización
+- **Solución implementada:**
+  - ✅ Creadas funciones auxiliares de persistencia separadas:
+    - `cargar_actuaciones_json(ruta)` - carga JSON raw
+    - `cargar_actuaciones_archivo(ruta)` - carga y convierte a modelo
+    - `guardar_actuaciones_json(archivo, dir)` - guarda modelo como JSON
+    - `listar_archivos_actuaciones(dir)` - lista JSONs disponibles
+    - `extraer_actuaciones_con_archivos(archivo)` - filtra pendientes
+    - `actualizar_descargados(ruta, actuaciones)` - actualiza estado
+  - ✅ Creada `descargar_archivos_desde_archivo()` - versión pura (sin I/O)
+- **Impacto:** 🟠 ALTO - Permite composición flexible de operaciones
+- **Uso nuevo:**
+  ```python
+  from pjn.persistence import cargar_actuaciones_archivo, guardar_actuaciones_json
+
+  # Cargar, procesar, guardar por separado
+  archivo = cargar_actuaciones_archivo("datos/exp-123/actuaciones-123.json")
+  archivo_actualizado = await descargar_archivos_desde_archivo(page, archivo, "datos/exp-123")
+  guardar_actuaciones_json(archivo_actualizado, "datos/exp-123")
+  ```
+
+---
+
+### ⏸️ Mejora #6: Parametrizar estrategias de paginación
+- **Estado:** ⏸️ PENDIENTE (no prioritario por ahora)
+- **Archivos afectados:**
+  - `pjn/scraping/expedientes.py:169-508`
+- **Descripción:** Lógica de paginación hardcodeada en función gigante
+- **Solución propuesta:**
+  - ⏸️ Crear `Protocol` para estrategias de paginación
+  - ⏸️ Extraer lógica PrimeFaces a clase `PrimeFacesPaginationStrategy`
+  - ⏸️ Inyectar estrategia como parámetro opcional
+- **Impacto:** 🟠 MEDIO-ALTO - Facilita adaptación a otros portales
+- **Nota:** Puede implementarse si se necesita soporte para otros portales
+
+---
+
+## 🟡 Prioridad MEDIA
+
+### ⏸️ Mejora #7: Refactorizar funciones gigantes
+- **Estado:** ⏸️ PENDIENTE
+- **Archivos:** `expedientes.py:169-508` (230 líneas), `entradas.py:124-421` (297 líneas)
+- **Impacto:** 🟡 MEDIO
+
+### ⏸️ Mejora #8: Mejorar tipado con TypedDict
+- **Estado:** ⏸️ PENDIENTE
+- **Archivos:** `actuaciones.py`, `expedientes.py`
+- **Impacto:** 🟡 MEDIO
+
+### ⏸️ Mejora #9: Centralizar normalización de nombres de archivo
+- **Estado:** ⏸️ PENDIENTE
+- **Archivos:** `actuaciones.py:714-741`, `parsers/actuaciones_parser.py`
+- **Impacto:** 🟡 MEDIO
+
+---
+
+## 🟢 Prioridad BAJA
+
+### ⏸️ Mejora #10: Validación con Pydantic
+- **Estado:** ⏸️ PENDIENTE
+- **Impacto:** 🟢 BAJO
+
+### ⏸️ Mejora #11: Abstracción para selectores CSS versionados
+- **Estado:** ⏸️ PENDIENTE
+- **Impacto:** 🟢 BAJO
+
+### ⏸️ Mejora #12: Suite de tests unitarios
+- **Estado:** ⏸️ PENDIENTE
+- **Impacto:** 🟢 BAJO
+
+### ⏸️ Mejora #13: Documentación con Sphinx
+- **Estado:** ⏸️ PENDIENTE
+- **Impacto:** 🟢 BAJO
+
+### ⏸️ Mejora #14: Logging de métricas de rendimiento
+- **Estado:** ⏸️ PENDIENTE
+- **Impacto:** 🟢 BAJO
+
+---
+
+## 📊 Progreso General
+
+```
+🔴 CRÍTICA:  [███░] 75% (3/4 completadas)
+🟠 ALTA:     [██░] 67% (2/3 completadas)
+🟡 MEDIA:    [░░░] 0% (0/3 completadas)
+🟢 BAJA:     [░░░] 0% (0/5 completadas)
+
+TOTAL: 33% (5/15 mejoras)
+```
+
+**Mejoras completadas HOY (2025-10-15):**
+- ✅ Mejora #0: Hoja de ruta
+- ✅ Mejora #1: Separación de extracción y persistencia
+- ✅ Mejora #3: Eliminación de side effects
+- ✅ Mejora #4: Configuración centralizada
+- ✅ Mejora #5: Módulo de persistencia
+
+---
+
+## 🎯 Siguiente Sprint
+
+**Foco:** Mejora #2 (estandarizar errores) y mejoras de MEDIA prioridad si es necesario
+**Estimación:** 1-2 horas de trabajo
+**Bloqueos:** Ninguno identificado
+**Nota:** Las mejoras implementadas hoy ya cubren el 80% del valor para reutilización
+
+---
+
+## 📝 Notas
+
+- Las mejoras críticas desbloquean el 80% del valor para reutilización
+- Se mantiene retrocompatibilidad creando nuevas funciones en lugar de modificar existentes
+- Los scripts existentes (`rf_test_extraccion_completa.py`) seguirán funcionando
+- Se recomienda actualizar scripts para usar las nuevas funciones "puras"
+
+---
+
+**Última actualización:** 2025-10-15

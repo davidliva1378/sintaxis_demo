@@ -120,29 +120,37 @@ def _base_key(e: Dict[str, Any]) -> tuple:
 def _event_key(e: Dict[str, Any]) -> tuple:
     return _base_key(e) + (e.get("evento","") or "",)
 
-# ===== FUNCIÓN ÚNICA =====
-async def extraer_entradas_pjn(
+# ===== FUNCIÓN PURA (sin I/O) =====
+async def extraer_entradas_datos(
     page: Page,
-    destino: Optional[str] = None,
     duplicados: bool = False,
     incluir_tipos: tuple[str, ...] = ("N", "D"),
     fechas: Optional[Iterable[str]] = None,
     fecha_desde: Optional[str] = None,
     fecha_hasta: Optional[str] = None,
-    coleccion_modelos: Optional[List[Entrada]] = None,
-) -> int:
-    """
-    Recorre la lista del PJN y persiste JSON/CSV.
-    - page: Playwright Page ya logueada y con la lista abierta.
-    - destino: carpeta base (default ./datos_extraidos/monitoreo).
-    - duplicados: False => dedup por (numero, fecha, caratula, evento) + enriquece históricos.
-                  True  => guarda todas las apariciones.
-    - incluir_tipos: ('N',), ('D',) o ('N','D') (default).
-    - fechas: fecha(s) exactas (YYYY-MM-DD o DD/MM/YYYY). Si se indica, se ignoran los rangos.
-    - fecha_desde / fecha_hasta: rango inclusivo (mismos formatos).
+    historial_existente: Optional[List[Entrada]] = None,
+) -> List[Entrada]:
+    """Extrae entradas del PJN y retorna lista de modelos (NO guarda archivos).
 
-    Retorna: cantidad de registros NUEVOS agregados en esta corrida
-             (si duplicados=True, cantidad agregada tal cual).
+    Esta es la versión "pura" que NO persiste JSON/CSV. Útil para:
+    - Procesamiento en memoria
+    - Integración con otras rutinas
+    - Testing
+
+    Args:
+        page: Playwright Page ya logueada y con la lista abierta.
+        duplicados: False => dedup por (numero, fecha, caratula, evento).
+                    True => retorna todas las apariciones.
+        incluir_tipos: ('N',), ('D',) o ('N','D') (default).
+        fechas: fecha(s) exactas (YYYY-MM-DD o DD/MM/YYYY).
+        fecha_desde / fecha_hasta: rango inclusivo (mismos formatos).
+        historial_existente: Lista de entradas previas para deduplicación.
+
+    Returns:
+        List[Entrada]: Lista de modelos de Entrada extraídos.
+
+    Raises:
+        ExtraccionError: Si no se puede acceder al contenedor de entradas.
     """
     logger.info("🔍 Extrayendo entradas del PJN...")
 
@@ -151,32 +159,27 @@ async def extraer_entradas_pjn(
     rango_desde = _parse_fecha_limite(fecha_desde)
     rango_hasta = _parse_fecha_limite(fecha_hasta)
 
-    # Destino y archivos
-    base_dir = destino if destino else os.path.join(os.getcwd(), "datos_extraidos", "monitoreo")
-    os.makedirs(base_dir, exist_ok=True)
-    HISTORIAL_JSON = os.path.join(base_dir, "historial_notificaciones.json")
-    HISTORIAL_CSV  = os.path.join(base_dir, "historial_notificaciones.csv")
+    # Preparar historial para deduplicación
+    historial_dicts: list[Dict[str, Any]] = []
+    if historial_existente:
+        historial_dicts = [e.to_dict() for e in historial_existente]
 
-    # Cargar historial
-    historial: list[Dict[str, Any]] = []
-    if os.path.exists(HISTORIAL_JSON):
-        try:
-            with open(HISTORIAL_JSON, "r", encoding="utf-8") as f:
-                historial = json.load(f)
-        except Exception as e:
-            logger.warning("⚠️ Error leyendo JSON existente: %s. Se continúa con historial vacío.", e)
-            historial = []
-
-    claves_hist_base  = set(_base_key(e) for e in historial if e.get("numero") and e.get("fecha") and e.get("caratula"))
-    claves_hist_event = set(_event_key(e) for e in historial if e.get("numero") and e.get("fecha") and e.get("caratula"))
+    claves_hist_base = set(
+        _base_key(e) for e in historial_dicts
+        if e.get("numero") and e.get("fecha") and e.get("caratula")
+    )
+    claves_hist_event = set(
+        _event_key(e) for e in historial_dicts
+        if e.get("numero") and e.get("fecha") and e.get("caratula")
+    )
 
     # Asegurar contenedor y filas
+    from ..exceptions import ExtraccionError
     try:
         await page.wait_for_selector(SEL_ENTRADAS.CONTENEDOR_SCROLL, state="visible", timeout=15_000)
         await page.wait_for_selector(SEL_ENTRADAS.TABLA, state="visible", timeout=15_000)
-    except Exception:
-        logger.error("❌ Contenedor o filas no visibles. Abortando.")
-        return 0
+    except Exception as exc:
+        raise ExtraccionError("Contenedor o filas no visibles") from exc
 
     cont = page.locator(SEL_ENTRADAS.CONTENEDOR_SCROLL)
     await cont.scroll_into_view_if_needed()
@@ -195,11 +198,11 @@ async def extraer_entradas_pjn(
     except Exception:
         pass
 
-    nuevas_run: list[Dict[str, Any]] = []
+    nuevas_entradas: List[Entrada] = []
     vistos_run_event: set[tuple] = set()
     scrolled_count = 0
     iteracion = 0
-    max_iter = 500  # safety
+    max_iter = 500
 
     # Contadores de diagnóstico
     filas_procesadas = 0
@@ -210,9 +213,7 @@ async def extraer_entradas_pjn(
     filas_sin_evento = 0
     filas_filtradas_tipo = 0
     filas_filtradas_fecha = 0
-    filas_duplicadas = 0
 
-    # Para confirmar avance (listas virtualizadas)
     async def _ultima_fila_texto() -> str:
         filas = await page.query_selector_all(SEL_ENTRADAS.TABLA)
         if not filas:
@@ -230,7 +231,6 @@ async def extraer_entradas_pjn(
     while iteracion < max_iter:
         iteracion += 1
 
-        # 1) Procesar filas visibles
         filas = await page.query_selector_all(SEL_ENTRADAS.TABLA)
         for fila in filas:
             try:
@@ -238,7 +238,7 @@ async def extraer_entradas_pjn(
 
                 num_elem = await fila.query_selector(SEL_ENTRADAS.EXPEDIENTE_NUMERO)
                 car_elem = await fila.query_selector(SEL_ENTRADAS.EXPEDIENTE_CARATULA)
-                celdas   = await fila.query_selector_all(SEL_ENTRADAS.CELDAS_FILA)
+                celdas = await fila.query_selector_all(SEL_ENTRADAS.CELDAS_FILA)
 
                 if not num_elem:
                     filas_sin_numero += 1
@@ -250,35 +250,30 @@ async def extraer_entradas_pjn(
                     filas_sin_celdas += 1
                     continue
 
-                numero   = limpiar_texto(await num_elem.inner_text())
+                numero = limpiar_texto(await num_elem.inner_text())
                 caratula = limpiar_texto(await car_elem.inner_text())
 
-                # Extraer fecha desde aria-label (formato: "DD/MM/YYYY HH:MM")
                 fecha_s = ""
                 try:
                     fecha_elem = await celdas[2].query_selector(SEL_ENTRADAS.FECHA_ELEMENTO)
                     if fecha_elem:
                         fecha_aria = await fecha_elem.get_attribute("aria-label")
                         if fecha_aria:
-                            # Extraer solo la fecha (primera parte antes del espacio)
                             fecha_s = fecha_aria.split()[0] if " " in fecha_aria else fecha_aria
                 except Exception:
                     pass
 
-                # Fallback: usar inner_text si no se encontró aria-label
                 if not fecha_s:
                     fecha_s = limpiar_texto(await celdas[2].inner_text())
 
                 fecha_iso = _to_iso(fecha_s)
                 if not fecha_iso:
                     filas_sin_fecha += 1
-                    logger.debug("Fila sin fecha válida. Texto extraído: '%s'", fecha_s)
                     continue
 
                 evento, tipo_evento = await _detectar_indicador_evento(fila)
                 if not evento:
                     filas_sin_evento += 1
-                    logger.debug("Fila sin indicador de evento. Número: %s", numero[:20])
                     continue
                 if incluir_tipos and evento not in incluir_tipos:
                     filas_filtradas_tipo += 1
@@ -307,44 +302,39 @@ async def extraer_entradas_pjn(
                     leida=False,
                     extraida_en=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 )
-                item = entrada_modelo.to_dict()
-                if coleccion_modelos is not None:
-                    coleccion_modelos.append(entrada_modelo)
 
                 if duplicados:
-                    nuevas_run.append(item)
+                    nuevas_entradas.append(entrada_modelo)
                     continue
 
-                # sin duplicados: dedup por evento
-                base_k  = _base_key(item)
-                event_k = _event_key(item)
+                # Deduplicación
+                item_dict = entrada_modelo.to_dict()
+                base_k = _base_key(item_dict)
+                event_k = _event_key(item_dict)
 
-                # ya existe exactamente este evento
                 if event_k in claves_hist_event or event_k in vistos_run_event:
                     continue
 
-                # existe la base pero sin 'evento' => enriquecer historial
-                if base_k in claves_hist_base and item.get("evento"):
-                    for reg in historial:
-                        if _base_key(reg) == base_k and not reg.get("evento"):
-                            reg["evento"] = item["evento"]
-                            reg["tipo_evento"] = item.get("tipo_evento")
+                if base_k in claves_hist_base and item_dict.get("evento"):
+                    # Enriquecer historial (actualizar in-place si se proporcionó)
+                    for reg_dict in historial_dicts:
+                        if _base_key(reg_dict) == base_k and not reg_dict.get("evento"):
+                            reg_dict["evento"] = item_dict["evento"]
+                            reg_dict["tipo_evento"] = item_dict.get("tipo_evento")
                     claves_hist_event.add(event_k)
                     continue
 
-                # nuevo real
-                nuevas_run.append(item)
+                nuevas_entradas.append(entrada_modelo)
                 vistos_run_event.add(event_k)
 
             except Exception:
-                # error puntual de parse: seguir
                 continue
 
-        # 2) ¿fin al fondo con heading visible?
+        # Detección de fin
         if scrolled_count > 0 and await _near_bottom(page) and await fin_loc.is_visible():
             break
 
-        # 3) Avanzar tramo: scroll + wheel + sync loader
+        # Avanzar
         await _scroll_step(page)
         scrolled_count += 1
         await _wheel(page, cont)
@@ -355,7 +345,6 @@ async def extraer_entradas_pjn(
         except Exception:
             pass
 
-        # 4) Confirmar avance
         ultima_fila_now = await _ultima_fila_texto()
         if ultima_fila_now == ultima_fila_prev and not await _near_bottom(page):
             for _ in range(2):
@@ -363,45 +352,9 @@ async def extraer_entradas_pjn(
             ultima_fila_now = await _ultima_fila_texto()
         ultima_fila_prev = ultima_fila_now
 
-    # ===== Persistencia =====
-    nuevas_count = 0
-    if duplicados:
-        historial = nuevas_run + historial
-        nuevas_count = len(nuevas_run)
-    else:
-        if nuevas_run:
-            historial = nuevas_run + historial
-            nuevas_count = len(nuevas_run)
-
-    # Guardar JSON
-    try:
-        with open(HISTORIAL_JSON, "w", encoding="utf-8") as f:
-            json.dump(historial, f, indent=4, ensure_ascii=False)
-    except Exception as e:
-        logger.error("❌ Error guardando JSON: %s", e)
-
-    # Regenerar CSV completo
-    try:
-        with open(HISTORIAL_CSV, "w", newline="", encoding="utf-8") as f:
-            w = csv.writer(f)
-            w.writerow(["Fecha", "Número", "Carátula", "Evento", "TipoEvento", "Leída", "Extraída En"])
-            for e in historial:
-                w.writerow([
-                    e.get("fecha",""),
-                    e.get("numero",""),
-                    e.get("caratula",""),
-                    e.get("evento","") or "",
-                    e.get("tipo_evento","") or "",
-                    "Sí" if e.get("leida", False) else "No",
-                    e.get("extraida_en",""),
-                ])
-    except Exception as e:
-        logger.error("❌ Error guardando CSV: %s", e)
-
-    # Resumen de diagnóstico
-    logger.info("✅ Listo. Nuevas agregadas en esta corrida: %d", nuevas_count)
-    logger.info("   Carpeta: %s", os.path.abspath(base_dir))
-    logger.info("\n📊 Resumen de procesamiento:")
+    # Logging de diagnóstico
+    logger.info("✅ Extracción completada. Nuevas entradas: %d", len(nuevas_entradas))
+    logger.info("📊 Resumen de procesamiento:")
     logger.info("   - Filas procesadas: %d", filas_procesadas)
     if filas_sin_numero > 0:
         logger.warning("   - Filas sin número: %d", filas_sin_numero)
@@ -418,6 +371,125 @@ async def extraer_entradas_pjn(
     if filas_filtradas_fecha > 0:
         logger.info("   - Filtradas por fecha: %d", filas_filtradas_fecha)
 
+    return nuevas_entradas
+
+
+# ===== FUNCIÓN CON PERSISTENCIA (compatibilidad) =====
+async def extraer_entradas_pjn(
+    page: Page,
+    destino: Optional[str] = None,
+    duplicados: bool = False,
+    incluir_tipos: tuple[str, ...] = ("N", "D"),
+    fechas: Optional[Iterable[str]] = None,
+    fecha_desde: Optional[str] = None,
+    fecha_hasta: Optional[str] = None,
+    coleccion_modelos: Optional[List[Entrada]] = None,
+) -> int:
+    """Extrae entradas del PJN y persiste JSON/CSV (versión con persistencia).
+
+    NOTA: Esta función mantiene compatibilidad con código existente.
+    Para uso desde otras rutinas, considere usar extraer_entradas_datos()
+    que no guarda archivos automáticamente.
+
+    Args:
+        page: Playwright Page ya logueada y con la lista abierta.
+        destino: carpeta base (default ./datos_extraidos/monitoreo).
+        duplicados: False => dedup por (numero, fecha, caratula, evento).
+                    True => guarda todas las apariciones.
+        incluir_tipos: ('N',), ('D',) o ('N','D') (default).
+        fechas: fecha(s) exactas (YYYY-MM-DD o DD/MM/YYYY).
+        fecha_desde / fecha_hasta: rango inclusivo (mismos formatos).
+        coleccion_modelos: Lista opcional para recibir modelos extraídos.
+
+    Returns:
+        int: cantidad de registros NUEVOS agregados en esta corrida.
+
+    Deprecated:
+        Esta función será deprecada en favor de extraer_entradas_datos()
+        + funciones de persistencia separadas.
+    """
+    # Destino y archivos
+    base_dir = destino if destino else os.path.join(os.getcwd(), "datos_extraidos", "monitoreo")
+    os.makedirs(base_dir, exist_ok=True)
+    HISTORIAL_JSON = os.path.join(base_dir, "historial_notificaciones.json")
+    HISTORIAL_CSV  = os.path.join(base_dir, "historial_notificaciones.csv")
+
+    # Cargar historial existente
+    historial_modelo: List[Entrada] = []
+    historial_dicts: list[Dict[str, Any]] = []
+    if os.path.exists(HISTORIAL_JSON):
+        try:
+            with open(HISTORIAL_JSON, "r", encoding="utf-8") as f:
+                historial_dicts = json.load(f)
+                historial_modelo = [Entrada.from_dict(e) for e in historial_dicts]
+        except Exception as e:
+            logger.warning("⚠️ Error leyendo JSON existente: %s. Se continúa con historial vacío.", e)
+            historial_modelo = []
+            historial_dicts = []
+
+    # Usar la versión pura para extracción
+    try:
+        nuevas_entradas = await extraer_entradas_datos(
+            page,
+            duplicados=duplicados,
+            incluir_tipos=incluir_tipos,
+            fechas=fechas,
+            fecha_desde=fecha_desde,
+            fecha_hasta=fecha_hasta,
+            historial_existente=historial_modelo,
+        )
+    except Exception as e:
+        logger.error("❌ Error extrayendo entradas: %s", e)
+        return 0
+
+    # Poblar colección de modelos si se proporcionó
+    if coleccion_modelos is not None:
+        coleccion_modelos.extend(nuevas_entradas)
+
+    # Convertir a dicts para persistencia
+    nuevas_dicts = [e.to_dict() for e in nuevas_entradas]
+
+    # Combinar con historial
+    historial_actualizado: list[Dict[str, Any]]
+    if duplicados:
+        historial_actualizado = nuevas_dicts + historial_dicts
+        nuevas_count = len(nuevas_dicts)
+    else:
+        if nuevas_dicts:
+            historial_actualizado = nuevas_dicts + historial_dicts
+            nuevas_count = len(nuevas_dicts)
+        else:
+            historial_actualizado = historial_dicts
+            nuevas_count = 0
+
+    # Persistir JSON
+    try:
+        with open(HISTORIAL_JSON, "w", encoding="utf-8") as f:
+            json.dump(historial_actualizado, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        logger.error("❌ Error guardando JSON: %s", e)
+
+    # Regenerar CSV completo
+    try:
+        with open(HISTORIAL_CSV, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["Fecha", "Número", "Carátula", "Evento", "TipoEvento", "Leída", "Extraída En"])
+            for e in historial_actualizado:
+                w.writerow([
+                    e.get("fecha",""),
+                    e.get("numero",""),
+                    e.get("caratula",""),
+                    e.get("evento","") or "",
+                    e.get("tipo_evento","") or "",
+                    "Sí" if e.get("leida", False) else "No",
+                    e.get("extraida_en",""),
+                ])
+    except Exception as e:
+        logger.error("❌ Error guardando CSV: %s", e)
+
+    logger.info("✅ Listo. Nuevas agregadas en esta corrida: %d", nuevas_count)
+    logger.info("   Carpeta: %s", os.path.abspath(base_dir))
+
     return nuevas_count
 
 
@@ -430,8 +502,11 @@ async def extraer_entradas_pjn_modelos(
     fecha_desde: Optional[str] = None,
     fecha_hasta: Optional[str] = None,
 ) -> tuple[int, List[Entrada]]:
-    """Devuelve también los modelos :class:`Entrada` generados."""
+    """Extrae entradas con persistencia y devuelve modelos generados.
 
+    Deprecated:
+        Usar extraer_entradas_datos() para obtener solo modelos sin persistencia.
+    """
     modelos: List[Entrada] = []
     cantidad = await extraer_entradas_pjn(
         page,
