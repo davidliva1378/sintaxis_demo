@@ -53,30 +53,6 @@ _SEL_ORDENAR_LINK = "a:has-text('Ordenar')"
 TResumen = TypeVar("TResumen")
 
 
-def _parsear_fecha_corte(fecha_corte: str | None) -> datetime | None:
-    """Parsea y valida la fecha de corte.
-
-    Args:
-        fecha_corte: Fecha en formato 'YYYY-MM-DD' o 'DD/MM/AAAA'.
-
-    Returns:
-        datetime object si la fecha es válida, None si no se proporciona fecha.
-
-    Raises:
-        ValueError: Si el formato de fecha es inválido.
-    """
-    if not fecha_corte:
-        return None
-
-    fecha_corte_norm = _norm_fecha(fecha_corte)
-    try:
-        return datetime.strptime(fecha_corte_norm, "%Y-%m-%d")
-    except ValueError as exc:
-        raise ValueError(
-            "fecha_corte debe tener formato 'YYYY-MM-DD' o 'DD/MM/AAAA'"
-        ) from exc
-
-
 def _resolver_valor_orden(orden: str | None) -> str | None:
     if not orden:
         return None
@@ -162,177 +138,6 @@ async def _tbody_fingerprint(tbody: Locator | ElementHandle) -> str:
     return _build_fingerprint(html)
 
 _SEL_TOTAL_EXPEDIENTES = "strong:has-text('Se han encontrado')"
-
-
-async def _navegar_siguiente_pagina(
-    page: Page,
-    tbody_locator: Locator,
-    sel_siguiente: str,
-    fingerprint_actual: str,
-) -> tuple[bool, str | None]:
-    """Intenta navegar a la siguiente página y verifica que haya cambiado el contenido.
-
-    Args:
-        page: Página de Playwright.
-        tbody_locator: Locator del tbody para verificar cambios.
-        sel_siguiente: Selector del botón "Siguiente".
-        fingerprint_actual: Fingerprint del tbody antes de hacer clic.
-
-    Returns:
-        tuple[exito, motivo_fallo]:
-            - exito: True si navegó correctamente y cambió el contenido
-            - motivo_fallo: Código de error si falló, None si tuvo éxito
-    """
-    next_btn = page.locator(sel_siguiente)
-    btn_count = await next_btn.count()
-    if btn_count <= 0:
-        return False, "sin_siguiente"
-
-    # Buscar botón habilitado y visible
-    boton: Locator | None = None
-    for idx in range(btn_count):
-        candidato = next_btn.nth(idx)
-        if await _is_locator_enabled(candidato) and await candidato.is_visible():
-            boton = candidato
-            break
-
-    if boton is None:
-        return False, "sin_siguiente_habilitado"
-
-    # Esperar que sea visible
-    try:
-        await boton.wait_for(state="visible", timeout=10_000)
-    except TimeoutError as exc:
-        logger.warning("Botón 'Siguiente' no visible: %s", exc)
-        return False, "siguiente_timeout"
-
-    if not await _is_locator_enabled(boton):
-        return False, "siguiente_deshabilitado"
-
-    # Hacer clic
-    try:
-        await boton.click()
-    except (TimeoutError, Error) as exc:
-        logger.error("Fallo al hacer clic en 'Siguiente': %s", exc)
-        return False, "error_click"
-
-    # Esperar a que cambie el tbody
-    max_wait_ms = 12_000
-    poll_interval_ms = 400
-    elapsed_ms = 0
-    fingerprint_cambio = False
-
-    while elapsed_ms < max_wait_ms:
-        despues = await _tbody_fingerprint(tbody_locator)
-        if despues != fingerprint_actual:
-            fingerprint_cambio = True
-            break
-        wait_time = min(poll_interval_ms, max_wait_ms - elapsed_ms)
-        if wait_time <= 0:
-            break
-        await page.wait_for_timeout(wait_time)
-        elapsed_ms += wait_time
-
-    if not fingerprint_cambio:
-        return False, "fin_listado"
-
-    return True, None
-
-
-def _procesar_expediente_resumen(
-    resumen: ExpedienteResumen,
-    fecha_corte_dt: datetime | None,
-    huellas: set[tuple[str, str, str]],
-    omitir_duplicados: bool,
-    detener_en_duplicado: bool,
-) -> tuple[bool, bool, bool]:
-    """Procesa un resumen de expediente y determina si debe agregarse.
-
-    Args:
-        resumen: Resumen del expediente extraído.
-        fecha_corte_dt: Fecha de corte para filtrar (None = sin filtro).
-        huellas: Set de huellas ya vistas (numero, caratula, dependencia).
-        omitir_duplicados: Si True, no agrega duplicados.
-        detener_en_duplicado: Si True, detiene extracción al encontrar duplicado.
-
-    Returns:
-        tuple[agregar, detener, es_duplicado]:
-            - agregar: True si debe agregarse a resultados
-            - detener: True si debe detenerse la extracción
-            - es_duplicado: True si es un duplicado
-    """
-    # Parsear fecha de última actuación
-    ultima_actuacion_norm = resumen.ultima_actuacion
-    ultima_dt: datetime | None = None
-    if ultima_actuacion_norm:
-        try:
-            ultima_dt = datetime.strptime(ultima_actuacion_norm, "%Y-%m-%d")
-        except ValueError:
-            ultima_dt = None
-
-    # Crear huella para detectar duplicados
-    huella = (resumen.numero, resumen.caratula, resumen.dependencia)
-    es_duplicado = huella in huellas
-
-    # Verificar si debe detenerse por duplicado
-    if es_duplicado and detener_en_duplicado:
-        return False, True, True
-
-    # Verificar si supera fecha de corte
-    if fecha_corte_dt and ultima_dt and ultima_dt < fecha_corte_dt:
-        return False, True, False
-
-    # Verificar si debe omitirse por duplicado
-    if es_duplicado and omitir_duplicados:
-        return False, False, True
-
-    # Agregar huella si no es duplicado
-    if not es_duplicado:
-        huellas.add(huella)
-
-    return True, False, es_duplicado
-
-
-async def _aplicar_ordenamiento_tabla(
-    page: Page,
-    tabla: Locator,
-    orden: str | None,
-) -> None:
-    """Aplica ordenamiento a la tabla de expedientes si se especifica.
-
-    Args:
-        page: Página de Playwright.
-        tabla: Locator de la tabla de expedientes.
-        orden: Criterio de orden ('fecha', 'caratula', 'oficina', 'situacion').
-
-    Raises:
-        No lanza excepciones, solo loguea warnings si falla el ordenamiento.
-    """
-    if not orden:
-        return
-
-    valor_orden = _resolver_valor_orden(orden)
-    if not valor_orden:
-        logger.warning(
-            "⚠️ Valor de orden desconocido (%s). Se mantiene el orden actual.", orden
-        )
-        return
-
-    try:
-        await page.select_option(_SEL_ORDEN_SELECT, value=valor_orden)
-        await page.locator(_SEL_ORDENAR_LINK).click()
-        try:
-            await tabla.wait_for(state="hidden", timeout=5_000)
-        except TimeoutError:
-            pass
-        await tabla.wait_for(state="visible", timeout=25_000)
-        logger.info("🔽 Tabla ordenada por %s", orden.upper())
-    except TimeoutError as exc:
-        logger.warning(
-            "⚠️ El reordenamiento por %s no se completó a tiempo: %s", orden, exc
-        )
-    except Error as exc:
-        logger.warning("⚠️ No se pudo reordenar la tabla por %s: %s", orden, exc)
 
 
 async def _extraer_total_esperado(page: Page) -> int | None:
@@ -493,8 +298,16 @@ async def extraer_expedientes_completos(
             metadata["paginas_esperadas"] = paginas_esperadas
         return resultados, motivo, metadata
 
-    # Validar y parsear fecha de corte
-    fecha_corte_dt = _parsear_fecha_corte(fecha_corte)
+    # INICIO: Código movido desde líneas 333-514 (estaba suelto, ahora dentro de la función)
+    fecha_corte_dt: datetime | None = None
+    if fecha_corte:
+        fecha_corte_norm = _norm_fecha(fecha_corte)
+        try:
+            fecha_corte_dt = datetime.strptime(fecha_corte_norm, "%Y-%m-%d")
+        except ValueError as exc:
+            raise ValueError(
+                "fecha_corte debe tener formato 'YYYY-MM-DD' o 'DD/MM/AAAA'"
+            ) from exc
 
     inicio = perf_counter()
 
@@ -517,8 +330,28 @@ async def extraer_expedientes_completos(
                 // EXPEDIENTES_POR_PAGINA
             )
 
-    # Aplicar ordenamiento si se especifica
-    await _aplicar_ordenamiento_tabla(page, tabla, orden)
+    if orden:
+        valor_orden = _resolver_valor_orden(orden)
+        if not valor_orden:
+            logger.warning(
+                "⚠️ Valor de orden desconocido (%s). Se mantiene el orden actual.", orden
+            )
+        else:
+            try:
+                await page.select_option(_SEL_ORDEN_SELECT, value=valor_orden)
+                await page.locator(_SEL_ORDENAR_LINK).click()
+                try:
+                    await tabla.wait_for(state="hidden", timeout=5_000)
+                except TimeoutError:
+                    pass
+                await tabla.wait_for(state="visible", timeout=25_000)
+                logger.info("🔽 Tabla ordenada por %s", orden.upper())
+            except TimeoutError as exc:
+                logger.warning(
+                    "⚠️ El reordenamiento por %s no se completó a tiempo: %s", orden, exc
+                )
+            except Error as exc:
+                logger.warning("⚠️ No se pudo reordenar la tabla por %s: %s", orden, exc)
 
     tbody_locator = page.locator(sel_tbody)
 
@@ -556,24 +389,35 @@ async def extraer_expedientes_completos(
                 filas_descartadas += 1
                 continue
 
-            # Procesar expediente y determinar si agregarlo
-            agregar, detener, es_duplicado = _procesar_expediente_resumen(
-                resumen,
-                fecha_corte_dt,
-                huellas,
-                omitir_duplicados,
-                detener_en_duplicado,
-            )
+            ultima_actuacion_norm = resumen.ultima_actuacion
+            ultima_dt: datetime | None = None
+            if ultima_actuacion_norm:
+                try:
+                    ultima_dt = datetime.strptime(ultima_actuacion_norm, "%Y-%m-%d")
+                except ValueError:
+                    ultima_dt = None
 
-            if detener:
-                motivo = "duplicado_encontrado" if es_duplicado else "limite_fecha"
-                return _finalizar(motivo)
+            numero = resumen.numero
+            dependencia = resumen.dependencia
+            caratula = resumen.caratula
 
-            if es_duplicado:
+            huella = (numero, caratula, dependencia)
+            duplicado = huella in huellas
+
+            if duplicado and detener_en_duplicado:
+                return _finalizar("duplicado_encontrado")
+
+            if fecha_corte_dt and ultima_dt and ultima_dt < fecha_corte_dt:
+                return _finalizar("limite_fecha")
+
+            if duplicado and omitir_duplicados:
                 duplicados_descartados += 1
+                continue
 
-            if agregar:
-                resultados.append(resumen_mapper(resumen))
+            if not duplicado:
+                huellas.add(huella)
+
+            resultados.append(resumen_mapper(resumen))
 
             if _excedio_tiempo():
                 return _finalizar("limite_tiempo")
@@ -582,20 +426,60 @@ async def extraer_expedientes_completos(
         if paginas_recorridas >= max_paginas:
             return _finalizar("limite_paginas")
 
-        # Navegar a siguiente página
-        exito, motivo = await _navegar_siguiente_pagina(
-            page,
-            tbody_locator,
-            sel_siguiente,
-            fingerprint_actual,
-        )
+        next_btn = page.locator(sel_siguiente)
+        btn_count = await next_btn.count()
+        if btn_count <= 0:
+            return _finalizar("sin_siguiente")  # no hay control de siguiente
 
-        if not exito:
-            return _finalizar(motivo)
+        boton: Locator | None = None
+        for idx in range(btn_count):
+            candidato = next_btn.nth(idx)
+            if await _is_locator_enabled(candidato) and await candidato.is_visible():
+                boton = candidato
+                break
+
+        if boton is None:
+            return _finalizar("sin_siguiente_habilitado")
+
+        try:
+            await boton.wait_for(state="visible", timeout=10_000)
+        except TimeoutError as exc:
+            logger.warning("Botón 'Siguiente' no visible: %s", exc)
+            return _finalizar("siguiente_timeout")
+
+        if not await _is_locator_enabled(boton):
+            return _finalizar("siguiente_deshabilitado")
+
+        # Fingerprint antes del click para confirmar cambio real
+        antes = fingerprint_actual
+        try:
+            await boton.click()
+        except (TimeoutError, Error) as exc:
+            logger.error("Fallo al hacer clic en 'Siguiente': %s", exc)
+            return _finalizar("error_click")
+
+        # Esperar a que cambie el tbody (evita loops)
+        max_wait_ms = 12_000
+        poll_interval_ms = 400
+        elapsed_ms = 0
+        fingerprint_cambio = False
+        while elapsed_ms < max_wait_ms:
+            despues = await _tbody_fingerprint(tbody_locator)
+            if despues != antes:
+                fingerprint_cambio = True
+                break
+            wait_time = min(poll_interval_ms, max_wait_ms - elapsed_ms)
+            if wait_time <= 0:
+                break
+            await page.wait_for_timeout(wait_time)
+            elapsed_ms += wait_time
+
+        if not fingerprint_cambio:
+            # No cambió el contenido → estamos al final
+            return _finalizar("fin_listado")
 
         if _excedio_tiempo():
             return _finalizar("limite_tiempo")
-
     return _finalizar("fin_listado")
 
 
@@ -630,6 +514,188 @@ async def extraer_expedientes_completos_modelos(
     )
     return resultados, motivo, metadata
 
+    fecha_corte_dt: datetime | None = None
+    if fecha_corte:
+        fecha_corte_norm = _norm_fecha(fecha_corte)
+        try:
+            fecha_corte_dt = datetime.strptime(fecha_corte_norm, "%Y-%m-%d")
+        except ValueError as exc:
+            raise ValueError(
+                "fecha_corte debe tener formato 'YYYY-MM-DD' o 'DD/MM/AAAA'"
+            ) from exc
+
+    inicio = perf_counter()
+
+    def _excedio_tiempo() -> bool:
+        return (
+            tiempo_maximo_segundos is not None
+            and (perf_counter() - inicio) > tiempo_maximo_segundos
+        )
+
+    # Aseguramos presencia de tabla
+    tabla = page.locator(sel_tabla)
+    await tabla.wait_for(state="visible", timeout=25_000)
+
+    total_esperado = await _extraer_total_esperado(page)
+    if total_esperado is not None:
+        metadata["total_esperado"] = total_esperado
+        if isinstance(total_esperado, int):
+            paginas_esperadas = (
+                (total_esperado + EXPEDIENTES_POR_PAGINA - 1)
+                // EXPEDIENTES_POR_PAGINA
+            )
+
+    if orden:
+        valor_orden = _resolver_valor_orden(orden)
+        if not valor_orden:
+            logger.warning(
+                "⚠️ Valor de orden desconocido (%s). Se mantiene el orden actual.", orden
+            )
+        else:
+            try:
+                await page.select_option(_SEL_ORDEN_SELECT, value=valor_orden)
+                await page.locator(_SEL_ORDENAR_LINK).click()
+                try:
+                    await tabla.wait_for(state="hidden", timeout=5_000)
+                except TimeoutError:
+                    pass
+                await tabla.wait_for(state="visible", timeout=25_000)
+                logger.info("🔽 Tabla ordenada por %s", orden.upper())
+            except TimeoutError as exc:
+                logger.warning(
+                    "⚠️ El reordenamiento por %s no se completó a tiempo: %s", orden, exc
+                )
+            except Error as exc:
+                logger.warning("⚠️ No se pudo reordenar la tabla por %s: %s", orden, exc)
+
+    tbody_locator = page.locator(sel_tbody)
+
+    while True:
+        if _excedio_tiempo():
+            return _finalizar("limite_tiempo")
+
+        paginas_recorridas += 1
+        logger.info("Procesando página %d", paginas_recorridas)
+
+        fingerprint_actual = await _tbody_fingerprint(tbody_locator)
+        if fingerprint_actual in paginas_visitadas:
+            pagina_prev = paginas_visitadas[fingerprint_actual]
+            logger.warning(
+                "🔁 Página %d coincide con la ya vista en la página %d. Finalizando para evitar bucles.",
+                paginas_recorridas, pagina_prev
+            )
+            return _finalizar("bucle_detectado")
+
+        paginas_visitadas[fingerprint_actual] = paginas_recorridas
+
+        # 1) Extraer filas visibles de ESTA página en un solo evaluate
+        filas: list[list[str]] = await page.evaluate(
+            """(tbodySelector) => Array.from(
+                    document.querySelectorAll(`${tbodySelector} tr`),
+                    tr => Array.from(tr.cells, c => c.innerText.trim())
+                )""",
+            sel_tbody,
+        )
+
+        # 2) Mapear a objetos usando las columnas útiles
+        for cols in filas:
+            resumen = parse_expediente_resumen(cols)
+            if resumen is None:
+                filas_descartadas += 1
+                continue
+
+            ultima_actuacion_norm = resumen.ultima_actuacion
+            ultima_dt: datetime | None = None
+            if ultima_actuacion_norm:
+                try:
+                    ultima_dt = datetime.strptime(ultima_actuacion_norm, "%Y-%m-%d")
+                except ValueError:
+                    ultima_dt = None
+
+            numero = resumen.numero
+            dependencia = resumen.dependencia
+            caratula = resumen.caratula
+
+            huella = (numero, caratula, dependencia)
+            duplicado = huella in huellas
+
+            if duplicado and detener_en_duplicado:
+                return _finalizar("duplicado_encontrado")
+
+            if fecha_corte_dt and ultima_dt and ultima_dt < fecha_corte_dt:
+                return _finalizar("limite_fecha")
+
+            if duplicado and omitir_duplicados:
+                duplicados_descartados += 1
+                continue
+
+            if not duplicado:
+                huellas.add(huella)
+
+            resultados.append(resumen_mapper(resumen))
+
+            if _excedio_tiempo():
+                return _finalizar("limite_tiempo")
+
+        # 3) Intentar ir a la siguiente página; cortar si no hay
+        if paginas_recorridas >= max_paginas:
+            return _finalizar("limite_paginas")
+
+        next_btn = page.locator(sel_siguiente)
+        btn_count = await next_btn.count()
+        if btn_count <= 0:
+            return _finalizar("sin_siguiente")  # no hay control de siguiente
+
+        boton: Locator | None = None
+        for idx in range(btn_count):
+            candidato = next_btn.nth(idx)
+            if await _is_locator_enabled(candidato) and await candidato.is_visible():
+                boton = candidato
+                break
+
+        if boton is None:
+            return _finalizar("sin_siguiente_habilitado")
+
+        try:
+            await boton.wait_for(state="visible", timeout=10_000)
+        except TimeoutError as exc:
+            logger.warning("Botón 'Siguiente' no visible: %s", exc)
+            return _finalizar("siguiente_timeout")
+
+        if not await _is_locator_enabled(boton):
+            return _finalizar("siguiente_deshabilitado")
+
+        # Fingerprint antes del click para confirmar cambio real
+        antes = fingerprint_actual
+        try:
+            await boton.click()
+        except (TimeoutError, Error) as exc:
+            logger.error("Fallo al hacer clic en 'Siguiente': %s", exc)
+            return _finalizar("error_click")
+
+        # Esperar a que cambie el tbody (evita loops)
+        max_wait_ms = 12_000
+        poll_interval_ms = 400
+        elapsed_ms = 0
+        fingerprint_cambio = False
+        while elapsed_ms < max_wait_ms:
+            despues = await _tbody_fingerprint(tbody_locator)
+            if despues != antes:
+                fingerprint_cambio = True
+                break
+            wait_time = min(poll_interval_ms, max_wait_ms - elapsed_ms)
+            if wait_time <= 0:
+                break
+            await page.wait_for_timeout(wait_time)
+            elapsed_ms += wait_time
+
+        if not fingerprint_cambio:
+            # No cambió el contenido → estamos al final
+            return _finalizar("fin_listado")
+
+        if _excedio_tiempo():
+            return _finalizar("limite_tiempo")
+    return _finalizar("fin_listado")
 
 
 async def extraer_datos_expediente(page: Page) -> dict[str, str] | None:
