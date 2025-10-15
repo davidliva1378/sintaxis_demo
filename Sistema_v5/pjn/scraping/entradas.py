@@ -16,15 +16,10 @@ from playwright.async_api import Page
 from .base import limpiar_texto, normalizar_texto
 from ..models import Entrada
 from ..parsers.entradas_parser import parse_entrada
+from ..selectores import SEL_ENTRADAS
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-# ===== Selectores del PJN (ajusta si cambian) =====
-SELEC_TABLA = "div.MuiTableContainer-root tr"
-SELEC_EXPEDIENTE_NUMERO   = "p.MuiTypography-root.MuiTypography-body1.w-full.css-11dlpbt"
-SELEC_EXPEDIENTE_CARATULA = "p.MuiTypography-root.MuiTypography-body1.w-full.italic.css-4icvzy"
-SELEC_CONTENEDOR_SCROLL   = "#LayoutScrollingContainer"
 
 RE_FIN     = re.compile(r"No hay m[aá]s eventos", re.I)
 RE_LOADING = re.compile(r"Cargando m[aá]s eventos", re.I)
@@ -69,7 +64,7 @@ async def _near_bottom(page: Page, tol: int = 24) -> bool:
         "  if (!el) return false;"
         "  return (el.scrollTop + el.clientHeight) >= (el.scrollHeight - args.tol);"
         "}",
-        {"sel": SELEC_CONTENEDOR_SCROLL, "tol": tol},
+        {"sel": SEL_ENTRADAS.CONTENEDOR_SCROLL, "tol": tol},
     )
 
 
@@ -78,7 +73,7 @@ async def _scroll_step(page: Page):
         "(sel)=>{const el=document.querySelector(sel); if(el){"
         " const paso=Math.max(el.clientHeight*0.9,600);"
         " el.scrollTop=Math.min(el.scrollTop+paso, el.scrollHeight-el.clientHeight);"
-        "}}", SELEC_CONTENEDOR_SCROLL
+        "}}", SEL_ENTRADAS.CONTENEDOR_SCROLL
     )
 
 async def _wheel(page: Page, cont_locator):
@@ -97,7 +92,7 @@ async def _detectar_indicador_evento(fila) -> Tuple[Optional[str], Optional[str]
     """Devuelve (evento, tipo_evento): 'N'/'D' y 'NOTIFICACION'/'DESPACHO' (o None/None)."""
     # 1) aria-label (robusto)
     try:
-        con_aria = await fila.query_selector_all("[aria-label]")
+        con_aria = await fila.query_selector_all(SEL_ENTRADAS.ELEMENTOS_CON_ARIA)
         for el in con_aria:
             al = await el.get_attribute("aria-label") or ""
             if RE_EVENTO_NOTIF.search(al):
@@ -108,7 +103,7 @@ async def _detectar_indicador_evento(fila) -> Tuple[Optional[str], Optional[str]
         pass
     # 2) Fallback: letra en el Avatar
     try:
-        avatar_p = await fila.query_selector(".MuiAvatar-root p")
+        avatar_p = await fila.query_selector(SEL_ENTRADAS.AVATAR_LETRA)
         if avatar_p:
             ch = (await avatar_p.inner_text()).strip().lower()
             if ch == "n":
@@ -177,13 +172,13 @@ async def extraer_entradas_pjn(
 
     # Asegurar contenedor y filas
     try:
-        await page.wait_for_selector(SELEC_CONTENEDOR_SCROLL, state="visible", timeout=15_000)
-        await page.wait_for_selector(SELEC_TABLA, state="visible", timeout=15_000)
+        await page.wait_for_selector(SEL_ENTRADAS.CONTENEDOR_SCROLL, state="visible", timeout=15_000)
+        await page.wait_for_selector(SEL_ENTRADAS.TABLA, state="visible", timeout=15_000)
     except Exception:
         logger.error("❌ Contenedor o filas no visibles. Abortando.")
         return 0
 
-    cont = page.locator(SELEC_CONTENEDOR_SCROLL)
+    cont = page.locator(SEL_ENTRADAS.CONTENEDOR_SCROLL)
     await cont.scroll_into_view_if_needed()
 
     fin_loc = cont.get_by_role("heading", name=re.compile(r"No hay m[aá]s eventos", re.I))
@@ -208,7 +203,7 @@ async def extraer_entradas_pjn(
 
     # Para confirmar avance (listas virtualizadas)
     async def _ultima_fila_texto() -> str:
-        filas = await page.query_selector_all(SELEC_TABLA)
+        filas = await page.query_selector_all(SEL_ENTRADAS.TABLA)
         if not filas:
             return ""
         textos = []
@@ -225,12 +220,12 @@ async def extraer_entradas_pjn(
         iteracion += 1
 
         # 1) Procesar filas visibles
-        filas = await page.query_selector_all(SELEC_TABLA)
+        filas = await page.query_selector_all(SEL_ENTRADAS.TABLA)
         for fila in filas:
             try:
-                num_elem = await fila.query_selector(SELEC_EXPEDIENTE_NUMERO)
-                car_elem = await fila.query_selector(SELEC_EXPEDIENTE_CARATULA)
-                celdas   = await fila.query_selector_all("td")
+                num_elem = await fila.query_selector(SEL_ENTRADAS.EXPEDIENTE_NUMERO)
+                car_elem = await fila.query_selector(SEL_ENTRADAS.EXPEDIENTE_CARATULA)
+                celdas   = await fila.query_selector_all(SEL_ENTRADAS.CELDAS_FILA)
                 if not num_elem or not car_elem or len(celdas) < 3:
                     continue
 

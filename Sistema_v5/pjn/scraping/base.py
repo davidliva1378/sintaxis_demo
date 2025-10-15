@@ -33,13 +33,10 @@ from playwright.async_api import (
 )
 
 from ..exceptions import CredencialesFaltantes, SesionInvalida
+from ..selectores import SEL_AUTH
 
 # === Constantes de autenticación ===
 PJN_LOGIN_URL = "https://portalpjn.pjn.gov.ar/inicio"
-PJN_SELECTOR_USUARIO = "input[name='username']"
-PJN_SELECTOR_PASSWORD = "input[name='password']"
-PJN_SELECTOR_SUBMIT = "#kc-login"
-PJN_SELECTOR_CONFIRMACION = "text='Menú'"
 DEFAULT_SESSION_FILE = Path(__file__).with_name("pjn_storage_state.json")
 DEFAULT_BROWSER_ARGS = [
     "--disable-blink-features=AutomationControlled",
@@ -217,10 +214,10 @@ async def _realizar_login(
         page = await context.new_page()
         await page.goto(login_url)
         await page.wait_for_load_state("domcontentloaded")
-        await page.fill(PJN_SELECTOR_USUARIO, usuario)
-        await page.fill(PJN_SELECTOR_PASSWORD, contraseña)
-        await page.click(PJN_SELECTOR_SUBMIT)
-        await page.wait_for_selector(PJN_SELECTOR_CONFIRMACION, timeout=60000)
+        await page.fill(SEL_AUTH.USUARIO, usuario)
+        await page.fill(SEL_AUTH.PASSWORD, contraseña)
+        await page.click(SEL_AUTH.BOTON_LOGIN)
+        await page.wait_for_selector(SEL_AUTH.CONFIRMACION_LOGIN, timeout=60000)
         await _guardar_storage_state(context, session_file)
     finally:
         if page:
@@ -233,13 +230,13 @@ async def _realizar_login(
 
 async def _verificar_sesion(page: Page) -> bool:
     try:
-        await page.wait_for_selector(PJN_SELECTOR_CONFIRMACION, timeout=5000)
+        await page.wait_for_selector(SEL_AUTH.CONFIRMACION_LOGIN, timeout=5000)
         return True
     except TimeoutError:
         pass
 
     try:
-        if await page.is_visible(PJN_SELECTOR_USUARIO):
+        if await page.is_visible(SEL_AUTH.USUARIO):
             return False
     except Exception:
         return False

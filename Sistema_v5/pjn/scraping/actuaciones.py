@@ -25,6 +25,7 @@ from ..parsers.actuaciones_parser import (
     obtener_extension_valida,
     parse_actuacion_row,
 )
+from ..selectores import SEL_ACTUACIONES, escapar_id_jsf_para_css, escapar_id_jsf_para_js
 from ..utils.logging import get_logger
 from .base import normalizar_numero_expediente
 
@@ -109,16 +110,10 @@ def construir_encabezado_actuaciones(
     )
 
 
-def _escape_selector_for_css(selector: str) -> str:
-    """Escapa los dos puntos presentes en un selector CSS para Playwright."""
-
-    return re.sub(r"(?<!\\):", r"\\:", selector)
-
-
-def _escape_selector_for_js(selector: str) -> str:
-    """Escapa los dos puntos presentes en un selector CSS para ejecutarlo en JS."""
-
-    return re.sub(r"(?<!\\):", r"\\\\:", selector)
+# Las funciones de escape ahora están en selectores.py
+# Se mantienen aquí como aliases por compatibilidad
+_escape_selector_for_css = escapar_id_jsf_para_css
+_escape_selector_for_js = escapar_id_jsf_para_js
 
 
 async def _obtener_paginador_activo(page: Page, tabla_id: str) -> tuple[str | None, str | None]:

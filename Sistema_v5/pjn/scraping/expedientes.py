@@ -14,12 +14,13 @@ from playwright.async_api import (
 
 from ..models import ExpedienteResumen
 from ..parsers.expedientes_parser import parse_expediente_resumen
+from ..selectores import SEL_EXPEDIENTES
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 # --- Config por defecto (ajustables por parámetro) ---
-SEL_TABLA = "table.table-striped"
+SEL_TABLA = SEL_EXPEDIENTES.TABLA_RESULTADOS
 SEL_TBODY = f"{SEL_TABLA} tbody"
 # Varios selectores posibles de "Siguiente" (ajustá según tu portal)
 SEL_SIGUIENTE = ", ".join(
@@ -514,11 +515,11 @@ async def extraer_datos_expediente(page: Page) -> dict[str, str] | None:
         await page.wait_for_load_state("load")
         await page.wait_for_timeout(2_000)
 
-        numero = await page.query_selector("span[style='color:#000000;']")
-        caratula = await page.query_selector(r"#expediente\:j_idt96\:detailCover")
-        dependencia = await page.query_selector(r"#expediente\:j_idt96\:detailDependencia")
-        jurisdiccion = await page.query_selector(r"#expediente\:j_idt96\:detailCamera")
-        situacion = await page.query_selector(r"#expediente\:j_idt96\:detailSituation")
+        numero = await page.query_selector(SEL_EXPEDIENTES.NUMERO_DETALLE)
+        caratula = await page.query_selector(SEL_EXPEDIENTES.CARATULA_DETALLE)
+        dependencia = await page.query_selector(SEL_EXPEDIENTES.DEPENDENCIA_DETALLE)
+        jurisdiccion = await page.query_selector(SEL_EXPEDIENTES.JURISDICCION_DETALLE)
+        situacion = await page.query_selector(SEL_EXPEDIENTES.SITUACION_DETALLE)
 
         return {
             "numero": await numero.inner_text() if numero else "No encontrado",
@@ -546,7 +547,7 @@ async def abrir_expediente_desde_fila(
         logger.error("❌ No se proporcionó ninguna fila válida.")
         return None
 
-    enlace = await fila.query_selector("a")
+    enlace = await fila.query_selector(SEL_EXPEDIENTES.ENLACE_EXPEDIENTE)
     if not enlace:
         logger.warning("⚠️ No se encontró enlace para abrir el expediente en la fila.")
         return None
@@ -603,7 +604,7 @@ async def mostrar_y_elegir_expediente(
         opciones_datos: list[dict[str, str]] = []
 
         for idx, fila in enumerate(filas, start=1):
-            columnas = await fila.query_selector_all("td")
+            columnas = await fila.query_selector_all(SEL_EXPEDIENTES.COLUMNAS_FILA)
             if len(columnas) >= 3:
                 nro = (await columnas[0].inner_text()).strip()
                 anio_fila = (await columnas[1].inner_text()).strip()
@@ -762,7 +763,7 @@ async def buscar_expedientes(
     if caratula:
         filas_filtradas: list[ElementHandle] = []
         for fila in filas:
-            columnas = await fila.query_selector_all("td")
+            columnas = await fila.query_selector_all(SEL_EXPEDIENTES.COLUMNAS_FILA)
             if len(columnas) >= 3:
                 caratula_texto = (await columnas[2].inner_text()).strip().lower()
                 if caratula_texto == caratula.lower():

@@ -13,6 +13,7 @@ from ..scraping.actuaciones_utils import (
     normalizar_fecha,
 )
 from ..scraping.base import normalizar_numero_expediente
+from ..selectores import SEL_ACTUACIONES
 
 
 EXTENSIONES_CONOCIDAS = {
@@ -161,7 +162,7 @@ async def parse_actuacion_row(
     tipo_archivo = None
     hash_val = generar_hash_archivo(fecha, tipo, detalle)
 
-    icono = await fila.query_selector("i.fa-download")
+    icono = await fila.query_selector(SEL_ACTUACIONES.ICONO_DESCARGA)
     tiene_archivo = bool(icono)
 
     if icono:
