@@ -1,0 +1,17 @@
+{
+  "Indice": 1,
+  "Oficina": "Juzgado",
+  "OficinaCompleta": "Juzgado Civil",
+  "Fecha": "2024-01-02",
+  "Tipo": "DEO",
+  "Detalle": "Notificación",
+  "Foja": null,
+  "Archivo": "https://pjn.gob.ar/documento.pdf",
+  "NombreArchivo": "2024-01-02-deo-hash1.pdf",
+  "TieneArchivo": true,
+  "TipoArchivo": ".pdf",
+  "Hash": "hash1",
+  "ExtraidaEn": "2024-02-01T00:00:00Z",
+  "EsHistorica": false,
+  "Descargado": true
+}
