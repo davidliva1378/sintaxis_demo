@@ -691,7 +691,7 @@ async def extraer_actuaciones_completas(
 
 async def aviso_si_tarda(idx, segundos):
     await asyncio.sleep(segundos)
-    print(f"⏳ Descarga en curso para actuación {idx}... lleva más de {segundos} segundos.")
+    logger.warning("⏳ Descarga en curso para actuación %d... lleva más de %d segundos.", idx, segundos)
 
 async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_destino: str):
     if not actuaciones:

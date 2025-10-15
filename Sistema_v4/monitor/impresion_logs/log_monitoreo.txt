@@ -645,6 +645,147 @@
 [2025-10-08 00:44:23] ⚠️ Comparación automática: No se encontró: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo/expedientes_monitor - base.json
 [2025-10-08 00:44:59] ℹ️ Comparación manual: Modo de comparación seleccionado: parcial (filtra la base según la fecha de corte).
 [2025-10-08 00:44:59] ⚠️ Comparación manual: No se encontró: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo/expedientes_monitor - base.json
+[2025-10-13 11:13:57] 📊 Comparación configurada en modo total: se omitirá la fecha de corte durante la extracción.
+[2025-10-13 11:16:14] 📈 Total anunciado por el portal: 2065 expedientes
+[2025-10-13 11:16:14] 🧹 Filas descartadas durante la extracción: 0 duplicadas / 0 sin datos requeridos.
+[2025-10-13 11:16:14] 🚫 Expedientes marcados como inválidos en el resultado: 1.
+[2025-10-13 11:16:14] 📄 Paginación: 138 / 138
+[2025-10-13 11:16:14] 📦 Estado: completo
+[2025-10-13 11:16:14] ✅ Extracción finalizada exitosamente.
+[2025-10-13 11:16:14] 🧾 Descartes reportados: 0 duplicadas / 1 inválidas.
+[2025-10-13 11:16:14] ℹ️ No se detectó un botón 'Siguiente'; se asumió el final del listado.
+[2025-10-13 11:16:14] 📄 Paginación reportada: 138 / 138
+[2025-10-13 11:16:14] 📊 Expedientes recopilados: 2065 / 2065 esperados
+[2025-10-13 11:16:14] 📁 Guardado en: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-10-13 11:16:14] ✅ Comparación guardada en: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\reportes\comparacion_20251013_111614.json
+[2025-10-13 11:16:14] ℹ️ Comparación automática: Modo de comparación seleccionado: total (se compara contra toda la base histórica).
+[2025-10-13 11:16:14] 🧪 Comparación automática: 180 cambios detectados en expedientes.
+[2025-10-13 11:16:14] 📄 Informe de comparación: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\reportes\comparacion_20251013_111614.json
+[2025-10-13 11:20:07] 📤 Resultado entradas: Sin nuevas entradas detectadas.
+[2025-10-13 11:20:07] 📁 Carpeta de monitoreo: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo
+[2025-10-13 11:20:07] 📄 Historial JSON: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\historial_notificaciones.json
+[2025-10-13 11:20:07] 📄 Historial CSV: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\historial_notificaciones.csv
+[2025-10-13 11:20:43] 📊 Comparación configurada en modo total: se omitirá la fecha de corte durante la extracción.
+[2025-10-13 11:22:49] 📈 Total anunciado por el portal: 2065 expedientes
+[2025-10-13 11:22:49] 🧹 Filas descartadas durante la extracción: 0 duplicadas / 0 sin datos requeridos.
+[2025-10-13 11:22:49] 🚫 Expedientes marcados como inválidos en el resultado: 1.
+[2025-10-13 11:22:49] 📄 Paginación: 138 / 138
+[2025-10-13 11:22:49] 📦 Estado: completo
+[2025-10-13 11:22:49] ✅ Extracción finalizada exitosamente.
+[2025-10-13 11:22:49] 🧾 Descartes reportados: 0 duplicadas / 1 inválidas.
+[2025-10-13 11:22:49] ℹ️ No se detectó un botón 'Siguiente'; se asumió el final del listado.
+[2025-10-13 11:22:49] 📄 Paginación reportada: 138 / 138
+[2025-10-13 11:22:49] 📊 Expedientes recopilados: 2065 / 2065 esperados
+[2025-10-13 11:22:49] 📁 Guardado en: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-10-13 11:22:49] ℹ️ Comparación automática: Modo de comparación seleccionado: total (se compara contra toda la base histórica).
+[2025-10-13 11:22:49] 🧪 Comparación automática: sin cambios detectados.
+[2025-10-13 11:43:57] 📊 Comparación configurada en modo total: se omitirá la fecha de corte durante la extracción.
+[2025-10-13 11:46:06] 📈 Total anunciado por el portal: 2065 expedientes
+[2025-10-13 11:46:06] 🧹 Filas descartadas durante la extracción: 0 duplicadas / 0 sin datos requeridos.
+[2025-10-13 11:46:06] 🚫 Expedientes marcados como inválidos en el resultado: 1.
+[2025-10-13 11:46:06] 📄 Paginación: 138 / 138
+[2025-10-13 11:46:06] 📦 Estado: completo
+[2025-10-13 11:46:06] ✅ Extracción finalizada exitosamente.
+[2025-10-13 11:46:06] 🧾 Descartes reportados: 0 duplicadas / 1 inválidas.
+[2025-10-13 11:46:06] ℹ️ No se detectó un botón 'Siguiente'; se asumió el final del listado.
+[2025-10-13 11:46:06] 📄 Paginación reportada: 138 / 138
+[2025-10-13 11:46:06] 📊 Expedientes recopilados: 2065 / 2065 esperados
+[2025-10-13 11:46:06] 📁 Guardado en: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-10-13 11:46:06] ✅ Comparación guardada en: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\reportes\comparacion_20251013_114606.json
+[2025-10-13 11:46:06] ℹ️ Comparación automática: Modo de comparación seleccionado: total (se compara contra toda la base histórica).
+[2025-10-13 11:46:06] 🧪 Comparación automática: 3 cambios detectados en expedientes.
+[2025-10-13 11:46:06] 📄 Informe de comparación: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\reportes\comparacion_20251013_114606.json
+[2025-10-13 11:49:45] 📤 Resultado entradas: Sin nuevas entradas detectadas.
+[2025-10-13 11:49:45] 📁 Carpeta de monitoreo: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo
+[2025-10-13 11:49:45] 📄 Historial JSON: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\historial_notificaciones.json
+[2025-10-13 11:49:45] 📄 Historial CSV: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\historial_notificaciones.csv
+[2025-10-13 12:13:57] 📊 Comparación configurada en modo total: se omitirá la fecha de corte durante la extracción.
+[2025-10-13 12:16:15] 📈 Total anunciado por el portal: 2065 expedientes
+[2025-10-13 12:16:15] 🧹 Filas descartadas durante la extracción: 0 duplicadas / 0 sin datos requeridos.
+[2025-10-13 12:16:15] 🚫 Expedientes marcados como inválidos en el resultado: 1.
+[2025-10-13 12:16:15] 📄 Paginación: 138 / 138
+[2025-10-13 12:16:15] 📦 Estado: completo
+[2025-10-13 12:16:15] ✅ Extracción finalizada exitosamente.
+[2025-10-13 12:16:15] 🧾 Descartes reportados: 0 duplicadas / 1 inválidas.
+[2025-10-13 12:16:15] ℹ️ No se detectó un botón 'Siguiente'; se asumió el final del listado.
+[2025-10-13 12:16:15] 📄 Paginación reportada: 138 / 138
+[2025-10-13 12:16:15] 📊 Expedientes recopilados: 2065 / 2065 esperados
+[2025-10-13 12:16:15] 📁 Guardado en: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-10-13 12:16:15] ✅ Comparación guardada en: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\reportes\comparacion_20251013_121615.json
+[2025-10-13 12:16:15] ℹ️ Comparación automática: Modo de comparación seleccionado: total (se compara contra toda la base histórica).
+[2025-10-13 12:16:15] 🧪 Comparación automática: 9 cambios detectados en expedientes.
+[2025-10-13 12:16:15] 📄 Informe de comparación: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\reportes\comparacion_20251013_121615.json
+[2025-10-13 12:19:57] 📤 Resultado entradas: Sin nuevas entradas detectadas.
+[2025-10-13 12:19:57] 📁 Carpeta de monitoreo: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo
+[2025-10-13 12:19:57] 📄 Historial JSON: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\historial_notificaciones.json
+[2025-10-13 12:19:57] 📄 Historial CSV: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\historial_notificaciones.csv
+[2025-10-13 12:43:57] 📊 Comparación configurada en modo total: se omitirá la fecha de corte durante la extracción.
+[2025-10-13 12:47:43] 📈 Total anunciado por el portal: 2065 expedientes
+[2025-10-13 12:47:43] 🧹 Filas descartadas durante la extracción: 0 duplicadas / 0 sin datos requeridos.
+[2025-10-13 12:47:43] 🚫 Expedientes marcados como inválidos en el resultado: 1.
+[2025-10-13 12:47:43] 📄 Paginación: 138 / 138
+[2025-10-13 12:47:43] 📦 Estado: completo
+[2025-10-13 12:47:43] ✅ Extracción finalizada exitosamente.
+[2025-10-13 12:47:43] 🧾 Descartes reportados: 0 duplicadas / 1 inválidas.
+[2025-10-13 12:47:43] ℹ️ No se detectó un botón 'Siguiente'; se asumió el final del listado.
+[2025-10-13 12:47:43] 📄 Paginación reportada: 138 / 138
+[2025-10-13 12:47:43] 📊 Expedientes recopilados: 2065 / 2065 esperados
+[2025-10-13 12:47:43] 📁 Guardado en: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-10-13 12:47:43] ✅ Comparación guardada en: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\reportes\comparacion_20251013_124743.json
+[2025-10-13 12:47:43] ℹ️ Comparación automática: Modo de comparación seleccionado: total (se compara contra toda la base histórica).
+[2025-10-13 12:47:43] 🧪 Comparación automática: 31 cambios detectados en expedientes.
+[2025-10-13 12:47:43] 📄 Informe de comparación: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\reportes\comparacion_20251013_124743.json
+[2025-10-13 12:53:30] 📊 Comparación configurada en modo total: se omitirá la fecha de corte durante la extracción.
+[2025-10-13 12:59:56] 📊 Comparación configurada en modo total: se omitirá la fecha de corte durante la extracción.
+[2025-10-13 13:01:58] 📈 Total anunciado por el portal: 2065 expedientes
+[2025-10-13 13:01:58] 🧹 Filas descartadas durante la extracción: 1 duplicadas / 0 sin datos requeridos.
+[2025-10-13 13:01:58] 🚫 Expedientes marcados como inválidos en el resultado: 1.
+[2025-10-13 13:01:58] 📄 Paginación: 138 / 138
+[2025-10-13 13:01:58] ⚠️ El portal informó más expedientes de los que se guardaron, pero la diferencia se explicó por 1 duplicadas, 1 marcadas inválidas (total descartado: 1; diferencia informada: 1).
+[2025-10-13 13:01:58] 📦 Estado: completo
+[2025-10-13 13:01:58] ✅ Extracción finalizada exitosamente.
+[2025-10-13 13:01:58] 🧾 Descartes reportados: 1 duplicadas / 1 inválidas.
+[2025-10-13 13:01:58] ℹ️ No se detectó un botón 'Siguiente'; se asumió el final del listado.
+[2025-10-13 13:01:58] 📄 Paginación reportada: 138 / 138
+[2025-10-13 13:01:58] 📊 Expedientes recopilados: 2064 / 2065 esperados
+[2025-10-13 13:01:58] 📁 Guardado en: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-10-13 13:01:58] ✅ Comparación guardada en: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\reportes\comparacion_20251013_130158.json
+[2025-10-13 13:01:58] ℹ️ Comparación automática: Modo de comparación seleccionado: total (se compara contra toda la base histórica).
+[2025-10-13 13:01:58] 🧪 Comparación automática: 36 cambios detectados en expedientes.
+[2025-10-13 13:01:58] 📄 Informe de comparación: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\reportes\comparacion_20251013_130158.json
+[2025-10-13 13:06:18] 📤 Resultado entradas: Sin nuevas entradas detectadas.
+[2025-10-13 13:06:18] 📁 Carpeta de monitoreo: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo
+[2025-10-13 13:06:18] 📄 Historial JSON: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\historial_notificaciones.json
+[2025-10-13 13:06:18] 📄 Historial CSV: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\historial_notificaciones.csv
+[2025-10-13 13:15:30] ❌ Error en verificación de entradas: generator didn't stop after athrow()
+[2025-10-13 13:15:30] 🧯 Se propagó una excepción desde el hilo de entradas: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 13:15:30] ❌ No se pudieron verificar las entradas.
+[2025-10-13 13:15:30] 🛑 Error reportado: generator didn't stop after athrow()
+[2025-10-13 13:15:30] 🔁 Reintentando entradas (1/5) en 5 segundo(s)...
+[2025-10-13 13:22:31] 📤 Resultado entradas: Sin nuevas entradas detectadas.
+[2025-10-13 13:22:31] 📁 Carpeta de monitoreo: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo
+[2025-10-13 13:22:31] 📄 Historial JSON: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\historial_notificaciones.json
+[2025-10-13 13:22:31] 📄 Historial CSV: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\historial_notificaciones.csv
+[2025-10-13 13:47:01] 📊 Comparación configurada en modo total: se omitirá la fecha de corte durante la extracción.
+[2025-10-13 13:48:39] 📈 Total anunciado por el portal: 2065 expedientes
+[2025-10-13 13:48:39] 🧹 Filas descartadas durante la extracción: 0 duplicadas / 0 sin datos requeridos.
+[2025-10-13 13:48:39] 🚫 Expedientes marcados como inválidos en el resultado: 1.
+[2025-10-13 13:48:39] 📄 Paginación: 138 / 138
+[2025-10-13 13:48:39] 📦 Estado: completo
+[2025-10-13 13:48:39] ✅ Extracción finalizada exitosamente.
+[2025-10-13 13:48:39] 🧾 Descartes reportados: 0 duplicadas / 1 inválidas.
+[2025-10-13 13:48:39] ℹ️ No se detectó un botón 'Siguiente'; se asumió el final del listado.
+[2025-10-13 13:48:39] 📄 Paginación reportada: 138 / 138
+[2025-10-13 13:48:39] 📊 Expedientes recopilados: 2065 / 2065 esperados
+[2025-10-13 13:48:39] 📁 Guardado en: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-10-13 13:48:39] ✅ Comparación guardada en: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\reportes\comparacion_20251013_134839.json
+[2025-10-13 13:48:39] ℹ️ Comparación automática: Modo de comparación seleccionado: total (se compara contra toda la base histórica).
+[2025-10-13 13:48:39] 🧪 Comparación automática: 59 cambios detectados en expedientes.
+[2025-10-13 13:48:39] 📄 Informe de comparación: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\reportes\comparacion_20251013_134839.json
+[2025-10-13 13:57:45] 📤 Resultado entradas: Sin nuevas entradas detectadas.
+[2025-10-13 13:57:45] 📁 Carpeta de monitoreo: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo
+[2025-10-13 13:57:45] 📄 Historial JSON: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\historial_notificaciones.json
+[2025-10-13 13:57:45] 📄 Historial CSV: F:\RESPALDO DAVID\Sistema_v2\Sistema_v4\monitor\datos_extraidos\monitoreo\historial_notificaciones.csv
 [2025-10-13 19:58:17] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
 [2025-10-13 19:59:02] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
 [2025-10-13 19:59:02] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()

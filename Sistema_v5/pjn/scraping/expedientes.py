@@ -660,7 +660,7 @@ async def buscar_expediente_por_numero(
     page: Page, numero: str, anio: str, timeout: int = 8_000
 ) -> tuple[bool, str]:
     try:
-        print(f"🔎 Buscando expediente {numero}/{anio} usando el formulario...")
+        logger.info("🔎 Buscando expediente %s/%s usando el formulario...", numero, anio)
 
         await page.click("a[href='#collapseOne']")
         await page.wait_for_selector("#collapseOne.collapse.in", timeout=5_000)
@@ -674,21 +674,21 @@ async def buscar_expediente_por_numero(
             await page.wait_for_selector(
                 "text=No se han encontrado expedientes", timeout=3_000
             )
-            print(f"❗ Expediente {numero}/{anio} no encontrado.")
+            logger.warning("❗ Expediente %s/%s no encontrado.", numero, anio)
             return False, "no_encontrado"
         except TimeoutError:
             pass
 
         await page.wait_for_selector("table.table-striped", timeout=timeout)
-        print(f"✅ Resultados cargados correctamente para {numero}/{anio}.")
+        logger.info("✅ Resultados cargados correctamente para %s/%s.", numero, anio)
         return True, "OK"
 
     except TimeoutError:
-        print(f"⏳ Tiempo de espera agotado buscando expediente {numero}/{anio}.")
+        logger.error("⏳ Tiempo de espera agotado buscando expediente %s/%s.", numero, anio)
         return False, "timeout"
 
     except Exception as exc:  # noqa: BLE001
-        print(f"❌ Error general buscando expediente {numero}/{anio}: {exc}")
+        logger.error("❌ Error general buscando expediente %s/%s: %s", numero, anio, exc)
         return False, "error"
 
 
@@ -698,10 +698,10 @@ async def buscar_expedientes_por_caratula(
     """Realiza la búsqueda de expedientes utilizando sólo la carátula."""
 
     if not caratula:
-        print("❌ Debe indicar una carátula válida para utilizar este modo de búsqueda.")
+        logger.error("❌ Debe indicar una carátula válida para utilizar este modo de búsqueda.")
         return []
 
-    print(
+    logger.info(
         "ℹ️ La búsqueda exclusiva por carátula no está automatizada aún. "
         "Se devuelve una lista vacía para permitir un manejo seguro."
     )
@@ -721,15 +721,15 @@ async def buscar_expedientes(
     caratula = caratula.strip() if caratula and caratula.strip() else None
 
     if numero and not anio:
-        print("❌ Para buscar por número debe indicar también el año del expediente.")
+        logger.error("❌ Para buscar por número debe indicar también el año del expediente.")
         return []
 
     if anio and not numero:
-        print("❌ Para buscar por año debe indicar también el número del expediente.")
+        logger.error("❌ Para buscar por año debe indicar también el número del expediente.")
         return []
 
     if not numero and not caratula:
-        print(
+        logger.error(
             "❌ Debe proporcionar un número y año del expediente o bien una carátula para realizar la búsqueda."
         )
         return []
@@ -742,21 +742,21 @@ async def buscar_expedientes(
 
     if not exito:
         if motivo == "no_encontrado":
-            print("❗ No se encontraron expedientes para los datos ingresados.")
+            logger.warning("❗ No se encontraron expedientes para los datos ingresados.")
         elif motivo == "timeout":
-            print("⏳ La búsqueda tardó demasiado en cargar.")
+            logger.error("⏳ La búsqueda tardó demasiado en cargar.")
         else:
-            print(f"❌ Error inesperado durante la búsqueda: {motivo}")
+            logger.error("❌ Error inesperado durante la búsqueda: %s", motivo)
         return []
 
     tabla = await page.query_selector("table.table-striped")
     if not tabla:
-        print("⚠️ No se encontró la tabla de resultados.")
+        logger.warning("⚠️ No se encontró la tabla de resultados.")
         return []
 
     filas = await tabla.query_selector_all("tbody tr")
     if not filas:
-        print("❌ No se encontraron filas en la tabla de resultados.")
+        logger.error("❌ No se encontraron filas en la tabla de resultados.")
         return []
 
     if caratula:

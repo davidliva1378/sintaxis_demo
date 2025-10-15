@@ -16,6 +16,9 @@ from playwright.async_api import Page
 from .base import limpiar_texto, normalizar_texto
 from ..models import Entrada
 from ..parsers.entradas_parser import parse_entrada
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 # ===== Selectores del PJN (ajusta si cambian) =====
 SELEC_TABLA = "div.MuiTableContainer-root tr"
@@ -146,7 +149,7 @@ async def extraer_entradas_pjn(
     Retorna: cantidad de registros NUEVOS agregados en esta corrida
              (si duplicados=True, cantidad agregada tal cual).
     """
-    print("🔍 Extrayendo entradas del PJN...")
+    logger.info("🔍 Extrayendo entradas del PJN...")
 
     # Normalizar filtros de fecha
     fechas_exactas = _parse_fechas_exactas(fechas)
@@ -166,7 +169,7 @@ async def extraer_entradas_pjn(
             with open(HISTORIAL_JSON, "r", encoding="utf-8") as f:
                 historial = json.load(f)
         except Exception as e:
-            print(f"⚠️ Error leyendo JSON existente: {e}. Se continúa con historial vacío.")
+            logger.warning("⚠️ Error leyendo JSON existente: %s. Se continúa con historial vacío.", e)
             historial = []
 
     claves_hist_base  = set(_base_key(e) for e in historial if e.get("numero") and e.get("fecha") and e.get("caratula"))
@@ -177,7 +180,7 @@ async def extraer_entradas_pjn(
         await page.wait_for_selector(SELEC_CONTENEDOR_SCROLL, state="visible", timeout=15_000)
         await page.wait_for_selector(SELEC_TABLA, state="visible", timeout=15_000)
     except Exception:
-        print("❌ Contenedor o filas no visibles. Abortando.")
+        logger.error("❌ Contenedor o filas no visibles. Abortando.")
         return 0
 
     cont = page.locator(SELEC_CONTENEDOR_SCROLL)
@@ -335,7 +338,7 @@ async def extraer_entradas_pjn(
         with open(HISTORIAL_JSON, "w", encoding="utf-8") as f:
             json.dump(historial, f, indent=4, ensure_ascii=False)
     except Exception as e:
-        print(f"❌ Error guardando JSON: {e}")
+        logger.error("❌ Error guardando JSON: %s", e)
 
     # Regenerar CSV completo
     try:
@@ -353,10 +356,10 @@ async def extraer_entradas_pjn(
                     e.get("extraida_en",""),
                 ])
     except Exception as e:
-        print(f"❌ Error guardando CSV: {e}")
+        logger.error("❌ Error guardando CSV: %s", e)
 
-    print(f"✅ Listo. Nuevas agregadas en esta corrida: {nuevas_count}")
-    print(f"   Carpeta: {os.path.abspath(base_dir)}")
+    logger.info("✅ Listo. Nuevas agregadas en esta corrida: %d", nuevas_count)
+    logger.info("   Carpeta: %s", os.path.abspath(base_dir))
     return nuevas_count
 
 

@@ -43,15 +43,15 @@ def seleccionar_por_consola(opciones: list[dict[str, str]]) -> int | None:
     try:
         idx = int(seleccion) - 1
     except ValueError:
-        print("❌ Selección inválida.")
+        logger.error("❌ Selección inválida.")
         return None
 
     if idx < 0:
-        print("❌ Operación cancelada por el usuario.")
+        logger.warning("❌ Operación cancelada por el usuario.")
         return None
 
     if idx >= len(opciones):
-        print("❌ Selección fuera de rango.")
+        logger.error("❌ Selección fuera de rango.")
         return None
 
     return idx
@@ -64,7 +64,7 @@ async def _mostrar_credenciales_vacias(page: Page) -> bool:
     """Verifica si el portal redirigió al formulario de login por credenciales faltantes."""
 
     if await page.is_visible("#username"):
-        print(
+        logger.warning(
             "⚠️ Debe configurar las variables de entorno PJN_USUARIO y PJN_CONTRASENA "
             "con credenciales válidas antes de ejecutar el script."
         )
@@ -83,7 +83,7 @@ async def _buscar_y_seleccionar_expediente(page: Page) -> dict[str, Any] | None:
 
     filas = await buscar_expedientes(page, numero, anio, caratula)
     if not filas:
-        print("❌ No se encontraron expedientes.")
+        logger.error("❌ No se encontraron expedientes.")
         return None
 
     return await mostrar_y_elegir_expediente(
@@ -128,30 +128,30 @@ async def main() -> None:
 
             datos_expediente = await _buscar_y_seleccionar_expediente(page)
             if not datos_expediente:
-                print("❌ No se pudo abrir ni extraer el expediente.")
+                logger.error("❌ No se pudo abrir ni extraer el expediente.")
                 return
 
             await _extraer_actuaciones(page, datos_expediente)
 
     except CredencialesFaltantes as e:
-        print(f"\n❌ Error de credenciales: {e}")
-        print("💡 Configure las variables de entorno PJN_USER y PJN_PASSWORD")
+        logger.error("\n❌ Error de credenciales: %s", e)
+        logger.info("💡 Configure las variables de entorno PJN_USER y PJN_PASSWORD")
         return
     except SesionInvalida as e:
-        print(f"\n❌ Error de sesión: {e}")
-        print("💡 Intente eliminar el archivo pjn_storage_state.json y vuelva a intentar")
+        logger.error("\n❌ Error de sesión: %s", e)
+        logger.info("💡 Intente eliminar el archivo pjn_storage_state.json y vuelva a intentar")
         return
     except ExtraccionError as e:
-        print(f"\n❌ Error durante la extracción: {e}")
+        logger.error("\n❌ Error durante la extracción: %s", e)
         return
     except PJNError as e:
-        print(f"\n❌ Error del sistema PJN: {e}")
+        logger.error("\n❌ Error del sistema PJN: %s", e)
         return
     except KeyboardInterrupt:
-        print("\n\n⚠️ Operación cancelada por el usuario")
+        logger.warning("\n\n⚠️ Operación cancelada por el usuario")
         return
     except Exception as e:
-        print(f"\n❌ Error inesperado: {type(e).__name__}: {e}")
+        logger.error("\n❌ Error inesperado: %s: %s", type(e).__name__, e)
         import traceback
         traceback.print_exc()
         return
