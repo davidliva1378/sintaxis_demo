@@ -29,6 +29,7 @@ base_datos_simulada/
 datos_extraidos/
 backup_*/
 *.json
+!tests/fixtures/**/*.json
 
 # Archivos comprimidos y exportaciones
 *.zip
