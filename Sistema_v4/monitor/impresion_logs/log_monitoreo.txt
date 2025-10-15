@@ -645,3 +645,201 @@
 [2025-10-08 00:44:23] ⚠️ Comparación automática: No se encontró: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo/expedientes_monitor - base.json
 [2025-10-08 00:44:59] ℹ️ Comparación manual: Modo de comparación seleccionado: parcial (filtra la base según la fecha de corte).
 [2025-10-08 00:44:59] ⚠️ Comparación manual: No se encontró: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo/expedientes_monitor - base.json
+[2025-10-13 19:58:17] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 19:59:02] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 19:59:02] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 19:59:02] 📦 Estado: fallo
+[2025-10-13 19:59:02] ❌ Fallo en la verificación.
+[2025-10-13 19:59:02] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 19:59:02] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 19:59:02] 🔁 Reintentando verificación (1/5) en 5 segundo(s)...
+[2025-10-13 19:59:07] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 19:59:37] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 19:59:37] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 19:59:37] 📦 Estado: fallo
+[2025-10-13 19:59:37] ❌ Fallo en la verificación.
+[2025-10-13 19:59:37] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 19:59:37] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 19:59:37] 🔁 Reintentando verificación (2/5) en 5 segundo(s)...
+[2025-10-13 19:59:42] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:00:13] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:00:13] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:00:13] 📦 Estado: fallo
+[2025-10-13 20:00:13] ❌ Fallo en la verificación.
+[2025-10-13 20:00:13] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:00:13] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:00:13] 🔁 Reintentando verificación (3/5) en 5 segundo(s)...
+[2025-10-13 20:00:17] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:00:48] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:00:48] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:00:48] 📦 Estado: fallo
+[2025-10-13 20:00:48] ❌ Fallo en la verificación.
+[2025-10-13 20:00:48] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:00:48] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:00:48] 🔁 Reintentando verificación (4/5) en 5 segundo(s)...
+[2025-10-13 20:00:53] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:01:24] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:01:24] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:01:24] 📦 Estado: fallo
+[2025-10-13 20:01:24] ❌ Fallo en la verificación.
+[2025-10-13 20:01:24] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:01:24] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:01:24] 🔁 Reintentando verificación (5/5) en 5 segundo(s)...
+[2025-10-13 20:01:29] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:01:59] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:01:59] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:01:59] 📦 Estado: fallo
+[2025-10-13 20:01:59] ❌ Fallo en la verificación.
+[2025-10-13 20:01:59] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:01:59] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:01:59] ❌ Se alcanzó el límite de reintentos configurado para expedientes.
+[2025-10-13 20:04:23] 📤 Resultado entradas: 536 nuevas entradas registradas.
+[2025-10-13 20:04:23] 📁 Carpeta de monitoreo: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo
+[2025-10-13 20:04:23] 📄 Historial JSON: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo/historial_notificaciones.json
+[2025-10-13 20:04:23] 📄 Historial CSV: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo/historial_notificaciones.csv
+[2025-10-13 20:23:49] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:24:20] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:24:20] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:24:20] 📦 Estado: fallo
+[2025-10-13 20:24:20] ❌ Fallo en la verificación.
+[2025-10-13 20:24:20] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:24:20] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:24:20] 🔁 Reintentando verificación (1/5) en 5 segundo(s)...
+[2025-10-13 20:24:25] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:24:56] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:24:56] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:24:56] 📦 Estado: fallo
+[2025-10-13 20:24:56] ❌ Fallo en la verificación.
+[2025-10-13 20:24:56] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:24:56] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:24:56] 🔁 Reintentando verificación (2/5) en 5 segundo(s)...
+[2025-10-13 20:25:01] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:25:05] 📤 Resultado entradas: Sin nuevas entradas detectadas.
+[2025-10-13 20:25:05] 📁 Carpeta de monitoreo: /Users/davidalejandroliva/PycharmProjects/sintaXis/datos_extraidos/monitoreo
+[2025-10-13 20:25:05] 📄 Historial JSON: /Users/davidalejandroliva/PycharmProjects/sintaXis/datos_extraidos/monitoreo/historial_notificaciones.json
+[2025-10-13 20:25:05] 📄 Historial CSV: /Users/davidalejandroliva/PycharmProjects/sintaXis/datos_extraidos/monitoreo/historial_notificaciones.csv
+[2025-10-13 20:25:32] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:25:32] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:25:32] 📦 Estado: fallo
+[2025-10-13 20:25:32] ❌ Fallo en la verificación.
+[2025-10-13 20:25:32] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:25:32] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:25:32] 🔁 Reintentando verificación (3/5) en 5 segundo(s)...
+[2025-10-13 20:25:37] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:25:44] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:25:44] 📦 Estado: fallo
+[2025-10-13 20:25:44] ❌ Fallo en la verificación.
+[2025-10-13 20:25:44] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:25:44] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:25:44] 🔁 Reintentando verificación (4/5) en 5 segundo(s)...
+[2025-10-13 20:25:47] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:26:16] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:26:16] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:26:16] 📦 Estado: fallo
+[2025-10-13 20:26:16] ❌ Fallo en la verificación.
+[2025-10-13 20:26:16] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:26:16] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:26:16] 🔁 Reintentando verificación (1/5) en 5 segundo(s)...
+[2025-10-13 20:26:21] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:26:52] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:26:52] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:26:52] 📦 Estado: fallo
+[2025-10-13 20:26:52] ❌ Fallo en la verificación.
+[2025-10-13 20:26:52] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:26:52] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:26:52] 🔁 Reintentando verificación (2/5) en 5 segundo(s)...
+[2025-10-13 20:26:57] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:27:03] 📤 Resultado entradas: Sin nuevas entradas detectadas.
+[2025-10-13 20:27:03] 📁 Carpeta de monitoreo: /Users/davidalejandroliva/PycharmProjects/sintaXis/datos_extraidos/monitoreo
+[2025-10-13 20:27:03] 📄 Historial JSON: /Users/davidalejandroliva/PycharmProjects/sintaXis/datos_extraidos/monitoreo/historial_notificaciones.json
+[2025-10-13 20:27:03] 📄 Historial CSV: /Users/davidalejandroliva/PycharmProjects/sintaXis/datos_extraidos/monitoreo/historial_notificaciones.csv
+[2025-10-13 20:27:27] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:27:27] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:27:27] 📦 Estado: fallo
+[2025-10-13 20:27:27] ❌ Fallo en la verificación.
+[2025-10-13 20:27:27] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:27:27] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:27:27] 🔁 Reintentando verificación (3/5) en 5 segundo(s)...
+[2025-10-13 20:27:32] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:27:39] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:27:39] 📦 Estado: fallo
+[2025-10-13 20:27:39] ❌ Fallo en la verificación.
+[2025-10-13 20:27:39] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:27:39] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:27:39] 🔁 Reintentando verificación (4/5) en 5 segundo(s)...
+[2025-10-13 20:28:11] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:28:13] 📦 Estado: fallo
+[2025-10-13 20:28:13] ❌ Fallo en la verificación.
+[2025-10-13 20:28:13] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:28:13] 🔁 Reintentando verificación (1/5) en 5 segundo(s)...
+[2025-10-13 20:28:25] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:28:55] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:28:55] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:28:55] 📦 Estado: fallo
+[2025-10-13 20:28:55] ❌ Fallo en la verificación.
+[2025-10-13 20:28:55] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:28:55] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:28:55] 🔁 Reintentando verificación (1/5) en 5 segundo(s)...
+[2025-10-13 20:29:00] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:29:31] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:29:31] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:29:31] 📦 Estado: fallo
+[2025-10-13 20:29:31] ❌ Fallo en la verificación.
+[2025-10-13 20:29:31] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:29:31] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:29:31] 🔁 Reintentando verificación (2/5) en 5 segundo(s)...
+[2025-10-13 20:29:36] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:30:06] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:30:06] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:30:06] 📦 Estado: fallo
+[2025-10-13 20:30:06] ❌ Fallo en la verificación.
+[2025-10-13 20:30:06] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:30:06] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:30:06] 🔁 Reintentando verificación (3/5) en 5 segundo(s)...
+[2025-10-13 20:30:11] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:30:42] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:30:42] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:30:42] 📦 Estado: fallo
+[2025-10-13 20:30:42] ❌ Fallo en la verificación.
+[2025-10-13 20:30:42] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:30:42] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:30:42] 🔁 Reintentando verificación (4/5) en 5 segundo(s)...
+[2025-10-13 20:30:47] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:31:17] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:31:17] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:31:17] 📦 Estado: fallo
+[2025-10-13 20:31:17] ❌ Fallo en la verificación.
+[2025-10-13 20:31:17] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:31:17] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:31:17] 🔁 Reintentando verificación (5/5) en 5 segundo(s)...
+[2025-10-13 20:31:22] 📆 Fecha de corte aplicada para la extracción: 13/10/2025
+[2025-10-13 20:31:53] ❌ Error crítico en hilo de expedientes: generator didn't stop after athrow()
+[2025-10-13 20:31:53] 🧯 Se propagó una excepción desde el hilo de expedientes: RuntimeError: generator didn't stop after athrow()
+[2025-10-13 20:31:53] 📦 Estado: fallo
+[2025-10-13 20:31:53] ❌ Fallo en la verificación.
+[2025-10-13 20:31:53] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-13 20:31:53] 🛑 Error: generator didn't stop after athrow()
+[2025-10-13 20:31:53] ❌ Se alcanzó el límite de reintentos configurado para expedientes.
+[2025-10-13 20:34:19] 📤 Resultado entradas: 1 nuevas entradas registradas.
+[2025-10-13 20:34:19] 📁 Carpeta de monitoreo: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo
+[2025-10-13 20:34:19] 📄 Historial JSON: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo/historial_notificaciones.json
+[2025-10-13 20:34:19] 📄 Historial CSV: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo/historial_notificaciones.csv
+[2025-10-14 01:36:30] 📆 Fecha de corte aplicada para la extracción: 14/10/2025
+[2025-10-14 01:36:52] 📈 Total anunciado por el portal: 2065 expedientes
+[2025-10-14 01:36:52] 🧹 Filas descartadas durante la extracción: 0 duplicadas / 0 sin datos requeridos.
+[2025-10-14 01:36:52] 📄 Paginación: 1 / 138
+[2025-10-14 01:36:52] ℹ️ La extracción finalizó por la fecha de corte 14/10/2025; es esperable obtener menos expedientes que el total anunciado.
+[2025-10-14 01:36:52] ℹ️ La extracción se detuvo antes de recorrer todas las páginas debido al límite configurado.
+[2025-10-14 01:36:52] 📦 Estado: corte_controlado
+[2025-10-14 01:36:52] ✅ Extracción detenida de forma controlada.
+[2025-10-14 01:36:52] 🧾 Descartes reportados: 0 duplicadas / 0 inválidas.
+[2025-10-14 01:36:52] 📅 Se alcanzó la fecha límite configurada.
+[2025-10-14 01:36:52] 📄 Paginación reportada: 1 / 138
+[2025-10-14 01:36:52] 📊 Expedientes recopilados: 0 / 2065 esperados
+[2025-10-14 01:36:52] 📁 Guardado en: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo/expedientes_monitor.json
+[2025-10-14 01:36:52] ℹ️ Comparación automática: Modo de comparación seleccionado: parcial (filtra la base según la fecha de corte).
+[2025-10-14 01:36:52] ⚠️ Comparación automática: No se encontró: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo/expedientes_monitor - base.json
+[2025-10-14 01:43:43] 📤 Resultado entradas: 13 nuevas entradas registradas.
+[2025-10-14 01:43:43] 📁 Carpeta de monitoreo: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo
+[2025-10-14 01:43:43] 📄 Historial JSON: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo/historial_notificaciones.json
+[2025-10-14 01:43:43] 📄 Historial CSV: /Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v4/monitor/datos_extraidos/monitoreo/historial_notificaciones.csv

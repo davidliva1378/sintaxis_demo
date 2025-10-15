@@ -7,12 +7,12 @@ from typing import Iterable, Mapping, Sequence
 from playwright.async_api import ElementHandle, Page
 
 from ..models import Actuacion, ActuacionesArchivo
-from ..scraping.actuaciones_utils import generar_hash_archivo
-from ..scraping.base import (
+from ..scraping.actuaciones_utils import (
+    generar_hash_archivo,
     limpiar_texto,
     normalizar_fecha,
-    normalizar_numero_expediente,
 )
+from ..scraping.base import normalizar_numero_expediente
 
 
 EXTENSIONES_CONOCIDAS = {
@@ -108,10 +108,19 @@ def construir_nombre_archivo_normalizado(
         fragmento = archivo_url.split("?")[0]
         extension = obtener_extension_valida(fragmento.split(".")[-1])
 
-    nombre_base = "-".join(
+    # Sanitizar la fecha para evitar crear subdirectorios
+    # Remover cualquier prefijo "Fecha:" y reemplazar barras por guiones
+    fecha_limpia = fecha or ""
+    if fecha_limpia:
+        # Remover prefijo "Fecha:"
+        fecha_limpia = fecha_limpia.replace("Fecha:", "").replace("Fecha: ", "").strip()
+        # Reemplazar barras por guiones para evitar crear carpetas
+        fecha_limpia = fecha_limpia.replace("/", "-")
+
+    nombre_base = "_".join(
         filtro
         for filtro in (
-            fecha or "",
+            fecha_limpia,
             (tipo or "").replace(" ", "_").lower(),
             hash_val or "",
         )
@@ -119,9 +128,10 @@ def construir_nombre_archivo_normalizado(
     )
     nombre_base = nombre_base or "actuacion"
 
-    if extension:
-        return f"{nombre_base}{extension}", extension
-    return nombre_base, None
+    tipo_archivo = extension[1:] if extension and len(extension) > 1 else None
+    nombre_final = f"{nombre_base}{extension}" if extension else nombre_base
+
+    return nombre_final, tipo_archivo
 
 
 async def parse_actuacion_row(
