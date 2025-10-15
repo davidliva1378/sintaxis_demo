@@ -36,11 +36,12 @@ class EntradasSelectores:
 
     # Campos de cada entrada
     EXPEDIENTE_NUMERO: ClassVar[str] = (
-        "p.MuiTypography-root.MuiTypography-body1.w-full.css-11dlpbt"
+        "p.MuiTypography-root.MuiTypography-body1.w-full.css-7t4nkx"
     )
     EXPEDIENTE_CARATULA: ClassVar[str] = (
-        "p.MuiTypography-root.MuiTypography-body1.w-full.italic.css-4icvzy"
+        "p.MuiTypography-root.MuiTypography-body1.w-full.italic.css-s43c20"
     )
+    FECHA_ELEMENTO: ClassVar[str] = "p.MuiTypography-root.MuiTypography-body2.css-diq46q"
     CELDAS_FILA: ClassVar[str] = "td"
 
     # Scroll infinito

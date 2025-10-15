@@ -201,6 +201,17 @@ async def extraer_entradas_pjn(
     iteracion = 0
     max_iter = 500  # safety
 
+    # Contadores de diagnóstico
+    filas_procesadas = 0
+    filas_sin_numero = 0
+    filas_sin_caratula = 0
+    filas_sin_celdas = 0
+    filas_sin_fecha = 0
+    filas_sin_evento = 0
+    filas_filtradas_tipo = 0
+    filas_filtradas_fecha = 0
+    filas_duplicadas = 0
+
     # Para confirmar avance (listas virtualizadas)
     async def _ultima_fila_texto() -> str:
         filas = await page.query_selector_all(SEL_ENTRADAS.TABLA)
@@ -223,34 +234,68 @@ async def extraer_entradas_pjn(
         filas = await page.query_selector_all(SEL_ENTRADAS.TABLA)
         for fila in filas:
             try:
+                filas_procesadas += 1
+
                 num_elem = await fila.query_selector(SEL_ENTRADAS.EXPEDIENTE_NUMERO)
                 car_elem = await fila.query_selector(SEL_ENTRADAS.EXPEDIENTE_CARATULA)
                 celdas   = await fila.query_selector_all(SEL_ENTRADAS.CELDAS_FILA)
-                if not num_elem or not car_elem or len(celdas) < 3:
+
+                if not num_elem:
+                    filas_sin_numero += 1
+                    continue
+                if not car_elem:
+                    filas_sin_caratula += 1
+                    continue
+                if len(celdas) < 3:
+                    filas_sin_celdas += 1
                     continue
 
                 numero   = limpiar_texto(await num_elem.inner_text())
                 caratula = limpiar_texto(await car_elem.inner_text())
-                fecha_s  = limpiar_texto(await celdas[2].inner_text())
+
+                # Extraer fecha desde aria-label (formato: "DD/MM/YYYY HH:MM")
+                fecha_s = ""
+                try:
+                    fecha_elem = await celdas[2].query_selector(SEL_ENTRADAS.FECHA_ELEMENTO)
+                    if fecha_elem:
+                        fecha_aria = await fecha_elem.get_attribute("aria-label")
+                        if fecha_aria:
+                            # Extraer solo la fecha (primera parte antes del espacio)
+                            fecha_s = fecha_aria.split()[0] if " " in fecha_aria else fecha_aria
+                except Exception:
+                    pass
+
+                # Fallback: usar inner_text si no se encontró aria-label
+                if not fecha_s:
+                    fecha_s = limpiar_texto(await celdas[2].inner_text())
+
                 fecha_iso = _to_iso(fecha_s)
                 if not fecha_iso:
+                    filas_sin_fecha += 1
+                    logger.debug("Fila sin fecha válida. Texto extraído: '%s'", fecha_s)
                     continue
 
                 evento, tipo_evento = await _detectar_indicador_evento(fila)
                 if not evento:
+                    filas_sin_evento += 1
+                    logger.debug("Fila sin indicador de evento. Número: %s", numero[:20])
                     continue
                 if incluir_tipos and evento not in incluir_tipos:
+                    filas_filtradas_tipo += 1
                     continue
 
                 # Filtros de fecha
                 if fechas_exactas:
                     if fecha_iso not in fechas_exactas:
+                        filas_filtradas_fecha += 1
                         continue
                 else:
                     f = datetime.strptime(fecha_iso, "%Y-%m-%d").date()
                     if rango_desde and f < rango_desde:
+                        filas_filtradas_fecha += 1
                         continue
                     if rango_hasta and f > rango_hasta:
+                        filas_filtradas_fecha += 1
                         continue
 
                 entrada_modelo = parse_entrada(
@@ -353,8 +398,26 @@ async def extraer_entradas_pjn(
     except Exception as e:
         logger.error("❌ Error guardando CSV: %s", e)
 
+    # Resumen de diagnóstico
     logger.info("✅ Listo. Nuevas agregadas en esta corrida: %d", nuevas_count)
     logger.info("   Carpeta: %s", os.path.abspath(base_dir))
+    logger.info("\n📊 Resumen de procesamiento:")
+    logger.info("   - Filas procesadas: %d", filas_procesadas)
+    if filas_sin_numero > 0:
+        logger.warning("   - Filas sin número: %d", filas_sin_numero)
+    if filas_sin_caratula > 0:
+        logger.warning("   - Filas sin carátula: %d", filas_sin_caratula)
+    if filas_sin_celdas > 0:
+        logger.warning("   - Filas sin suficientes celdas: %d", filas_sin_celdas)
+    if filas_sin_fecha > 0:
+        logger.warning("   - Filas sin fecha válida: %d", filas_sin_fecha)
+    if filas_sin_evento > 0:
+        logger.warning("   - Filas sin indicador de evento: %d", filas_sin_evento)
+    if filas_filtradas_tipo > 0:
+        logger.info("   - Filtradas por tipo: %d", filas_filtradas_tipo)
+    if filas_filtradas_fecha > 0:
+        logger.info("   - Filtradas por fecha: %d", filas_filtradas_fecha)
+
     return nuevas_count
 
 
