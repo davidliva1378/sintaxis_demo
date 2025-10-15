@@ -344,24 +344,48 @@ async def _extraer_actuaciones_pagina_generico(
     expediente_datos: Mapping[str, object] | dict,
     indice_inicial: int,
     builder: ActuacionBuilder[TActuacion],
-) -> tuple[list[TActuacion], str | None]:
+) -> list[TActuacion]:
+    """Extrae actuaciones de una página usando el builder especificado.
+
+    Esta función interna ahora lanza excepciones en lugar de retornar tuplas.
+
+    Args:
+        page_expediente: Página de Playwright con el expediente abierto.
+        expediente_datos: Datos del expediente.
+        indice_inicial: Índice inicial para numerar actuaciones.
+        builder: Función para construir objetos Actuacion desde filas HTML.
+
+    Returns:
+        list[TActuacion]: Lista de actuaciones extraídas.
+
+    Raises:
+        TimeoutExtraccion: Si no se encuentra la tabla en el tiempo esperado.
+        ExtraccionError: Si hay errores durante la extracción de actuaciones.
+    """
     actuaciones: list[TActuacion] = []
+
     try:
         await page_expediente.wait_for_selector(
             r"#expediente\:action-table tbody tr", timeout=8000
         )
-        filas = await page_expediente.query_selector_all(
-            r"#expediente\:action-table tbody tr"
-        )
-        if not filas:
-            return [], None
+    except PlaywrightTimeout as exc:
+        raise TimeoutExtraccion(
+            "Timeout esperando tabla de actuaciones"
+        ) from exc
 
-        normalizar_numero_expediente(
-            expediente_datos.get("numero"), valor_por_defecto="desconocido"
-        )
+    filas = await page_expediente.query_selector_all(
+        r"#expediente\:action-table tbody tr"
+    )
+    if not filas:
+        return []
 
-        timestamp_extraccion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    normalizar_numero_expediente(
+        expediente_datos.get("numero"), valor_por_defecto="desconocido"
+    )
 
+    timestamp_extraccion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    try:
         for idx, fila in enumerate(filas, start=indice_inicial):
             actuacion = await builder(
                 page_expediente,
@@ -372,27 +396,55 @@ async def _extraer_actuaciones_pagina_generico(
             )
             if actuacion:
                 actuaciones.append(actuacion)
-        return actuaciones, None
-    except Exception as e:  # noqa: BLE001
-        return [], f"{type(e).__name__}: {str(e)}"
+        return actuaciones
+    except Exception as exc:
+        raise ExtraccionError(
+            f"Error extrayendo actuaciones de la página: {type(exc).__name__}: {str(exc)}"
+        ) from exc
 
 
 async def extraer_actuaciones_pagina(
     page_expediente, expediente_datos, indice_inicial=1
-):
-    return await _extraer_actuaciones_pagina_generico(
-        page_expediente,
-        expediente_datos,
-        indice_inicial,
-        construir_actuacion_desde_fila,
-    )
+) -> tuple[list[dict], str | None]:
+    """Extrae actuaciones de la página actual (versión deprecated con tuple).
+
+    DEPRECATED: Esta función mantiene el retorno tuple[result, error] por compatibilidad.
+    Para nuevo código, use extraer_actuaciones_pagina_modelos() que lanza excepciones.
+
+    Returns:
+        tuple: (lista_actuaciones_dict, error_str_o_None)
+    """
+    try:
+        actuaciones = await _extraer_actuaciones_pagina_generico(
+            page_expediente,
+            expediente_datos,
+            indice_inicial,
+            construir_actuacion_desde_fila,
+        )
+        return actuaciones, None
+    except Exception as e:
+        return [], f"{type(e).__name__}: {str(e)}"
 
 
 async def extraer_actuaciones_pagina_modelos(
     page_expediente: Page,
     expediente_datos: Mapping[str, object] | dict,
     indice_inicial: int = 1,
-) -> tuple[list[Actuacion], str | None]:
+) -> list[Actuacion]:
+    """Extrae actuaciones de la página actual y retorna modelos Actuacion.
+
+    Args:
+        page_expediente: Página de Playwright con el expediente abierto.
+        expediente_datos: Datos del expediente.
+        indice_inicial: Índice inicial para numerar actuaciones.
+
+    Returns:
+        list[Actuacion]: Lista de modelos de actuaciones extraídas.
+
+    Raises:
+        TimeoutExtraccion: Si no se encuentra la tabla en el tiempo esperado.
+        ExtraccionError: Si hay errores durante la extracción.
+    """
     return await _extraer_actuaciones_pagina_generico(
         page_expediente,
         expediente_datos,
@@ -686,11 +738,13 @@ async def extraer_actuaciones_datos(
 
     while True:
         logger.info("📄 Página %d: extrayendo actuaciones actuales...", pagina)
-        nuevas, error = await extraer_actuaciones_pagina_modelos(
-            page_expediente, expediente_datos, indice_actual
-        )
-        if error:
-            raise ExtraccionError(f"Error en página {pagina}: {error}")
+        try:
+            nuevas = await extraer_actuaciones_pagina_modelos(
+                page_expediente, expediente_datos, indice_actual
+            )
+        except (TimeoutExtraccion, ExtraccionError) as exc:
+            raise ExtraccionError(f"Error en página {pagina}: {str(exc)}") from exc
+
         if not nuevas:
             break
 
