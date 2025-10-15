@@ -6,7 +6,7 @@ from .base import generar_hash_identificador, limpiar_texto as _limpiar_texto_ba
 from .base import normalizar_fecha as _normalizar_fecha_base
 
 _PREFIXES = re.compile(
-    r"^(?:Oficina:|Fecha:|Tipo actuacion:|Detalle:|Foja:)\s*",
+    r"^(?:Oficina:|Fecha:|Tipo[_ ]actuacion:|Detalle:|Foja:)[_\s]*",
     re.IGNORECASE,
 )
 
@@ -23,7 +23,13 @@ def limpiar_texto(texto: str | None) -> str:
 def normalizar_fecha(texto: str | None) -> str:
     """Adapta fechas dd/mm/YYYY al formato ISO, manteniendo valores originales."""
 
-    normalizada = _normalizar_fecha_base(texto)
+    # Primero limpiar el prefijo "Fecha:" si existe
+    texto_limpio = limpiar_texto(texto)
+    if not texto_limpio:
+        return ""
+
+    # Luego normalizar al formato ISO
+    normalizada = _normalizar_fecha_base(texto_limpio)
     if normalizada is None:
         return ""
     return normalizada
