@@ -64,9 +64,20 @@ Esta subdivisión mantiene módulos pequeños, testeables y cohesivos, facilita 
    auxiliares (`obtener_actuaciones_todas_paginas_modelos_async`,
    `extraer_expedientes_completos_modelos`, `extraer_entradas_pjn_modelos`).
 5. Añadir pruebas unitarias por módulo (parsers y services) y pruebas de integración con el portal (con *fixtures* controladas).
-   ✅ En progreso: se incorporaron pruebas unitarias para las utilidades de
-   scraping (normalización, métricas de descargas y filtros de entradas).
-   Resta preparar *fixtures* controladas para validar la interacción con el
-   portal real y los futuros servicios de orquestación.
+   ✅ Completado: además de las pruebas unitarias de utilidades y parsers,
+   ahora existe una batería de tests de integración ligera en
+   `tests/test_pjn_scraping_integration.py` que valida las funciones
+   asincrónicas de scraping con *fixtures* controladas ubicadas en
+   `tests/fixtures/pjn/`. Estas pruebas simulan la interacción con el portal y
+   garantizan que las capas de scraping devuelvan los modelos dataclass
+   esperados incluso ante refactors internos.
+
+### Interpretación de resultados de prueba
+- **`Process finished with exit code 0`**: indica que el proceso de pruebas finalizó
+  sin errores ni fallos. Pytest usa este código para señalar que todas las
+  aserciones pasaron correctamente.
+- **Códigos distintos de 0** (`1`, `2`, etc.): señalan fallos, interrupciones o
+  errores de ejecución. Pytest mostrará además un resumen con los tests que
+  fallaron para facilitar el diagnóstico.
 
 Esta organización minimiza dependencias circulares, centraliza la interacción con el PJN y prepara el proyecto para una futura migración a servicios externos o APIs oficiales si estuvieran disponibles.
