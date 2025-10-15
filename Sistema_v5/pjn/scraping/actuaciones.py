@@ -7,8 +7,15 @@ from datetime import datetime
 from typing import Awaitable, Callable, Iterable, Mapping, TypeVar
 from urllib.parse import parse_qs, urlparse
 
-from playwright.async_api import ElementHandle, Page, TimeoutError
+from playwright.async_api import ElementHandle, Page
+from playwright.async_api import TimeoutError as PlaywrightTimeout
 
+from ..exceptions import (
+    ActuacionesNoDisponibles,
+    DescargaFallida,
+    ExtraccionError,
+    TimeoutExtraccion,
+)
 from ..models import Actuacion, ActuacionesArchivo
 from ..parsers.actuaciones_parser import (
     EXTENSIONES_GENERICAS,
@@ -18,8 +25,11 @@ from ..parsers.actuaciones_parser import (
     obtener_extension_valida,
     parse_actuacion_row,
 )
+from ..utils.logging import get_logger
 from .base import normalizar_numero_expediente
 
+# Logger para este módulo
+logger = get_logger(__name__)
 
 TActuacion = TypeVar("TActuacion")
 
@@ -214,14 +224,16 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
                 r"#expediente\:action-historic-table tbody tr, div.alert.white-panel",
                 timeout=8000,
             )
-        except Exception:
-            return [], "Timeout esperando tabla o mensaje de actuaciones históricas"
+        except PlaywrightTimeout as e:
+            raise TimeoutExtraccion(
+                "Timeout esperando tabla o mensaje de actuaciones históricas"
+            ) from e
 
         mensaje = await page_expediente.query_selector("div.alert.white-panel")
         if mensaje:
             texto = await mensaje.inner_text()
             if "no posee actuaciones históricas" in texto.lower():
-                print("El expediente no posee actuaciones históricas.")
+                logger.info("El expediente no posee actuaciones históricas.")
                 return [], None
 
         expediente_numero = normalizar_numero_expediente(
@@ -235,11 +247,11 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
         tabla_selector_css = _escape_selector_for_css(f"#{tabla_id}")
         filas_selector = f"{tabla_selector_css} tbody tr"
         while True:
-            print(f"Página {pagina} (históricas): extrayendo...")
+            logger.info("📄 Página %d (históricas): extrayendo...", pagina)
 
             filas = await page_expediente.query_selector_all(filas_selector)
             if not filas:
-                print("No se encontraron filas en actuaciones históricas.")
+                logger.warning("⚠️ No se encontraron filas en actuaciones históricas.")
                 break
 
             for fila in filas:
@@ -276,10 +288,10 @@ async def extraer_actuaciones_historicas(page_expediente, expediente_datos, indi
                     )
 
                 except Exception as e:
-                    print(f"No se pudo avanzar de página histórica: {e}")
+                    logger.error("❌ No se pudo avanzar de página histórica: %s", e)
                     break
             else:
-                print("No hay más páginas históricas.")
+                logger.info("✅ No hay más páginas históricas.")
                 break
 
         return actuaciones, None
@@ -357,7 +369,7 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
     tabla_id = "expediente:action-table"
     tabla_selector_css = _escape_selector_for_css(f"#{tabla_id}")
     while True:
-        print(f"📄 Página {pagina}: extrayendo...")
+        logger.info("📄 Página %d: extrayendo...", pagina)
         nuevas, error = await extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_actual)
         if error:
             return todas, f"❌ Error en página {pagina}: {error}", None
@@ -369,7 +381,7 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
         boton_siguiente = await page_expediente.query_selector("a:has(span[title='Siguiente']):not(.ui-state-disabled)")
 
         if not boton_siguiente:
-            print("✅ No hay más páginas.")
+            logger.info("✅ No hay más páginas.")
             break
 
         try:
@@ -409,8 +421,8 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump({"Expediente": encabezado, "Actuaciones": todas}, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Archivo JSON guardado: {json_path}")
-    print(f"📂 Total de actuaciones: {len(todas)}")
+    logger.info("✅ Archivo JSON guardado: %s", json_path)
+    logger.info("📂 Total de actuaciones: %d", len(todas))
     return todas, None, carpeta_actuaciones
 
 
@@ -535,10 +547,10 @@ async def actualizar_actuaciones_desde_json(
             )
 
     if not nuevas_actuaciones:
-        print("ℹ️ No se detectaron actuaciones nuevas.")
+        logger.info("ℹ️ No se detectaron actuaciones nuevas.")
         return 0, data, None
 
-    print(f"✨ Se encontraron {len(nuevas_actuaciones)} actuaciones nuevas.")
+    logger.info("✨ Se encontraron %d actuaciones nuevas.", len(nuevas_actuaciones))
 
     actuaciones_actuales_existentes = [
         act
@@ -649,9 +661,9 @@ async def extraer_actuaciones_completas(
             indice_historico_esperado = len(actuaciones_actuales) + 1
             primer_indice_historico = actuaciones_historicas[0].get("Indice")
             if primer_indice_historico != indice_historico_esperado:
-                print(
+                logger.warning(
                     "⚠️ Verificar numeración histórica: se esperaba que iniciara en "
-                    f"{indice_historico_esperado}, pero comenzó en {primer_indice_historico}."
+                    "%d, pero comenzó en %d.", indice_historico_esperado, primer_indice_historico
                 )
 
         timestamp_generacion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -668,7 +680,7 @@ async def extraer_actuaciones_completas(
         json_path = os.path.join(carpeta_final, f"actuaciones-{numero_normalizado}.json")
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(estructura_json, f, indent=2, ensure_ascii=False)
-        print(f"📄 JSON generado: {json_path}")
+        logger.info("📄 JSON generado: %s", json_path)
 
         return actuaciones_actuales, actuaciones_historicas, None
 
@@ -683,16 +695,16 @@ async def aviso_si_tarda(idx, segundos):
 
 async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_destino: str):
     if not actuaciones:
-        print("⚠️ No se proporcionaron actuaciones para descargar.")
+        logger.warning("⚠️ No se proporcionaron actuaciones para descargar.")
         return
 
-    print(f"📥 Iniciando descarga de archivos ({len(actuaciones)} actuaciones)...")
+    logger.info("📥 Iniciando descarga de archivos (%d actuaciones)...", len(actuaciones))
     os.makedirs(carpeta_destino, exist_ok=True)
 
     for idx, act in enumerate(actuaciones, start=1):
         archivo_url = act.get("Archivo", "N/A")
         if not archivo_url or archivo_url == "N/A":
-            print(f"🚫 Actuación {idx}: sin archivo para descargar.")
+            logger.debug("🚫 Actuación %d: sin archivo para descargar.", idx)
             continue
 
         nombre_archivo = act.get("NombreArchivo")
@@ -736,9 +748,10 @@ async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_
         ruta_archivo = os.path.join(carpeta_destino, nombre_archivo)
 
         if os.path.exists(ruta_archivo):
-            print(f"⏭️ Archivo ya existe: {nombre_archivo}")
+            logger.info("⏭️ Archivo ya existe: %s", nombre_archivo)
             continue
 
+        ultimo_error = None
         for intento in range(3):
             advertencia = None
             try:
@@ -759,13 +772,26 @@ async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_
                 advertencia = asyncio.create_task(aviso_si_tarda(idx, 30))
                 await download.save_as(ruta_archivo)
 
-                print(f"✅ Archivo descargado: {nombre_archivo}")
+                logger.info("✅ Archivo descargado: %s", nombre_archivo)
                 break  # éxito
-            except Exception as e:
+            except (PlaywrightTimeout, asyncio.TimeoutError) as e:
+                ultimo_error = e
                 if intento == 2:
-                    print(f"❌ Falló la descarga tras 3 intentos para actuación {idx}: {e}")
+                    logger.error("❌ Timeout en descarga tras 3 intentos para actuación %d", idx)
                 else:
-                    print(f"⚠️ Reintentando actuación {idx} ({intento + 1}/3)...")
+                    logger.warning("⚠️ Timeout en actuación %d, reintentando (%d/3)...", idx, intento + 1)
+                    await asyncio.sleep(4)
+            except (OSError, IOError) as e:
+                # Errores de I/O no deben reintentar
+                logger.error("❌ Error de I/O al guardar archivo %s: %s", nombre_archivo, e)
+                ultimo_error = e
+                break
+            except Exception as e:
+                ultimo_error = e
+                if intento == 2:
+                    logger.error("❌ Error inesperado tras 3 intentos para actuación %d: %s", idx, e)
+                else:
+                    logger.warning("⚠️ Error en actuación %d, reintentando (%d/3)...", idx, intento + 1)
                     await asyncio.sleep(4)
             finally:
                 if advertencia is not None:
@@ -783,7 +809,7 @@ async def descargar_archivos_de_json(page, carpeta_destino: str):
     Marca las actuaciones descargadas como "Descargado": true.
     """
     if not carpeta_destino:
-        print("⚠️ Carpeta destino no proporcionada para las descargas.")
+        logger.warning("⚠️ Carpeta destino no proporcionada para las descargas.")
         return
 
     os.makedirs(carpeta_destino, exist_ok=True)
@@ -803,21 +829,21 @@ async def descargar_archivos_de_json(page, carpeta_destino: str):
                         actuaciones_filtradas.append(act)
                     else:
                         act["Descargado"] = True
-                        print(f"🟡 Ya existe: {act['NombreArchivo']}")
+                        logger.debug("🟡 Ya existe: %s", act['NombreArchivo'])
 
             if actuaciones_filtradas:
-                print(f"\n🔽 Descargando {len(actuaciones_filtradas)} archivo(s)...")
+                logger.info("\n🔽 Descargando %d archivo(s)...", len(actuaciones_filtradas))
                 await descargar_archivos_actuaciones(page, actuaciones_filtradas, carpeta_destino)
                 for act in actuaciones_filtradas:
                     act["Descargado"] = True
             else:
-                print("✅ Todos los archivos ya existen.")
+                logger.info("✅ Todos los archivos ya existen.")
 
         # Guardar archivo actualizado
         actualizar_metricas_descargas_en_json(data)
 
         with open(ruta_json, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-        print("📝 JSON actualizado con estado de descarga.")
+        logger.info("📝 JSON actualizado con estado de descarga.")
     else:
-        print("⚠️ No se encontró archivo de actuaciones unificado.")
+        logger.warning("⚠️ No se encontró archivo de actuaciones unificado.")

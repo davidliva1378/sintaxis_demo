@@ -32,6 +32,8 @@ from playwright.async_api import (
     async_playwright,
 )
 
+from ..exceptions import CredencialesFaltantes, SesionInvalida
+
 # === Constantes de autenticación ===
 PJN_LOGIN_URL = "https://portalpjn.pjn.gov.ar/inicio"
 PJN_SELECTOR_USUARIO = "input[name='username']"
@@ -43,14 +45,6 @@ DEFAULT_BROWSER_ARGS = [
     "--disable-blink-features=AutomationControlled",
     "--no-sandbox",
 ]
-
-
-class CredencialesFaltantes(EnvironmentError):
-    """Se lanza cuando no se encuentran credenciales para el portal."""
-
-
-class SesionInvalida(RuntimeError):
-    """Se lanza cuando no puede verificarse un login válido."""
 
 
 # === Normalización de texto y fechas ===

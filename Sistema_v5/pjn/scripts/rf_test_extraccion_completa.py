@@ -9,7 +9,14 @@ from typing import Any
 from playwright.async_api import Page
 
 from panel_pjn.acciones_pjn.urls_pjn import URL_CONSULTAS
+from Sistema_v5.pjn import (
+    CredencialesFaltantes,
+    ExtraccionError,
+    PJNError,
+    SesionInvalida,
+)
 from Sistema_v5.pjn.scraping import obtener_pagina_autenticada, normalizar_numero_expediente
+from Sistema_v5.pjn.utils.logging import get_logger, setup_logging
 from Sistema_v5.pjn.scraping.actuaciones import (
     descargar_archivos_de_json,
     extraer_actuaciones_completas,
@@ -21,7 +28,12 @@ from Sistema_v5.pjn.scraping.expedientes import (
 )
 
 
+# Configuración
 HEADLESS = os.getenv("PJN_HEADLESS", "false").lower() in {"1", "true", "yes", "y"}
+
+# Configurar logging desde variables de entorno o usar defaults
+# Usa LOG_LEVEL y LOG_FILE si están definidos
+logger = get_logger(__name__)
 
 
 def seleccionar_por_consola(opciones: list[dict[str, str]]) -> int | None:
@@ -83,7 +95,7 @@ async def _buscar_y_seleccionar_expediente(page: Page) -> dict[str, Any] | None:
 
 
 async def _extraer_actuaciones(page: Page, datos_expediente: dict[str, Any]) -> None:
-    print("\n📂 Extrayendo actuaciones actuales e históricas...")
+    logger.info("\n📂 Extrayendo actuaciones actuales e históricas...")
     actuales, historicas, error = await extraer_actuaciones_completas(
         page_expediente=page,
         expediente_datos=datos_expediente,
@@ -91,15 +103,15 @@ async def _extraer_actuaciones(page: Page, datos_expediente: dict[str, Any]) -> 
     )
 
     if error:
-        print(f"❌ Error en la extracción: {error}")
+        logger.error("❌ Error en la extracción: %s", error)
         return
 
-    print(f"✅ Se extrajeron {len(actuales)} actuaciones actuales.")
-    print(f"📜 Se extrajeron {len(historicas)} actuaciones históricas.")
+    logger.info("✅ Se extrajeron %d actuaciones actuales.", len(actuales))
+    logger.info("📜 Se extrajeron %d actuaciones históricas.", len(historicas))
 
     numero_normalizado = normalizar_numero_expediente(datos_expediente.get("numero"))
     carpeta = os.path.join("ActuacionesCompletas", numero_normalizado)
-    print(f"📁 JSONs guardados en: {carpeta}")
+    logger.info("📁 JSONs guardados en: %s", carpeta)
 
     descargar = _leer_dato("\n¿Deseás descargar los archivos vinculados? (s/n): ").lower()
     if descargar == "s":
@@ -107,18 +119,42 @@ async def _extraer_actuaciones(page: Page, datos_expediente: dict[str, Any]) -> 
 
 
 async def main() -> None:
-    async with obtener_pagina_autenticada(headless=HEADLESS) as (page, _context, _browser):
-        if await _mostrar_credenciales_vacias(page):
-            return
+    try:
+        async with obtener_pagina_autenticada(headless=HEADLESS) as (page, _context, _browser):
+            if await _mostrar_credenciales_vacias(page):
+                return
 
-        await page.goto(URL_CONSULTAS)
+            await page.goto(URL_CONSULTAS)
 
-        datos_expediente = await _buscar_y_seleccionar_expediente(page)
-        if not datos_expediente:
-            print("❌ No se pudo abrir ni extraer el expediente.")
-            return
+            datos_expediente = await _buscar_y_seleccionar_expediente(page)
+            if not datos_expediente:
+                print("❌ No se pudo abrir ni extraer el expediente.")
+                return
 
-        await _extraer_actuaciones(page, datos_expediente)
+            await _extraer_actuaciones(page, datos_expediente)
+
+    except CredencialesFaltantes as e:
+        print(f"\n❌ Error de credenciales: {e}")
+        print("💡 Configure las variables de entorno PJN_USER y PJN_PASSWORD")
+        return
+    except SesionInvalida as e:
+        print(f"\n❌ Error de sesión: {e}")
+        print("💡 Intente eliminar el archivo pjn_storage_state.json y vuelva a intentar")
+        return
+    except ExtraccionError as e:
+        print(f"\n❌ Error durante la extracción: {e}")
+        return
+    except PJNError as e:
+        print(f"\n❌ Error del sistema PJN: {e}")
+        return
+    except KeyboardInterrupt:
+        print("\n\n⚠️ Operación cancelada por el usuario")
+        return
+    except Exception as e:
+        print(f"\n❌ Error inesperado: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return
 
 
 if __name__ == "__main__":

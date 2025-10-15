@@ -14,6 +14,9 @@ from playwright.async_api import (
 
 from ..models import ExpedienteResumen
 from ..parsers.expedientes_parser import parse_expediente_resumen
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 # --- Config por defecto (ajustables por parámetro) ---
 SEL_TABLA = "table.table-striped"
@@ -354,8 +357,8 @@ async def extraer_expedientes_completos_modelos(
     if orden:
         valor_orden = _resolver_valor_orden(orden)
         if not valor_orden:
-            print(
-                f"⚠️ Valor de orden desconocido ({orden}). Se mantiene el orden actual."
+            logger.warning(
+                "⚠️ Valor de orden desconocido (%s). Se mantiene el orden actual.", orden
             )
         else:
             try:
@@ -366,13 +369,13 @@ async def extraer_expedientes_completos_modelos(
                 except TimeoutError:
                     pass
                 await tabla.wait_for(state="visible", timeout=25_000)
-                print(f"🔽 Tabla ordenada por {orden.upper()}")
+                logger.info("🔽 Tabla ordenada por %s", orden.upper())
             except TimeoutError as exc:
-                print(
-                    f"⚠️ El reordenamiento por {orden} no se completó a tiempo: {exc}"
+                logger.warning(
+                    "⚠️ El reordenamiento por %s no se completó a tiempo: %s", orden, exc
                 )
             except Error as exc:
-                print(f"⚠️ No se pudo reordenar la tabla por {orden}: {exc}")
+                logger.warning("⚠️ No se pudo reordenar la tabla por %s: %s", orden, exc)
 
     tbody_locator = page.locator(sel_tbody)
 
@@ -381,14 +384,14 @@ async def extraer_expedientes_completos_modelos(
             return _finalizar("limite_tiempo")
 
         paginas_recorridas += 1
-        print(f"Procesando página {paginas_recorridas}")
+        logger.info("Procesando página %d", paginas_recorridas)
 
         fingerprint_actual = await _tbody_fingerprint(tbody_locator)
         if fingerprint_actual in paginas_visitadas:
             pagina_prev = paginas_visitadas[fingerprint_actual]
-            print(
-                f"🔁 Página {paginas_recorridas} coincide con la ya vista en la "
-                f"página {pagina_prev}. Finalizando para evitar bucles."
+            logger.warning(
+                "🔁 Página %d coincide con la ya vista en la página %d. Finalizando para evitar bucles.",
+                paginas_recorridas, pagina_prev
             )
             return _finalizar("bucle_detectado")
 
@@ -465,7 +468,7 @@ async def extraer_expedientes_completos_modelos(
         try:
             await boton.wait_for(state="visible", timeout=10_000)
         except TimeoutError as exc:
-            print(f"Botón 'Siguiente' no visible: {exc}")
+            logger.warning("Botón 'Siguiente' no visible: %s", exc)
             return _finalizar("siguiente_timeout")
 
         if not await _is_locator_enabled(boton):
@@ -476,7 +479,7 @@ async def extraer_expedientes_completos_modelos(
         try:
             await boton.click()
         except (TimeoutError, Error) as exc:
-            print(f"Fallo al hacer clic en 'Siguiente': {exc}")
+            logger.error("Fallo al hacer clic en 'Siguiente': %s", exc)
             return _finalizar("error_click")
 
         # Esperar a que cambie el tbody (evita loops)
@@ -525,7 +528,7 @@ async def extraer_datos_expediente(page: Page) -> dict[str, str] | None:
             "situacion": await situacion.inner_text() if situacion else "No encontrada",
         }
     except Exception as exc:  # noqa: BLE001 - queremos loguear cualquier falla
-        print(f"⚠️ Error al extraer datos del expediente: {exc}")
+        logger.error("⚠️ Error al extraer datos del expediente: %s", exc)
         return None
 
 
@@ -540,25 +543,25 @@ async def abrir_expediente_desde_fila(
     """
 
     if not fila:
-        print("❌ No se proporcionó ninguna fila válida.")
+        logger.error("❌ No se proporcionó ninguna fila válida.")
         return None
 
     enlace = await fila.query_selector("a")
     if not enlace:
-        print("⚠️ No se encontró enlace para abrir el expediente en la fila.")
+        logger.warning("⚠️ No se encontró enlace para abrir el expediente en la fila.")
         return None
 
-    print("👁 Haciendo clic para abrir el expediente...")
+    logger.info("👁 Haciendo clic para abrir el expediente...")
     await enlace.click()
     await page.wait_for_load_state("load")
     await page.wait_for_timeout(2_000)
 
     datos = await extraer_datos_expediente(page)
     if datos:
-        print("✅ Datos del expediente extraídos correctamente.")
+        logger.info("✅ Datos del expediente extraídos correctamente.")
         return datos
 
-    print("⚠️ No se pudieron extraer datos. Posible error de apertura.")
+    logger.warning("⚠️ No se pudieron extraer datos. Posible error de apertura.")
     return None
 
 
@@ -578,7 +581,7 @@ async def mostrar_y_elegir_expediente(
     """Muestra las filas encontradas y abre la opción seleccionada."""
 
     if not filas:
-        print("❌ No hay filas disponibles para seleccionar.")
+        logger.error("❌ No hay filas disponibles para seleccionar.")
         return None
 
     descripcion_final = descripcion_estrategia or (
@@ -586,15 +589,15 @@ async def mostrar_y_elegir_expediente(
     )
 
     if len(filas) == 1:
-        print(
-            "✅ Solo un expediente encontrado. "
-            f"La estrategia '{descripcion_final}' no es necesaria."
+        logger.info(
+            "✅ Solo un expediente encontrado. La estrategia '%s' no es necesaria.",
+            descripcion_final
         )
         fila = filas[0]
     else:
-        print(
-            "🔎 Se encontraron múltiples expedientes. "
-            f"Aplicando estrategia '{descripcion_final}'."
+        logger.info(
+            "🔎 Se encontraron múltiples expedientes. Aplicando estrategia '%s'.",
+            descripcion_final
         )
         opciones_filas: list[ElementHandle | Locator] = []
         opciones_datos: list[dict[str, str]] = []
@@ -605,8 +608,9 @@ async def mostrar_y_elegir_expediente(
                 nro = (await columnas[0].inner_text()).strip()
                 anio_fila = (await columnas[1].inner_text()).strip()
                 caratula_fila = (await columnas[2].inner_text()).strip()
-                print(
-                    f"[{idx}] Número: {nro} / Año: {anio_fila} / Carátula: {caratula_fila}"
+                logger.info(
+                    "[%d] Número: %s / Año: %s / Carátula: %s",
+                    idx, nro, anio_fila, caratula_fila
                 )
                 opciones_filas.append(fila)
                 opciones_datos.append(
@@ -619,36 +623,36 @@ async def mostrar_y_elegir_expediente(
                 )
 
         if not opciones_filas:
-            print("❌ No se pudieron obtener opciones válidas para seleccionar.")
+            logger.error("❌ No se pudieron obtener opciones válidas para seleccionar.")
             return None
 
         estrategia = estrategia_seleccion or _seleccionar_primera_opcion
         indice = estrategia(opciones_datos)
 
         if indice is None:
-            print(
+            logger.error(
                 "❌ La estrategia de selección no devolvió ninguna opción válida."
             )
             return None
 
         if not isinstance(indice, int) or indice < 0 or indice >= len(opciones_filas):
-            print(
-                "❌ La estrategia devolvió un índice fuera de rango: "
-                f"{indice} (opciones disponibles: {len(opciones_filas)})."
+            logger.error(
+                "❌ La estrategia devolvió un índice fuera de rango: %d (opciones disponibles: %d).",
+                indice, len(opciones_filas)
             )
             return None
 
-        print(
-            f"🎯 Estrategia '{descripcion_final}' seleccionó la opción {indice + 1}."
+        logger.info(
+            "🎯 Estrategia '%s' seleccionó la opción %d.", descripcion_final, indice + 1
         )
         fila = opciones_filas[indice]
 
     datos = await abrir_expediente_desde_fila(fila, page)
     if not datos:
-        print("⚠️ No se pudo abrir el expediente seleccionado.")
+        logger.warning("⚠️ No se pudo abrir el expediente seleccionado.")
         return None
 
-    print("✅ Datos extraídos correctamente del expediente.")
+    logger.info("✅ Datos extraídos correctamente del expediente.")
     return datos
 
 
