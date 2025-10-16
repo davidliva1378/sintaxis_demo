@@ -1,8 +1,8 @@
 # Sistema_v5 - Web Scraping Framework para PJN
 
-**Versión:** 5.5
+**Versión:** 5.5.1
 **Estado:** ✅ Producción Ready
-**Líneas de código:** ~5,776 líneas Python
+**Líneas de código:** ~5,800 líneas Python
 
 ---
 
@@ -311,5 +311,5 @@ Las contribuciones son bienvenidas. Por favor:
 
 ---
 
-**Última actualización:** 2025-10-15
-**Versión:** 5.5
+**Última actualización:** 2025-10-16
+**Versión:** 5.5.1

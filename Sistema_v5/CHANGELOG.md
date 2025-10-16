@@ -7,6 +7,32 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [5.5.1] - 2025-10-16
+
+### 🔧 Modificado
+
+- **Logging mejorado en sistema de autenticación** (`pjn/scraping/base.py`)
+  - Agregado logging estructurado a `_realizar_login()`
+  - Agregado logging estructurado a `_verificar_sesion()`
+  - Agregado logging estructurado a `obtener_pagina_autenticada()`
+  - 15 mensajes de log en niveles apropiados (INFO, WARNING, ERROR, DEBUG)
+  - Visibilidad completa del flujo de autenticación y re-login automático
+
+### 📊 Métricas
+
+- **Funciones mejoradas:** 3
+- **Mensajes de log agregados:** 15
+- **Cobertura de logging:** 100% del flujo de autenticación
+
+### 🎯 Beneficios
+
+- ✅ Debugging más fácil del proceso de login
+- ✅ Visibilidad de reutilización vs creación de sesión
+- ✅ Alertas claras cuando la sesión expira
+- ✅ Logging con niveles apropiados para producción/desarrollo
+
+---
+
 ## [5.1.0] - 2025-10-15
 
 ### ⭐ Agregado

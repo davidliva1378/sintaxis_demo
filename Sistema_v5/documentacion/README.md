@@ -6,7 +6,8 @@ Esta carpeta contiene la documentación técnica y guías de uso para Sistema_v5
 
 ### 📋 Documentos Técnicos
 
-- **[pjn_selectores_tabla.md](./pjn_selectores_tabla.md)** - ⭐ **NUEVO** - Tabla centralizada de selectores CSS del portal PJN. Incluye guía de uso, código de fragilidad y plan de mantenimiento.
+- **[sistema_autenticacion.md](./sistema_autenticacion.md)** - ⭐ **NUEVO** - Sistema de autenticación automática con persistencia de sesión, logging completo y re-login transparente. Incluye flujos, ejemplos y comparación con v3.
+- **[pjn_selectores_tabla.md](./pjn_selectores_tabla.md)** - Tabla centralizada de selectores CSS del portal PJN. Incluye guía de uso, código de fragilidad y plan de mantenimiento.
 - **[refactorizacion_excepciones.md](./refactorizacion_excepciones.md)** - Detalle completo de la refactorización del sistema de manejo de excepciones, incluyendo la jerarquía de excepciones, cambios realizados y mejoras implementadas.
 - **[reporte_testing.md](./reporte_testing.md)** - Estado actual de tests, cobertura y plan de acción para mejorar la calidad del código.
 - **[guia_logging.md](./guia_logging.md)** - Guía de uso del sistema de logging con colores y niveles configurables.

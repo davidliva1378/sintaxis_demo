@@ -35,12 +35,16 @@ from playwright.async_api import (
 from ..config import get_config
 from ..exceptions import CredencialesFaltantes, SesionInvalida
 from ..selectores import SEL_AUTH
+from ..utils.logging import get_logger
 
 # === Constantes de autenticación (ahora desde config) ===
 _config = get_config()
 PJN_LOGIN_URL = _config.auth.login_url
 DEFAULT_SESSION_FILE = Path(__file__).with_name(_config.auth.session_file_name)
 DEFAULT_BROWSER_ARGS = list(_config.browser.args)
+
+# === Logger ===
+logger = get_logger(__name__)
 
 
 # === Normalización de texto y fechas ===
@@ -205,16 +209,20 @@ async def _realizar_login(
 ) -> None:
     browser = context = page = None
     try:
+        logger.info("Iniciando nuevo login en %s", login_url)
         browser, context = await _crear_contexto(
             playwright, headless=headless, browser_args=browser_args
         )
         page = await context.new_page()
         await page.goto(login_url)
         await page.wait_for_load_state("domcontentloaded")
+        logger.debug("Página de login cargada, rellenando credenciales")
         await page.fill(SEL_AUTH.USUARIO, usuario)
         await page.fill(SEL_AUTH.PASSWORD, contraseña)
         await page.click(SEL_AUTH.BOTON_LOGIN)
+        logger.info("Credenciales enviadas, esperando confirmación de login...")
         await page.wait_for_selector(SEL_AUTH.CONFIRMACION_LOGIN, timeout=60000)
+        logger.info("Login exitoso, guardando sesión en %s", session_file)
         await _guardar_storage_state(context, session_file)
     finally:
         if page:
@@ -226,18 +234,23 @@ async def _realizar_login(
 
 
 async def _verificar_sesion(page: Page) -> bool:
+    """Verifica si la sesión está activa buscando el elemento de confirmación."""
     try:
         await page.wait_for_selector(SEL_AUTH.CONFIRMACION_LOGIN, timeout=5000)
+        logger.debug("Sesión verificada correctamente - elemento de confirmación encontrado")
         return True
     except TimeoutError:
-        pass
+        logger.debug("Elemento de confirmación no encontrado, verificando si hay formulario de login")
 
     try:
         if await page.is_visible(SEL_AUTH.USUARIO):
+            logger.warning("Sesión expirada - formulario de login visible")
             return False
-    except Exception:
+    except Exception as e:
+        logger.warning("Error al verificar visibilidad del formulario de login: %s", e)
         return False
 
+    logger.warning("No se pudo determinar el estado de la sesión")
     return False
 
 
@@ -262,6 +275,7 @@ async def obtener_pagina_autenticada(
     async with async_playwright() as playwright:
         storage_state = _leer_storage_state(session_file)
         if storage_state is None:
+            logger.warning("No hay sesión guardada en %s - realizando login inicial", session_file)
             await _realizar_login(
                 playwright,
                 usuario=usuario_resuelto,
@@ -274,6 +288,8 @@ async def obtener_pagina_autenticada(
             storage_state = _leer_storage_state(session_file)
             if storage_state is None:
                 raise SesionInvalida("No se pudo crear el archivo de sesión")
+        else:
+            logger.info("Reutilizando sesión guardada desde %s", session_file)
 
         browser = context = page = None
         try:
@@ -287,7 +303,9 @@ async def obtener_pagina_autenticada(
             await page.goto(login_url)
             await page.wait_for_load_state("domcontentloaded")
 
+            logger.debug("Verificando validez de la sesión...")
             if not await _verificar_sesion(page):
+                logger.warning("Sesión inválida o expirada - realizando re-login automático")
                 await page.close()
                 await context.close()
                 await browser.close()
@@ -317,10 +335,12 @@ async def obtener_pagina_autenticada(
                 await page.wait_for_load_state("domcontentloaded")
 
                 if not await _verificar_sesion(page):
+                    logger.error("Login falló después de reintentar - sesión no se pudo validar")
                     raise SesionInvalida(
                         "No se pudo validar la sesión luego de reloguear"
                     )
 
+            logger.info("Sesión autenticada exitosamente - página lista para usar")
             yield page, context, browser
         finally:
             if page:
