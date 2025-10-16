@@ -57,6 +57,10 @@ class SchedulerMonitor:
         self.job_entradas = None
         self.job_expedientes = None
 
+        # Locks para prevenir ejecuciones concurrentes
+        self._lock_entradas = asyncio.Lock()
+        self._lock_expedientes = asyncio.Lock()
+
         logger.info("Scheduler inicializado")
 
     def _es_horario_laboral(self) -> bool:
@@ -130,45 +134,57 @@ class SchedulerMonitor:
 
     async def _job_verificar_entradas(self):
         """Job wrapper para verificar entradas con manejo de errores."""
-        try:
-            logger.info("🔄 Ejecutando verificación de entradas...")
-            nuevas = await self.monitor.verificar_entradas()
+        # Intentar adquirir el lock sin bloquear
+        if self._lock_entradas.locked():
+            logger.warning("⏭️ Verificación de entradas anterior aún en progreso, omitiendo esta ejecución")
+            return
 
-            if nuevas:
-                logger.info(f"✅ Verificación completada - {len(nuevas)} nuevas entradas")
-            else:
-                logger.info("✅ Verificación completada - sin nuevas entradas")
+        async with self._lock_entradas:
+            try:
+                logger.info("🔄 Ejecutando verificación de entradas...")
+                nuevas = await self.monitor.verificar_entradas()
 
-        except Exception as e:
-            logger.error(f"❌ Error en job de verificación de entradas: {e}", exc_info=True)
+                if nuevas:
+                    logger.info(f"✅ Verificación completada - {len(nuevas)} nuevas entradas")
+                else:
+                    logger.info("✅ Verificación completada - sin nuevas entradas")
 
-            # Si hay demasiados errores consecutivos, considerar detener
-            if self.monitor.estado.errores_consecutivos_entradas >= self.config.max_reintentos_entradas:
-                logger.critical(
-                    f"⚠️ Máximo de errores consecutivos alcanzado para entradas "
-                    f"({self.config.max_reintentos_entradas})"
-                )
+            except Exception as e:
+                logger.error(f"❌ Error en job de verificación de entradas: {e}", exc_info=True)
+
+                # Si hay demasiados errores consecutivos, considerar detener
+                if self.monitor.estado.errores_consecutivos_entradas >= self.config.max_reintentos_entradas:
+                    logger.critical(
+                        f"⚠️ Máximo de errores consecutivos alcanzado para entradas "
+                        f"({self.config.max_reintentos_entradas})"
+                    )
 
     async def _job_verificar_expedientes(self):
         """Job wrapper para verificar expedientes con manejo de errores."""
-        try:
-            logger.info("🔄 Ejecutando verificación de expedientes...")
-            cambios = await self.monitor.verificar_expedientes()
+        # Intentar adquirir el lock sin bloquear
+        if self._lock_expedientes.locked():
+            logger.warning("⏭️ Verificación de expedientes anterior aún en progreso, omitiendo esta ejecución")
+            return
 
-            if cambios:
-                logger.info(f"✅ Verificación completada - {len(cambios)} expedientes con cambios")
-            else:
-                logger.info("✅ Verificación completada - sin cambios en expedientes")
+        async with self._lock_expedientes:
+            try:
+                logger.info("🔄 Ejecutando verificación de expedientes...")
+                cambios = await self.monitor.verificar_expedientes()
 
-        except Exception as e:
-            logger.error(f"❌ Error en job de verificación de expedientes: {e}", exc_info=True)
+                if cambios:
+                    logger.info(f"✅ Verificación completada - {len(cambios)} expedientes con cambios")
+                else:
+                    logger.info("✅ Verificación completada - sin cambios en expedientes")
 
-            # Si hay demasiados errores consecutivos, considerar detener
-            if self.monitor.estado.errores_consecutivos_expedientes >= self.config.max_reintentos_expedientes:
-                logger.critical(
-                    f"⚠️ Máximo de errores consecutivos alcanzado para expedientes "
-                    f"({self.config.max_reintentos_expedientes})"
-                )
+            except Exception as e:
+                logger.error(f"❌ Error en job de verificación de expedientes: {e}", exc_info=True)
+
+                # Si hay demasiados errores consecutivos, considerar detener
+                if self.monitor.estado.errores_consecutivos_expedientes >= self.config.max_reintentos_expedientes:
+                    logger.critical(
+                        f"⚠️ Máximo de errores consecutivos alcanzado para expedientes "
+                        f"({self.config.max_reintentos_expedientes})"
+                    )
 
     def iniciar(self) -> None:
         """Inicia el scheduler con los jobs programados.

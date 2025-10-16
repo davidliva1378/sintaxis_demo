@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}Configuración - Monitor PJN{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Configuración del Monitor</h2>
+    <p class="subtitle">Ajusta los parámetros de monitoreo</p>
+</div>
+
+<div class="config-container">
+    <form id="configForm" class="config-form">
+        <div class="config-section">
+            <h3>General</h3>
+
+            <div class="form-group">
+                <label for="modo">Modo de Operación</label>
+                <select id="modo" name="modo" class="form-control">
+                    <option value="todo" {% if config.modo == 'todo' %}selected{% endif %}>Todo (Entradas y Expedientes)</option>
+                    <option value="entradas" {% if config.modo == 'entradas' %}selected{% endif %}>Solo Entradas</option>
+                    <option value="expedientes" {% if config.modo == 'expedientes' %}selected{% endif %}>Solo Expedientes</option>
+                </select>
+                <small>Define qué elementos se monitorean</small>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="headless" name="headless" {% if config.headless %}checked{% endif %}>
+                    <span>Modo Headless (sin interfaz gráfica)</span>
+                </label>
+                <small>Ejecuta el navegador en segundo plano sin ventana visible</small>
+            </div>
+        </div>
+
+        <div class="config-section">
+            <h3>Verificaciones</h3>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="verificar_entradas" name="verificar_entradas" {% if config.verificar_entradas %}checked{% endif %}>
+                    <span>Verificar Entradas</span>
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="verificar_expedientes" name="verificar_expedientes" {% if config.verificar_expedientes %}checked{% endif %}>
+                    <span>Verificar Expedientes</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="config-section">
+            <h3>Intervalos de Verificación (minutos)</h3>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="intervalos_laboral_entradas">Entradas (horario laboral)</label>
+                    <input type="number" id="intervalos_laboral_entradas" name="intervalos_laboral_entradas"
+                           value="{{ config.intervalos_laboral_entradas }}" min="1" max="1440" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="intervalos_laboral_expedientes">Expedientes (horario laboral)</label>
+                    <input type="number" id="intervalos_laboral_expedientes" name="intervalos_laboral_expedientes"
+                           value="{{ config.intervalos_laboral_expedientes }}" min="1" max="1440" class="form-control">
+                </div>
+            </div>
+        </div>
+
+        <div class="config-section">
+            <h3>Notificaciones</h3>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="notificar_nuevas_entradas" name="notificar_nuevas_entradas"
+                           {% if config.notificar_nuevas_entradas %}checked{% endif %}>
+                    <span>Notificar Nuevas Entradas</span>
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="notificar_cambios_expedientes" name="notificar_cambios_expedientes"
+                           {% if config.notificar_cambios_expedientes %}checked{% endif %}>
+                    <span>Notificar Cambios en Expedientes</span>
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="notificar_errores" name="notificar_errores"
+                           {% if config.notificar_errores %}checked{% endif %}>
+                    <span>Notificar Errores</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="config-section">
+            <h3>Filtros de Fecha</h3>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="fecha_desde_entradas">Entradas desde</label>
+                    <input type="date" id="fecha_desde_entradas" name="fecha_desde_entradas"
+                           value="{{ config.fecha_desde_entradas or '' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="fecha_hasta_entradas">Entradas hasta</label>
+                    <input type="date" id="fecha_hasta_entradas" name="fecha_hasta_entradas"
+                           value="{{ config.fecha_hasta_entradas or '' }}" class="form-control">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="fecha_desde_expedientes">Expedientes desde</label>
+                    <input type="date" id="fecha_desde_expedientes" name="fecha_desde_expedientes"
+                           value="{{ config.fecha_desde_expedientes or '' }}" class="form-control">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+            <button type="button" class="btn btn-secondary" onclick="location.reload()">Cancelar</button>
+        </div>
+    </form>
+</div>
+
+<div id="message" class="message" style="display: none;"></div>
+
+<script>
+document.getElementById('configForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    const data = {};
+
+    // Convertir FormData a objeto JSON
+    for (let [key, value] of formData.entries()) {
+        if (key === 'headless' || key === 'verificar_entradas' || key === 'verificar_expedientes' ||
+            key === 'notificar_nuevas_entradas' || key === 'notificar_cambios_expedientes' ||
+            key === 'notificar_errores') {
+            data[key] = true;
+        } else {
+            data[key] = value;
+        }
+    }
+
+    // Checkboxes no marcados
+    ['headless', 'verificar_entradas', 'verificar_expedientes',
+     'notificar_nuevas_entradas', 'notificar_cambios_expedientes', 'notificar_errores'].forEach(field => {
+        if (!(field in data)) {
+            data[field] = false;
+        }
+    });
+
+    try {
+        const response = await fetch('/config/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+        const messageDiv = document.getElementById('message');
+
+        if (result.success) {
+            messageDiv.className = 'message message-success';
+            messageDiv.textContent = result.message;
+        } else {
+            messageDiv.className = 'message message-error';
+            messageDiv.textContent = result.message;
+        }
+
+        messageDiv.style.display = 'block';
+        setTimeout(() => {
+            messageDiv.style.display = 'none';
+        }, 5000);
+
+    } catch (error) {
+        const messageDiv = document.getElementById('message');
+        messageDiv.className = 'message message-error';
+        messageDiv.textContent = 'Error al guardar la configuración: ' + error.message;
+        messageDiv.style.display = 'block';
+    }
+});
+</script>
+{% endblock %}

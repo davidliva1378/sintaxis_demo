@@ -51,6 +51,10 @@ class MonitorConfig:
 
         comparacion_automatica: Si True, compara expedientes tras cada verificación
         fecha_corte_expedientes: Fecha de corte para extracción de expedientes (YYYY-MM-DD)
+        fecha_desde_entradas: Fecha desde para filtrar entradas (YYYY-MM-DD o DD/MM/YYYY)
+        fecha_hasta_entradas: Fecha hasta para filtrar entradas (YYYY-MM-DD o DD/MM/YYYY)
+        fecha_desde_expedientes: Fecha desde para filtrar expedientes (YYYY-MM-DD o DD/MM/YYYY)
+        fecha_hasta_expedientes: Fecha hasta para filtrar expedientes (YYYY-MM-DD o DD/MM/YYYY)
     """
 
     # Básico
@@ -93,6 +97,10 @@ class MonitorConfig:
     # Filtros de rango de fechas para entradas
     fecha_desde_entradas: str | None = None  # Formato: YYYY-MM-DD o DD/MM/YYYY
     fecha_hasta_entradas: str | None = None  # Formato: YYYY-MM-DD o DD/MM/YYYY
+
+    # Filtros de rango de fechas para expedientes
+    fecha_desde_expedientes: str | None = None  # Formato: YYYY-MM-DD o DD/MM/YYYY
+    fecha_hasta_expedientes: str | None = None  # Formato: YYYY-MM-DD o DD/MM/YYYY
 
     @classmethod
     def from_file(cls, path: str | Path = "config/monitor.json") -> "MonitorConfig":

@@ -150,18 +150,27 @@ class MonitorPJN:
         logger.info("Verificando expedientes...")
 
         try:
+            # Determinar fecha de corte (priorizar fecha_desde_expedientes)
+            fecha_corte = (
+                self.config.fecha_desde_expedientes
+                or self.config.fecha_corte_expedientes
+            )
+
+            if fecha_corte:
+                logger.debug(f"Usando fecha de corte para expedientes: {fecha_corte}")
+
             # Extraer expedientes actuales
             async with obtener_pagina_autenticada(
                 headless=self.config.headless
             ) as (page, _, _):
                 logger.debug("Sesión autenticada, navegando a consultas")
-                await page.goto("https://portalpjn.pjn.gov.ar/consultas")
+                await page.goto("https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam")
 
                 expedientes, motivo, metadata = await extraer_expedientes_completos_modelos(
                     page,
                     max_paginas=50,
                     orden="fecha",
-                    fecha_corte=self.config.fecha_corte_expedientes
+                    fecha_corte=fecha_corte
                 )
 
             logger.info(

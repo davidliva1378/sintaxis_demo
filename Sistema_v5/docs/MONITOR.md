@@ -165,7 +165,9 @@ El monitor se configura mediante `config/monitor.json`:
   "comparacion_automatica": false,
   "fecha_corte_expedientes": null,
   "fecha_desde_entradas": "15/10/2025",
-  "fecha_hasta_entradas": "16/10/2025"
+  "fecha_hasta_entradas": "16/10/2025",
+  "fecha_desde_expedientes": null,
+  "fecha_hasta_expedientes": null
 }
 ```
 
@@ -219,6 +221,15 @@ El monitor se configura mediante `config/monitor.json`:
 
 - **`fecha_hasta_entradas`**: Fecha maxima para filtrar entradas (formato "DD/MM/YYYY" o "YYYY-MM-DD")
   - Solo se extraeran entradas con fecha <= fecha_hasta
+  - `null`: Sin filtro de fecha maxima
+
+- **`fecha_desde_expedientes`**: Fecha minima para filtrar expedientes (formato "DD/MM/YYYY" o "YYYY-MM-DD")
+  - Solo se extraeran expedientes con fecha >= fecha_desde
+  - Prioridad sobre `fecha_corte_expedientes` (retrocompatibilidad)
+  - `null`: Sin filtro de fecha minima
+
+- **`fecha_hasta_expedientes`**: Fecha maxima para filtrar expedientes (formato "DD/MM/YYYY" o "YYYY-MM-DD")
+  - Reservado para futura implementacion de filtro superior
   - `null`: Sin filtro de fecha maxima
 
 - **`fecha_corte_expedientes`**: Fecha de corte para expedientes (formato "YYYY-MM-DD")
@@ -462,17 +473,24 @@ data/monitor/
 2. Eliminar sesion guardada: `rm pjn/scraping/pjn_storage_state.json`
 3. Ejecutar con `--no-headless` para ver que esta pasando
 
-### Problema: Error 404 en expedientes
+### Problema: Error 404 en expedientes (RESUELTO)
 
-**Sintoma:** `Locator.wait_for: Timeout 25000ms exceeded`
+**Sintoma:** `Locator.wait_for: Timeout 25000ms exceeded` o error 404 al navegar a expedientes
 
-**Solucion:**
-1. Deshabilitar verificacion de expedientes temporalmente:
+**Causa:** El portal PJN cambió la URL de consultas de expedientes
+
+**Solución aplicada (16/10/2025):**
+- ✅ Actualizada URL en `pjn/monitor/core.py:158`
+- URL antigua: `https://portalpjn.pjn.gov.ar/consultas` (devolvía 404)
+- URL nueva: `https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam`
+
+Si vuelves a experimentar este error:
+1. Verificar que estés usando la versión actualizada del código
+2. Comprobar que el portal no haya cambiado nuevamente su estructura
+3. Si el problema persiste, deshabilitar temporalmente:
    ```json
    "verificar_expedientes": false
    ```
-2. Verificar que la URL de consultas este correcta
-3. Revisar si el portal cambio su estructura
 
 ### Problema: No detecta nuevas entradas
 

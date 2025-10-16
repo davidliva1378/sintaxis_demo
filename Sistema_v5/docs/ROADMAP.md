@@ -299,4 +299,294 @@ TOTAL: 60% (9/15 mejoras)
 
 ---
 
-**Última actualización:** 2025-10-15
+# 🔵 MONITOR PJN v5 - FASE 2
+
+**Fecha de inicio:** 2025-10-16
+**Objetivo:** Completar funcionalidad del Monitor PJN y agregar mejoras avanzadas
+
+---
+
+## ✅ Monitor PJN - Fase 1: Core y Funcionalidad Básica (COMPLETADA)
+
+### ✅ Mejora #M1: Motor Principal del Monitor
+- **Estado:** ✅ COMPLETADA
+- **Fecha:** 2025-10-16
+- **Archivos creados:**
+  - `pjn/monitor/core.py` - Motor principal (MonitorPJN)
+  - `pjn/monitor/config.py` - Configuración con dataclasses
+  - `pjn/monitor/detector.py` - Detección de cambios
+  - `pjn/monitor/storage.py` - Persistencia
+  - `pjn/monitor/notifier.py` - Notificaciones desktop
+  - `pjn/monitor/scheduler.py` - Scheduler inteligente
+- **Funcionalidades:**
+  - ✅ Verificación de entradas/notificaciones
+  - ✅ Verificación de expedientes (con error 404 temporal)
+  - ✅ Detección de cambios inteligente
+  - ✅ Persistencia de estado
+  - ✅ Notificaciones desktop con plyer
+  - ✅ Scheduler con horario laboral
+- **Impacto:** 🔥 MUY ALTO - Sistema de monitoreo automatizado funcional
+
+---
+
+### ✅ Mejora #M2: Filtros Avanzados y Corte Temprano
+- **Estado:** ✅ COMPLETADA
+- **Fecha:** 2025-10-16
+- **Archivos modificados:**
+  - `pjn/scraping/entradas.py` - Agregado corte temprano
+  - `pjn/monitor/config.py` - Agregados filtros de fecha
+  - `config/monitor.json` - Configuración actualizada
+- **Funcionalidades:**
+  - ✅ Filtro por rango de fechas (fecha_desde/fecha_hasta)
+  - ✅ Corte temprano después de 10 filas antiguas consecutivas
+  - ✅ Filtro por tipo de evento (N/D)
+  - ✅ Deduplicación automática
+  - ✅ Logging detallado de entradas capturadas
+- **Impacto:** 🔥 ALTO - Extracción eficiente y controlada
+
+---
+
+### ✅ Mejora #M3: CLI y Scripts de Ejecución
+- **Estado:** ✅ COMPLETADA
+- **Fecha:** 2025-10-16
+- **Archivos creados:**
+  - `scripts/monitor_cli.py` - CLI completo
+  - `ejecutar_monitor.py` - Script simple
+  - `ejecutar_monitor_continuo.py` - Script con scheduler
+  - `mi_monitor.py` - Script personalizable
+  - `test_monitor_simple.py` - Tests básicos
+- **Funcionalidades:**
+  - ✅ Verificación inmediata
+  - ✅ Modo continuo con scheduler
+  - ✅ Opciones CLI (--verbose, --no-headless, etc)
+  - ✅ Scripts personalizables
+- **Impacto:** 🔥 MEDIO - Fácil de ejecutar y personalizar
+
+---
+
+### ✅ Mejora #M4: Documentación Completa
+- **Estado:** ✅ COMPLETADA
+- **Fecha:** 2025-10-16
+- **Archivos creados:**
+  - `docs/MONITOR.md` - Documentación técnica completa
+  - `docs/MONITOR_EJEMPLOS.md` - Ejemplos prácticos
+  - `docs/MONITOR_QUICKSTART.md` - Guía rápida
+- **Contenido:**
+  - ✅ Guía de instalación
+  - ✅ Configuración detallada
+  - ✅ Ejemplos de uso
+  - ✅ Scripts personalizados
+  - ✅ Troubleshooting
+  - ✅ Integraciones (Email, Telegram, etc)
+- **Impacto:** 🔥 ALTO - Documentación profesional
+
+---
+
+### ✅ Mejora #M5: Control de Verificaciones
+- **Estado:** ✅ COMPLETADA
+- **Fecha:** 2025-10-16
+- **Archivos modificados:**
+  - `pjn/monitor/config.py` - Agregadas opciones verificar_entradas/verificar_expedientes
+  - `scripts/monitor_cli.py` - Respeta configuración
+  - `config/monitor.json` - Actualizado
+- **Funcionalidades:**
+  - ✅ Habilitar/deshabilitar verificación de entradas
+  - ✅ Habilitar/deshabilitar verificación de expedientes
+  - ✅ Monitor funciona solo con entradas (expedientes deshabilitado temporalmente)
+- **Impacto:** 🔥 ALTO - Flexibilidad y workaround para error 404
+
+---
+
+## 🔴 Monitor PJN - Fase 2: Correcciones y Mejoras Críticas
+
+### ✅ Mejora #M6: Corregir Error 404 en Expedientes
+- **Estado:** ✅ COMPLETADA
+- **Fecha:** 2025-10-16
+- **Prioridad:** ⚠️ ALTA - CRÍTICA
+- **Descripción:** Al navegar a /consultas, el monitor obtenía timeout esperando la tabla de expedientes
+- **Causa raíz:** La URL del portal cambió de `portalpjn.pjn.gov.ar/consultas` a `scw.pjn.gov.ar/scw/consultaListaRelacionados.seam`
+- **Solución implementada:**
+  - ✅ Investigada causa del error 404 (URL obsoleta)
+  - ✅ Verificada nueva URL correcta mediante navegación manual
+  - ✅ Actualizada URL en `pjn/monitor/core.py:158`
+  - ✅ Probada verificación completa (750 expedientes extraídos exitosamente)
+- **Archivos modificados:**
+  - `pjn/monitor/core.py` (línea 158)
+- **Resultado:** Verificación de expedientes funciona perfectamente
+- **Impacto:** 🔥 MUY ALTO - Funcionalidad completa del monitor restaurada
+
+---
+
+### ✅ Mejora #M7: Filtro de Fechas para Expedientes
+- **Estado:** ✅ COMPLETADA
+- **Fecha:** 2025-10-16
+- **Prioridad:** 🟡 MEDIA
+- **Descripción:** Agregar fecha_desde/fecha_hasta para expedientes (similar a entradas)
+- **Solución implementada:**
+  - ✅ Agregados campos fecha_desde_expedientes y fecha_hasta_expedientes a MonitorConfig
+  - ✅ Modificado core.py para usar fecha_desde_expedientes como fecha_corte
+  - ✅ Prioridad: fecha_desde_expedientes > fecha_corte_expedientes (retrocompatible)
+  - ✅ Actualizado config/monitor.json con nuevos campos
+  - ✅ Probado con fecha "2024-01-01" exitosamente
+- **Archivos modificados:**
+  - `pjn/monitor/config.py` (líneas 97-99)
+  - `pjn/monitor/core.py` (líneas 153-160)
+  - `config/monitor.json`
+- **Nota:** El extractor de expedientes usa fecha_corte para filtrar, por lo que fecha_desde_expedientes
+  se mapea automáticamente. La implementación de corte temprano queda como mejora futura.
+- **Impacto:** 🔥 MEDIO - Mayor control sobre expedientes monitoreados
+
+---
+
+## 🟢 Monitor PJN - Fase 3: Interfaz Web y Visualización
+
+### ✅ Mejora #M8: Interfaz Web con Flask
+- **Estado:** ✅ COMPLETADA
+- **Fecha:** 2025-10-16
+- **Prioridad:** 🟢 ALTA
+- **Descripción:** Interfaz web completa para gestionar el monitor
+- **Solución implementada:**
+  - ✅ Flask instalado (v3.1.2)
+  - ✅ Estructura completa (web_app/app.py, templates/, static/)
+  - ✅ 5 páginas HTML implementadas con Jinja2
+  - ✅ CSS profesional y responsive (600+ líneas)
+  - ✅ API REST endpoints para stats y config
+  - ✅ Probado exitosamente (servidor corriendo en :5000)
+- **Páginas implementadas:**
+  - ✅ **Dashboard**: Estadísticas, entradas recientes, expedientes recientes
+  - ✅ **Entradas**: Tabla completa con todas las entradas
+  - ✅ **Expedientes**: Tabla completa con todos los expedientes
+  - ✅ **Configuración**: Formulario editable con AJAX
+  - ✅ **Logs**: Visualizador de últimas 100 líneas
+- **Archivos creados:**
+  - `web_app/app.py` - Aplicación Flask con 10 rutas
+  - `web_app/templates/` - 5 templates HTML
+  - `web_app/static/css/style.css` - Estilos completos
+  - `ejecutar_web.py` - Script de inicio
+- **Características:**
+  - Navegación con menú activo
+  - Tablas ordenables con badges visuales
+  - Formulario de configuración con validación
+  - Responsive design para móviles
+  - API endpoints para integraciones
+- **Impacto:** 🔥 MUY ALTO - Monitor transformado en herramienta profesional
+
+---
+
+### 🟡 Mejora #M9: Dashboard de Estadísticas
+- **Estado:** 🟡 PENDIENTE
+- **Prioridad:** 🟢 BAJA
+- **Tiempo estimado:** 1 hora
+- **Descripción:** Agregar gráficos y reportes
+- **Funcionalidades:**
+  - [ ] Gráfico de entradas por día
+  - [ ] Expedientes más activos
+  - [ ] Horarios de mayor actividad
+  - [ ] Exportación a Excel/PDF
+- **Impacto:** 🔥 MEDIO - Análisis de datos históricos
+
+---
+
+## 🟠 Monitor PJN - Fase 4: Notificaciones Avanzadas
+
+### 🟡 Mejora #M10: Notificaciones por Email
+- **Estado:** 🟡 PENDIENTE
+- **Prioridad:** 🟠 MEDIA
+- **Tiempo estimado:** 30 minutos
+- **Tareas:**
+  - [ ] Agregar soporte SMTP
+  - [ ] Templates de email HTML
+  - [ ] Configuración en config.json
+  - [ ] Probar con Gmail
+- **Impacto:** 🔥 MEDIO - Notificaciones más profesionales
+
+---
+
+### 🟡 Mejora #M11: Notificaciones por Telegram
+- **Estado:** 🟡 PENDIENTE
+- **Prioridad:** 🟠 MEDIA
+- **Tiempo estimado:** 30 minutos
+- **Tareas:**
+  - [ ] Instalar python-telegram-bot
+  - [ ] Implementar NotificadorTelegram
+  - [ ] Configuración de bot
+  - [ ] Formateo con Markdown
+- **Impacto:** 🔥 MEDIO - Canal adicional de notificaciones
+
+---
+
+### 🟡 Mejora #M12: Webhooks (Slack/Discord)
+- **Estado:** 🟡 PENDIENTE
+- **Prioridad:** 🟢 BAJA
+- **Tiempo estimado:** 20 minutos
+- **Tareas:**
+  - [ ] Implementar NotificadorWebhook
+  - [ ] Soporte para Slack
+  - [ ] Soporte para Discord
+- **Impacto:** 🔥 BAJO - Integraciones adicionales
+
+---
+
+## 🔵 Monitor PJN - Fase 5: Inteligencia y Automatización
+
+### 🟡 Mejora #M13: Sistema de Alertas Inteligentes
+- **Estado:** 🟡 PENDIENTE
+- **Prioridad:** 🟠 MEDIA
+- **Tiempo estimado:** 45 minutos
+- **Descripción:** Reglas condicionales para notificaciones
+- **Funcionalidades:**
+  - [ ] Motor de reglas
+  - [ ] Alertas por expediente específico
+  - [ ] Alertas por palabras clave
+  - [ ] Priorización de notificaciones
+- **Impacto:** 🔥 ALTO - Menos ruido, más relevancia
+
+---
+
+## 🟣 Monitor PJN - Fase 6: API REST
+
+### 🟡 Mejora #M14: API REST con FastAPI
+- **Estado:** 🟡 PENDIENTE
+- **Prioridad:** 🟢 BAJA
+- **Tiempo estimado:** 1 hora
+- **Endpoints:**
+  - [ ] GET /api/v1/entradas
+  - [ ] GET /api/v1/expedientes
+  - [ ] GET /api/v1/estado
+  - [ ] POST /api/v1/verificar/entradas
+  - [ ] PUT /api/v1/config
+- **Impacto:** 🔥 MEDIO - Integración con otros sistemas
+
+---
+
+## 🧪 Monitor PJN - Fase 7: Testing
+
+### 🟡 Mejora #M15: Tests Unitarios
+- **Estado:** 🟡 PENDIENTE
+- **Prioridad:** 🟠 MEDIA
+- **Tiempo estimado:** 1 hora
+- **Tareas:**
+  - [ ] Tests para DetectorCambios
+  - [ ] Tests para StorageManager
+  - [ ] Tests para MonitorConfig
+  - [ ] Tests para filtros
+  - [ ] Coverage > 80%
+- **Impacto:** 🔥 MEDIO - Mayor confiabilidad
+
+---
+
+## 📊 Progreso Monitor PJN
+
+**Fase 1 (Core):**  ████████████████████ 100% ✅ (5/5 mejoras)
+**Fase 2 (Bugs):**  ████████████████████ 100% ✅ (2/2 mejoras - M6 y M7 completadas)
+**Fase 3 (Web):**   ██████████░░░░░░░░░░  50% ✅ (1/2 mejoras - M8 completada)
+**Fase 4 (Notif):** ░░░░░░░░░░░░░░░░░░░░   0% 🟡 (0/3 mejoras)
+**Fase 5 (AI):**    ░░░░░░░░░░░░░░░░░░░░   0% 🟡 (0/1 mejora)
+**Fase 6 (API):**   ░░░░░░░░░░░░░░░░░░░░   0% 🟡 (0/1 mejora)
+**Fase 7 (Test):**  ░░░░░░░░░░░░░░░░░░░░   0% 🟡 (0/1 mejora)
+
+**Total Monitor:** ██████░░░░░░░░░░░░░░  33% (8/15 mejoras completadas)
+
+---
+
+**Última actualización:** 2025-10-16

@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Monitor PJN{% endblock %}
+
+{% block content %}
+<h2>Dashboard del Monitor</h2>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>Total Entradas</h3>
+        <p class="stat-number">{{ stats.total_entradas }}</p>
+    </div>
+    <div class="stat-card">
+        <h3>Total Expedientes</h3>
+        <p class="stat-number">{{ stats.total_expedientes }}</p>
+    </div>
+    <div class="stat-card {% if stats.errores_entradas > 0 %}error{% endif %}">
+        <h3>Errores Entradas</h3>
+        <p class="stat-number">{{ stats.errores_entradas }}</p>
+    </div>
+    <div class="stat-card {% if stats.errores_expedientes > 0 %}error{% endif %}">
+        <h3>Errores Expedientes</h3>
+        <p class="stat-number">{{ stats.errores_expedientes }}</p>
+    </div>
+</div>
+
+<div class="info-grid">
+    <div class="info-card">
+        <h3>Estado del Monitor</h3>
+        <div class="monitor-status">
+            <p><strong>Estado:</strong> <span id="monitor-status-badge" class="badge badge-secondary">Verificando...</span></p>
+            <p id="monitor-pid" style="color: var(--text-light); font-size: 0.9rem; margin-top: 0.5rem;"></p>
+            <div class="monitor-controls">
+                <button id="btn-start" class="btn btn-success" onclick="startMonitor()" disabled>Iniciar Monitor</button>
+                <button id="btn-stop" class="btn btn-danger" onclick="stopMonitor()" disabled>Detener Monitor</button>
+                <button id="btn-refresh" class="btn btn-secondary" onclick="updateMonitorStatus()" style="margin-left: auto;">
+                    <span id="refresh-icon">↻</span> Actualizar
+                </button>
+            </div>
+            <p id="monitor-message" class="monitor-message"></p>
+        </div>
+        <hr>
+        <p><strong>Modo:</strong> {{ stats.modo }}</p>
+        <p><strong>Verifica Entradas:</strong> {{ 'Sí' if stats.verificar_entradas else 'No' }}</p>
+        <p><strong>Verifica Expedientes:</strong> {{ 'Sí' if stats.verificar_expedientes else 'No' }}</p>
+        <p><strong>Última verificación entradas:</strong> {{ stats.ultima_verificacion_entradas or 'Nunca' }}</p>
+        <p><strong>Última verificación expedientes:</strong> {{ stats.ultima_verificacion_expedientes or 'Nunca' }}</p>
+    </div>
+</div>
+
+<script>
+// Variable global para almacenar el PID
+let currentPID = null;
+
+// Actualizar estado del monitor
+async function updateMonitorStatus() {
+    console.log('[DEBUG] Actualizando estado del monitor...');
+
+    // Animación del botón de actualizar
+    const refreshIcon = document.getElementById('refresh-icon');
+    if (refreshIcon) {
+        refreshIcon.style.display = 'inline-block';
+        refreshIcon.style.animation = 'spin 0.5s linear';
+    }
+
+    try {
+        const response = await fetch('/api/monitor/status');
+        const data = await response.json();
+
+        console.log('[DEBUG] Estado recibido:', data);
+
+        const badge = document.getElementById('monitor-status-badge');
+        const btnStart = document.getElementById('btn-start');
+        const btnStop = document.getElementById('btn-stop');
+        const pidElement = document.getElementById('monitor-pid');
+
+        if (data.running) {
+            badge.textContent = '● En Ejecución';
+            badge.className = 'badge badge-success';
+            btnStart.disabled = true;
+            btnStop.disabled = false;
+            if (currentPID) {
+                pidElement.textContent = `PID: ${currentPID}`;
+            }
+            console.log('[DEBUG] Monitor está corriendo');
+        } else {
+            badge.textContent = '○ Detenido';
+            badge.className = 'badge badge-danger';
+            btnStart.disabled = false;
+            btnStop.disabled = true;
+            pidElement.textContent = '';
+            currentPID = null;
+            console.log('[DEBUG] Monitor está detenido');
+        }
+    } catch (error) {
+        console.error('[ERROR] Error al obtener estado del monitor:', error);
+        const badge = document.getElementById('monitor-status-badge');
+        badge.textContent = '⚠ Error';
+        badge.className = 'badge badge-warning';
+    } finally {
+        // Detener animación
+        setTimeout(() => {
+            if (refreshIcon) {
+                refreshIcon.style.animation = '';
+            }
+        }, 500);
+    }
+}
+
+// Iniciar monitor
+async function startMonitor() {
+    console.log('[DEBUG] Iniciando monitor...');
+    const messageEl = document.getElementById('monitor-message');
+    messageEl.textContent = '⏳ Iniciando monitor...';
+    messageEl.className = 'monitor-message info';
+
+    // Deshabilitar botón temporalmente
+    const btnStart = document.getElementById('btn-start');
+    btnStart.disabled = true;
+
+    try {
+        const response = await fetch('/api/monitor/start', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+        console.log('[DEBUG] Respuesta de start:', data);
+
+        if (data.success) {
+            currentPID = data.pid;
+            messageEl.textContent = `✓ ${data.message} (PID: ${data.pid})`;
+            messageEl.className = 'monitor-message success';
+
+            // Actualizar estado inmediatamente
+            await updateMonitorStatus();
+
+            // Limpiar mensaje después de 3 segundos
+            setTimeout(() => {
+                messageEl.textContent = '';
+            }, 3000);
+        } else {
+            messageEl.textContent = `✗ ${data.message}`;
+            messageEl.className = 'monitor-message error';
+            btnStart.disabled = false;
+        }
+    } catch (error) {
+        console.error('[ERROR] Error al iniciar monitor:', error);
+        messageEl.textContent = '✗ Error al iniciar el monitor: ' + error.message;
+        messageEl.className = 'monitor-message error';
+        btnStart.disabled = false;
+    }
+}
+
+// Detener monitor
+async function stopMonitor() {
+    console.log('[DEBUG] Deteniendo monitor...');
+    const messageEl = document.getElementById('monitor-message');
+    messageEl.textContent = '⏳ Deteniendo monitor...';
+    messageEl.className = 'monitor-message info';
+
+    // Deshabilitar botón temporalmente
+    const btnStop = document.getElementById('btn-stop');
+    btnStop.disabled = true;
+
+    try {
+        const response = await fetch('/api/monitor/stop', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+        console.log('[DEBUG] Respuesta de stop:', data);
+
+        if (data.success) {
+            messageEl.textContent = `✓ ${data.message}`;
+            messageEl.className = 'monitor-message success';
+
+            // Actualizar estado inmediatamente
+            await updateMonitorStatus();
+
+            // Limpiar mensaje después de 3 segundos
+            setTimeout(() => {
+                messageEl.textContent = '';
+            }, 3000);
+        } else {
+            messageEl.textContent = `✗ ${data.message}`;
+            messageEl.className = 'monitor-message error';
+            btnStop.disabled = false;
+        }
+    } catch (error) {
+        console.error('[ERROR] Error al detener monitor:', error);
+        messageEl.textContent = '✗ Error al detener el monitor: ' + error.message;
+        messageEl.className = 'monitor-message error';
+        btnStop.disabled = false;
+    }
+}
+
+// Actualizar estado al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    updateMonitorStatus();
+    // Actualizar cada 5 segundos
+    setInterval(updateMonitorStatus, 5000);
+});
+</script>
+
+<div class="info-grid">
+    <div class="info-card">
+        <h3>Actividad Reciente del Monitor</h3>
+        <div id="activity-panel">
+            <p id="activity-last-check-entradas" style="font-size: 0.9rem; color: var(--text-light);"></p>
+            <p id="activity-last-check-expedientes" style="font-size: 0.9rem; color: var(--text-light);"></p>
+            <hr style="margin: 1rem 0;">
+            <h4 style="font-size: 1rem; margin-bottom: 0.5rem;">Últimos logs:</h4>
+            <div id="log-container" style="background: #2c3e50; color: #ecf0f1; padding: 1rem; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 0.85rem; max-height: 200px; overflow-y: auto;">
+                <div id="log-lines">Esperando actividad...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Actualizar actividad del monitor
+async function updateActivity() {
+    try {
+        const response = await fetch('/api/activity');
+        const data = await response.json();
+
+        // Actualizar fechas de última verificación
+        const lastCheckEntradas = document.getElementById('activity-last-check-entradas');
+        const lastCheckExpedientes = document.getElementById('activity-last-check-expedientes');
+
+        if (data.ultima_verificacion_entradas) {
+            lastCheckEntradas.innerHTML = `<strong>Última verificación entradas:</strong> ${data.ultima_verificacion_entradas}`;
+        } else {
+            lastCheckEntradas.innerHTML = `<strong>Última verificación entradas:</strong> <em>Nunca</em>`;
+        }
+
+        if (data.ultima_verificacion_expedientes) {
+            lastCheckExpedientes.innerHTML = `<strong>Última verificación expedientes:</strong> ${data.ultima_verificacion_expedientes}`;
+        } else {
+            lastCheckExpedientes.innerHTML = `<strong>Última verificación expedientes:</strong> <em>Nunca</em>`;
+        }
+
+        // Actualizar logs
+        const logLines = document.getElementById('log-lines');
+        if (data.log_lines && data.log_lines.length > 0) {
+            logLines.innerHTML = data.log_lines.map(line => {
+                // Resaltar diferentes niveles de log
+                let className = '';
+                if (line.includes('ERROR')) className = 'log-error';
+                else if (line.includes('WARNING')) className = 'log-warning';
+                else if (line.includes('INFO')) className = 'log-info';
+
+                return `<div class="${className}">${escapeHtml(line.trim())}</div>`;
+            }).join('');
+
+            // Auto-scroll al final
+            const logContainer = document.getElementById('log-container');
+            logContainer.scrollTop = logContainer.scrollHeight;
+        } else {
+            logLines.innerHTML = 'No hay logs disponibles';
+        }
+    } catch (error) {
+        console.error('[ERROR] Error al obtener actividad:', error);
+    }
+}
+
+// Función para escapar HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Actualizar actividad al cargar y cada 5 segundos
+document.addEventListener('DOMContentLoaded', function() {
+    updateActivity();
+    setInterval(updateActivity, 5000);
+});
+</script>
+
+<h3>Entradas Recientes</h3>
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Fecha</th>
+            <th>Expediente</th>
+            <th>Tipo</th>
+            <th>Contenido</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for entrada in entradas_recientes %}
+        <tr>
+            <td>{{ entrada.fecha }}</td>
+            <td>{{ entrada.expediente }}</td>
+            <td>{{ entrada.tipo }}</td>
+            <td>{{ entrada.contenido[:80] }}...</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h3>Expedientes con Cambios Recientes</h3>
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Expediente</th>
+            <th>Caratula</th>
+            <th>Última Actuación</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for exp in expedientes_recientes %}
+        <tr>
+            <td>{{ exp.expediente }}</td>
+            <td>{{ exp.caratula }}</td>
+            <td>{{ exp.ultima_actuacion }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
