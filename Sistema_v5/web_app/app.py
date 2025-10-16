@@ -454,6 +454,9 @@ def config_update():
         if errors:
             return jsonify({'success': False, 'errors': errors, 'message': 'Revisa los campos indicados'}), 400
 
+        if errors:
+            return jsonify({'success': False, 'errors': errors, 'message': 'Revisa los campos indicados'}), 400
+
         # Guardar configuración
         config.to_file(CONFIG_PATH)
 
