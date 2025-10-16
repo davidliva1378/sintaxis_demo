@@ -507,13 +507,31 @@ async def obtener_actuaciones_todas_paginas_async(page_expediente, expediente_da
     )
 
     carpeta_actuaciones = os.path.abspath(carpeta_destino)
-    os.makedirs(carpeta_actuaciones, exist_ok=True)
+
+    # Validar y crear carpeta si no existe
+    try:
+        os.makedirs(carpeta_actuaciones, exist_ok=True)
+    except OSError as e:
+        logger.error("❌ Error al crear carpeta %s: %s", carpeta_actuaciones, e)
+        return todas, f"Error al crear carpeta: {e}", None
+
+    # Validar permisos de escritura
+    if not os.access(carpeta_actuaciones, os.W_OK):
+        error_msg = f"Sin permisos de escritura en: {carpeta_actuaciones}"
+        logger.error("❌ %s", error_msg)
+        return todas, error_msg, None
+
     json_path = os.path.join(carpeta_actuaciones, f"actuaciones-{expediente_numero}.json")
 
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump({"Expediente": encabezado, "Actuaciones": todas}, f, indent=2, ensure_ascii=False)
-
-    logger.info("✅ Archivo JSON guardado: %s", json_path)
+    # Guardar archivo JSON con manejo de errores
+    try:
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump({"Expediente": encabezado, "Actuaciones": todas}, f, indent=2, ensure_ascii=False)
+        logger.info("✅ Archivo JSON guardado: %s", json_path)
+    except OSError as e:
+        error_msg = f"Error al guardar archivo {json_path}: {e}"
+        logger.error("❌ %s", error_msg)
+        return todas, error_msg, None
     logger.info("📂 Total de actuaciones: %d", len(todas))
     return todas, None, carpeta_actuaciones
 
@@ -559,14 +577,29 @@ async def actualizar_actuaciones_desde_json(
     actualizada (o ``None`` si hubo error) y un mensaje de error en caso de fallos.
     """
 
-    if not ruta_json_existente or not os.path.exists(ruta_json_existente):
-        return 0, None, "El archivo de actuaciones especificado no existe."
+    # Validar que la ruta fue proporcionada
+    if not ruta_json_existente:
+        return 0, None, "No se proporcionó ruta al archivo de actuaciones."
+
+    # Validar que el archivo existe
+    if not os.path.exists(ruta_json_existente):
+        return 0, None, f"El archivo de actuaciones no existe: {ruta_json_existente}"
+
+    # Validar que es un archivo regular
+    if not os.path.isfile(ruta_json_existente):
+        return 0, None, f"La ruta no es un archivo válido: {ruta_json_existente}"
+
+    # Validar permisos de lectura
+    if not os.access(ruta_json_existente, os.R_OK):
+        return 0, None, f"Sin permisos de lectura para: {ruta_json_existente}"
 
     try:
         with open(ruta_json_existente, "r", encoding="utf-8") as f:
             data = json.load(f)
-    except Exception as e:  # noqa: BLE001
-        return 0, None, f"No se pudo leer el JSON existente: {type(e).__name__}: {str(e)}"
+    except json.JSONDecodeError as e:
+        return 0, None, f"El archivo no contiene JSON válido: {e}"
+    except OSError as e:
+        return 0, None, f"Error al leer el archivo: {e}"
 
     actuaciones_existentes = data.get("Actuaciones")
     if not isinstance(actuaciones_existentes, list):
@@ -688,11 +721,16 @@ async def actualizar_actuaciones_desde_json(
     nuevo_payload["Actuaciones"] = todas_actuaciones
     actualizar_metricas_descargas_en_json(nuevo_payload)
 
+    # Validar permisos de escritura antes de guardar
+    carpeta_json = os.path.dirname(ruta_json_existente)
+    if not os.access(carpeta_json, os.W_OK):
+        return 0, None, f"Sin permisos de escritura en: {carpeta_json}"
+
     try:
         with open(ruta_json_existente, "w", encoding="utf-8") as f:
             json.dump(nuevo_payload, f, indent=2, ensure_ascii=False)
-    except Exception as e:  # noqa: BLE001
-        return 0, None, f"No se pudo actualizar el JSON: {type(e).__name__}: {str(e)}"
+    except OSError as e:
+        return 0, None, f"Error al guardar el archivo: {e}"
 
     return len(nuevas_actuaciones), nuevo_payload, None
 
@@ -1212,38 +1250,84 @@ async def descargar_archivos_de_json(page, carpeta_destino: str):
         logger.warning("⚠️ Carpeta destino no proporcionada para las descargas.")
         return
 
-    os.makedirs(carpeta_destino, exist_ok=True)
+    # Validar que la carpeta destino existe
+    if not os.path.exists(carpeta_destino):
+        try:
+            os.makedirs(carpeta_destino, exist_ok=True)
+            logger.debug("📁 Carpeta creada: %s", carpeta_destino)
+        except OSError as e:
+            logger.error("❌ Error al crear carpeta %s: %s", carpeta_destino, e)
+            return
 
-    archivos_json = [f for f in os.listdir(carpeta_destino) if f.startswith("actuaciones-") and f.endswith(".json")]
+    # Validar que es un directorio
+    if not os.path.isdir(carpeta_destino):
+        logger.error("❌ La ruta no es un directorio: %s", carpeta_destino)
+        return
+
+    # Buscar archivos JSON de actuaciones
+    try:
+        archivos_json = [f for f in os.listdir(carpeta_destino) if f.startswith("actuaciones-") and f.endswith(".json")]
+    except OSError as e:
+        logger.error("❌ Error al listar archivos en %s: %s", carpeta_destino, e)
+        return
+
     if archivos_json:
         ruta_json = os.path.join(carpeta_destino, archivos_json[0])
-        with open(ruta_json, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            actuaciones = data.get("Actuaciones", [])
-            actuaciones_filtradas = []
 
-            for act in actuaciones:
-                if act.get("TieneArchivo") and act.get("NombreArchivo"):
-                    archivo_path = os.path.join(carpeta_destino, act["NombreArchivo"])
-                    if not os.path.exists(archivo_path):
-                        actuaciones_filtradas.append(act)
-                    else:
-                        act["Descargado"] = True
-                        logger.debug("🟡 Ya existe: %s", act['NombreArchivo'])
+        # Validar que el archivo existe
+        if not os.path.exists(ruta_json):
+            logger.error("❌ Archivo JSON no encontrado: %s", ruta_json)
+            return
 
-            if actuaciones_filtradas:
-                logger.info("\n🔽 Descargando %d archivo(s)...", len(actuaciones_filtradas))
-                await descargar_archivos_actuaciones(page, actuaciones_filtradas, carpeta_destino)
-                for act in actuaciones_filtradas:
+        # Validar que el archivo es legible
+        if not os.access(ruta_json, os.R_OK):
+            logger.error("❌ Sin permisos de lectura para: %s", ruta_json)
+            return
+
+        try:
+            with open(ruta_json, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except json.JSONDecodeError as e:
+            logger.error("❌ El archivo no contiene JSON válido (%s): %s", ruta_json, e)
+            return
+        except OSError as e:
+            logger.error("❌ Error al leer archivo %s: %s", ruta_json, e)
+            return
+
+        actuaciones = data.get("Actuaciones", [])
+        actuaciones_filtradas = []
+
+        for act in actuaciones:
+            if act.get("TieneArchivo") and act.get("NombreArchivo"):
+                archivo_path = os.path.join(carpeta_destino, act["NombreArchivo"])
+                if not os.path.exists(archivo_path):
+                    actuaciones_filtradas.append(act)
+                else:
                     act["Descargado"] = True
-            else:
-                logger.info("✅ Todos los archivos ya existen.")
+                    logger.debug("🟡 Ya existe: %s", act['NombreArchivo'])
+
+        if actuaciones_filtradas:
+            logger.info("\n🔽 Descargando %d archivo(s)...", len(actuaciones_filtradas))
+            await descargar_archivos_actuaciones(page, actuaciones_filtradas, carpeta_destino)
+            for act in actuaciones_filtradas:
+                act["Descargado"] = True
+        else:
+            logger.info("✅ Todos los archivos ya existen.")
 
         # Guardar archivo actualizado
         actualizar_metricas_descargas_en_json(data)
 
-        with open(ruta_json, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        logger.info("📝 JSON actualizado con estado de descarga.")
+        # Validar permisos de escritura antes de guardar
+        if not os.access(carpeta_destino, os.W_OK):
+            logger.error("❌ Sin permisos de escritura en: %s", carpeta_destino)
+            return
+
+        try:
+            with open(ruta_json, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            logger.info("📝 JSON actualizado con estado de descarga.")
+        except OSError as e:
+            logger.error("❌ Error al guardar archivo %s: %s", ruta_json, e)
+            return
     else:
         logger.warning("⚠️ No se encontró archivo de actuaciones unificado.")
