@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import re
+import warnings
 from contextlib import suppress
 from datetime import datetime
 from typing import Awaitable, Callable, Iterable, Mapping, TypeVar
@@ -83,13 +84,33 @@ def calcular_metricas_descargas_json(payload: dict) -> dict:
 def actualizar_metricas_descargas_en_json(payload: dict) -> None:
     """Recalcula los contadores de descargas dentro de la estructura JSON.
 
-    Deprecated:
+    .. deprecated:: 5.6
         Esta función modifica el payload in-place (side effect).
-        Usar calcular_metricas_descargas_json() que retorna una copia.
+        Usar :func:`calcular_metricas_descargas_json` que retorna una copia inmutable.
+        Esta función será eliminada en la versión 6.0.
 
     Warning:
-        Esta función MUTA el argumento payload.
+        Esta función MUTA el argumento payload. Para código nuevo, use
+        ``calcular_metricas_descargas_json()`` que retorna una copia modificada
+        sin alterar el original.
+
+    Args:
+        payload: Diccionario con estructura JSON de expediente.
+
+    Example:
+        >>> # ❌ MAL - Muta el original
+        >>> actualizar_metricas_descargas_en_json(payload)
+        >>>
+        >>> # ✅ BIEN - Retorna copia
+        >>> nuevo_payload = calcular_metricas_descargas_json(payload)
     """
+    warnings.warn(
+        "actualizar_metricas_descargas_en_json() está deprecated y será eliminada en v6.0. "
+        "Use calcular_metricas_descargas_json() que retorna una copia sin mutar el original.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+
     if not payload or not isinstance(payload, dict):
         return
 
@@ -1042,13 +1063,36 @@ async def descargar_archivos_actuaciones_modelos(
 async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_destino: str):
     """Descarga archivos de actuaciones (versión con side effects).
 
-    Deprecated:
-        Esta función modifica la lista de actuaciones in-place.
-        Usar descargar_archivos_actuaciones_modelos() que retorna una copia.
+    .. deprecated:: 5.6
+        Esta función modifica la lista de actuaciones in-place (side effect).
+        Usar :func:`descargar_archivos_actuaciones_modelos` que trabaja con objetos
+        inmutables y retorna una copia. Esta función será eliminada en la versión 6.0.
 
     Warning:
-        Esta función MUTA los elementos de la lista actuaciones.
+        Esta función MUTA los elementos de la lista actuaciones. Para código nuevo,
+        use ``descargar_archivos_actuaciones_modelos()`` que trabaja con modelos
+        Pydantic inmutables.
+
+    Args:
+        page: Página de Playwright para realizar las descargas.
+        actuaciones: Lista de diccionarios con datos de actuaciones (SERÁ MUTADA).
+        carpeta_destino: Ruta donde guardar los archivos descargados.
+
+    Example:
+        >>> # ❌ MAL - Muta la lista original
+        >>> await descargar_archivos_actuaciones(page, actuaciones, carpeta)
+        >>>
+        >>> # ✅ BIEN - Trabaja con modelos inmutables
+        >>> modelos = [Actuacion.from_dict(a) for a in actuaciones]
+        >>> await descargar_archivos_actuaciones_modelos(page, modelos, carpeta)
     """
+    warnings.warn(
+        "descargar_archivos_actuaciones() está deprecated y será eliminada en v6.0. "
+        "Use descargar_archivos_actuaciones_modelos() que trabaja con objetos inmutables.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+
     if not actuaciones:
         logger.warning("⚠️ No se proporcionaron actuaciones para descargar.")
         return
