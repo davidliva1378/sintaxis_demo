@@ -14,9 +14,10 @@
             <tr>
                 <th>Fecha</th>
                 <th>Expediente</th>
+                <th>Carátula</th>
                 <th>Tipo</th>
-                <th>Contenido</th>
-                <th>Detectada</th>
+                <th>Evento</th>
+                <th>Extraída</th>
             </tr>
         </thead>
         <tbody>
@@ -24,19 +25,28 @@
                 {% for entrada in entradas %}
                 <tr>
                     <td>{{ entrada.fecha or '-' }}</td>
-                    <td><span class="expediente-badge">{{ entrada.expediente }}</span></td>
-                    <td><span class="tipo-badge">{{ entrada.tipo }}</span></td>
-                    <td class="content-cell">
-                        <div class="content-preview" title="{{ entrada.contenido }}">
-                            {{ entrada.contenido[:100] }}{% if entrada.contenido|length > 100 %}...{% endif %}
+                    <td><span class="expediente-badge">{{ entrada.numero or '-' }}</span></td>
+                    <td class="caratula-cell">
+                        {% if entrada.caratula %}
+                        <div class="content-preview" title="{{ entrada.caratula }}">
+                            {{ entrada.caratula[:60] }}{% if entrada.caratula|length > 60 %}...{% endif %}
                         </div>
+                        {% else %}-{% endif %}
                     </td>
-                    <td class="timestamp-cell">{{ entrada.detectada_en or '-' }}</td>
+                    <td><span class="tipo-badge">{{ entrada.tipo_evento or '-' }}</span></td>
+                    <td class="content-cell">
+                        {% if entrada.evento %}
+                        <div class="content-preview" title="{{ entrada.evento }}">
+                            {{ entrada.evento[:100] }}{% if entrada.evento|length > 100 %}...{% endif %}
+                        </div>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="timestamp-cell">{{ entrada.extraida_en or '-' }}</td>
                 </tr>
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="5" class="empty-message">No hay entradas registradas</td>
+                    <td colspan="6" class="empty-message">No hay entradas registradas</td>
                 </tr>
             {% endif %}
         </tbody>

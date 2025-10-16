@@ -28,8 +28,12 @@
     <div class="info-card">
         <h3>Estado del Monitor</h3>
         <div class="monitor-status">
+            <div id="monitor-busy-overlay" class="monitor-busy-overlay" style="display: none;">
+                <div class="busy-spinner"></div>
+                <p id="monitor-busy-text">Procesando…</p>
+            </div>
             <p><strong>Estado:</strong> <span id="monitor-status-badge" class="badge badge-secondary">Verificando...</span></p>
-            <p id="monitor-pid" style="color: var(--text-light); font-size: 0.9rem; margin-top: 0.5rem;"></p>
+            <p id="monitor-runtime" class="monitor-runtime"></p>
             <div class="monitor-controls">
                 <button id="btn-start" class="btn btn-success" onclick="startMonitor()" disabled>Iniciar Monitor</button>
                 <button id="btn-stop" class="btn btn-danger" onclick="stopMonitor()" disabled>Detener Monitor</button>
@@ -38,6 +42,15 @@
                 </button>
             </div>
             <p id="monitor-message" class="monitor-message"></p>
+            <div class="manual-verifications">
+                <h4>Verificación manual</h4>
+                <p>Ejecuta una verificación inmediata cuando el monitor esté detenido.</p>
+                <div class="monitor-controls manual-controls">
+                    <button id="btn-verify-entradas" type="button" class="btn btn-primary" onclick="verifyEntradas()">Verificar Entradas</button>
+                    <button id="btn-verify-expedientes" type="button" class="btn btn-primary" onclick="verifyExpedientes()">Verificar Expedientes</button>
+                </div>
+                <p id="verification-message" class="monitor-message" style="display: none;"></p>
+            </div>
         </div>
         <hr>
         <p><strong>Modo:</strong> {{ stats.modo }}</p>
@@ -49,11 +62,113 @@
 </div>
 
 <script>
-// Variable global para almacenar el PID
-let currentPID = null;
+let monitorBusy = false;
+let monitorStatusData = null;
+
+function applyVerificationButtonState() {
+    const btnEntradas = document.getElementById('btn-verify-entradas');
+    const btnExpedientes = document.getElementById('btn-verify-expedientes');
+    const hasStatus = monitorStatusData !== null;
+    const running = hasStatus ? Boolean(monitorStatusData.running) : false;
+
+    if (btnEntradas) {
+        const enabledConfig = hasStatus ? Boolean(monitorStatusData.verificar_entradas) : false;
+        let tooltip = '';
+        if (monitorBusy) {
+            tooltip = 'Aguarda a que finalice la operación en curso.';
+        } else if (!hasStatus) {
+            tooltip = 'Esperando estado del monitor...';
+        } else if (!enabledConfig) {
+            tooltip = 'Habilita la opción “Verificar entradas” en la configuración para usar este botón.';
+        } else if (running) {
+            tooltip = 'Detén el monitor para ejecutar una verificación manual.';
+        }
+        btnEntradas.title = tooltip;
+        const shouldDisable = monitorBusy || !hasStatus || running || !enabledConfig;
+        btnEntradas.disabled = shouldDisable;
+    }
+
+    if (btnExpedientes) {
+        const enabledConfig = hasStatus ? Boolean(monitorStatusData.verificar_expedientes) : false;
+        let tooltip = '';
+        if (monitorBusy) {
+            tooltip = 'Aguarda a que finalice la operación en curso.';
+        } else if (!hasStatus) {
+            tooltip = 'Esperando estado del monitor...';
+        } else if (!enabledConfig) {
+            tooltip = 'Habilita la opción “Verificar expedientes” en la configuración para usar este botón.';
+        } else if (running) {
+            tooltip = 'Detén el monitor para ejecutar una verificación manual.';
+        }
+        btnExpedientes.title = tooltip;
+        const shouldDisable = monitorBusy || !hasStatus || running || !enabledConfig;
+        btnExpedientes.disabled = shouldDisable;
+    }
+}
+
+function setMonitorBusy(active, message) {
+    monitorBusy = active;
+    const overlay = document.getElementById('monitor-busy-overlay');
+    const container = document.querySelector('.monitor-status');
+    const busyText = document.getElementById('monitor-busy-text');
+    const btnStart = document.getElementById('btn-start');
+    const btnStop = document.getElementById('btn-stop');
+    const btnRefresh = document.getElementById('btn-refresh');
+
+    if (overlay && container) {
+        overlay.style.display = active ? 'flex' : 'none';
+        container.classList.toggle('busy', active);
+    }
+
+    if (busyText && message) {
+        busyText.textContent = message;
+    }
+
+    if (btnStart) btnStart.disabled = active;
+    if (btnStop) btnStop.disabled = active;
+    if (btnRefresh) btnRefresh.disabled = active;
+
+    applyVerificationButtonState();
+}
+
+function formatDateTime(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return new Intl.DateTimeFormat('es-AR', {
+        dateStyle: 'short',
+        timeStyle: 'medium'
+    }).format(date);
+}
+
+function updateRuntimeInfo(pid, startedAt) {
+    const runtimeEl = document.getElementById('monitor-runtime');
+    if (!runtimeEl) return;
+
+    if (!pid) {
+        runtimeEl.textContent = '';
+        runtimeEl.style.display = 'none';
+        return;
+    }
+
+    const segments = [`PID: ${pid}`];
+    if (startedAt) {
+        segments.push(`Iniciado: ${formatDateTime(startedAt)}`);
+    }
+
+    runtimeEl.textContent = segments.join(' • ');
+    runtimeEl.style.display = 'block';
+}
 
 // Actualizar estado del monitor
 async function updateMonitorStatus() {
+    if (monitorBusy) {
+        return;
+    }
+
     console.log('[DEBUG] Actualizando estado del monitor...');
 
     // Animación del botón de actualizar
@@ -67,33 +182,34 @@ async function updateMonitorStatus() {
         const response = await fetch('/api/monitor/status');
         const data = await response.json();
 
+        monitorStatusData = data;
+        applyVerificationButtonState();
+
         console.log('[DEBUG] Estado recibido:', data);
 
         const badge = document.getElementById('monitor-status-badge');
         const btnStart = document.getElementById('btn-start');
         const btnStop = document.getElementById('btn-stop');
-        const pidElement = document.getElementById('monitor-pid');
 
         if (data.running) {
             badge.textContent = '● En Ejecución';
             badge.className = 'badge badge-success';
-            btnStart.disabled = true;
-            btnStop.disabled = false;
-            if (currentPID) {
-                pidElement.textContent = `PID: ${currentPID}`;
-            }
+            if (btnStart) btnStart.disabled = true;
+            if (btnStop) btnStop.disabled = false;
+            updateRuntimeInfo(data.pid, data.started_at);
             console.log('[DEBUG] Monitor está corriendo');
         } else {
             badge.textContent = '○ Detenido';
             badge.className = 'badge badge-danger';
-            btnStart.disabled = false;
-            btnStop.disabled = true;
-            pidElement.textContent = '';
-            currentPID = null;
+            if (btnStart) btnStart.disabled = false;
+            if (btnStop) btnStop.disabled = true;
+            updateRuntimeInfo(null, null);
             console.log('[DEBUG] Monitor está detenido');
         }
     } catch (error) {
         console.error('[ERROR] Error al obtener estado del monitor:', error);
+        monitorStatusData = null;
+        applyVerificationButtonState();
         const badge = document.getElementById('monitor-status-badge');
         badge.textContent = '⚠ Error';
         badge.className = 'badge badge-warning';
@@ -114,9 +230,7 @@ async function startMonitor() {
     messageEl.textContent = '⏳ Iniciando monitor...';
     messageEl.className = 'monitor-message info';
 
-    // Deshabilitar botón temporalmente
-    const btnStart = document.getElementById('btn-start');
-    btnStart.disabled = true;
+    setMonitorBusy(true, 'Iniciando monitor...');
 
     try {
         const response = await fetch('/api/monitor/start', {
@@ -130,11 +244,11 @@ async function startMonitor() {
         console.log('[DEBUG] Respuesta de start:', data);
 
         if (data.success) {
-            currentPID = data.pid;
             messageEl.textContent = `✓ ${data.message} (PID: ${data.pid})`;
             messageEl.className = 'monitor-message success';
 
-            // Actualizar estado inmediatamente
+            setMonitorBusy(false);
+            updateRuntimeInfo(data.pid, data.started_at);
             await updateMonitorStatus();
 
             // Limpiar mensaje después de 3 segundos
@@ -144,13 +258,15 @@ async function startMonitor() {
         } else {
             messageEl.textContent = `✗ ${data.message}`;
             messageEl.className = 'monitor-message error';
-            btnStart.disabled = false;
+            setMonitorBusy(false);
+            await updateMonitorStatus();
         }
     } catch (error) {
         console.error('[ERROR] Error al iniciar monitor:', error);
         messageEl.textContent = '✗ Error al iniciar el monitor: ' + error.message;
         messageEl.className = 'monitor-message error';
-        btnStart.disabled = false;
+        setMonitorBusy(false);
+        await updateMonitorStatus();
     }
 }
 
@@ -161,9 +277,7 @@ async function stopMonitor() {
     messageEl.textContent = '⏳ Deteniendo monitor...';
     messageEl.className = 'monitor-message info';
 
-    // Deshabilitar botón temporalmente
-    const btnStop = document.getElementById('btn-stop');
-    btnStop.disabled = true;
+    setMonitorBusy(true, 'Deteniendo monitor...');
 
     try {
         const response = await fetch('/api/monitor/stop', {
@@ -180,7 +294,8 @@ async function stopMonitor() {
             messageEl.textContent = `✓ ${data.message}`;
             messageEl.className = 'monitor-message success';
 
-            // Actualizar estado inmediatamente
+            setMonitorBusy(false);
+            updateRuntimeInfo(null, null);
             await updateMonitorStatus();
 
             // Limpiar mensaje después de 3 segundos
@@ -190,18 +305,99 @@ async function stopMonitor() {
         } else {
             messageEl.textContent = `✗ ${data.message}`;
             messageEl.className = 'monitor-message error';
-            btnStop.disabled = false;
+            setMonitorBusy(false);
+            await updateMonitorStatus();
         }
     } catch (error) {
         console.error('[ERROR] Error al detener monitor:', error);
         messageEl.textContent = '✗ Error al detener el monitor: ' + error.message;
         messageEl.className = 'monitor-message error';
-        btnStop.disabled = false;
+        setMonitorBusy(false);
+        await updateMonitorStatus();
     }
+}
+
+async function triggerManualVerification(kind, labels) {
+    if (monitorBusy) {
+        return;
+    }
+
+    const messageEl = document.getElementById('verification-message');
+    if (messageEl) {
+        messageEl.style.display = 'block';
+        messageEl.textContent = `⏳ ${labels.start}`;
+        messageEl.className = 'monitor-message info';
+    }
+
+    setMonitorBusy(true, labels.busy);
+
+    try {
+        const response = await fetch(`/api/monitor/verify/${kind}`, {
+            method: 'POST'
+        });
+
+        let data = null;
+        try {
+            data = await response.json();
+        } catch (parseError) {
+            console.error(`[ERROR] No se pudo parsear la respuesta de verificación ${kind}:`, parseError);
+        }
+
+        if (response.ok && data && data.success) {
+            let text = `✓ ${data.message}`;
+            if (data.ultima_verificacion) {
+                text += ` • ${formatDateTime(data.ultima_verificacion)}`;
+            }
+
+            if (messageEl) {
+                messageEl.textContent = text;
+                messageEl.className = 'monitor-message success';
+                setTimeout(() => {
+                    messageEl.style.display = 'none';
+                    messageEl.textContent = '';
+                }, 5000);
+            }
+        } else {
+            const errorMessage = data && data.message ? data.message : labels.genericError;
+            if (messageEl) {
+                messageEl.textContent = `✗ ${errorMessage}`;
+                messageEl.className = 'monitor-message error';
+            }
+        }
+    } catch (error) {
+        console.error(`[ERROR] Error al solicitar verificación ${kind}:`, error);
+        if (messageEl) {
+            messageEl.textContent = `✗ ${labels.errorPrefix}${error.message}`;
+            messageEl.className = 'monitor-message error';
+        }
+    } finally {
+        setMonitorBusy(false);
+        await updateActivity();
+        await updateMonitorStatus();
+    }
+}
+
+function verifyEntradas() {
+    return triggerManualVerification('entradas', {
+        start: 'Verificando entradas...',
+        busy: 'Verificando entradas...',
+        genericError: 'No se pudo completar la verificación de entradas.',
+        errorPrefix: 'Error al verificar entradas: '
+    });
+}
+
+function verifyExpedientes() {
+    return triggerManualVerification('expedientes', {
+        start: 'Verificando expedientes...',
+        busy: 'Verificando expedientes...',
+        genericError: 'No se pudo completar la verificación de expedientes.',
+        errorPrefix: 'Error al verificar expedientes: '
+    });
 }
 
 // Actualizar estado al cargar la página
 document.addEventListener('DOMContentLoaded', function() {
+    applyVerificationButtonState();
     updateMonitorStatus();
     // Actualizar cada 5 segundos
     setInterval(updateMonitorStatus, 5000);
@@ -291,16 +487,22 @@ document.addEventListener('DOMContentLoaded', function() {
             <th>Fecha</th>
             <th>Expediente</th>
             <th>Tipo</th>
-            <th>Contenido</th>
+            <th>Evento</th>
         </tr>
     </thead>
     <tbody>
         {% for entrada in entradas_recientes %}
         <tr>
-            <td>{{ entrada.fecha }}</td>
-            <td>{{ entrada.expediente }}</td>
-            <td>{{ entrada.tipo }}</td>
-            <td>{{ entrada.contenido[:80] }}...</td>
+            <td>{{ entrada.fecha or '-' }}</td>
+            <td>{{ entrada.numero or '-' }}</td>
+            <td>{{ entrada.tipo_evento or '-' }}</td>
+            <td>
+                {% if entrada.evento %}
+                    {{ entrada.evento[:80] }}{% if entrada.evento|length > 80 %}...{% endif %}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
         </tr>
         {% endfor %}
     </tbody>
@@ -311,16 +513,24 @@ document.addEventListener('DOMContentLoaded', function() {
     <thead>
         <tr>
             <th>Expediente</th>
-            <th>Caratula</th>
+            <th>Dependencia</th>
             <th>Última Actuación</th>
+            <th>Situación</th>
         </tr>
     </thead>
     <tbody>
         {% for exp in expedientes_recientes %}
         <tr>
-            <td>{{ exp.expediente }}</td>
-            <td>{{ exp.caratula }}</td>
-            <td>{{ exp.ultima_actuacion }}</td>
+            <td>{{ exp.numero or '-' }}</td>
+            <td>{{ exp.dependencia or '-' }}</td>
+            <td>{{ exp.ultima_actuacion or '-' }}</td>
+            <td>
+                {% if exp.situacion %}
+                    {{ exp.situacion[:80] }}{% if exp.situacion|length > 80 %}...{% endif %}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
         </tr>
         {% endfor %}
     </tbody>
