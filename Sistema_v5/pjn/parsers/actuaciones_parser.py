@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Iterable, Mapping, Sequence
 
+# Mapping ya está importado arriba para type hints
+
 from playwright.async_api import ElementHandle, Page
 
 from ..models import Actuacion, ActuacionesArchivo
@@ -199,15 +201,37 @@ async def parse_actuacion_row(
 
 
 def _calcular_metricas_descargas(
-    actuaciones: Iterable[Actuacion],
+    actuaciones: Iterable[Actuacion | Mapping[str, object]],
 ) -> tuple[int, int, int]:
+    """Calcula métricas de descarga para una lista de actuaciones.
+
+    Args:
+        actuaciones: Iterable de objetos Actuacion o dicts con datos de actuaciones
+
+    Returns:
+        tuple[total_con_archivo, total_descargados, pendientes]
+
+    Note:
+        Función consolidada desde actuaciones.py para evitar duplicación.
+        Acepta tanto objetos Actuacion como dicts para compatibilidad.
+    """
     total_con_archivo = 0
     total_descargados = 0
-    for actuacion in actuaciones:
+
+    for act in actuaciones:
+        # Convertir dict a Actuacion si es necesario
+        if isinstance(act, Actuacion):
+            actuacion = act
+        elif isinstance(act, Mapping):
+            actuacion = Actuacion.from_dict(act)
+        else:
+            continue
+
         if actuacion.tiene_archivo:
             total_con_archivo += 1
             if actuacion.descargado:
                 total_descargados += 1
+
     pendientes = max(total_con_archivo - total_descargados, 0)
     return total_con_archivo, total_descargados, pendientes
 
