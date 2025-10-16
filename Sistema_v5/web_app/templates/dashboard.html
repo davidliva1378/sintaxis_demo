@@ -28,8 +28,12 @@
     <div class="info-card">
         <h3>Estado del Monitor</h3>
         <div class="monitor-status">
+            <div id="monitor-busy-overlay" class="monitor-busy-overlay" style="display: none;">
+                <div class="busy-spinner"></div>
+                <p id="monitor-busy-text">Procesando…</p>
+            </div>
             <p><strong>Estado:</strong> <span id="monitor-status-badge" class="badge badge-secondary">Verificando...</span></p>
-            <p id="monitor-pid" style="color: var(--text-light); font-size: 0.9rem; margin-top: 0.5rem;"></p>
+            <p id="monitor-runtime" class="monitor-runtime"></p>
             <div class="monitor-controls">
                 <button id="btn-start" class="btn btn-success" onclick="startMonitor()" disabled>Iniciar Monitor</button>
                 <button id="btn-stop" class="btn btn-danger" onclick="stopMonitor()" disabled>Detener Monitor</button>
@@ -49,11 +53,69 @@
 </div>
 
 <script>
-// Variable global para almacenar el PID
-let currentPID = null;
+let monitorBusy = false;
+
+function setMonitorBusy(active, message) {
+    monitorBusy = active;
+    const overlay = document.getElementById('monitor-busy-overlay');
+    const container = document.querySelector('.monitor-status');
+    const busyText = document.getElementById('monitor-busy-text');
+    const btnStart = document.getElementById('btn-start');
+    const btnStop = document.getElementById('btn-stop');
+    const btnRefresh = document.getElementById('btn-refresh');
+
+    if (overlay && container) {
+        overlay.style.display = active ? 'flex' : 'none';
+        container.classList.toggle('busy', active);
+    }
+
+    if (busyText && message) {
+        busyText.textContent = message;
+    }
+
+    if (btnStart) btnStart.disabled = active;
+    if (btnStop) btnStop.disabled = active;
+    if (btnRefresh) btnRefresh.disabled = active;
+}
+
+function formatDateTime(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return new Intl.DateTimeFormat('es-AR', {
+        dateStyle: 'short',
+        timeStyle: 'medium'
+    }).format(date);
+}
+
+function updateRuntimeInfo(pid, startedAt) {
+    const runtimeEl = document.getElementById('monitor-runtime');
+    if (!runtimeEl) return;
+
+    if (!pid) {
+        runtimeEl.textContent = '';
+        runtimeEl.style.display = 'none';
+        return;
+    }
+
+    const segments = [`PID: ${pid}`];
+    if (startedAt) {
+        segments.push(`Iniciado: ${formatDateTime(startedAt)}`);
+    }
+
+    runtimeEl.textContent = segments.join(' • ');
+    runtimeEl.style.display = 'block';
+}
 
 // Actualizar estado del monitor
 async function updateMonitorStatus() {
+    if (monitorBusy) {
+        return;
+    }
+
     console.log('[DEBUG] Actualizando estado del monitor...');
 
     // Animación del botón de actualizar
@@ -72,24 +134,20 @@ async function updateMonitorStatus() {
         const badge = document.getElementById('monitor-status-badge');
         const btnStart = document.getElementById('btn-start');
         const btnStop = document.getElementById('btn-stop');
-        const pidElement = document.getElementById('monitor-pid');
 
         if (data.running) {
             badge.textContent = '● En Ejecución';
             badge.className = 'badge badge-success';
-            btnStart.disabled = true;
-            btnStop.disabled = false;
-            if (currentPID) {
-                pidElement.textContent = `PID: ${currentPID}`;
-            }
+            if (btnStart) btnStart.disabled = true;
+            if (btnStop) btnStop.disabled = false;
+            updateRuntimeInfo(data.pid, data.started_at);
             console.log('[DEBUG] Monitor está corriendo');
         } else {
             badge.textContent = '○ Detenido';
             badge.className = 'badge badge-danger';
-            btnStart.disabled = false;
-            btnStop.disabled = true;
-            pidElement.textContent = '';
-            currentPID = null;
+            if (btnStart) btnStart.disabled = false;
+            if (btnStop) btnStop.disabled = true;
+            updateRuntimeInfo(null, null);
             console.log('[DEBUG] Monitor está detenido');
         }
     } catch (error) {
@@ -114,9 +172,7 @@ async function startMonitor() {
     messageEl.textContent = '⏳ Iniciando monitor...';
     messageEl.className = 'monitor-message info';
 
-    // Deshabilitar botón temporalmente
-    const btnStart = document.getElementById('btn-start');
-    btnStart.disabled = true;
+    setMonitorBusy(true, 'Iniciando monitor...');
 
     try {
         const response = await fetch('/api/monitor/start', {
@@ -130,11 +186,11 @@ async function startMonitor() {
         console.log('[DEBUG] Respuesta de start:', data);
 
         if (data.success) {
-            currentPID = data.pid;
             messageEl.textContent = `✓ ${data.message} (PID: ${data.pid})`;
             messageEl.className = 'monitor-message success';
 
-            // Actualizar estado inmediatamente
+            setMonitorBusy(false);
+            updateRuntimeInfo(data.pid, data.started_at);
             await updateMonitorStatus();
 
             // Limpiar mensaje después de 3 segundos
@@ -144,13 +200,15 @@ async function startMonitor() {
         } else {
             messageEl.textContent = `✗ ${data.message}`;
             messageEl.className = 'monitor-message error';
-            btnStart.disabled = false;
+            setMonitorBusy(false);
+            await updateMonitorStatus();
         }
     } catch (error) {
         console.error('[ERROR] Error al iniciar monitor:', error);
         messageEl.textContent = '✗ Error al iniciar el monitor: ' + error.message;
         messageEl.className = 'monitor-message error';
-        btnStart.disabled = false;
+        setMonitorBusy(false);
+        await updateMonitorStatus();
     }
 }
 
@@ -161,9 +219,7 @@ async function stopMonitor() {
     messageEl.textContent = '⏳ Deteniendo monitor...';
     messageEl.className = 'monitor-message info';
 
-    // Deshabilitar botón temporalmente
-    const btnStop = document.getElementById('btn-stop');
-    btnStop.disabled = true;
+    setMonitorBusy(true, 'Deteniendo monitor...');
 
     try {
         const response = await fetch('/api/monitor/stop', {
@@ -180,7 +236,8 @@ async function stopMonitor() {
             messageEl.textContent = `✓ ${data.message}`;
             messageEl.className = 'monitor-message success';
 
-            // Actualizar estado inmediatamente
+            setMonitorBusy(false);
+            updateRuntimeInfo(null, null);
             await updateMonitorStatus();
 
             // Limpiar mensaje después de 3 segundos
@@ -190,13 +247,15 @@ async function stopMonitor() {
         } else {
             messageEl.textContent = `✗ ${data.message}`;
             messageEl.className = 'monitor-message error';
-            btnStop.disabled = false;
+            setMonitorBusy(false);
+            await updateMonitorStatus();
         }
     } catch (error) {
         console.error('[ERROR] Error al detener monitor:', error);
         messageEl.textContent = '✗ Error al detener el monitor: ' + error.message;
         messageEl.className = 'monitor-message error';
-        btnStop.disabled = false;
+        setMonitorBusy(false);
+        await updateMonitorStatus();
     }
 }
 

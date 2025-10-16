@@ -69,6 +69,82 @@
         </div>
 
         <div class="config-section">
+            <h3>Intervalos Fuera de Horario Laboral (minutos)</h3>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="intervalos_no_laboral_entradas">Entradas (fuera de horario)</label>
+                    <input type="number" id="intervalos_no_laboral_entradas" name="intervalos_no_laboral_entradas"
+                           value="{{ config.intervalos_no_laboral_entradas }}" min="1" max="1440" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="intervalos_no_laboral_expedientes">Expedientes (fuera de horario)</label>
+                    <input type="number" id="intervalos_no_laboral_expedientes" name="intervalos_no_laboral_expedientes"
+                           value="{{ config.intervalos_no_laboral_expedientes }}" min="1" max="1440" class="form-control">
+                </div>
+            </div>
+        </div>
+
+        <div class="config-section">
+            <h3>Horario Laboral</h3>
+
+            <div class="form-group">
+                <label>Días laborales habilitados</label>
+                <div class="checkbox-grid">
+                    {% set dias = config.dias_laborales | default([]) %}
+                    {% for dia in ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] %}
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="dias_laborales" value="{{ dia }}" {% if dia in dias %}checked{% endif %}>
+                        <span>{{ dia|capitalize }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="hora_inicio">Hora de inicio</label>
+                    <input type="time" id="hora_inicio" name="hora_inicio" value="{{ config.hora_inicio }}" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="hora_fin">Hora de cierre</label>
+                    <input type="time" id="hora_fin" name="hora_fin" value="{{ config.hora_fin }}" class="form-control">
+                </div>
+            </div>
+        </div>
+
+        <div class="config-section">
+            <h3>Reintentos ante Errores</h3>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="max_reintentos_entradas">Máx. reintentos entradas</label>
+                    <input type="number" id="max_reintentos_entradas" name="max_reintentos_entradas"
+                           value="{{ config.max_reintentos_entradas }}" min="1" max="10" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="espera_reintentos_entradas">Espera entre reintentos entradas (segundos)</label>
+                    <input type="number" id="espera_reintentos_entradas" name="espera_reintentos_entradas"
+                           value="{{ config.espera_reintentos_entradas }}" min="1" max="3600" class="form-control">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="max_reintentos_expedientes">Máx. reintentos expedientes</label>
+                    <input type="number" id="max_reintentos_expedientes" name="max_reintentos_expedientes"
+                           value="{{ config.max_reintentos_expedientes }}" min="1" max="10" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="espera_reintentos_expedientes">Espera entre reintentos expedientes (segundos)</label>
+                    <input type="number" id="espera_reintentos_expedientes" name="espera_reintentos_expedientes"
+                           value="{{ config.espera_reintentos_expedientes }}" min="1" max="3600" class="form-control">
+                </div>
+            </div>
+        </div>
+
+        <div class="config-section">
             <h3>Notificaciones</h3>
 
             <div class="form-group">
@@ -97,6 +173,25 @@
         </div>
 
         <div class="config-section">
+            <h3>Opciones avanzadas</h3>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="comparacion_automatica" name="comparacion_automatica" {% if config.comparacion_automatica %}checked{% endif %}>
+                    <span>Comparación automática de expedientes</span>
+                </label>
+                <small>Compara expedientes luego de cada verificación para detectar diferencias.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="fecha_corte_expedientes">Fecha de corte expedientes</label>
+                <input type="date" id="fecha_corte_expedientes" name="fecha_corte_expedientes"
+                       value="{{ config.fecha_corte_expedientes or '' }}" class="form-control">
+                <small>Opcional. Limita la extracción de expedientes hasta la fecha indicada.</small>
+            </div>
+        </div>
+
+        <div class="config-section">
             <h3>Filtros de Fecha</h3>
 
             <div class="form-row">
@@ -119,6 +214,11 @@
                     <input type="date" id="fecha_desde_expedientes" name="fecha_desde_expedientes"
                            value="{{ config.fecha_desde_expedientes or '' }}" class="form-control">
                 </div>
+                <div class="form-group">
+                    <label for="fecha_hasta_expedientes">Expedientes hasta</label>
+                    <input type="date" id="fecha_hasta_expedientes" name="fecha_hasta_expedientes"
+                           value="{{ config.fecha_hasta_expedientes or '' }}" class="form-control">
+                </div>
             </div>
         </div>
 
@@ -127,6 +227,19 @@
             <button type="button" class="btn btn-secondary" onclick="location.reload()">Cancelar</button>
         </div>
     </form>
+
+    <div class="config-section config-backups">
+        <h3>Respaldos rápidos</h3>
+        <p class="subtitle">Descarga o sube el archivo <code>monitor.json</code> para compartir configuraciones.</p>
+        <div class="backup-actions">
+            <button type="button" class="btn btn-secondary" id="downloadConfigBtn">Descargar configuración</button>
+            <form id="uploadConfigForm" class="upload-form" enctype="multipart/form-data">
+                <label for="configFileInput" class="upload-label">Cargar configuración</label>
+                <input type="file" id="configFileInput" name="config_file" accept="application/json" required>
+                <button type="submit" class="btn btn-primary">Subir archivo</button>
+            </form>
+        </div>
+    </div>
 </div>
 
 <div id="message" class="message" style="display: none;"></div>
@@ -137,21 +250,39 @@ document.getElementById('configForm').addEventListener('submit', async function(
 
     const formData = new FormData(this);
     const data = {};
+    const booleanFields = [
+        'headless',
+        'verificar_entradas',
+        'verificar_expedientes',
+        'notificar_nuevas_entradas',
+        'notificar_cambios_expedientes',
+        'notificar_errores',
+        'comparacion_automatica'
+    ];
+    const multiValueFields = ['dias_laborales'];
 
     // Convertir FormData a objeto JSON
     for (let [key, value] of formData.entries()) {
-        if (key === 'headless' || key === 'verificar_entradas' || key === 'verificar_expedientes' ||
-            key === 'notificar_nuevas_entradas' || key === 'notificar_cambios_expedientes' ||
-            key === 'notificar_errores') {
+        if (booleanFields.includes(key)) {
             data[key] = true;
+        } else if (multiValueFields.includes(key)) {
+            if (!Array.isArray(data[key])) {
+                data[key] = [];
+            }
+            data[key].push(value);
         } else {
             data[key] = value;
         }
     }
 
+    multiValueFields.forEach(field => {
+        if (!(field in data)) {
+            data[field] = [];
+        }
+    });
+
     // Checkboxes no marcados
-    ['headless', 'verificar_entradas', 'verificar_expedientes',
-     'notificar_nuevas_entradas', 'notificar_cambios_expedientes', 'notificar_errores'].forEach(field => {
+    booleanFields.forEach(field => {
         if (!(field in data)) {
             data[field] = false;
         }
@@ -188,6 +319,45 @@ document.getElementById('configForm').addEventListener('submit', async function(
         const messageDiv = document.getElementById('message');
         messageDiv.className = 'message message-error';
         messageDiv.textContent = 'Error al guardar la configuración: ' + error.message;
+        messageDiv.style.display = 'block';
+    }
+});
+
+document.getElementById('downloadConfigBtn').addEventListener('click', function() {
+    window.location.href = '/config/download';
+});
+
+document.getElementById('uploadConfigForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const uploadForm = document.getElementById('uploadConfigForm');
+    const formData = new FormData(uploadForm);
+    const messageDiv = document.getElementById('message');
+
+    try {
+        const response = await fetch('/config/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            messageDiv.className = 'message message-success';
+            messageDiv.textContent = result.message;
+            messageDiv.style.display = 'block';
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            const message = result.message || 'No se pudo cargar la configuración.';
+            messageDiv.className = 'message message-error';
+            messageDiv.textContent = message;
+            messageDiv.style.display = 'block';
+        }
+    } catch (error) {
+        messageDiv.className = 'message message-error';
+        messageDiv.textContent = 'Error al cargar la configuración: ' + error.message;
         messageDiv.style.display = 'block';
     }
 });
