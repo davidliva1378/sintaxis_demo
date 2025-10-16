@@ -123,31 +123,37 @@ async def verificar_inmediato(monitor: MonitorPJN) -> int:
     logger.info("=" * 60)
 
     try:
-        # Verificar entradas
-        logger.info("\n📥 Verificando entradas...")
-        nuevas_entradas = await monitor.verificar_entradas()
+        # Verificar entradas si está habilitado
+        if monitor.config.verificar_entradas:
+            logger.info("\n📥 Verificando entradas...")
+            nuevas_entradas = await monitor.verificar_entradas()
 
-        if nuevas_entradas:
-            logger.info(f"✅ {len(nuevas_entradas)} nuevas entradas detectadas:")
-            for entrada in nuevas_entradas[:5]:  # Mostrar hasta 5
-                logger.info(f"  - {entrada.numero}: {entrada.evento}")
-            if len(nuevas_entradas) > 5:
-                logger.info(f"  ... y {len(nuevas_entradas) - 5} más")
+            if nuevas_entradas:
+                logger.info(f"✅ {len(nuevas_entradas)} nuevas entradas detectadas:")
+                for entrada in nuevas_entradas[:5]:  # Mostrar hasta 5
+                    logger.info(f"  - {entrada.numero}: {entrada.evento}")
+                if len(nuevas_entradas) > 5:
+                    logger.info(f"  ... y {len(nuevas_entradas) - 5} más")
+            else:
+                logger.info("✅ Sin nuevas entradas")
         else:
-            logger.info("✅ Sin nuevas entradas")
+            logger.info("\n📥 Verificación de entradas deshabilitada")
 
-        # Verificar expedientes
-        logger.info("\n📊 Verificando expedientes...")
-        cambios_expedientes = await monitor.verificar_expedientes()
+        # Verificar expedientes si está habilitado
+        if monitor.config.verificar_expedientes:
+            logger.info("\n📊 Verificando expedientes...")
+            cambios_expedientes = await monitor.verificar_expedientes()
 
-        if cambios_expedientes:
-            logger.info(f"✅ {len(cambios_expedientes)} expedientes con cambios:")
-            for exp in cambios_expedientes[:5]:  # Mostrar hasta 5
-                logger.info(f"  - {exp.numero}: {exp.ultima_actuacion}")
-            if len(cambios_expedientes) > 5:
-                logger.info(f"  ... y {len(cambios_expedientes) - 5} más")
+            if cambios_expedientes:
+                logger.info(f"✅ {len(cambios_expedientes)} expedientes con cambios:")
+                for exp in cambios_expedientes[:5]:  # Mostrar hasta 5
+                    logger.info(f"  - {exp.numero}: {exp.ultima_actuacion}")
+                if len(cambios_expedientes) > 5:
+                    logger.info(f"  ... y {len(cambios_expedientes) - 5} más")
+            else:
+                logger.info("✅ Sin cambios en expedientes")
         else:
-            logger.info("✅ Sin cambios en expedientes")
+            logger.info("\n📊 Verificación de expedientes deshabilitada")
 
         logger.info("\n" + "=" * 60)
         logger.info("VERIFICACIÓN COMPLETADA EXITOSAMENTE")

@@ -75,7 +75,9 @@ class MonitorPJN:
                 entradas_actuales = await extraer_entradas_datos(
                     page,
                     duplicados=False,
-                    incluir_tipos=("N",)  # Solo notificaciones
+                    incluir_tipos=("N",),  # Solo notificaciones
+                    fecha_desde=self.config.fecha_desde_entradas,
+                    fecha_hasta=self.config.fecha_hasta_entradas
                 )
 
             logger.info(f"Extraídas {len(entradas_actuales)} entradas del portal")

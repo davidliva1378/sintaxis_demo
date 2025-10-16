@@ -82,9 +82,17 @@ class MonitorConfig:
     notificar_cambios_expedientes: bool = True
     notificar_errores: bool = True
 
+    # Verificaciones (habilitar/deshabilitar)
+    verificar_entradas: bool = True
+    verificar_expedientes: bool = True
+
     # Avanzado
     comparacion_automatica: bool = False
     fecha_corte_expedientes: str | None = None
+
+    # Filtros de rango de fechas para entradas
+    fecha_desde_entradas: str | None = None  # Formato: YYYY-MM-DD o DD/MM/YYYY
+    fecha_hasta_entradas: str | None = None  # Formato: YYYY-MM-DD o DD/MM/YYYY
 
     @classmethod
     def from_file(cls, path: str | Path = "config/monitor.json") -> "MonitorConfig":

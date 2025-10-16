@@ -315,6 +315,9 @@ async def _procesar_fila_entrada(
         extraida_en=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     )
 
+    # Logging de entrada capturada
+    logger.debug(f"  -> Capturada: {fecha_iso} | {numero} | {tipo_evento}")
+
     return entrada_modelo
 
 
@@ -497,10 +500,13 @@ async def extraer_entradas_datos(
     ultima_fila_prev = await _ultima_fila_texto()
 
     # Bucle principal de extracción
+    filas_consecutivas_antiguas = 0
     while iteracion < max_iter:
         iteracion += 1
 
         filas = await page.query_selector_all(SEL_ENTRADAS.TABLA)
+        nuevas_en_esta_iter = 0
+
         for fila in filas:
             try:
                 # Procesar fila y obtener entrada si pasa filtros
@@ -514,11 +520,38 @@ async def extraer_entradas_datos(
                 )
 
                 if not entrada_modelo:
+                    # Verificar si fue filtrada por ser más antigua que fecha_desde (para corte temprano)
+                    if rango_desde:
+                        try:
+                            # Intentar extraer fecha de la fila para verificar si estamos fuera de rango
+                            celdas = await fila.query_selector_all(SEL_ENTRADAS.CELDAS_FILA)
+                            if len(celdas) >= 3:
+                                fecha_elem = await celdas[2].query_selector(SEL_ENTRADAS.FECHA_ELEMENTO)
+                                if fecha_elem:
+                                    fecha_aria = await fecha_elem.get_attribute("aria-label")
+                                    if fecha_aria:
+                                        fecha_s = fecha_aria.split()[0] if " " in fecha_aria else fecha_aria
+                                        fecha_iso = _to_iso(fecha_s)
+                                        if fecha_iso:
+                                            f = datetime.strptime(fecha_iso, "%Y-%m-%d").date()
+                                            if f < rango_desde:
+                                                filas_consecutivas_antiguas += 1
+                                                logger.debug(f"  -> Filtrada (antigua): {fecha_iso} (consecutivas: {filas_consecutivas_antiguas})")
+                                                # Corte temprano: si encontramos 10 filas consecutivas más antiguas que fecha_desde
+                                                if filas_consecutivas_antiguas >= 10:
+                                                    logger.info(f"Corte temprano: 10 filas consecutivas más antiguas que {rango_desde}")
+                                                    break
+                        except Exception:
+                            pass
                     continue
+
+                # Resetear contador si encontramos una entrada válida
+                filas_consecutivas_antiguas = 0
 
                 # Si se permiten duplicados, agregar directamente
                 if duplicados:
                     nuevas_entradas.append(entrada_modelo)
+                    nuevas_en_esta_iter += 1
                     continue
 
                 # Aplicar deduplicación
@@ -530,9 +563,14 @@ async def extraer_entradas_datos(
                     vistos_run_event,
                 ):
                     nuevas_entradas.append(entrada_modelo)
+                    nuevas_en_esta_iter += 1
 
             except Exception:
                 continue
+
+        # Si se activó el corte temprano, salir del while
+        if rango_desde and filas_consecutivas_antiguas >= 10:
+            break
 
         # Detección de fin
         if scrolled_count > 0 and await _near_bottom(page) and await fin_loc.is_visible():

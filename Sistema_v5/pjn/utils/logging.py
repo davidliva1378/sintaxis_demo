@@ -19,6 +19,27 @@ _LOGGERS: dict[str, logging.Logger] = {}
 _DEFAULT_LEVEL = logging.INFO
 
 
+class SafeStreamHandler(logging.StreamHandler):
+    """StreamHandler que maneja errores de encoding en Windows."""
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            stream = self.stream
+            # Intentar escribir normalmente
+            try:
+                stream.write(msg + self.terminator)
+                self.flush()
+            except (UnicodeEncodeError, ValueError):
+                # Si falla, reemplazar caracteres problemáticos
+                msg_safe = msg.encode('ascii', 'replace').decode('ascii')
+                stream.write(msg_safe + self.terminator)
+                self.flush()
+        except Exception:
+            # Si todo falla, no crashear el programa
+            self.handleError(record)
+
+
 class ColoredFormatter(logging.Formatter):
     """Formatter que agrega colores ANSI a los niveles de log.
 
@@ -37,7 +58,11 @@ class ColoredFormatter(logging.Formatter):
 
     def __init__(self, *args, use_colors: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
-        self.use_colors = use_colors and sys.stdout.isatty()
+        # Verificar si stdout soporta isatty
+        try:
+            self.use_colors = use_colors and sys.stdout.isatty()
+        except:
+            self.use_colors = False
 
     def format(self, record: logging.LogRecord) -> str:
         if self.use_colors:
@@ -87,8 +112,8 @@ def setup_logging(
     root_logger.setLevel(logging.DEBUG)  # Captura todo, los handlers filtran
     root_logger.handlers.clear()  # Limpiar handlers existentes
 
-    # Handler para CONSOLA
-    console_handler = logging.StreamHandler(sys.stdout)
+    # Handler para CONSOLA - Usa SafeStreamHandler para manejar encoding en Windows
+    console_handler = SafeStreamHandler(sys.stdout)
     console_handler.setLevel(level)
 
     # Formato simple para consola (mantiene emojis visibles)
