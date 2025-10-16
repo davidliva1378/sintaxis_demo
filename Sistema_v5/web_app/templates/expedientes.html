@@ -13,38 +13,32 @@
         <thead>
             <tr>
                 <th>Expediente</th>
-                <th>Caratula</th>
-                <th>Organismo</th>
-                <th>Ultima Actuacion</th>
-                <th>Actuaciones</th>
-                <th>Estado Hash</th>
-                <th>Detectado</th>
+                <th>Carátula</th>
+                <th>Dependencia</th>
+                <th>Situación</th>
+                <th>Última Actuación</th>
             </tr>
         </thead>
         <tbody>
             {% if expedientes %}
                 {% for exp in expedientes %}
                 <tr>
-                    <td><span class="expediente-badge">{{ exp.expediente }}</span></td>
+                    <td><span class="expediente-badge">{{ exp.numero or '-' }}</span></td>
                     <td class="caratula-cell">
+                        {% if exp.caratula %}
                         <div class="caratula-preview" title="{{ exp.caratula }}">
                             {{ exp.caratula[:60] }}{% if exp.caratula|length > 60 %}...{% endif %}
                         </div>
+                        {% else %}-{% endif %}
                     </td>
-                    <td>{{ exp.organismo or '-' }}</td>
+                    <td>{{ exp.dependencia or '-' }}</td>
+                    <td>{{ exp.situacion or '-' }}</td>
                     <td class="timestamp-cell">{{ exp.ultima_actuacion or '-' }}</td>
-                    <td class="center-cell">
-                        <span class="count-badge">{{ exp.actuaciones_count }}</span>
-                    </td>
-                    <td class="hash-cell">
-                        <code class="hash-code">{{ exp.estado_hash[:12] }}...</code>
-                    </td>
-                    <td class="timestamp-cell">{{ exp.detectado_en or '-' }}</td>
                 </tr>
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="7" class="empty-message">No hay expedientes registrados</td>
+                    <td colspan="5" class="empty-message">No hay expedientes registrados</td>
                 </tr>
             {% endif %}
         </tbody>

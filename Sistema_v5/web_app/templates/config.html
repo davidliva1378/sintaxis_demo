@@ -16,11 +16,11 @@
             <div class="form-group">
                 <label for="modo">Modo de Operación</label>
                 <select id="modo" name="modo" class="form-control">
-                    <option value="todo" {% if config.modo == 'todo' %}selected{% endif %}>Todo (Entradas y Expedientes)</option>
-                    <option value="entradas" {% if config.modo == 'entradas' %}selected{% endif %}>Solo Entradas</option>
-                    <option value="expedientes" {% if config.modo == 'expedientes' %}selected{% endif %}>Solo Expedientes</option>
+                    <option value="automatico" {% if config.modo == 'automatico' %}selected{% endif %}>Automático (según horario)</option>
+                    <option value="laboral" {% if config.modo == 'laboral' %}selected{% endif %}>Solo horario laboral</option>
+                    <option value="no_laboral" {% if config.modo == 'no_laboral' %}selected{% endif %}>Fuera de horario laboral</option>
                 </select>
-                <small>Define qué elementos se monitorean</small>
+                <small>Define qué intervalos se aplican al monitoreo</small>
             </div>
 
             <div class="form-group">
@@ -169,12 +169,14 @@ document.getElementById('configForm').addEventListener('submit', async function(
         const result = await response.json();
         const messageDiv = document.getElementById('message');
 
-        if (result.success) {
+        if (response.ok && result.success) {
             messageDiv.className = 'message message-success';
             messageDiv.textContent = result.message;
         } else {
+            const errors = result.errors ? Object.values(result.errors).join('. ') : '';
+            const message = result.message || 'No se pudo guardar la configuración.';
             messageDiv.className = 'message message-error';
-            messageDiv.textContent = result.message;
+            messageDiv.textContent = errors ? `${message} ${errors}` : message;
         }
 
         messageDiv.style.display = 'block';
