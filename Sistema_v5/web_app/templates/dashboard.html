@@ -291,16 +291,22 @@ document.addEventListener('DOMContentLoaded', function() {
             <th>Fecha</th>
             <th>Expediente</th>
             <th>Tipo</th>
-            <th>Contenido</th>
+            <th>Evento</th>
         </tr>
     </thead>
     <tbody>
         {% for entrada in entradas_recientes %}
         <tr>
-            <td>{{ entrada.fecha }}</td>
-            <td>{{ entrada.expediente }}</td>
-            <td>{{ entrada.tipo }}</td>
-            <td>{{ entrada.contenido[:80] }}...</td>
+            <td>{{ entrada.fecha or '-' }}</td>
+            <td>{{ entrada.numero or '-' }}</td>
+            <td>{{ entrada.tipo_evento or '-' }}</td>
+            <td>
+                {% if entrada.evento %}
+                    {{ entrada.evento[:80] }}{% if entrada.evento|length > 80 %}...{% endif %}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
         </tr>
         {% endfor %}
     </tbody>
@@ -311,16 +317,24 @@ document.addEventListener('DOMContentLoaded', function() {
     <thead>
         <tr>
             <th>Expediente</th>
-            <th>Caratula</th>
+            <th>Dependencia</th>
             <th>Última Actuación</th>
+            <th>Situación</th>
         </tr>
     </thead>
     <tbody>
         {% for exp in expedientes_recientes %}
         <tr>
-            <td>{{ exp.expediente }}</td>
-            <td>{{ exp.caratula }}</td>
-            <td>{{ exp.ultima_actuacion }}</td>
+            <td>{{ exp.numero or '-' }}</td>
+            <td>{{ exp.dependencia or '-' }}</td>
+            <td>{{ exp.ultima_actuacion or '-' }}</td>
+            <td>
+                {% if exp.situacion %}
+                    {{ exp.situacion[:80] }}{% if exp.situacion|length > 80 %}...{% endif %}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
         </tr>
         {% endfor %}
     </tbody>

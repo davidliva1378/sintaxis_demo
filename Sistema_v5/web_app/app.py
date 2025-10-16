@@ -6,13 +6,12 @@ el monitoreo de expedientes y entradas del PJN.
 
 from __future__ import annotations
 
-import json
 import sys
 import subprocess
 import signal
 from datetime import datetime
 from pathlib import Path
-from threading import Thread, Lock
+from threading import Lock
 
 from flask import Flask, render_template, jsonify, request, redirect, url_for
 
@@ -29,8 +28,6 @@ app.config['JSON_AS_ASCII'] = False  # Para caracteres UTF-8
 
 # Rutas de configuración
 CONFIG_PATH = Path(__file__).parent.parent / "config" / "monitor.json"
-DATA_DIR = Path(__file__).parent.parent / "data" / "monitor"
-PYTHON_PATH = Path(__file__).parent.parent.parent / ".venv" / "Scripts" / "python.exe"
 MONITOR_SCRIPT = Path(__file__).parent.parent / "ejecutar_monitor_continuo.py"
 
 # Variables globales para control del monitor
@@ -44,9 +41,29 @@ def get_monitor_config() -> MonitorConfig:
 
 
 def get_storage() -> StorageManager:
-    """Obtiene el StorageManager."""
+    """Obtiene el StorageManager resolviendo rutas relativas al proyecto."""
     config = get_monitor_config()
-    return StorageManager(Path(config.directorio_datos))
+    data_dir = Path(config.directorio_datos)
+    if not data_dir.is_absolute():
+        data_dir = Path(__file__).parent.parent / data_dir
+    return StorageManager(data_dir)
+
+
+def _parse_datetime(value: str | None) -> datetime:
+    """Intenta convertir una cadena en fecha/hora para ordenamiento."""
+    if not value:
+        return datetime.min
+
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        for fmt in ("%d/%m/%Y", "%d/%m/%Y %H:%M", "%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+            try:
+                return datetime.strptime(value, fmt)
+            except ValueError:
+                continue
+
+    return datetime.min
 
 
 @app.route('/')
@@ -82,14 +99,14 @@ def dashboard():
     # Entradas recientes (últimas 10)
     entradas_recientes = sorted(
         entradas,
-        key=lambda e: datetime.fromisoformat(e.fecha) if e.fecha else datetime.min,
+        key=lambda e: _parse_datetime(e.fecha),
         reverse=True
     )[:10]
 
     # Expedientes con cambios recientes (últimos 10)
     expedientes_recientes = sorted(
         expedientes,
-        key=lambda e: datetime.fromisoformat(e.ultima_actuacion) if e.ultima_actuacion else datetime.min,
+        key=lambda e: _parse_datetime(e.ultima_actuacion),
         reverse=True
     )[:10]
 
@@ -110,7 +127,7 @@ def entradas():
     # Ordenar por fecha descendente
     entradas_list = sorted(
         entradas_list,
-        key=lambda e: datetime.fromisoformat(e.fecha) if e.fecha else datetime.min,
+        key=lambda e: _parse_datetime(e.fecha),
         reverse=True
     )
 
@@ -126,7 +143,7 @@ def expedientes():
     # Ordenar por última actuación descendente
     expedientes_list = sorted(
         expedientes_list,
-        key=lambda e: datetime.fromisoformat(e.ultima_actuacion) if e.ultima_actuacion else datetime.min,
+        key=lambda e: _parse_datetime(e.ultima_actuacion),
         reverse=True
     )
 
@@ -145,11 +162,15 @@ def config_update():
     """Actualiza la configuración."""
     try:
         config = get_monitor_config()
-        data = request.json
+        data = request.json or {}
+        errors: dict[str, str] = {}
 
         # Actualizar campos básicos
         if 'modo' in data:
-            config.modo = data['modo']
+            if data['modo'] in {"automatico", "laboral", "no_laboral"}:
+                config.modo = data['modo']
+            else:
+                errors['modo'] = 'Modo de operación inválido'
         if 'headless' in data:
             config.headless = data['headless']
         if 'verificar_entradas' in data:
@@ -159,9 +180,19 @@ def config_update():
 
         # Actualizar intervalos
         if 'intervalos_laboral_entradas' in data:
-            config.intervalos_laboral_entradas = int(data['intervalos_laboral_entradas'])
+            value = data['intervalos_laboral_entradas']
+            if value not in (None, ""):
+                try:
+                    config.intervalos_laboral_entradas = int(value)
+                except (TypeError, ValueError):
+                    errors['intervalos_laboral_entradas'] = 'Debe ser un número entero'
         if 'intervalos_laboral_expedientes' in data:
-            config.intervalos_laboral_expedientes = int(data['intervalos_laboral_expedientes'])
+            value = data['intervalos_laboral_expedientes']
+            if value not in (None, ""):
+                try:
+                    config.intervalos_laboral_expedientes = int(value)
+                except (TypeError, ValueError):
+                    errors['intervalos_laboral_expedientes'] = 'Debe ser un número entero'
 
         # Actualizar notificaciones
         if 'notificar_nuevas_entradas' in data:
@@ -178,6 +209,9 @@ def config_update():
             config.fecha_hasta_entradas = data['fecha_hasta_entradas'] or None
         if 'fecha_desde_expedientes' in data:
             config.fecha_desde_expedientes = data['fecha_desde_expedientes'] or None
+
+        if errors:
+            return jsonify({'success': False, 'errors': errors, 'message': 'Revisa los campos indicados'}), 400
 
         # Guardar configuración
         config.to_file(CONFIG_PATH)
@@ -291,12 +325,16 @@ def api_monitor_start():
                 }), 400
 
             # Iniciar el proceso del monitor
+            creationflags = 0
+            if sys.platform == 'win32':
+                creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+
             monitor_process = subprocess.Popen(
-                [str(PYTHON_PATH), str(MONITOR_SCRIPT)],
+                [sys.executable, str(MONITOR_SCRIPT)],
                 cwd=str(MONITOR_SCRIPT.parent),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+                creationflags=creationflags
             )
 
             return jsonify({
