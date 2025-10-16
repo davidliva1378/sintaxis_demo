@@ -11,7 +11,7 @@
 
 ### Progreso General
 ```
-████████░░░░░░░░░░░░░░░░ 33%
+████████████████░░░░░░░░ 67%
 ```
 
 ### Tareas
@@ -24,10 +24,13 @@
   - Commit: 2eae8b4
   - Tests: 7 nuevos tests, todos pasan ✅
 
-- [ ] 1.2: Deprecar funciones con side effects (3h)
-  - Responsable: [TBD]
-  - Estado: ⏳ No iniciada
-  - PR: -
+- [x] 1.2: Deprecar funciones con side effects (3h)
+  - Responsable: Claude
+  - Estado: ✅ Completada
+  - PR: refactor/deprecar-side-effects
+  - Funciones deprecated: 2 (actualizar_metricas_descargas_en_json, descargar_archivos_actuaciones)
+  - Tests: 13 nuevos tests, todos pasan ✅
+  - Documentación: Guía de migración completa creada
 
 #### Mejora de Manejo de Errores
 - [ ] 1.3: Validación de recursos I/O (4h)
@@ -82,10 +85,18 @@
 ### Notas del Sprint
 **2025-10-16:**
 - ✅ Tarea 1.1 completada e integrada a v5.6
-- Merge commit: 3f4d1ae
-- Todos los tests pasan post-merge (7/7)
-- Tests de sistema funcionando correctamente
-- Sin regresiones detectadas
+  - Merge commit: 3f4d1ae
+  - Todos los tests pasan post-merge (7/7)
+  - Tests de sistema funcionando correctamente
+  - Sin regresiones detectadas
+
+- ✅ Tarea 1.2 completada
+  - Branch: refactor/deprecar-side-effects
+  - 2 funciones marcadas como deprecated con warnings
+  - 13 tests nuevos para verificar warnings
+  - Guía de migración completa creada (GUIA_MIGRACION_DEPRECACIONES.md)
+  - Todos los tests pasan (20/20)
+  - Listo para merge
 
 ---
 
