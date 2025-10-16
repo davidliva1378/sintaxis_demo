@@ -11,16 +11,18 @@
 
 ### Progreso General
 ```
-████░░░░░░░░░░░░░░░░░░░░ 20%
+████████░░░░░░░░░░░░░░░░ 33%
 ```
 
 ### Tareas
 
 #### Eliminación de Código Duplicado
-- [ ] 1.1: Consolidar `_calcular_metricas_descargas()` (2h)
-  - Responsable: [TBD]
-  - Estado: ⏳ No iniciada
-  - PR: -
+- [x] 1.1: Consolidar `_calcular_metricas_descargas()` (2h)
+  - Responsable: Claude
+  - Estado: ✅ Completada
+  - PR: refactor/consolidar-calculo-metricas
+  - Commit: 2eae8b4
+  - Tests: 7 nuevos tests, todos pasan ✅
 
 - [ ] 1.2: Deprecar funciones con side effects (3h)
   - Responsable: [TBD]
