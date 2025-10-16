@@ -155,17 +155,36 @@
 
 ---
 
-### ⏸️ Mejora #6: Parametrizar estrategias de paginación
-- **Estado:** ⏸️ PENDIENTE (no prioritario por ahora)
-- **Archivos afectados:**
-  - `pjn/scraping/expedientes.py:169-508`
-- **Descripción:** Lógica de paginación hardcodeada en función gigante
-- **Solución propuesta:**
-  - ⏸️ Crear `Protocol` para estrategias de paginación
-  - ⏸️ Extraer lógica PrimeFaces a clase `PrimeFacesPaginationStrategy`
-  - ⏸️ Inyectar estrategia como parámetro opcional
-- **Impacto:** 🟠 MEDIO-ALTO - Facilita adaptación a otros portales
-- **Nota:** Puede implementarse si se necesita soporte para otros portales
+### ✅ Mejora #6: Parametrizar estrategias de paginación
+- **Estado:** ✅ COMPLETADA
+- **Fecha:** 2025-10-15
+- **Archivos modificados:**
+  - `pjn/scraping/pagination.py` (NUEVO)
+  - `pjn/scraping/expedientes.py`
+- **Descripción:** Lógica de paginación estaba hardcodeada, dificultando adaptación a otros portales
+- **Solución implementada:**
+  - ✅ Creado `Protocol` `PaginationStrategy` para estrategias de paginación
+  - ✅ Implementada clase `PrimeFacesPaginationStrategy` con lógica PrimeFaces
+  - ✅ Agregado parámetro `pagination_strategy` a funciones de extracción
+  - ✅ Mantenida compatibilidad total: código existente funciona sin cambios
+  - ✅ Refactorizada `_navegar_siguiente_pagina()` para delegar a estrategia
+  - ✅ Documentación completa con ejemplos de uso
+- **Impacto:** 🟠 ALTO - Facilita adaptación a diferentes frameworks de paginación
+- **Características:**
+  - Protocol permite crear estrategias sin herencia
+  - Estrategia default usa lógica PrimeFaces probada
+  - Fácil crear estrategias para Bootstrap, Material-UI, infinite scroll, etc.
+  - Ideal para testing con estrategias mock
+- **Ejemplo de uso:**
+  ```python
+  from pjn.scraping.pagination import PrimeFacesPaginationStrategy
+
+  strategy = PrimeFacesPaginationStrategy(timeout_ms=15_000)
+  expedientes, motivo, metadata = await extraer_expedientes_completos(
+      page,
+      pagination_strategy=strategy,  # Parámetro opcional
+  )
+  ```
 
 ---
 
@@ -242,11 +261,11 @@
 
 ```
 🔴 CRÍTICA:  [████] 100% (4/4 completadas) ✅
-🟠 ALTA:     [███░] 67% (2/3 completadas)
+🟠 ALTA:     [████] 100% (3/3 completadas) ✅
 🟡 MEDIA:    [██░] 67% (2/3 completadas)
 🟢 BAJA:     [░░░] 0% (0/5 completadas)
 
-TOTAL: 53% (8/15 mejoras)
+TOTAL: 60% (9/15 mejoras)
 ```
 
 **Mejoras completadas HOY (2025-10-15):**
@@ -256,16 +275,18 @@ TOTAL: 53% (8/15 mejoras)
 - ✅ Mejora #3: Eliminación de side effects
 - ✅ Mejora #4: Configuración centralizada
 - ✅ Mejora #5: Módulo de persistencia
-- ✅ Mejora #7: Refactorización completa (expedientes.py + entradas.py) ⭐ COMPLETADA
+- ✅ Mejora #6: Estrategias de paginación parametrizables ⭐ COMPLETADA
+- ✅ Mejora #7: Refactorización completa (expedientes.py + entradas.py)
 
 ---
 
 ## 🎯 Siguiente Sprint
 
-**Foco:** Mejora #6 (parametrizar paginación) - última mejora ALTA prioridad
-**Estimación:** 2-3 horas de trabajo
+**Foco:** Mejoras de MEDIA prioridad (Mejora #8 o #9)
+**Estimación:** 2-4 horas de trabajo
 **Bloqueos:** Ninguno identificado
-**Nota:** ¡8/15 mejoras completadas! Sistema con buena estructura y muy mantenible
+**Nota:** ¡TODAS las mejoras CRÍTICAS y ALTAS completadas! 🎉
+        60% del proyecto completado. Sistema altamente reutilizable y mantenible.
 
 ---
 

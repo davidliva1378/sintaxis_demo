@@ -17,6 +17,7 @@ from ..models import ExpedienteResumen
 from ..parsers.expedientes_parser import parse_expediente_resumen
 from ..selectores import SEL_EXPEDIENTES
 from ..utils.logging import get_logger
+from .pagination import PaginationStrategy, DEFAULT_PAGINATION_STRATEGY
 
 logger = get_logger(__name__)
 _config = get_config()
@@ -169,20 +170,31 @@ async def _navegar_siguiente_pagina(
     tbody_locator: Locator,
     sel_siguiente: str,
     fingerprint_actual: str,
+    estrategia: PaginationStrategy | None = None,
 ) -> tuple[bool, str | None]:
     """Intenta navegar a la siguiente página y verifica que haya cambiado el contenido.
 
     Args:
         page: Página de Playwright.
         tbody_locator: Locator del tbody para verificar cambios.
-        sel_siguiente: Selector del botón "Siguiente".
+        sel_siguiente: Selector del botón "Siguiente" (usado si no hay estrategia).
         fingerprint_actual: Fingerprint del tbody antes de hacer clic.
+        estrategia: Estrategia de paginación a usar. Si es None, usa lógica legacy.
 
     Returns:
         tuple[exito, motivo_fallo]:
             - exito: True si navegó correctamente y cambió el contenido
             - motivo_fallo: Código de error si falló, None si tuvo éxito
+
+    Note:
+        Si se proporciona una estrategia, el parámetro sel_siguiente se ignora
+        ya que la estrategia maneja sus propios selectores.
     """
+    # Si se proporciona estrategia, delegar a ella
+    if estrategia is not None:
+        return await estrategia.navegar_siguiente(page, tbody_locator, fingerprint_actual)
+
+    # Código legacy (compatible con versiones anteriores)
     next_btn = page.locator(sel_siguiente)
     btn_count = await next_btn.count()
     if btn_count <= 0:
@@ -376,6 +388,7 @@ async def extraer_expedientes_completos(
     tiempo_maximo_segundos: int | None = None,
     orden: str | None = None,
     mapper: Callable[[ExpedienteResumen], TResumen] | None = None,
+    pagination_strategy: PaginationStrategy | None = None,
 ) -> tuple[list[TResumen], str, dict[str, object]]:
     """
     Extrae TODAS las páginas del listado de expedientes y devuelve:
@@ -443,6 +456,13 @@ async def extraer_expedientes_completos(
         Permite reordenar el listado antes de comenzar la extracción.
         Actualmente acepta ``"fecha"``, ``"caratula"``, ``"oficina"`` y
         ``"situacion"`` (sin distinción entre mayúsculas y minúsculas).
+    pagination_strategy:
+        Estrategia de paginación a usar (opcional). Si se proporciona, reemplaza
+        la lógica de navegación por defecto. Útil para adaptar el scraper a
+        diferentes frameworks de paginación (e.g., Bootstrap, Material-UI, etc.).
+        Si es None, usa la lógica legacy basada en selectores CSS.
+        Ver ``pjn.scraping.pagination.PaginationStrategy`` para implementar
+        estrategias personalizadas.
 
     Retorna
     -------
@@ -588,6 +608,7 @@ async def extraer_expedientes_completos(
             tbody_locator,
             sel_siguiente,
             fingerprint_actual,
+            estrategia=pagination_strategy,
         )
 
         if not exito:
@@ -611,8 +632,17 @@ async def extraer_expedientes_completos_modelos(
     fecha_corte: str | None = None,
     tiempo_maximo_segundos: int | None = None,
     orden: str | None = None,
+    pagination_strategy: PaginationStrategy | None = None,
 ) -> tuple[list[ExpedienteResumen], str, dict[str, object]]:
-    """Versión que devuelve :class:`ExpedienteResumen` en lugar de dicts."""
+    """Versión que devuelve :class:`ExpedienteResumen` en lugar de dicts.
+
+    Args:
+        Ver documentación de :func:`extraer_expedientes_completos`.
+
+    Returns:
+        tuple[list[ExpedienteResumen], str, dict]: Lista de modelos ExpedienteResumen,
+        motivo de finalización y metadata.
+    """
 
     mapper = lambda resumen: resumen
     resultados, motivo, metadata = await extraer_expedientes_completos(
@@ -627,6 +657,7 @@ async def extraer_expedientes_completos_modelos(
         tiempo_maximo_segundos=tiempo_maximo_segundos,
         orden=orden,
         mapper=mapper,
+        pagination_strategy=pagination_strategy,
     )
     return resultados, motivo, metadata
 
