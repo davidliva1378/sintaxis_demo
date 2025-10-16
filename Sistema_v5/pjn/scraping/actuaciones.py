@@ -20,6 +20,7 @@ from ..exceptions import (
 from ..models import Actuacion, ActuacionesArchivo
 from ..parsers.actuaciones_parser import (
     EXTENSIONES_GENERICAS,
+    _calcular_metricas_descargas,
     construir_actuaciones_archivo,
     construir_encabezado_actuaciones as parser_construir_encabezado_actuaciones,
     construir_nombre_archivo_normalizado,
@@ -40,29 +41,8 @@ ActuacionBuilder = Callable[
 ]
 
 
-def _calcular_metricas_descargas(
-    actuaciones: Iterable[Actuacion | Mapping[str, object]]
-) -> tuple[int, int, int]:
-    """Devuelve ``(total_con_archivo, total_descargados, pendientes)``."""
-
-    total_con_archivo = 0
-    total_descargados = 0
-
-    for act in actuaciones:
-        if isinstance(act, Actuacion):
-            modelo = act
-        elif isinstance(act, Mapping):
-            modelo = Actuacion.from_dict(act)
-        else:
-            continue
-
-        if modelo.tiene_archivo:
-            total_con_archivo += 1
-            if modelo.descargado:
-                total_descargados += 1
-
-    pendientes = max(total_con_archivo - total_descargados, 0)
-    return total_con_archivo, total_descargados, pendientes
+# _calcular_metricas_descargas ahora se importa desde parsers.actuaciones_parser
+# para evitar duplicación de código
 
 
 def calcular_metricas_descargas_json(payload: dict) -> dict:
