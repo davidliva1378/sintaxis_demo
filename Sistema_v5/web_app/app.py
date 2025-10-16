@@ -6,6 +6,7 @@ el monitoreo de expedientes y entradas del PJN.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
@@ -32,6 +33,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # noinspection PyUnresolvedReferences
 from pjn.monitor.config import MonitorConfig
+# noinspection PyUnresolvedReferences
+from pjn.monitor.core import MonitorPJN
 # noinspection PyUnresolvedReferences
 from pjn.monitor.storage import StorageManager
 
@@ -62,6 +65,21 @@ def get_storage() -> StorageManager:
     if not data_dir.is_absolute():
         data_dir = Path(__file__).parent.parent / data_dir
     return StorageManager(data_dir)
+
+
+def _build_monitor(config: MonitorConfig | None = None) -> MonitorPJN:
+    """Crea una instancia del monitor con rutas absolutas para los datos."""
+
+    base_config = config or get_monitor_config()
+    config_dict = base_config.to_dict()
+    working_config = MonitorConfig(**config_dict)
+
+    data_dir = Path(working_config.directorio_datos)
+    if not data_dir.is_absolute():
+        data_dir = Path(__file__).parent.parent / data_dir
+    working_config.directorio_datos = str(data_dir)
+
+    return MonitorPJN(working_config)
 
 
 def _parse_datetime(value: str | None) -> datetime:
@@ -206,6 +224,20 @@ def _current_monitor_state() -> dict[str, object | None]:
         "started_at": None,
         "source": "stopped",
     }
+
+
+def _run_monitor_coroutine(coro):
+    """Ejecuta una coroutine del monitor en un loop aislado."""
+
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(coro)
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        return result
+    finally:
+        asyncio.set_event_loop(None)
+        loop.close()
 
 
 VALID_WEEK_DAYS = [
@@ -454,9 +486,6 @@ def config_update():
         if errors:
             return jsonify({'success': False, 'errors': errors, 'message': 'Revisa los campos indicados'}), 400
 
-        if errors:
-            return jsonify({'success': False, 'errors': errors, 'message': 'Revisa los campos indicados'}), 400
-
         # Guardar configuración
         config.to_file(CONFIG_PATH)
 
@@ -617,6 +646,7 @@ def get_monitor_status():
 def api_monitor_status():
     """API endpoint para obtener el estado del monitor."""
     state = _current_monitor_state()
+    config = get_monitor_config()
 
     return jsonify({
         "status": state["status"],
@@ -624,7 +654,99 @@ def api_monitor_status():
         "pid": state["pid"],
         "started_at": state["started_at"],
         "source": state["source"],
+        "verificar_entradas": config.verificar_entradas,
+        "verificar_expedientes": config.verificar_expedientes,
     })
+
+
+@app.route('/api/monitor/verify/entradas', methods=['POST'])
+def api_monitor_verify_entradas():
+    """Permite ejecutar una verificación manual de entradas."""
+
+    state = _current_monitor_state()
+    if state["running"]:
+        return jsonify({
+            "success": False,
+            "message": "Detén el monitor antes de ejecutar una verificación manual.",
+        }), 400
+
+    config = get_monitor_config()
+    if not config.verificar_entradas:
+        return jsonify({
+            "success": False,
+            "message": "La verificación de entradas está deshabilitada en la configuración.",
+        }), 400
+
+    monitor = _build_monitor(config)
+
+    try:
+        nuevas = _run_monitor_coroutine(monitor.verificar_entradas())
+        cantidad = len(nuevas)
+        if cantidad:
+            message = f"Se detectaron {cantidad} nuevas entradas."
+        else:
+            message = "Verificación completada sin nuevas entradas."
+
+        _log_monitor_event("verify_entradas", True, message)
+
+        return jsonify({
+            "success": True,
+            "message": message,
+            "nuevas": cantidad,
+            "ultima_verificacion": monitor.estado.ultima_verificacion_entradas,
+        })
+
+    except Exception as exc:  # noqa: BLE001
+        _log_monitor_event("verify_entradas", False, f"Error en verificación manual: {exc}")
+        return jsonify({
+            "success": False,
+            "message": f"Error al verificar entradas: {exc}",
+        }), 500
+
+
+@app.route('/api/monitor/verify/expedientes', methods=['POST'])
+def api_monitor_verify_expedientes():
+    """Permite ejecutar una verificación manual de expedientes."""
+
+    state = _current_monitor_state()
+    if state["running"]:
+        return jsonify({
+            "success": False,
+            "message": "Detén el monitor antes de ejecutar una verificación manual.",
+        }), 400
+
+    config = get_monitor_config()
+    if not config.verificar_expedientes:
+        return jsonify({
+            "success": False,
+            "message": "La verificación de expedientes está deshabilitada en la configuración.",
+        }), 400
+
+    monitor = _build_monitor(config)
+
+    try:
+        cambios = _run_monitor_coroutine(monitor.verificar_expedientes())
+        cantidad = len(cambios)
+        if cantidad:
+            message = f"Se detectaron cambios en {cantidad} expedientes."
+        else:
+            message = "Verificación completada sin cambios en expedientes."
+
+        _log_monitor_event("verify_expedientes", True, message)
+
+        return jsonify({
+            "success": True,
+            "message": message,
+            "cambios": cantidad,
+            "ultima_verificacion": monitor.estado.ultima_verificacion_expedientes,
+        })
+
+    except Exception as exc:  # noqa: BLE001
+        _log_monitor_event("verify_expedientes", False, f"Error en verificación manual: {exc}")
+        return jsonify({
+            "success": False,
+            "message": f"Error al verificar expedientes: {exc}",
+        }), 500
 
 
 @app.route('/api/monitor/start', methods=['POST'])

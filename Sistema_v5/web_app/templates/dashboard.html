@@ -42,6 +42,15 @@
                 </button>
             </div>
             <p id="monitor-message" class="monitor-message"></p>
+            <div class="manual-verifications">
+                <h4>Verificación manual</h4>
+                <p>Ejecuta una verificación inmediata cuando el monitor esté detenido.</p>
+                <div class="monitor-controls manual-controls">
+                    <button id="btn-verify-entradas" type="button" class="btn btn-primary" onclick="verifyEntradas()">Verificar Entradas</button>
+                    <button id="btn-verify-expedientes" type="button" class="btn btn-primary" onclick="verifyExpedientes()">Verificar Expedientes</button>
+                </div>
+                <p id="verification-message" class="monitor-message" style="display: none;"></p>
+            </div>
         </div>
         <hr>
         <p><strong>Modo:</strong> {{ stats.modo }}</p>
@@ -54,6 +63,48 @@
 
 <script>
 let monitorBusy = false;
+let monitorStatusData = null;
+
+function applyVerificationButtonState() {
+    const btnEntradas = document.getElementById('btn-verify-entradas');
+    const btnExpedientes = document.getElementById('btn-verify-expedientes');
+    const hasStatus = monitorStatusData !== null;
+    const running = hasStatus ? Boolean(monitorStatusData.running) : false;
+
+    if (btnEntradas) {
+        const enabledConfig = hasStatus ? Boolean(monitorStatusData.verificar_entradas) : false;
+        let tooltip = '';
+        if (monitorBusy) {
+            tooltip = 'Aguarda a que finalice la operación en curso.';
+        } else if (!hasStatus) {
+            tooltip = 'Esperando estado del monitor...';
+        } else if (!enabledConfig) {
+            tooltip = 'Habilita la opción “Verificar entradas” en la configuración para usar este botón.';
+        } else if (running) {
+            tooltip = 'Detén el monitor para ejecutar una verificación manual.';
+        }
+        btnEntradas.title = tooltip;
+        const shouldDisable = monitorBusy || !hasStatus || running || !enabledConfig;
+        btnEntradas.disabled = shouldDisable;
+    }
+
+    if (btnExpedientes) {
+        const enabledConfig = hasStatus ? Boolean(monitorStatusData.verificar_expedientes) : false;
+        let tooltip = '';
+        if (monitorBusy) {
+            tooltip = 'Aguarda a que finalice la operación en curso.';
+        } else if (!hasStatus) {
+            tooltip = 'Esperando estado del monitor...';
+        } else if (!enabledConfig) {
+            tooltip = 'Habilita la opción “Verificar expedientes” en la configuración para usar este botón.';
+        } else if (running) {
+            tooltip = 'Detén el monitor para ejecutar una verificación manual.';
+        }
+        btnExpedientes.title = tooltip;
+        const shouldDisable = monitorBusy || !hasStatus || running || !enabledConfig;
+        btnExpedientes.disabled = shouldDisable;
+    }
+}
 
 function setMonitorBusy(active, message) {
     monitorBusy = active;
@@ -76,6 +127,8 @@ function setMonitorBusy(active, message) {
     if (btnStart) btnStart.disabled = active;
     if (btnStop) btnStop.disabled = active;
     if (btnRefresh) btnRefresh.disabled = active;
+
+    applyVerificationButtonState();
 }
 
 function formatDateTime(value) {
@@ -129,6 +182,9 @@ async function updateMonitorStatus() {
         const response = await fetch('/api/monitor/status');
         const data = await response.json();
 
+        monitorStatusData = data;
+        applyVerificationButtonState();
+
         console.log('[DEBUG] Estado recibido:', data);
 
         const badge = document.getElementById('monitor-status-badge');
@@ -152,6 +208,8 @@ async function updateMonitorStatus() {
         }
     } catch (error) {
         console.error('[ERROR] Error al obtener estado del monitor:', error);
+        monitorStatusData = null;
+        applyVerificationButtonState();
         const badge = document.getElementById('monitor-status-badge');
         badge.textContent = '⚠ Error';
         badge.className = 'badge badge-warning';
@@ -259,8 +317,87 @@ async function stopMonitor() {
     }
 }
 
+async function triggerManualVerification(kind, labels) {
+    if (monitorBusy) {
+        return;
+    }
+
+    const messageEl = document.getElementById('verification-message');
+    if (messageEl) {
+        messageEl.style.display = 'block';
+        messageEl.textContent = `⏳ ${labels.start}`;
+        messageEl.className = 'monitor-message info';
+    }
+
+    setMonitorBusy(true, labels.busy);
+
+    try {
+        const response = await fetch(`/api/monitor/verify/${kind}`, {
+            method: 'POST'
+        });
+
+        let data = null;
+        try {
+            data = await response.json();
+        } catch (parseError) {
+            console.error(`[ERROR] No se pudo parsear la respuesta de verificación ${kind}:`, parseError);
+        }
+
+        if (response.ok && data && data.success) {
+            let text = `✓ ${data.message}`;
+            if (data.ultima_verificacion) {
+                text += ` • ${formatDateTime(data.ultima_verificacion)}`;
+            }
+
+            if (messageEl) {
+                messageEl.textContent = text;
+                messageEl.className = 'monitor-message success';
+                setTimeout(() => {
+                    messageEl.style.display = 'none';
+                    messageEl.textContent = '';
+                }, 5000);
+            }
+        } else {
+            const errorMessage = data && data.message ? data.message : labels.genericError;
+            if (messageEl) {
+                messageEl.textContent = `✗ ${errorMessage}`;
+                messageEl.className = 'monitor-message error';
+            }
+        }
+    } catch (error) {
+        console.error(`[ERROR] Error al solicitar verificación ${kind}:`, error);
+        if (messageEl) {
+            messageEl.textContent = `✗ ${labels.errorPrefix}${error.message}`;
+            messageEl.className = 'monitor-message error';
+        }
+    } finally {
+        setMonitorBusy(false);
+        await updateActivity();
+        await updateMonitorStatus();
+    }
+}
+
+function verifyEntradas() {
+    return triggerManualVerification('entradas', {
+        start: 'Verificando entradas...',
+        busy: 'Verificando entradas...',
+        genericError: 'No se pudo completar la verificación de entradas.',
+        errorPrefix: 'Error al verificar entradas: '
+    });
+}
+
+function verifyExpedientes() {
+    return triggerManualVerification('expedientes', {
+        start: 'Verificando expedientes...',
+        busy: 'Verificando expedientes...',
+        genericError: 'No se pudo completar la verificación de expedientes.',
+        errorPrefix: 'Error al verificar expedientes: '
+    });
+}
+
 // Actualizar estado al cargar la página
 document.addEventListener('DOMContentLoaded', function() {
+    applyVerificationButtonState();
     updateMonitorStatus();
     // Actualizar cada 5 segundos
     setInterval(updateMonitorStatus, 5000);
