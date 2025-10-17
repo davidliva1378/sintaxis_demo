@@ -2,6 +2,7 @@
 from .actuacion import Actuacion, ActuacionesArchivo
 from .entrada import Entrada
 from .expediente import ExpedienteIdentificacion, ExpedienteResumen
+from .extraccion_config import ExtraccionExpedientesConfig
 
 __all__ = [
     "Actuacion",
@@ -9,4 +10,5 @@ __all__ = [
     "Entrada",
     "ExpedienteIdentificacion",
     "ExpedienteResumen",
+    "ExtraccionExpedientesConfig",
 ]

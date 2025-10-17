@@ -13,7 +13,13 @@ from playwright.async_api import (
 )
 
 from ..config import get_config
+from ..constants import (
+    MAX_LONGITUD_FINGERPRINT,
+    STATE_HIDDEN,
+    STATE_VISIBLE,
+)
 from ..models import ExpedienteResumen
+from ..models.extraccion_config import ExtraccionExpedientesConfig
 from ..parsers.expedientes_parser import parse_expediente_resumen
 from ..selectores import SEL_EXPEDIENTES
 from ..utils.logging import get_logger
@@ -97,7 +103,7 @@ def _norm_fecha(s: str) -> str:
     except ValueError:
         return s  # por si viene algo raro
 
-_FP_MAX_LEN = 4_096
+_FP_MAX_LEN = MAX_LONGITUD_FINGERPRINT
 
 
 def _build_fingerprint(html: str, max_len: int | None = _FP_MAX_LEN) -> str:
@@ -213,7 +219,7 @@ async def _navegar_siguiente_pagina(
 
     # Esperar que sea visible
     try:
-        await boton.wait_for(state="visible", timeout=10_000)
+        await boton.wait_for(state=STATE_VISIBLE, timeout=_config.scraping.timeout_loading_hidden)
     except TimeoutError as exc:
         logger.warning("Botón 'Siguiente' no visible: %s", exc)
         return False, "siguiente_timeout"
@@ -334,10 +340,10 @@ async def _aplicar_ordenamiento_tabla(
         await page.select_option(_SEL_ORDEN_SELECT, value=valor_orden)
         await page.locator(_SEL_ORDENAR_LINK).click()
         try:
-            await tabla.wait_for(state="hidden", timeout=5_000)
+            await tabla.wait_for(state=STATE_HIDDEN, timeout=_config.scraping.timeout_default)
         except TimeoutError:
             pass
-        await tabla.wait_for(state="visible", timeout=25_000)
+        await tabla.wait_for(state=STATE_VISIBLE, timeout=_config.scraping.timeout_tabla_expedientes)
         logger.info("🔽 Tabla ordenada por %s", orden.upper())
     except TimeoutError as exc:
         logger.warning(
@@ -375,14 +381,75 @@ async def _extraer_total_esperado(page: Page) -> int | None:
         return None
 
 
+def _procesar_filas_pagina(
+    filas: list[list[str]],
+    fecha_corte_dt: datetime | None,
+    huellas: set[tuple[str, str, str]],
+    omitir_duplicados: bool,
+    detener_en_duplicado: bool,
+    resumen_mapper: Callable[[ExpedienteResumen], TResumen],
+) -> tuple[list[TResumen], int, int, str | None]:
+    """Procesa las filas extraídas de una página y retorna los resultados.
+
+    Responsabilidad única: Procesar filas de expedientes y aplicar filtros.
+
+    Args:
+        filas: Lista de filas extraídas (cada fila es una lista de strings).
+        fecha_corte_dt: Fecha de corte para filtrar expedientes.
+        huellas: Set de huellas para detectar duplicados.
+        omitir_duplicados: Si True, omite duplicados sin detener.
+        detener_en_duplicado: Si True, detiene al encontrar duplicado.
+        resumen_mapper: Función para mapear ExpedienteResumen a tipo deseado.
+
+    Returns:
+        tuple de:
+        - resultados: Lista de expedientes procesados
+        - filas_descartadas: Cantidad de filas descartadas
+        - duplicados_descartados: Cantidad de duplicados encontrados
+        - motivo_detencion: Motivo si debe detenerse (None si debe continuar)
+    """
+    resultados: list[TResumen] = []
+    filas_descartadas = 0
+    duplicados_descartados = 0
+
+    for cols in filas:
+        resumen = parse_expediente_resumen(cols)
+        if resumen is None:
+            filas_descartadas += 1
+            continue
+
+        # Procesar expediente y determinar si agregarlo
+        agregar, detener, es_duplicado = _procesar_expediente_resumen(
+            resumen,
+            fecha_corte_dt,
+            huellas,
+            omitir_duplicados,
+            detener_en_duplicado,
+        )
+
+        if detener:
+            motivo = "duplicado_encontrado" if es_duplicado else "limite_fecha"
+            return resultados, filas_descartadas, duplicados_descartados, motivo
+
+        if es_duplicado:
+            duplicados_descartados += 1
+
+        if agregar:
+            resultados.append(resumen_mapper(resumen))
+
+    return resultados, filas_descartadas, duplicados_descartados, None
+
+
 async def extraer_expedientes_completos(
     page: Page,
-    sel_tabla: str = SEL_TABLA,
-    sel_tbody: str = SEL_TBODY,
-    sel_siguiente: str = SEL_SIGUIENTE,
+    config: ExtraccionExpedientesConfig | None = None,
+    # --- Parámetros legacy (DEPRECATED - usar config en su lugar) ---
+    sel_tabla: str | None = None,
+    sel_tbody: str | None = None,
+    sel_siguiente: str | None = None,
     max_paginas: int | None = None,
-    omitir_duplicados: bool = True,
-    detener_en_duplicado: bool = True,
+    omitir_duplicados: bool | None = None,
+    detener_en_duplicado: bool | None = None,
     *,
     fecha_corte: str | None = None,
     tiempo_maximo_segundos: int | None = None,
@@ -390,105 +457,87 @@ async def extraer_expedientes_completos(
     mapper: Callable[[ExpedienteResumen], TResumen] | None = None,
     pagination_strategy: PaginationStrategy | None = None,
 ) -> tuple[list[TResumen], str, dict[str, object]]:
+    """Extrae TODAS las páginas del listado de expedientes.
+
+    Esta función soporta dos modos de uso:
+
+    1. **Modo moderno (recomendado)**: Usando objeto de configuración
+        >>> config = ExtraccionExpedientesConfig.rapido()
+        >>> expedientes, motivo, meta = await extraer_expedientes_completos(page, config)
+
+    2. **Modo legacy**: Pasando parámetros individuales (DEPRECATED)
+        >>> expedientes, motivo, meta = await extraer_expedientes_completos(
+        ...     page, max_paginas=10, omitir_duplicados=True
+        ... )
+
+    Args:
+        page: Página de Playwright ya posicionada sobre el listado.
+        config: Objeto de configuración (recomendado). Si se proporciona, se ignoran
+            los parámetros legacy.
+
+        --- Parámetros legacy (DEPRECATED - usar config en su lugar) ---
+        sel_tabla: Selector de la tabla principal (default: "table.table-striped").
+        sel_tbody: Selector del tbody (default: "{sel_tabla} tbody").
+        sel_siguiente: Selector del botón "Siguiente".
+        max_paginas: Límite máximo de páginas a extraer.
+        omitir_duplicados: Si omitir expedientes duplicados.
+        detener_en_duplicado: Si detener al encontrar duplicado.
+        tiempo_maximo_segundos: Límite máximo de duración del scraping.
+        orden: Criterio de ordenamiento (fecha, caratula, oficina, situacion).
+        mapper: Función para mapear ExpedienteResumen a otro tipo.
+        pagination_strategy: Estrategia de paginación personalizada.
+
+    Returns:
+        tuple[list[TResumen], str, dict[str, object]]: Tupla con:
+            - expedientes: Lista de expedientes extraídos
+            - motivo: Código de finalización ("fin_listado", "limite_paginas",
+                "limite_fecha", "limite_tiempo", "duplicado_encontrado", etc.)
+            - metadata: Información adicional (total_esperado, filas_descartadas, etc.)
+
+    Example:
+        >>> # Modo moderno con config
+        >>> config = ExtraccionExpedientesConfig.rapido()
+        >>> expedientes, motivo, meta = await extraer_expedientes_completos(page, config)
+        >>>
+        >>> # Con fecha de corte
+        >>> config = ExtraccionExpedientesConfig.con_fecha_corte("2025-01-01")
+        >>> expedientes, motivo, meta = await extraer_expedientes_completos(page, config)
     """
-    Extrae TODAS las páginas del listado de expedientes y devuelve:
-    [
-      {
-        "numero": "...",
-        "dependencia": "...",
-        "caratula": "...",
-        "situacion": "...",
-        "ultima_actuacion": "YYYY-MM-DD",
-      },
-      ...
-    ]
+    # --- Resolver configuración ---
+    # Si no se proporciona config, construir desde parámetros legacy
+    if config is None:
+        config = ExtraccionExpedientesConfig(
+            sel_tabla=sel_tabla or SEL_TABLA,
+            sel_tbody=sel_tbody or "",
+            sel_siguiente=sel_siguiente or SEL_SIGUIENTE,
+            max_paginas=max_paginas,
+            tiempo_maximo_segundos=tiempo_maximo_segundos,
+            fecha_corte=fecha_corte,
+            omitir_duplicados=omitir_duplicados if omitir_duplicados is not None else True,
+            detener_en_duplicado=detener_en_duplicado if detener_en_duplicado is not None else True,
+            orden=orden,
+            mapper=mapper,
+            pagination_strategy=pagination_strategy,
+        )
+        logger.debug("📦 Usando configuración construida desde parámetros legacy")
+    else:
+        logger.debug("📦 Usando configuración proporcionada explícitamente")
 
-    `sel_tabla` puede utilizar cualquier motor de selectores soportado por
-    Playwright (css=, xpath=, text=, etc.).
+    # Aplicar max_paginas desde config global si no se especificó
+    if config.max_paginas is None:
+        config.max_paginas = _config.scraping.max_paginas_expedientes
 
-    Selectores por defecto
-    ----------------------
-    ==================  =========================  =====================================
-    Constante           Valor por defecto          Propósito
-    ==================  =========================  =====================================
-    ``SEL_TABLA``       ``"table.table-striped"``  Tabla principal del listado.
-    ``SEL_TBODY``       ``f"{SEL_TABLA} tbody"``   Valor por defecto del parámetro
-                                                ``sel_tbody``; apunta al cuerpo de la
-                                                tabla desde donde se leen las filas.
-    ``SEL_SIGUIENTE``   Cadena con múltiples       Control que avanza a la página
-                        selectores                 siguiente del paginado.
-    ==================  =========================  =====================================
-
-    Parámetros posicionales
-    -----------------------
-    page (Page):
-        Página de Playwright ya posicionada sobre el listado de expedientes.
-    sel_tabla (str, predeterminado=``SEL_TABLA``):
-        Selector del elemento ``<table>`` que contiene el paginado de expedientes.
-    sel_tbody (str, predeterminado=``SEL_TBODY``):
-        Selector (CSS) del contenedor que agrupa las filas dentro de la tabla. Se
-        utiliza para ubicar las filas como ``f"{sel_tbody} tr"``. Si el listado no
-        utiliza ``<tbody>``, ajustá este selector al nodo que contenga las filas.
-    sel_siguiente (str, predeterminado=``SEL_SIGUIENTE``):
-        Selector (o conjunto de selectores) para ubicar el control "Siguiente".
-    max_paginas (int, predeterminado=``200``):
-        Límite máximo de páginas a recorrer antes de abortar la extracción.
-
-    Parámetros opcionales
-    ---------------------
-    fecha_corte:
-        Fecha mínima (inclusive) en formato ``YYYY-MM-DD`` o ``DD/MM/AAAA``.
-        Cuando la columna ``ultima_actuacion`` cae por debajo de este umbral se
-        finaliza la extracción inmediatamente y se retorna el motivo
-        ``"limite_fecha"``.
-    tiempo_maximo_segundos:
-        Límite máximo de duración del scraping. Al superarse se devuelve lo
-        acumulado hasta el momento con motivo ``"limite_tiempo"``.
-    omitir_duplicados:
-        Cuando es ``True`` (valor por defecto) evita agregar filas duplicadas
-        detectadas a partir de la combinación (``numero``, ``caratula``,
-        ``dependencia``).
-    detener_en_duplicado:
-        Si está activo y se detecta un duplicado, finaliza inmediatamente la
-        extracción devolviendo el motivo ``"duplicado_encontrado"`` junto con lo
-        acumulado hasta el momento.
-    orden:
-        Permite reordenar el listado antes de comenzar la extracción.
-        Actualmente acepta ``"fecha"``, ``"caratula"``, ``"oficina"`` y
-        ``"situacion"`` (sin distinción entre mayúsculas y minúsculas).
-    pagination_strategy:
-        Estrategia de paginación a usar (opcional). Si se proporciona, reemplaza
-        la lógica de navegación por defecto. Útil para adaptar el scraper a
-        diferentes frameworks de paginación (e.g., Bootstrap, Material-UI, etc.).
-        Si es None, usa la lógica legacy basada en selectores CSS.
-        Ver ``pjn.scraping.pagination.PaginationStrategy`` para implementar
-        estrategias personalizadas.
-
-    Retorna
-    -------
-    tuple[list[dict], str, dict[str, object]]
-        Una tupla ``(expedientes, motivo, metadata)`` donde ``expedientes`` es la
-        lista de diccionarios extraídos, ``motivo`` el código de finalización y
-        ``metadata`` un diccionario con información adicional recolectada durante
-        la extracción. Actualmente incluye la clave ``"total_esperado"`` cuando
-        el portal anuncia explícitamente el total de expedientes disponibles.
-        Los códigos de motivo actuales son:
-
-        * ``"fin_listado"``: se alcanzó el final natural del paginado.
-        * ``"limite_paginas"``: se alcanzó ``max_paginas``.
-        * ``"limite_fecha"``: se superó el umbral ``fecha_corte``.
-        * ``"limite_tiempo"``: se superó ``tiempo_maximo_segundos``.
-        * ``"sin_siguiente"``: no existe control para pasar de página.
-        * ``"sin_siguiente_habilitado"``: no hay botón "Siguiente" habilitado.
-        * ``"siguiente_timeout"``: el botón "Siguiente" no apareció a tiempo.
-        * ``"siguiente_deshabilitado"``: el botón se deshabilitó al intentar usarlo.
-        * ``"error_click"``: falló el clic en "Siguiente".
-        * ``"duplicado_encontrado"``: se detectó un expediente repetido.
-        * ``"bucle_detectado"``: se detectó un ciclo al intentar avanzar.
-    """
-    # Resolver max_paginas desde config si no se especificó
-    if max_paginas is None:
-        max_paginas = _config.scraping.max_paginas_expedientes
+    # Extraer valores de configuración
+    sel_tabla_final = config.sel_tabla
+    sel_tbody_final = config.sel_tbody
+    sel_siguiente_final = config.sel_siguiente
+    max_paginas_final = config.max_paginas
+    omitir_duplicados_final = config.omitir_duplicados
+    detener_en_duplicado_final = config.detener_en_duplicado
+    fecha_corte_final = config.fecha_corte
+    tiempo_maximo_segundos_final = config.tiempo_maximo_segundos
+    orden_final = config.orden
+    pagination_strategy_final = config.pagination_strategy
 
     resultados: list[TResumen] = []
     huellas: set[tuple[str, str, str]] = set()
@@ -500,10 +549,10 @@ async def extraer_expedientes_completos(
     paginas_recorridas = 0
 
     resumen_mapper: Callable[[ExpedienteResumen], TResumen]
-    if mapper is None:
+    if config.mapper is None:
         resumen_mapper = lambda resumen: resumen.to_dict()  # type: ignore[return-value]
     else:
-        resumen_mapper = mapper
+        resumen_mapper = config.mapper
 
     def _finalizar(motivo: str) -> tuple[list[dict], str, dict[str, object]]:
         metadata["filas_descartadas"] = filas_descartadas
@@ -514,19 +563,19 @@ async def extraer_expedientes_completos(
         return resultados, motivo, metadata
 
     # Validar y parsear fecha de corte
-    fecha_corte_dt = _parsear_fecha_corte(fecha_corte)
+    fecha_corte_dt = _parsear_fecha_corte(fecha_corte_final)
 
     inicio = perf_counter()
 
     def _excedio_tiempo() -> bool:
         return (
-            tiempo_maximo_segundos is not None
-            and (perf_counter() - inicio) > tiempo_maximo_segundos
+            tiempo_maximo_segundos_final is not None
+            and (perf_counter() - inicio) > tiempo_maximo_segundos_final
         )
 
     # Aseguramos presencia de tabla
-    tabla = page.locator(sel_tabla)
-    await tabla.wait_for(state="visible", timeout=25_000)
+    tabla = page.locator(sel_tabla_final)
+    await tabla.wait_for(state=STATE_VISIBLE, timeout=_config.scraping.timeout_tabla_expedientes)
 
     total_esperado = await _extraer_total_esperado(page)
     if total_esperado is not None:
@@ -538,9 +587,9 @@ async def extraer_expedientes_completos(
             )
 
     # Aplicar ordenamiento si se especifica
-    await _aplicar_ordenamiento_tabla(page, tabla, orden)
+    await _aplicar_ordenamiento_tabla(page, tabla, orden_final)
 
-    tbody_locator = page.locator(sel_tbody)
+    tbody_locator = page.locator(sel_tbody_final)
 
     while True:
         if _excedio_tiempo():
@@ -566,49 +615,42 @@ async def extraer_expedientes_completos(
                     document.querySelectorAll(`${tbodySelector} tr`),
                     tr => Array.from(tr.cells, c => c.innerText.trim())
                 )""",
-            sel_tbody,
+            sel_tbody_final,
         )
 
-        # 2) Mapear a objetos usando las columnas útiles
-        for cols in filas:
-            resumen = parse_expediente_resumen(cols)
-            if resumen is None:
-                filas_descartadas += 1
-                continue
+        # 2) Procesar filas de la página actual
+        resultados_pagina, filas_desc, dups_desc, motivo_detencion = _procesar_filas_pagina(
+            filas,
+            fecha_corte_dt,
+            huellas,
+            omitir_duplicados_final,
+            detener_en_duplicado_final,
+            resumen_mapper,
+        )
 
-            # Procesar expediente y determinar si agregarlo
-            agregar, detener, es_duplicado = _procesar_expediente_resumen(
-                resumen,
-                fecha_corte_dt,
-                huellas,
-                omitir_duplicados,
-                detener_en_duplicado,
-            )
+        # Acumular resultados y contadores
+        resultados.extend(resultados_pagina)
+        filas_descartadas += filas_desc
+        duplicados_descartados += dups_desc
 
-            if detener:
-                motivo = "duplicado_encontrado" if es_duplicado else "limite_fecha"
-                return _finalizar(motivo)
+        # Si debe detenerse, finalizar
+        if motivo_detencion:
+            return _finalizar(motivo_detencion)
 
-            if es_duplicado:
-                duplicados_descartados += 1
-
-            if agregar:
-                resultados.append(resumen_mapper(resumen))
-
-            if _excedio_tiempo():
-                return _finalizar("limite_tiempo")
+        if _excedio_tiempo():
+            return _finalizar("limite_tiempo")
 
         # 3) Intentar ir a la siguiente página; cortar si no hay
-        if paginas_recorridas >= max_paginas:
+        if paginas_recorridas >= max_paginas_final:
             return _finalizar("limite_paginas")
 
         # Navegar a siguiente página
         exito, motivo = await _navegar_siguiente_pagina(
             page,
             tbody_locator,
-            sel_siguiente,
+            sel_siguiente_final,
             fingerprint_actual,
-            estrategia=pagination_strategy,
+            estrategia=pagination_strategy_final,
         )
 
         if not exito:

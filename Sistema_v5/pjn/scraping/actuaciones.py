@@ -6,7 +6,7 @@ import warnings
 from contextlib import suppress
 from datetime import datetime
 from typing import Awaitable, Callable, Iterable, Mapping, TypeVar
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 from playwright.async_api import ElementHandle, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeout
@@ -28,7 +28,7 @@ from ..parsers.actuaciones_parser import (
     obtener_extension_valida,
     parse_actuacion_row,
 )
-from ..selectores import SEL_ACTUACIONES, escapar_id_jsf_para_css, escapar_id_jsf_para_js
+from ..selectores import escapar_id_jsf_para_css, escapar_id_jsf_para_js
 from ..utils.logging import get_logger
 from .base import normalizar_numero_expediente
 
@@ -735,12 +735,245 @@ async def actualizar_actuaciones_desde_json(
     return len(nuevas_actuaciones), nuevo_payload, None
 
 
+async def _navegar_paginas_actuaciones(
+    page: Page,
+    tabla_id: str,
+    expediente_datos: Mapping[str, object] | dict,
+    indice_inicial: int = 1,
+    es_historica: bool = False,
+) -> list[Actuacion]:
+    """Navega todas las páginas de una tabla y extrae actuaciones.
+
+    Responsabilidad única: Manejar la paginación de una tabla de actuaciones.
+
+    Args:
+        page: Página de Playwright.
+        tabla_id: ID de la tabla (ej: "expediente:action-table").
+        expediente_datos: Datos del expediente.
+        indice_inicial: Índice inicial para las actuaciones.
+        es_historica: Si las actuaciones son históricas.
+
+    Returns:
+        Lista de actuaciones extraídas de todas las páginas.
+
+    Raises:
+        TimeoutExtraccion: Si hay timeout al navegar.
+        ExtraccionError: Si hay error al extraer actuaciones.
+    """
+    actuaciones: list[Actuacion] = []
+    indice_actual = indice_inicial
+    pagina = 1
+    tabla_selector_css = _escape_selector_for_css(f"#{tabla_id}")
+    timestamp_extraccion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    tipo_actuacion = "históricas" if es_historica else "actuales"
+
+    while True:
+        logger.info("📄 Página %d (%s): extrayendo...", pagina, tipo_actuacion)
+
+        if es_historica:
+            # Para históricas, usar query_selector_all directamente
+            filas_selector = f"{tabla_selector_css} tbody tr"
+            filas = await page.query_selector_all(filas_selector)
+
+            if not filas:
+                break
+
+            for fila in filas:
+                actuacion = await construir_actuacion_modelo_desde_fila(
+                    page,
+                    fila,
+                    indice_actual,
+                    timestamp_extraccion,
+                    es_historica=True,
+                )
+                if actuacion:
+                    actuacion.descargado = False if actuacion.tiene_archivo else None
+                    actuaciones.append(actuacion)
+                    indice_actual += 1
+        else:
+            # Para actuales, usar la función existente
+            try:
+                nuevas = await extraer_actuaciones_pagina_modelos(
+                    page, expediente_datos, indice_actual
+                )
+            except (TimeoutExtraccion, ExtraccionError) as exc:
+                raise ExtraccionError(f"Error en página {pagina}: {str(exc)}") from exc
+
+            if not nuevas:
+                break
+
+            actuaciones.extend(nuevas)
+            indice_actual += len(nuevas)
+
+        # Intentar navegar a la siguiente página
+        if es_historica:
+            boton_siguiente = await page.query_selector(
+                "a[id^='expediente:j_idt']:not(.ui-state-disabled):has-text('Siguiente')"
+            )
+        else:
+            boton_siguiente = await page.query_selector(
+                "a:has(span[title='Siguiente']):not(.ui-state-disabled)"
+            )
+
+        if not boton_siguiente:
+            break
+
+        try:
+            html_anterior = await page.inner_html(tabla_selector_css)
+            paginador_selector_js, pagina_activa = await _obtener_paginador_activo(
+                page, tabla_id
+            )
+            await boton_siguiente.click()
+            await page.wait_for_load_state("domcontentloaded")
+
+            if es_historica:
+                # Para históricas, esperar selector de filas
+                filas_selector = f"{tabla_selector_css} tbody tr"
+                await page.wait_for_selector(filas_selector, timeout=8000)
+
+            await _esperar_cambio_pagina(
+                page,
+                tabla_id,
+                html_anterior,
+                paginador_selector_js,
+                pagina_activa,
+            )
+            pagina += 1
+        except PlaywrightTimeout as exc:
+            if es_historica:
+                # Para históricas, solo logear y terminar
+                logger.error("❌ No se pudo avanzar de página histórica: %s", exc)
+                break
+            else:
+                raise TimeoutExtraccion(
+                    f"Timeout al intentar avanzar a la página {pagina + 1}"
+                ) from exc
+        except Exception as exc:
+            if es_historica:
+                logger.error("❌ No se pudo avanzar de página histórica: %s", exc)
+                break
+            else:
+                raise ExtraccionError(
+                    f"Error inesperado al avanzar a la página {pagina + 1}: {type(exc).__name__}: {str(exc)}"
+                ) from exc
+
+    return actuaciones
+
+
+async def _extraer_actuaciones_actuales(
+    page: Page,
+    expediente_datos: Mapping[str, object] | dict,
+) -> list[Actuacion]:
+    """Extrae solo actuaciones actuales (no históricas).
+
+    Responsabilidad única: Extraer actuaciones actuales con paginación.
+
+    Args:
+        page: Página de Playwright con expediente abierto.
+        expediente_datos: Datos del expediente.
+
+    Returns:
+        Lista de actuaciones actuales extraídas.
+
+    Raises:
+        ActuacionesNoDisponibles: Si no hay tabla de actuaciones.
+        ExtraccionError: Si falla la extracción.
+    """
+    try:
+        await page.wait_for_selector(
+            r"#expediente\:action-table tbody tr", timeout=8000
+        )
+    except PlaywrightTimeout as exc:
+        raise ActuacionesNoDisponibles(
+            "No se encontró la tabla de actuaciones en el tiempo esperado"
+        ) from exc
+
+    actuaciones = await _navegar_paginas_actuaciones(
+        page=page,
+        tabla_id="expediente:action-table",
+        expediente_datos=expediente_datos,
+        indice_inicial=1,
+        es_historica=False,
+    )
+
+    # Marcar como actuales y sin descargar
+    for act in actuaciones:
+        act.es_historica = False
+        if act.tiene_archivo:
+            act.descargado = False
+
+    return actuaciones
+
+
+async def _extraer_actuaciones_historicas(
+    page: Page,
+    expediente_datos: Mapping[str, object] | dict,
+    indice_base: int,
+) -> list[Actuacion]:
+    """Extrae actuaciones históricas si existen.
+
+    Responsabilidad única: Extraer actuaciones históricas con paginación.
+
+    Args:
+        page: Página de Playwright con expediente abierto.
+        expediente_datos: Datos del expediente.
+        indice_base: Índice inicial para las actuaciones históricas.
+
+    Returns:
+        Lista de actuaciones históricas (puede ser vacía).
+
+    Raises:
+        TimeoutExtraccion: Si hay timeout esperando tabla.
+    """
+    try:
+        await page.click("a:has-text('Ver históricas')")
+        await page.wait_for_selector(
+            r"#expediente\:action-historic-table tbody tr, div.alert.white-panel",
+            timeout=8000,
+        )
+    except PlaywrightTimeout as exc:
+        raise TimeoutExtraccion(
+            "Timeout esperando tabla o mensaje de actuaciones históricas"
+        ) from exc
+
+    # Verificar si hay mensaje de "no hay históricas"
+    mensaje = await page.query_selector("div.alert.white-panel")
+    if mensaje:
+        texto = await mensaje.inner_text()
+        texto_lower = texto.lower()
+        if "no posee actuaciones históricas" in texto_lower or "no posee actuaciones" in texto_lower:
+            logger.info("El expediente no posee actuaciones históricas.")
+            return []
+        else:
+            logger.warning(
+                "Mensaje inesperado en actuaciones históricas: '%s'. "
+                "Continuando sin extraer históricas.",
+                texto.strip()
+            )
+            return []
+
+    # Extraer históricas paginadas
+    actuaciones = await _navegar_paginas_actuaciones(
+        page=page,
+        tabla_id="expediente:action-historic-table",
+        expediente_datos=expediente_datos,
+        indice_inicial=indice_base,
+        es_historica=True,
+    )
+
+    return actuaciones
+
+
 async def extraer_actuaciones_datos(
     page_expediente: Page,
     expediente_datos: Mapping[str, object] | dict,
     incluir_historicas: bool = True,
 ) -> ActuacionesArchivo:
     """Extrae actuaciones actuales e históricas (opcional) y retorna modelo estructurado.
+
+    Esta versión refactorizada delega en funciones especializadas para mayor
+    claridad, testabilidad y mantenibilidad.
 
     Esta es la versión "pura" que NO guarda archivos. Útil para:
     - Procesamiento en memoria
@@ -759,162 +992,48 @@ async def extraer_actuaciones_datos(
         ExtraccionError: Si falla la extracción de actuaciones.
         ActuacionesNoDisponibles: Si no hay actuaciones disponibles.
     """
-    # Extraer actuaciones actuales
-    actuaciones_actuales_modelo: list[Actuacion] = []
-    pagina = 1
-    indice_actual = 1
-    tabla_id = "expediente:action-table"
-    tabla_selector_css = _escape_selector_for_css(f"#{tabla_id}")
+    # 1. Extraer actuaciones actuales
+    actuaciones_actuales = await _extraer_actuaciones_actuales(
+        page_expediente,
+        expediente_datos
+    )
 
-    try:
-        await page_expediente.wait_for_selector(
-            r"#expediente\:action-table tbody tr", timeout=8000
-        )
-    except PlaywrightTimeout as exc:
+    if not actuaciones_actuales:
         raise ActuacionesNoDisponibles(
-            "No se encontró la tabla de actuaciones en el tiempo esperado"
-        ) from exc
+            "No se encontraron actuaciones en el expediente"
+        )
 
-    while True:
-        logger.info("📄 Página %d: extrayendo actuaciones actuales...", pagina)
+    # 2. Extraer históricas si se solicita
+    actuaciones_historicas: list[Actuacion] = []
+    if incluir_historicas:
+        indice_base = len(actuaciones_actuales) + 1
         try:
-            nuevas = await extraer_actuaciones_pagina_modelos(
-                page_expediente, expediente_datos, indice_actual
+            actuaciones_historicas = await _extraer_actuaciones_historicas(
+                page_expediente,
+                expediente_datos,
+                indice_base
             )
         except (TimeoutExtraccion, ExtraccionError) as exc:
-            raise ExtraccionError(f"Error en página {pagina}: {str(exc)}") from exc
-
-        if not nuevas:
-            break
-
-        actuaciones_actuales_modelo.extend(nuevas)
-        indice_actual += len(nuevas)
-
-        boton_siguiente = await page_expediente.query_selector(
-            "a:has(span[title='Siguiente']):not(.ui-state-disabled)"
-        )
-        if not boton_siguiente:
-            break
-
-        try:
-            html_anterior = await page_expediente.inner_html(tabla_selector_css)
-            paginador_selector_js, pagina_activa = await _obtener_paginador_activo(
-                page_expediente, tabla_id
+            logger.warning(
+                "No se pudieron extraer históricas: %s. "
+                "Continuando solo con actuaciones actuales.",
+                exc
             )
-            await boton_siguiente.click()
-            await page_expediente.wait_for_load_state("domcontentloaded")
-            await _esperar_cambio_pagina(
-                page_expediente,
-                tabla_id,
-                html_anterior,
-                paginador_selector_js,
-                pagina_activa,
-            )
-            pagina += 1
-        except PlaywrightTimeout as exc:
-            raise TimeoutExtraccion(
-                f"Timeout al intentar avanzar a la página {pagina + 1}"
-            ) from exc
-        except Exception as exc:
-            raise ExtraccionError(
-                f"Error inesperado al avanzar a la página {pagina + 1}: {type(exc).__name__}: {str(exc)}"
-            ) from exc
 
-    # Marcar como actuales y sin descargar
-    for act in actuaciones_actuales_modelo:
-        act.es_historica = False
-        if act.tiene_archivo:
-            act.descargado = False
-
-    # Extraer históricas si corresponde
-    actuaciones_historicas_modelo: list[Actuacion] = []
-    if incluir_historicas:
-        indice_base = len(actuaciones_actuales_modelo) + 1
-        try:
-            await page_expediente.click("a:has-text('Ver históricas')")
-            await page_expediente.wait_for_selector(
-                r"#expediente\:action-historic-table tbody tr, div.alert.white-panel",
-                timeout=8000,
-            )
-        except PlaywrightTimeout as exc:
-            raise TimeoutExtraccion(
-                "Timeout esperando tabla o mensaje de actuaciones históricas"
-            ) from exc
-
-        mensaje = await page_expediente.query_selector("div.alert.white-panel")
-        if mensaje:
-            texto = await mensaje.inner_text()
-            texto_lower = texto.lower()
-            if "no posee actuaciones históricas" in texto_lower or "no posee actuaciones" in texto_lower:
-                logger.info("El expediente no posee actuaciones históricas.")
-            else:
-                logger.warning(
-                    "Mensaje inesperado en actuaciones históricas: '%s'. "
-                    "Continuando sin extraer históricas.",
-                    texto.strip()
-                )
-                # No lanzar error, solo continuar sin históricas
-        else:
-            # Extraer históricas paginadas
-            timestamp_extraccion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            pagina_hist = 1
-            indice_hist = indice_base
-            tabla_hist_id = "expediente:action-historic-table"
-            tabla_hist_selector_css = _escape_selector_for_css(f"#{tabla_hist_id}")
-            filas_selector = f"{tabla_hist_selector_css} tbody tr"
-
-            while True:
-                logger.info("📄 Página %d (históricas): extrayendo...", pagina_hist)
-                filas = await page_expediente.query_selector_all(filas_selector)
-                if not filas:
-                    break
-
-                for fila in filas:
-                    actuacion = await construir_actuacion_modelo_desde_fila(
-                        page_expediente,
-                        fila,
-                        indice_hist,
-                        timestamp_extraccion,
-                        es_historica=True,
-                    )
-                    if actuacion:
-                        actuacion.descargado = False if actuacion.tiene_archivo else None
-                        actuaciones_historicas_modelo.append(actuacion)
-                        indice_hist += 1
-
-                boton_siguiente_hist = await page_expediente.query_selector(
-                    "a[id^='expediente:j_idt']:not(.ui-state-disabled):has-text('Siguiente')"
-                )
-                if not boton_siguiente_hist:
-                    break
-
-                try:
-                    html_anterior_hist = await page_expediente.inner_html(tabla_hist_selector_css)
-                    paginador_selector_js_hist, pagina_activa_hist = await _obtener_paginador_activo(
-                        page_expediente, tabla_hist_id
-                    )
-                    await boton_siguiente_hist.click()
-                    pagina_hist += 1
-                    await page_expediente.wait_for_selector(filas_selector, timeout=8000)
-                    await _esperar_cambio_pagina(
-                        page_expediente,
-                        tabla_hist_id,
-                        html_anterior_hist,
-                        paginador_selector_js_hist,
-                        pagina_activa_hist,
-                    )
-                except Exception as exc:
-                    logger.error("❌ No se pudo avanzar de página histórica: %s", exc)
-                    break
-
-    # Construir modelo final
+    # 3. Construir archivo final
     timestamp_generacion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     archivo = construir_actuaciones_archivo(
         expediente_datos,
-        actuaciones_actuales_modelo,
-        actuaciones_historicas_modelo,
-        incluye_historicas=bool(actuaciones_historicas_modelo),
+        actuaciones_actuales,
+        actuaciones_historicas,
+        incluye_historicas=bool(actuaciones_historicas),
         timestamp_generacion=timestamp_generacion,
+    )
+
+    logger.info(
+        "✅ Extraídas %d actuales + %d históricas",
+        len(actuaciones_actuales),
+        len(actuaciones_historicas)
     )
 
     return archivo

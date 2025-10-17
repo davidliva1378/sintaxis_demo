@@ -1,5 +1,8 @@
 """Sistema v5 de extracción de datos del Portal PJN."""
 
+# Exportar constantes globales
+from . import constants
+
 # Exportar excepciones para fácil acceso
 from .exceptions import (
     ActuacionesNoDisponibles,
@@ -24,6 +27,8 @@ from .exceptions import (
 )
 
 __all__ = [
+    # Constantes
+    "constants",
     # Excepciones
     "PJNError",
     "AutenticacionError",

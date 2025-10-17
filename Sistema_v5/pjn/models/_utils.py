@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Iterable, Mapping
+from typing import Any, Mapping
 
 
 def get_first(mapping: Mapping[str, Any], *keys: str, default: Any = None) -> Any:
@@ -52,13 +52,3 @@ def coerce_bool(value: Any, default: bool = False) -> bool:
         if normalized in {"0", "false", "f", "no", "n"}:
             return False
     return default
-
-
-def ensure_keys(mapping: Mapping[str, Any], keys: Iterable[str]) -> dict[str, Any]:
-    """Devuelve una copia *dict* solo con las ``keys`` solicitadas si existen."""
-
-    result: dict[str, Any] = {}
-    for key in keys:
-        if key in mapping:
-            result[key] = mapping[key]
-    return result
