@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from agenda import (
+from Sistema_v5.agenda import (
     AgendaQuery,
     AgendaService,
     calcular_fecha_plazo,
