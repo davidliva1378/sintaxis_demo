@@ -1,8 +1,20 @@
 """Tests para el módulo de agenda y gestión de plazos."""
 
+from __future__ import annotations
+
 from datetime import date
+from pathlib import Path
+import sys
 
 import pytest
+
+
+if __package__ in {None, ""}:
+    # Permite ejecutar el archivo directamente (`python test_agenda.py`).
+    proyecto_raiz = Path(__file__).resolve().parents[2]
+    if str(proyecto_raiz) not in sys.path:
+        sys.path.insert(0, str(proyecto_raiz))
+
 
 from Sistema_v5.agenda import (
     AgendaQuery,
