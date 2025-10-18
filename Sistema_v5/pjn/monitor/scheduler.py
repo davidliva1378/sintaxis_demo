@@ -14,6 +14,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from ..utils.logging import get_logger
+from .exceptions import (
+    AuthenticationError,
+    NetworkError,
+    ExtractionError,
+    VerificationError,
+    SchedulerError,
+)
 
 if TYPE_CHECKING:
     from .core import MonitorPJN
@@ -149,10 +156,41 @@ class SchedulerMonitor:
                 else:
                     logger.info("✅ Verificación completada - sin nuevas entradas")
 
-            except Exception as e:
-                logger.error(f"❌ Error en job de verificación de entradas: {e}", exc_info=True)
+            except AuthenticationError as e:
+                logger.error(f"❌ Error de autenticación en entradas: {e}", exc_info=True)
+                if self.monitor.estado.errores_consecutivos_entradas >= self.config.max_reintentos_entradas:
+                    logger.critical(
+                        f"⚠️ Máximo de errores consecutivos alcanzado para entradas "
+                        f"({self.config.max_reintentos_entradas})"
+                    )
 
-                # Si hay demasiados errores consecutivos, considerar detener
+            except NetworkError as e:
+                logger.error(f"❌ Error de red en entradas: {e}", exc_info=True)
+                if self.monitor.estado.errores_consecutivos_entradas >= self.config.max_reintentos_entradas:
+                    logger.critical(
+                        f"⚠️ Máximo de errores consecutivos alcanzado para entradas "
+                        f"({self.config.max_reintentos_entradas})"
+                    )
+
+            except ExtractionError as e:
+                logger.error(f"❌ Error de extracción en entradas: {e}", exc_info=True)
+                if self.monitor.estado.errores_consecutivos_entradas >= self.config.max_reintentos_entradas:
+                    logger.critical(
+                        f"⚠️ Máximo de errores consecutivos alcanzado para entradas "
+                        f"({self.config.max_reintentos_entradas})"
+                    )
+
+            except VerificationError as e:
+                logger.error(f"❌ Error de verificación en entradas: {e}", exc_info=True)
+                if self.monitor.estado.errores_consecutivos_entradas >= self.config.max_reintentos_entradas:
+                    logger.critical(
+                        f"⚠️ Máximo de errores consecutivos alcanzado para entradas "
+                        f"({self.config.max_reintentos_entradas})"
+                    )
+
+            except Exception as e:
+                # Capturar errores inesperados en el scheduler (último recurso)
+                logger.error(f"❌ Error inesperado en job de entradas: {e}", exc_info=True)
                 if self.monitor.estado.errores_consecutivos_entradas >= self.config.max_reintentos_entradas:
                     logger.critical(
                         f"⚠️ Máximo de errores consecutivos alcanzado para entradas "
@@ -176,10 +214,41 @@ class SchedulerMonitor:
                 else:
                     logger.info("✅ Verificación completada - sin cambios en expedientes")
 
-            except Exception as e:
-                logger.error(f"❌ Error en job de verificación de expedientes: {e}", exc_info=True)
+            except AuthenticationError as e:
+                logger.error(f"❌ Error de autenticación en expedientes: {e}", exc_info=True)
+                if self.monitor.estado.errores_consecutivos_expedientes >= self.config.max_reintentos_expedientes:
+                    logger.critical(
+                        f"⚠️ Máximo de errores consecutivos alcanzado para expedientes "
+                        f"({self.config.max_reintentos_expedientes})"
+                    )
 
-                # Si hay demasiados errores consecutivos, considerar detener
+            except NetworkError as e:
+                logger.error(f"❌ Error de red en expedientes: {e}", exc_info=True)
+                if self.monitor.estado.errores_consecutivos_expedientes >= self.config.max_reintentos_expedientes:
+                    logger.critical(
+                        f"⚠️ Máximo de errores consecutivos alcanzado para expedientes "
+                        f"({self.config.max_reintentos_expedientes})"
+                    )
+
+            except ExtractionError as e:
+                logger.error(f"❌ Error de extracción en expedientes: {e}", exc_info=True)
+                if self.monitor.estado.errores_consecutivos_expedientes >= self.config.max_reintentos_expedientes:
+                    logger.critical(
+                        f"⚠️ Máximo de errores consecutivos alcanzado para expedientes "
+                        f"({self.config.max_reintentos_expedientes})"
+                    )
+
+            except VerificationError as e:
+                logger.error(f"❌ Error de verificación en expedientes: {e}", exc_info=True)
+                if self.monitor.estado.errores_consecutivos_expedientes >= self.config.max_reintentos_expedientes:
+                    logger.critical(
+                        f"⚠️ Máximo de errores consecutivos alcanzado para expedientes "
+                        f"({self.config.max_reintentos_expedientes})"
+                    )
+
+            except Exception as e:
+                # Capturar errores inesperados en el scheduler (último recurso)
+                logger.error(f"❌ Error inesperado en job de expedientes: {e}", exc_info=True)
                 if self.monitor.estado.errores_consecutivos_expedientes >= self.config.max_reintentos_expedientes:
                     logger.critical(
                         f"⚠️ Máximo de errores consecutivos alcanzado para expedientes "

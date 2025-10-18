@@ -9,16 +9,25 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError, Error as PlaywrightError
+
 from ..scraping.base import obtener_pagina_autenticada
 from ..scraping.entradas import extraer_entradas_datos
 from ..scraping.expedientes import extraer_expedientes_completos_modelos
 from ..models import Entrada, ExpedienteResumen
 from ..utils.logging import get_logger
+from ..exceptions import CredencialesFaltantes, ExtraccionError, TimeoutExtraccion
 
 from .config import MonitorConfig
 from .detector import DetectorCambios
 from .notifier import NotificadorPlyer
 from .storage import StorageManager, EstadoMonitor
+from .exceptions import (
+    VerificationError,
+    AuthenticationError,
+    ExtractionError as MonitorExtractionError,
+    NetworkError,
+)
 
 logger = get_logger(__name__)
 
@@ -115,21 +124,54 @@ class MonitorPJN:
 
             return nuevas
 
-        except Exception as e:
-            logger.error(f"❌ Error al verificar entradas: {e}", exc_info=True)
-
-            # Incrementar contador de errores
+        except CredencialesFaltantes as e:
+            logger.error(f"❌ Credenciales faltantes: {e}", exc_info=True)
             self.estado.errores_consecutivos_entradas += 1
             self.storage.guardar_estado(self.estado)
 
-            # Notificar error si está configurado
             if self.config.notificar_errores:
                 self.notificador.notificar(
                     titulo="Error Monitor PJN",
                     mensaje=f"Error al verificar entradas: {e}"
                 )
+            raise AuthenticationError(f"Faltan credenciales: {e}") from e
 
-            raise
+        except (PlaywrightTimeoutError, TimeoutExtraccion) as e:
+            logger.error(f"❌ Timeout al verificar entradas: {e}", exc_info=True)
+            self.estado.errores_consecutivos_entradas += 1
+            self.storage.guardar_estado(self.estado)
+
+            if self.config.notificar_errores:
+                self.notificador.notificar(
+                    titulo="Error Monitor PJN",
+                    mensaje=f"Timeout al verificar entradas: {e}"
+                )
+            raise NetworkError(f"Timeout de red: {e}") from e
+
+        except (PlaywrightError, ExtraccionError) as e:
+            logger.error(f"❌ Error de extracción en entradas: {e}", exc_info=True)
+            self.estado.errores_consecutivos_entradas += 1
+            self.storage.guardar_estado(self.estado)
+
+            if self.config.notificar_errores:
+                self.notificador.notificar(
+                    titulo="Error Monitor PJN",
+                    mensaje=f"Error al verificar entradas: {e}"
+                )
+            raise MonitorExtractionError(f"Error extrayendo entradas: {e}") from e
+
+        except Exception as e:
+            # Capturar errores inesperados (último recurso)
+            logger.error(f"❌ Error inesperado al verificar entradas: {e}", exc_info=True)
+            self.estado.errores_consecutivos_entradas += 1
+            self.storage.guardar_estado(self.estado)
+
+            if self.config.notificar_errores:
+                self.notificador.notificar(
+                    titulo="Error Monitor PJN",
+                    mensaje=f"Error inesperado: {e}"
+                )
+            raise VerificationError(f"Error inesperado en verificación: {e}") from e
 
     async def verificar_expedientes(self) -> list[ExpedienteResumen]:
         """Verifica si hay cambios en expedientes.
@@ -215,21 +257,54 @@ class MonitorPJN:
 
             return cambios
 
-        except Exception as e:
-            logger.error(f"❌ Error al verificar expedientes: {e}", exc_info=True)
-
-            # Incrementar contador de errores
+        except CredencialesFaltantes as e:
+            logger.error(f"❌ Credenciales faltantes: {e}", exc_info=True)
             self.estado.errores_consecutivos_expedientes += 1
             self.storage.guardar_estado(self.estado)
 
-            # Notificar error si está configurado
             if self.config.notificar_errores:
                 self.notificador.notificar(
                     titulo="Error Monitor PJN",
                     mensaje=f"Error al verificar expedientes: {e}"
                 )
+            raise AuthenticationError(f"Faltan credenciales: {e}") from e
 
-            raise
+        except (PlaywrightTimeoutError, TimeoutExtraccion) as e:
+            logger.error(f"❌ Timeout al verificar expedientes: {e}", exc_info=True)
+            self.estado.errores_consecutivos_expedientes += 1
+            self.storage.guardar_estado(self.estado)
+
+            if self.config.notificar_errores:
+                self.notificador.notificar(
+                    titulo="Error Monitor PJN",
+                    mensaje=f"Timeout al verificar expedientes: {e}"
+                )
+            raise NetworkError(f"Timeout de red: {e}") from e
+
+        except (PlaywrightError, ExtraccionError) as e:
+            logger.error(f"❌ Error de extracción en expedientes: {e}", exc_info=True)
+            self.estado.errores_consecutivos_expedientes += 1
+            self.storage.guardar_estado(self.estado)
+
+            if self.config.notificar_errores:
+                self.notificador.notificar(
+                    titulo="Error Monitor PJN",
+                    mensaje=f"Error al verificar expedientes: {e}"
+                )
+            raise MonitorExtractionError(f"Error extrayendo expedientes: {e}") from e
+
+        except Exception as e:
+            # Capturar errores inesperados (último recurso)
+            logger.error(f"❌ Error inesperado al verificar expedientes: {e}", exc_info=True)
+            self.estado.errores_consecutivos_expedientes += 1
+            self.storage.guardar_estado(self.estado)
+
+            if self.config.notificar_errores:
+                self.notificador.notificar(
+                    titulo="Error Monitor PJN",
+                    mensaje=f"Error inesperado: {e}"
+                )
+            raise VerificationError(f"Error inesperado en verificación: {e}") from e
 
     def detener(self) -> None:
         """Detiene el monitor.

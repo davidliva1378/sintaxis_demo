@@ -14,6 +14,7 @@ from typing import Any
 
 from ..models import Entrada, ExpedienteResumen
 from ..utils.logging import get_logger
+from .exceptions import StorageError
 
 logger = get_logger(__name__)
 
@@ -100,9 +101,18 @@ class StorageManager:
                 data = json.load(f)
             logger.debug("Estado cargado desde disco")
             return EstadoMonitor.from_dict(data)
-        except Exception as e:
-            logger.error(f"Error al cargar estado: {e}, creando nuevo")
+        except FileNotFoundError:
+            logger.debug("Archivo de estado no existe, creando nuevo")
             return EstadoMonitor()
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON inválido en archivo de estado: {e}")
+            raise StorageError(f"Archivo de estado corrupto: {e}") from e
+        except PermissionError as e:
+            logger.error(f"Sin permisos para leer archivo de estado: {e}")
+            raise StorageError(f"Sin permisos de lectura: {e}") from e
+        except OSError as e:
+            logger.error(f"Error de I/O al cargar estado: {e}")
+            raise StorageError(f"Error de I/O: {e}") from e
 
     def guardar_estado(self, estado: EstadoMonitor) -> None:
         """Guarda el estado del monitor a disco.
@@ -114,8 +124,12 @@ class StorageManager:
             with self.archivo_estado.open("w", encoding="utf-8") as f:
                 json.dump(estado.to_dict(), f, indent=2, ensure_ascii=False)
             logger.debug("Estado guardado a disco")
-        except Exception as e:
-            logger.error(f"Error al guardar estado: {e}")
+        except PermissionError as e:
+            logger.error(f"Sin permisos para escribir archivo de estado: {e}")
+            raise StorageError(f"Sin permisos de escritura: {e}") from e
+        except OSError as e:
+            logger.error(f"Error de I/O al guardar estado: {e}")
+            raise StorageError(f"Error de I/O: {e}") from e
 
     def cargar_entradas_conocidas(self) -> list[Entrada]:
         """Carga el historial de entradas conocidas.
@@ -140,9 +154,15 @@ class StorageManager:
             logger.debug(f"Cargadas {len(entradas)} entradas desde historial")
             return entradas
 
-        except Exception as e:
-            logger.error(f"Error al cargar historial de entradas: {e}")
-            return []
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON inválido en historial de entradas: {e}")
+            raise StorageError(f"Historial de entradas corrupto: {e}") from e
+        except PermissionError as e:
+            logger.error(f"Sin permisos para leer historial de entradas: {e}")
+            raise StorageError(f"Sin permisos de lectura: {e}") from e
+        except OSError as e:
+            logger.error(f"Error de I/O al cargar historial de entradas: {e}")
+            raise StorageError(f"Error de I/O: {e}") from e
 
     def guardar_entradas(self, entradas: list[Entrada]) -> None:
         """Guarda el historial de entradas a disco.
@@ -157,8 +177,12 @@ class StorageManager:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
             logger.debug(f"Guardadas {len(entradas)} entradas a disco")
-        except Exception as e:
-            logger.error(f"Error al guardar entradas: {e}")
+        except PermissionError as e:
+            logger.error(f"Sin permisos para escribir historial de entradas: {e}")
+            raise StorageError(f"Sin permisos de escritura: {e}") from e
+        except OSError as e:
+            logger.error(f"Error de I/O al guardar entradas: {e}")
+            raise StorageError(f"Error de I/O: {e}") from e
 
     def cargar_expedientes_conocidos(self) -> list[ExpedienteResumen]:
         """Carga el historial de expedientes conocidos.
@@ -186,9 +210,15 @@ class StorageManager:
             logger.debug(f"Cargados {len(expedientes)} expedientes desde historial")
             return expedientes
 
-        except Exception as e:
-            logger.error(f"Error al cargar historial de expedientes: {e}")
-            return []
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON inválido en historial de expedientes: {e}")
+            raise StorageError(f"Historial de expedientes corrupto: {e}") from e
+        except PermissionError as e:
+            logger.error(f"Sin permisos para leer historial de expedientes: {e}")
+            raise StorageError(f"Sin permisos de lectura: {e}") from e
+        except OSError as e:
+            logger.error(f"Error de I/O al cargar historial de expedientes: {e}")
+            raise StorageError(f"Error de I/O: {e}") from e
 
     def guardar_expedientes(self, expedientes: list[ExpedienteResumen]) -> None:
         """Guarda el historial de expedientes a disco.
@@ -203,8 +233,12 @@ class StorageManager:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
             logger.debug(f"Guardados {len(expedientes)} expedientes a disco")
-        except Exception as e:
-            logger.error(f"Error al guardar expedientes: {e}")
+        except PermissionError as e:
+            logger.error(f"Sin permisos para escribir historial de expedientes: {e}")
+            raise StorageError(f"Sin permisos de escritura: {e}") from e
+        except OSError as e:
+            logger.error(f"Error de I/O al guardar expedientes: {e}")
+            raise StorageError(f"Error de I/O: {e}") from e
 
 
 __all__ = ["EstadoMonitor", "StorageManager"]

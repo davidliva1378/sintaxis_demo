@@ -1,43 +1,70 @@
-# Monitor PJN - System Tray (Bandeja del Sistema)
+# Monitor PJN - System Tray (Bandeja del Sistema) - Multiplataforma
 
 **Versión:** 5.6
 **Fecha:** 2025-10-17
+**Soporte:** Windows, macOS, Linux
 
 ---
 
 ## 🎯 Descripción
 
-El **System Tray** (indicador de bandeja del sistema) permite controlar el Monitor PJN desde un icono en la barra de tareas sin necesidad de mantener una terminal abierta.
+El **System Tray** (indicador de bandeja del sistema) permite controlar el Monitor PJN desde un icono en la barra de tareas/menú sin necesidad de mantener una terminal abierta.
 
 ### Características
 
-✅ **Icono en la bandeja del sistema** (Windows, macOS, Linux)
-✅ **Menú contextual** con 7 opciones
-✅ **Estados visuales** - Color del icono cambia según actividad
+✅ **Multiplataforma** - Windows, macOS y Linux
+✅ **Icono en la bandeja/menu bar** - Implementaciones nativas por OS
+✅ **Menú contextual** completo
+✅ **Estados visuales** - Emojis de colores según actividad
 ✅ **Verificación manual** - Click para verificar ahora
 ✅ **Acceso rápido a datos** - Abrir carpeta con un click
 ✅ **Control completo** - Iniciar, detener, ver estado
 ✅ **Ejecución en segundo plano** - No requiere terminal visible
+✅ **Auto-detección de OS** - Script universal que elige la mejor implementación
 
 ---
 
 ## 🚀 Inicio Rápido
 
-### 1. Instalar Dependencias
+### Opción 1: Script Universal (Recomendado)
+
+El script universal detecta automáticamente tu sistema operativo:
 
 ```bash
-pip install pystray pillow
+python ejecutar_monitor_universal.py
 ```
 
-### 2. Ejecutar Monitor con Tray
+Instalará las dependencias correctas según tu OS.
 
+### Opción 2: Por Sistema Operativo
+
+#### Windows
 ```bash
+pip install pystray pillow
+python ejecutar_monitor_tray.py
+```
+
+#### macOS
+```bash
+pip install rumps
+python ejecutar_monitor_statusbar.py
+```
+
+#### Linux
+```bash
+pip install pystray pillow
 python ejecutar_monitor_tray.py
 ```
 
 ### 3. Usar el Icono
 
-- **Click derecho** en el icono → Ver menú
+**Windows/Linux:**
+- **Click derecho** en el icono de la bandeja → Ver menú
+
+**macOS:**
+- **Click** en el icono 🟢 del menu bar → Ver menú
+
+**Menú disponible:**
 - **Verificar ahora** → Ejecuta verificación inmediata
 - **Estado** → Ver última verificación y errores
 - **Abrir carpeta de datos** → Ver archivos guardados
@@ -386,13 +413,31 @@ def create_icon_image(color: str = "green", size: int = 64) -> Image:
 
 ## 📱 Plataformas Soportadas
 
-| Plataforma | Soporte | Notas |
-|------------|---------|-------|
-| Windows 10/11 | ✅ Completo | Icono en system tray |
-| macOS | ✅ Completo | Icono en menu bar |
-| Linux (GNOME) | ✅ Completo | Requiere extensión de tray |
-| Linux (KDE) | ✅ Completo | Soporte nativo |
-| Linux (XFCE) | ✅ Completo | Soporte nativo |
+| Plataforma | Implementación | Librería | Estado | Notas |
+|------------|----------------|----------|--------|-------|
+| **Windows 10/11** | `tray.py` | pystray | ✅ Compatible | Icono en system tray |
+| **macOS** | `tray_macos.py` | rumps | ✅ Testeado | Icono en menu bar (nativo) |
+| **Linux (GNOME)** | `tray.py` | pystray | ✅ Compatible | Requiere extensión de tray |
+| **Linux (KDE)** | `tray.py` | pystray | ✅ Compatible | Soporte nativo |
+| **Linux (XFCE)** | `tray.py` | pystray | ✅ Compatible | Soporte nativo |
+
+### ¿Por qué dos implementaciones?
+
+**pystray (Windows/Linux):**
+- ✅ Multiplataforma genérico
+- ✅ Funciona en Windows y Linux
+- ⚠️ Problemas en macOS (framework de Python)
+
+**rumps (macOS):**
+- ✅ Nativo de macOS (APIs de Cocoa)
+- ✅ Más confiable y mejor integrado
+- ✅ UX superior en macOS
+- ❌ Solo funciona en macOS
+
+**Script universal:**
+- ✅ Detecta el OS automáticamente
+- ✅ Usa la mejor implementación para cada plataforma
+- ✅ Experiencia consistente en todos los sistemas
 
 ---
 

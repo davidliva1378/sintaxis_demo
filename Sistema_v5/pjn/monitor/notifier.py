@@ -7,6 +7,7 @@ con fallback a consola si plyer no está disponible.
 from __future__ import annotations
 
 from ..utils.logging import get_logger
+from .exceptions import NotificationError
 
 logger = get_logger(__name__)
 
@@ -60,9 +61,22 @@ class NotificadorPlyer:
                 app_name="Monitor PJN",
                 timeout=timeout
             )
+        except ImportError as e:
+            # Backend de notificaciones no disponible
+            logger.warning(f"Backend de notificaciones no disponible: {e}")
+            # Fallback a consola (no es un error crítico)
+            print(f"\n{'='*50}")
+            print(f"🔔 {titulo}")
+            print(f"   {mensaje}")
+            print(f"{'='*50}\n")
+        except PermissionError as e:
+            # Sin permisos para notificaciones (ej: macOS sin permisos)
+            logger.error(f"Sin permisos para notificaciones: {e}")
+            raise NotificationError(f"Sin permisos para enviar notificaciones: {e}") from e
         except Exception as e:
-            logger.error(f"Error al enviar notificación: {e}")
-            # Fallback a consola
+            # Otros errores de notificación (último recurso)
+            logger.error(f"Error inesperado al enviar notificación: {e}", exc_info=True)
+            # Fallback a consola en lugar de fallar
             print(f"\n{'='*50}")
             print(f"🔔 {titulo}")
             print(f"   {mensaje}")

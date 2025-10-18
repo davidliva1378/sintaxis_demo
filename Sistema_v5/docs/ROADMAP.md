@@ -473,39 +473,65 @@ TOTAL: 60% (9/15 mejoras)
 
 ---
 
-### ✅ Mejora #M9: Indicador de Bandeja del Sistema (System Tray)
+### ✅ Mejora #M9: Indicador de Bandeja del Sistema (System Tray) - Multiplataforma
 - **Estado:** ✅ COMPLETADA
 - **Fecha:** 2025-10-17
 - **Prioridad:** 🟠 ALTA
-- **Tiempo estimado:** 45 minutos
-- **Descripción:** Icono en la bandeja del sistema para control rápido del monitor
+- **Tiempo real:** 2 horas
+- **Descripción:** Icono en la bandeja del sistema para control rápido del monitor con soporte multiplataforma
 - **Archivos creados:**
-  - `pjn/monitor/tray.py` - Implementación del system tray (350+ líneas)
-  - `ejecutar_monitor_tray.py` - Script de ejecución con tray
+  - `pjn/monitor/tray.py` - Implementación genérica (pystray) (350+ líneas)
+  - `pjn/monitor/tray_macos.py` - Implementación nativa macOS (rumps) (320+ líneas)
+  - `ejecutar_monitor_tray.py` - Script Windows/Linux (pystray)
+  - `ejecutar_monitor_statusbar.py` - Script macOS (rumps)
+  - `ejecutar_monitor_universal.py` - Launcher auto-detección de OS
+- **Soporte multiplataforma:**
+  - ✅ **Windows:** pystray + pillow (system tray)
+  - ✅ **macOS:** rumps (menu bar nativo) - TESTEADO ✅
+  - ✅ **Linux:** pystray + pillow (system tray según DE)
+  - ✅ Script universal con auto-detección de sistema operativo
 - **Funcionalidades implementadas:**
-  - ✅ Icono en bandeja con 4 estados de color (verde/amarillo/rojo/gris)
-  - ✅ Menú contextual con 7 opciones
+  - ✅ Icono en bandeja/menu bar
+  - ✅ Estados visuales: 🟢 verde (ok), 🟡 amarillo (actividad), 🔴 rojo (error)
+  - ✅ Menú contextual completo (Verificar, Estado, Abrir datos, Salir)
   - ✅ Verificación manual desde el menú
   - ✅ Visualización de estado del monitor
   - ✅ Acceso rápido a carpeta de datos
-  - ✅ Control del monitor (salir)
-  - ✅ Notificaciones visuales (cambio de color del icono)
+  - ✅ Notificaciones nativas del sistema operativo
   - ✅ Integración con scheduler asíncrono
-- **Menú del tray:**
+  - ✅ Thread separado para no bloquear event loop
+- **Menú contextual:**
   - Monitor PJN (título)
-  - Verificar ahora
-  - Estado
-  - Iniciar/Detener (si hay scheduler)
-  - Abrir carpeta de datos
-  - Ver logs (TODO)
-  - Salir
-- **Requisitos:** `pip install pystray pillow`
+  - Verificar ahora → Ejecuta verificación inmediata
+  - Estado → Muestra última verificación y errores
+  - Abrir carpeta de datos → Abre explorador de archivos
+  - Ver logs → (TODO - placeholder)
+  - Salir → Cierre graceful del monitor
+- **Instalación por plataforma:**
+  ```bash
+  # Windows/Linux
+  pip install pystray pillow
+  python ejecutar_monitor_tray.py
+
+  # macOS
+  pip install rumps
+  python ejecutar_monitor_statusbar.py
+
+  # Universal (auto-detección)
+  python ejecutar_monitor_universal.py
+  ```
 - **Características técnicas:**
   - Fallback graceful si dependencias no están instaladas
-  - Thread separado para no bloquear event loop
-  - Integración completa con asyncio
-  - Colores dinámicos según estado (verde=ok, amarillo=actividad, rojo=error)
-- **Impacto:** 🔥 ALTO - UX profesional, control sin terminal
+  - pystray para Windows/Linux (multiplataforma genérico)
+  - rumps para macOS (APIs nativas de Cocoa, mejor UX)
+  - asyncio event loop corriendo en thread separado
+  - Integración completa con scheduler de apscheduler
+  - Colores dinámicos según estado
+- **Testing:**
+  - ✅ macOS (rumps): Testeado completamente, funcionando OK
+  - ⏸️ Windows (pystray): No testeado directamente, debería funcionar
+  - ⏸️ Linux (pystray): No testeado directamente, debería funcionar
+- **Impacto:** 🔥 MUY ALTO - Transforma CLI en aplicación de escritorio profesional multiplataforma
 
 ---
 
@@ -632,9 +658,13 @@ TOTAL: 60% (9/15 mejoras)
 ## 🎉 Mejoras Recientes
 
 **2025-10-17:**
-- ✅ Mejora #M9: System Tray completado
-  - Icono en bandeja del sistema
-  - Menú contextual completo
-  - Integración con asyncio
-  - Estados visuales (verde/amarillo/rojo)
+- ✅ Mejora #M9: System Tray completado - Soporte Multiplataforma
+  - Icono en bandeja del sistema (Windows/Linux con pystray)
+  - Menu bar nativo para macOS (rumps)
+  - Script universal con auto-detección de OS
+  - Menú contextual completo (Verificar, Estado, Datos, Salir)
+  - Integración completa con asyncio y scheduler
+  - Estados visuales (🟢🟡🔴 emojis)
+  - Testing exitoso en macOS
   - Fase 3 (UI) completada 100%
+  - 2 horas de desarrollo (estimado: 45 min)
