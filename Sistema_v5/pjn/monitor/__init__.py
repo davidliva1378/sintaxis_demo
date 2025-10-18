@@ -13,7 +13,6 @@ from .config import MonitorConfig
 from .core import MonitorPJN
 from .detector import DetectorCambios
 from .notifier import NotificadorPlyer
-from .scheduler import SchedulerMonitor
 from .storage import EstadoMonitor, StorageManager
 from .circuit_breaker import CircuitBreaker, CircuitBreakerConfig, ExponentialBackoff, CircuitState
 from .validators import (
@@ -27,6 +26,13 @@ from .validators import (
     validar_directorio,
 )
 
+try:
+    from .scheduler import SchedulerMonitor
+    SCHEDULER_AVAILABLE = True
+except ImportError:  # pragma: no cover - depende de apscheduler opcional
+    SchedulerMonitor = None  # type: ignore
+    SCHEDULER_AVAILABLE = False
+
 # System tray es opcional
 try:
     from .tray import MonitorSystemTray, TRAY_AVAILABLE
@@ -36,6 +42,7 @@ try:
         "DetectorCambios",
         "NotificadorPlyer",
         "SchedulerMonitor",
+        "SCHEDULER_AVAILABLE",
         "EstadoMonitor",
         "StorageManager",
         "CircuitBreaker",
@@ -60,6 +67,7 @@ except ImportError:
         "DetectorCambios",
         "NotificadorPlyer",
         "SchedulerMonitor",
+        "SCHEDULER_AVAILABLE",
         "EstadoMonitor",
         "StorageManager",
         "CircuitBreaker",
