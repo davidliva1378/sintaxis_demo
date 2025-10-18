@@ -1,9 +1,92 @@
-# Monitor PJN v5 - Documentacion
+# Monitor PJN v5 - Documentación Completa
 
 Sistema de monitoreo automatico del Portal Judicial de la Nacion (PJN) que detecta y notifica nuevas entradas/notificaciones y cambios en expedientes.
 
-## Tabla de Contenidos
+**Versión:** 5.6
+**Última actualización:** 17 de octubre, 2025
 
+---
+
+## 🚀 Inicio Rápido (5 minutos)
+
+### Instalación Express
+
+```bash
+# 1. Activar entorno virtual
+.venv\Scripts\activate  # Windows
+source .venv/bin/activate  # Linux/macOS
+
+# 2. Instalar dependencias
+pip install playwright plyer apscheduler
+
+# 3. Instalar navegadores
+playwright install chromium
+
+# 4. Configurar credenciales (.env en la raíz)
+PJN_USER=tu_usuario_pjn
+PJN_PASS=tu_password_pjn
+
+# 5. Configurar monitor (config/monitor.json)
+{
+  "modo": "automatico",
+  "headless": true,
+  "verificar_entradas": true,
+  "verificar_expedientes": false,
+  "fecha_desde_entradas": "15/10/2025",
+  "fecha_hasta_entradas": "16/10/2025"
+}
+
+# 6. Probar
+python scripts/monitor_cli.py --verificar-ahora --no-headless --verbose
+
+# 7. Si funciona, ejecutar en modo headless
+python scripts/monitor_cli.py --verificar-ahora
+```
+
+### Uso Básico
+
+```bash
+# Verificación inmediata (una vez)
+python scripts/monitor_cli.py --verificar-ahora
+
+# Con logs detallados
+python scripts/monitor_cli.py --verificar-ahora --verbose
+
+# Modo continuo (scheduler)
+python scripts/monitor_cli.py
+
+# Ver ayuda
+python scripts/monitor_cli.py --help
+```
+
+### Verificar que Funciona
+
+Después de ejecutar `--verificar-ahora`, deberás ver:
+
+```
+============================================================
+VERIFICACION INMEDIATA
+============================================================
+
+📥 Verificando entradas...
+✅ 8 nuevas entradas detectadas:
+  - FPA 4471/2020: Notificacion
+  - FPA 8018/2017/CA2: Notificacion
+  ... y 6 mas
+
+📊 Verificacion de expedientes deshabilitada
+
+============================================================
+VERIFICACION COMPLETADA EXITOSAMENTE
+============================================================
+```
+
+---
+
+## 📖 Tabla de Contenidos
+
+- [Inicio Rápido](#-inicio-rápido-5-minutos)
+- [Ejemplos Prácticos](#ejemplos-prácticos)
 - [Caracteristicas](#caracteristicas)
 - [Requisitos](#requisitos)
 - [Instalacion](#instalacion)
@@ -11,6 +94,177 @@ Sistema de monitoreo automatico del Portal Judicial de la Nacion (PJN) que detec
 - [Uso](#uso)
 - [Arquitectura](#arquitectura)
 - [Troubleshooting](#troubleshooting)
+- [Comandos Útiles](#comandos-útiles)
+
+---
+
+## Ejemplos Prácticos
+
+### 1. Monitor solo de entradas (recomendado)
+
+**config/monitor.json:**
+```json
+{
+  "modo": "automatico",
+  "headless": true,
+  "verificar_entradas": true,
+  "verificar_expedientes": false,
+  "intervalos_laboral_entradas": 10,
+  "intervalos_no_laboral_entradas": 30,
+  "fecha_desde_entradas": "15/10/2025",
+  "fecha_hasta_entradas": "16/10/2025"
+}
+```
+
+**Uso:**
+```bash
+python scripts/monitor_cli.py --verificar-ahora
+```
+
+### 2. Monitor completo (entradas + expedientes)
+
+**config/monitor.json:**
+```json
+{
+  "modo": "automatico",
+  "headless": true,
+  "verificar_entradas": true,
+  "verificar_expedientes": true,
+  "intervalos_laboral_entradas": 10,
+  "intervalos_laboral_expedientes": 15,
+  "intervalos_no_laboral_entradas": 30,
+  "intervalos_no_laboral_expedientes": 60,
+  "fecha_desde_entradas": "15/10/2025",
+  "fecha_corte_expedientes": "2025-01-01"
+}
+```
+
+### 3. Solo notificaciones (sin despachos)
+
+**config/monitor.json:**
+```json
+{
+  "verificar_entradas": true,
+  "verificar_expedientes": false,
+  "filtrar_tipo_entrada": ["N"],
+  "notificar_nuevas_entradas": true
+}
+```
+
+**Código Python:**
+```python
+from pjn.scraping.entradas import extraer_entradas_datos
+
+# Solo notificaciones
+notificaciones = await extraer_entradas_datos(
+    page,
+    incluir_tipos=("N",),  # Solo 'N'
+)
+```
+
+### 4. Modo horario laboral estricto
+
+**config/monitor.json:**
+```json
+{
+  "modo": "laboral",
+  "dias_laborales": ["lunes", "martes", "miercoles", "jueves", "viernes"],
+  "hora_inicio": "08:00",
+  "hora_fin": "18:00",
+  "intervalos_laboral_entradas": 5
+}
+```
+
+### 5. Ejecución en segundo plano (producción)
+
+**Linux/macOS:**
+```bash
+# Con nohup
+nohup python scripts/monitor_cli.py > monitor.log 2>&1 &
+
+# Ver proceso
+ps aux | grep monitor_cli
+
+# Ver logs en tiempo real
+tail -f monitor.log
+
+# Detener
+pkill -f monitor_cli.py
+```
+
+**Windows:**
+```powershell
+# Ejecutar en segundo plano
+Start-Process python -ArgumentList "scripts/monitor_cli.py" -WindowStyle Hidden
+
+# Ver procesos
+Get-Process | Where-Object {$_.ProcessName -like "*python*"}
+```
+
+### 6. Script personalizado con filtros
+
+```python
+import asyncio
+from playwright.async_api import async_playwright
+from pjn.scraping.entradas import extraer_entradas_datos
+from pjn.scraping import obtener_pagina_autenticada
+
+async def monitorear_rango_fechas():
+    """Monitorea entradas en un rango específico."""
+    async with obtener_pagina_autenticada(headless=True) as page:
+        # Navegar a entradas
+        await page.goto("https://portalpjn.pjn.gov.ar/...")
+
+        # Extraer con filtros
+        entradas = await extraer_entradas_datos(
+            page,
+            fecha_desde="2025-01-01",
+            fecha_hasta="2025-01-31",
+            incluir_tipos=("N", "D"),  # Ambos tipos
+            duplicados=False,
+        )
+
+        # Procesar
+        for entrada in entradas:
+            print(f"{entrada.fecha} - {entrada.tipo_evento}: {entrada.numero}")
+
+        return entradas
+
+if __name__ == "__main__":
+    asyncio.run(monitorear_rango_fechas())
+```
+
+### 7. Integración con sistema de alertas
+
+```python
+import asyncio
+from pjn.monitor.config import MonitorConfig
+from pjn.monitor.core import MonitorPJN
+
+async def alertar_si_nuevas_entradas():
+    """Verifica y alerta si hay nuevas entradas."""
+    config = MonitorConfig.from_file("config/monitor.json")
+    monitor = MonitorPJN(config)
+
+    # Verificar
+    nuevas = await monitor.verificar_entradas()
+
+    if nuevas:
+        # Enviar alerta (ejemplo: email, Slack, etc.)
+        mensaje = f"🔔 {len(nuevas)} nuevas entradas detectadas:\n"
+        for entrada in nuevas[:5]:  # Primeras 5
+            mensaje += f"- {entrada.numero}: {entrada.tipo_evento}\n"
+
+        # Aquí tu código para enviar alerta
+        print(mensaje)
+        # send_email(mensaje)
+        # send_slack_message(mensaje)
+
+    return nuevas
+
+if __name__ == "__main__":
+    asyncio.run(alertar_si_nuevas_entradas())
+```
 
 ---
 
@@ -536,6 +790,98 @@ Esto mostrara:
 - Entradas filtradas por ser antiguas
 - Contador de filas consecutivas antiguas
 - Momento del corte temprano
+
+---
+
+## Comandos Útiles
+
+### Gestión del Monitor
+
+```bash
+# Ver ayuda completa
+python scripts/monitor_cli.py --help
+
+# Limpiar historial de entradas
+rm data/monitor/entradas_conocidas.json
+
+# Limpiar historial de expedientes
+rm data/monitor/expedientes_conocidos.json
+
+# Limpiar todo el historial
+rm -rf data/monitor/
+
+# Limpiar sesión guardada
+rm pjn/scraping/pjn_storage_state.json
+```
+
+### Logs
+
+```bash
+# Ver logs en tiempo real (Linux/macOS)
+tail -f monitor.log
+
+# Ver últimas 50 líneas
+tail -n 50 monitor.log
+
+# Buscar errores
+grep ERROR monitor.log
+
+# Windows (PowerShell)
+Get-Content monitor.log -Tail 50 -Wait
+```
+
+### Debugging
+
+```bash
+# Ejecutar con ventana visible
+python scripts/monitor_cli.py --verificar-ahora --no-headless
+
+# Logs muy detallados (DEBUG)
+python scripts/monitor_cli.py --verificar-ahora --verbose
+
+# Verificar solo entradas (rápido)
+python scripts/monitor_cli.py --verificar-ahora --modo laboral
+```
+
+### Producción
+
+```bash
+# Ejecutar en segundo plano (Linux/macOS)
+nohup python scripts/monitor_cli.py > monitor.log 2>&1 &
+
+# Ver procesos
+ps aux | grep monitor_cli
+
+# Detener monitor
+pkill -f monitor_cli.py
+
+# Ver status
+ps aux | grep monitor_cli && echo "Monitor ejecutándose" || echo "Monitor detenido"
+```
+
+### Configuración Mínima para Producción
+
+**config/monitor.json:**
+```json
+{
+  "modo": "automatico",
+  "headless": true,
+  "verificar_entradas": true,
+  "verificar_expedientes": false,
+  "intervalos_laboral_entradas": 15,
+  "intervalos_no_laboral_entradas": 60,
+  "notificar_nuevas_entradas": true,
+  "notificar_errores": true,
+  "fecha_desde_entradas": null,
+  "fecha_hasta_entradas": null
+}
+```
+
+**Ejecución:**
+```bash
+# Modo continuo en segundo plano
+python scripts/monitor_cli.py &
+```
 
 ---
 
