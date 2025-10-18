@@ -18,7 +18,7 @@
 📌 NOTA: si tenés problemas al activar el entorno, usá este comando primero:
    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
-4. Definí las variables de entorno requeridas para el acceso al PJN:
+4. Definí **obligatoriamente** las credenciales del PJN como variables de entorno antes de ejecutar cualquier módulo que se conecte al portal.
 
    En PowerShell (ejecutado una vez):
 
@@ -26,6 +26,15 @@
    setx PJN_PASSWORD "tu_clave"
 
    Luego cerrá y abrí de nuevo la terminal para que los valores se apliquen.
+
+   📁 Alternativa recomendada para entornos de desarrollo: creá un archivo `.env` en la raíz del proyecto con el siguiente contenido y cargalo con [python-dotenv](https://pypi.org/project/python-dotenv/) u otra herramienta equivalente.
+
+   ```dotenv
+   PJN_USER=tu_usuario
+   PJN_PASSWORD=tu_clave
+   ```
+
+   Asegurate de añadir `.env` al archivo `.gitignore` o a la configuración de tu sistema de control de versiones para que las credenciales nunca se suban al repositorio.
 
 🗂️ DOCUMENTACIÓN DEL SISTEMA V4
 
@@ -48,3 +57,10 @@
    El script toma los directorios definidos en `config/sistema.json`, los resuelve respecto a la raíz del proyecto y crea los que falten.
 
 3. Después de personalizar los archivos de configuración podés volver a ejecutar el script cuando cambies rutas o agregues nuevos directorios.
+
+🔒 RECOMENDACIONES DE SEGURIDAD Y DESPLIEGUE
+
+- Nunca hardcodees `PJN_USER` ni `PJN_PASSWORD` en scripts, notebooks o archivos de configuración versionados.
+- Para despliegues en servidores, contenedores o servicios CI/CD, usá los mecanismos nativos de gestión de secretos (por ejemplo, variables protegidas en GitHub Actions, GitLab CI, Docker secrets o cofres de la nube) en lugar de archivos planos.
+- Si usás archivos `.env` en producción, almacenalos fuera del repositorio, aplicá permisos restrictivos (por ejemplo, sólo lectura para el usuario del servicio) y rotá las credenciales periódicamente.
+- Considerá habilitar el paquete `python-dotenv` o soluciones equivalentes para cargar automáticamente las variables durante la inicialización de la aplicación, evitando imprimir o registrar los valores en texto plano.
