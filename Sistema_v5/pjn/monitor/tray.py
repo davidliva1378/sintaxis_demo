@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -127,7 +128,6 @@ class MonitorSystemTray:
         self.icon = None
         self.loop = None
         self._running = False
-        self._tray_thread = None
 
         logger.info("System tray inicializado")
 
@@ -367,31 +367,27 @@ class MonitorSystemTray:
         if new_image:
             self.icon.icon = new_image
 
-    def _build_icon(self) -> pystray.Icon:
-        """Crea la instancia de icono de pystray."""
-        image = create_icon_image("green")
-        menu = self._create_menu()
-
-        return pystray.Icon(
-            name="monitor_pjn",
-            icon=image,
-            title="Monitor PJN - Click aquí",
-            menu=menu
-        )
-
-    def _on_icon_ready(self, icon: "pystray.Icon") -> None:
-        """Callback ejecutado cuando el icono está listo."""
-        logger.info("System tray listo - icono visible en bandeja")
-        icon.visible = True
-        self.update_icon("green")
-
     def run(self, event_loop: asyncio.AbstractEventLoop | None = None):
-        """Inicia el indicador de bandeja (bloqueante)."""
+        """Inicia el indicador de bandeja.
+
+        Este método bloquea hasta que se cierra el icono.
+
+        Args:
+            event_loop: Event loop de asyncio para operaciones async
+        """
         self.loop = event_loop
         self._running = True
 
-        self.icon = self._build_icon()
-        self._tray_thread = None
+        # Crear icono
+        image = create_icon_image("green")
+        menu = self._create_menu()
+
+        self.icon = pystray.Icon(
+            name="monitor_pjn",
+            icon=image,
+            title="Monitor PJN - Click aquí",  # Más descriptivo
+            menu=menu
+        )
 
         logger.info("Iniciando system tray (bloqueante)...")
         logger.info("🔍 BUSCANDO ICONO:")
@@ -404,25 +400,25 @@ class MonitorSystemTray:
         logger.info("   - Click DERECHO (o Control + Click) para ver menú")
         logger.info("   - Opciones: Verificar ahora, Estado, Salir")
 
-        self.icon.run(setup=self._on_icon_ready)
+        # Ejecutar (bloqueante)
+        self.icon.run()
 
         logger.info("System tray detenido")
         self._running = False
-        self.icon = None
 
     def run_detached(self, event_loop: asyncio.AbstractEventLoop):
-        """Inicia el indicador en segundo plano (no bloqueante)."""
-        self.loop = event_loop
-        self._running = True
+        """Inicia el indicador en un thread separado.
 
-        self.icon = self._build_icon()
+        Args:
+            event_loop: Event loop de asyncio para operaciones async
+        """
+        def _run_in_thread():
+            self.run(event_loop)
 
-        logger.info("Iniciando system tray en segundo plano...")
+        thread = threading.Thread(target=_run_in_thread, daemon=True)
+        thread.start()
 
-        # Usar run_detached de pystray para respetar requisitos por plataforma
-        self._tray_thread = self.icon.run_detached(setup=self._on_icon_ready)
-
-        logger.info("System tray iniciado en background")
+        logger.info("System tray iniciado en thread separado")
 
     def stop(self):
         """Detiene el indicador de bandeja."""
@@ -430,11 +426,6 @@ class MonitorSystemTray:
 
         if self.icon:
             self.icon.stop()
-            self.icon = None
-
-        if self._tray_thread and self._tray_thread.is_alive():
-            self._tray_thread.join(timeout=1)
-            self._tray_thread = None
 
         # Detener monitor y scheduler
         if self.scheduler:
