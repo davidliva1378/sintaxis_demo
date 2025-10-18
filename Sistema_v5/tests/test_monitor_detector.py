@@ -217,15 +217,15 @@ class TestDetectorCambios:
         exp_1_actualizado = ExpedienteResumen(
             numero="EXP-001/2025",
             caratula="Caso A vs B",
-            juzgado="Juzgado 1",
             dependencia="Secretaría 1",
+            situacion="En trámite",
             ultima_actuacion="17/10/2025"
         )
         exp_2_actualizado = ExpedienteResumen(
             numero="EXP-002/2025",
             caratula="Caso C vs D",
-            juzgado="Juzgado 2",
             dependencia="Secretaría 2",
+            situacion="En trámite",
             ultima_actuacion="18/10/2025"
         )
 
@@ -241,15 +241,15 @@ class TestDetectorCambios:
         anterior = ExpedienteResumen(
             numero="EXP-001/2025",
             caratula="Caso A",
-            juzgado="Juzgado 1",
             dependencia="Secretaría 1",
+            situacion="En trámite",
             ultima_actuacion="10/10/2025"
         )
         nuevo = ExpedienteResumen(
             numero="EXP-999/2025",  # Número diferente (nuevo)
             caratula="Caso Nuevo",
-            juzgado="Juzgado 2",
             dependencia="Secretaría 2",
+            situacion="En trámite",
             ultima_actuacion="17/10/2025"
         )
 
@@ -266,16 +266,16 @@ class TestDetectorCambios:
         anterior = ExpedienteResumen(
             numero="EXP-001/2025",
             caratula="Caso A",
-            juzgado="Juzgado 1",
             dependencia="Secretaría 1",
+            situacion="En trámite",
             ultima_actuacion="10/10/2025"
         )
         # Mismo número, misma ultima_actuacion
         actual = ExpedienteResumen(
             numero="EXP-001/2025",
             caratula="Caso A - Modificado",  # Carátula cambió (irrelevante)
-            juzgado="Juzgado 1",
             dependencia="Secretaría 1",
+            situacion="Finalizado",  # Situación cambió (irrelevante)
             ultima_actuacion="10/10/2025"  # Igual
         )
 
@@ -300,18 +300,18 @@ class TestDetectorCambios:
         """Maneja entradas con fecha None."""
         entrada_con_fecha = Entrada(
             numero="EXP-001",
-            fecha=datetime(2025, 10, 1),
+            caratula="Caso A",
+            fecha="01/10/2025",
             evento="Evento",
-            tipo="N",
-            link="https://example.com/1",
+            tipo_evento="N",
             leida=False
         )
         entrada_sin_fecha = Entrada(
             numero="EXP-002",
+            caratula="Caso B",
             fecha=None,
             evento="Evento sin fecha",
-            tipo="N",
-            link="https://example.com/2",
+            tipo_evento="N",
             leida=False
         )
 
@@ -328,15 +328,15 @@ class TestDetectorCambios:
         anterior = ExpedienteResumen(
             numero="EXP-001/2025",
             caratula="Caso",
-            juzgado="J1",
             dependencia="D1",
+            situacion="En trámite",
             ultima_actuacion=None
         )
         actual = ExpedienteResumen(
             numero="EXP-001/2025",
             caratula="Caso",
-            juzgado="J1",
             dependencia="D1",
+            situacion="En trámite",
             ultima_actuacion="17/10/2025"  # Ahora tiene fecha
         )
 

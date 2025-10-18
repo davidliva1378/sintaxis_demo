@@ -100,18 +100,18 @@ class TestStorageManager:
         return [
             Entrada(
                 numero="EXP-001",
-                fecha=datetime(2025, 10, 1),
+                caratula="Caso A",
+                fecha="01/10/2025",
                 evento="Notificación A",
-                tipo="N",
-                link="https://example.com/1",
+                tipo_evento="N",
                 leida=False
             ),
             Entrada(
                 numero="EXP-002",
-                fecha=datetime(2025, 10, 2),
+                caratula="Caso B",
+                fecha="02/10/2025",
                 evento="Notificación B",
-                tipo="N",
-                link="https://example.com/2",
+                tipo_evento="N",
                 leida=True
             ),
         ]
@@ -123,15 +123,15 @@ class TestStorageManager:
             ExpedienteResumen(
                 numero="EXP-001/2025",
                 caratula="Caso A",
-                juzgado="Juzgado 1",
                 dependencia="Secretaría 1",
+                situacion="En trámite",
                 ultima_actuacion="10/10/2025"
             ),
             ExpedienteResumen(
                 numero="EXP-002/2025",
                 caratula="Caso B",
-                juzgado="Juzgado 2",
                 dependencia="Secretaría 2",
+                situacion="En trámite",
                 ultima_actuacion="15/10/2025"
             ),
         ]
@@ -336,10 +336,10 @@ class TestStorageManager:
         """Guardar entradas preserva caracteres especiales (UTF-8)."""
         entrada_especial = Entrada(
             numero="EXP-ñ001",
-            fecha=datetime(2025, 10, 1),
+            caratula="Caso con ñ",
+            fecha="01/10/2025",
             evento="Notificación con ñ, á, é, í, ó, ú",
-            tipo="N",
-            link="https://example.com/1",
+            tipo_evento="N",
             leida=False
         )
 
@@ -358,10 +358,10 @@ class TestStorageManager:
         # Segundo guardado con diferentes datos
         nueva_entrada = Entrada(
             numero="EXP-999",
-            fecha=datetime(2025, 10, 10),
+            caratula="Caso Nuevo",
+            fecha="10/10/2025",
             evento="Nueva",
-            tipo="N",
-            link="https://example.com/999",
+            tipo_evento="N",
             leida=False
         )
         temp_storage.guardar_entradas([nueva_entrada])
