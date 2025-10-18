@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from pjn.agenda import (
+from agenda import (
     AgendaQuery,
     AgendaService,
     calcular_fecha_plazo,
