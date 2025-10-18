@@ -22,6 +22,7 @@ from .config import MonitorConfig
 from .detector import DetectorCambios
 from .notifier import NotificadorPlyer
 from .storage import StorageManager, EstadoMonitor
+from .circuit_breaker import CircuitBreaker, CircuitBreakerConfig, ExponentialBackoff
 from .exceptions import (
     VerificationError,
     AuthenticationError,
@@ -52,26 +53,46 @@ class MonitorPJN:
         self.estado = self.storage.cargar_estado()
         self.running = False
 
+        # Circuit breakers para entradas y expedientes
+        cb_config = CircuitBreakerConfig(
+            failure_threshold=config.max_reintentos_entradas,
+            success_threshold=2,
+            timeout=config.espera_reintentos_entradas * 2,  # Timeout más largo
+            expected_exception=Exception
+        )
+        self.circuit_breaker_entradas = CircuitBreaker(cb_config)
+
+        cb_config_exp = CircuitBreakerConfig(
+            failure_threshold=config.max_reintentos_expedientes,
+            success_threshold=2,
+            timeout=config.espera_reintentos_expedientes * 2,
+            expected_exception=Exception
+        )
+        self.circuit_breaker_expedientes = CircuitBreaker(cb_config_exp)
+
+        # Backoff para reintentos
+        self.backoff_entradas = ExponentialBackoff(
+            base_delay=config.espera_reintentos_entradas / 2,
+            max_delay=config.espera_reintentos_entradas * 4
+        )
+        self.backoff_expedientes = ExponentialBackoff(
+            base_delay=config.espera_reintentos_expedientes / 2,
+            max_delay=config.espera_reintentos_expedientes * 4
+        )
+
         logger.info(f"Monitor PJN inicializado - Modo: {config.modo}")
         logger.info(f"Directorio de datos: {config.directorio_datos}")
+        logger.info(f"Circuit breaker habilitado - Umbral fallos: {config.max_reintentos_entradas}")
 
-    async def verificar_entradas(self) -> list[Entrada]:
-        """Verifica si hay nuevas entradas/notificaciones.
-
-        Este método:
-        1. Extrae las entradas actuales del portal
-        2. Las compara con las conocidas
-        3. Detecta las nuevas
-        4. Actualiza el historial
-        5. Envía notificación si corresponde
+    async def _verificar_entradas_internal(self) -> list[Entrada]:
+        """Método interno de verificación de entradas (sin circuit breaker).
 
         Returns:
             list[Entrada]: Lista de entradas nuevas detectadas
 
         Raises:
-            Exception: Si falla la extracción o hay error en la sesión
+            Exception: Si falla la extracción
         """
-        logger.info("Verificando entradas...")
 
         try:
             # Extraer entradas actuales
@@ -173,23 +194,47 @@ class MonitorPJN:
                 )
             raise VerificationError(f"Error inesperado en verificación: {e}") from e
 
-    async def verificar_expedientes(self) -> list[ExpedienteResumen]:
-        """Verifica si hay cambios en expedientes.
+    async def verificar_entradas(self) -> list[Entrada]:
+        """Verifica si hay nuevas entradas/notificaciones.
+
+        Este método usa circuit breaker para prevenir cascadas de errores.
 
         Este método:
-        1. Extrae los expedientes actuales
-        2. Los compara con los conocidos
-        3. Detecta expedientes con cambios en ultima_actuacion
+        1. Extrae las entradas actuales del portal
+        2. Las compara con las conocidas
+        3. Detecta las nuevas
         4. Actualiza el historial
         5. Envía notificación si corresponde
+
+        Returns:
+            list[Entrada]: Lista de entradas nuevas detectadas
+
+        Raises:
+            SchedulerError: Si el circuit breaker está abierto
+            Exception: Si falla la extracción o hay error en la sesión
+        """
+        logger.info("Verificando entradas...")
+
+        try:
+            # Usar circuit breaker para proteger la llamada
+            return await self.circuit_breaker_entradas.call_async(
+                self._verificar_entradas_internal
+            )
+        except Exception:
+            # Reset backoff en caso de éxito después de errores
+            if self.circuit_breaker_entradas.state.value == "closed":
+                self.backoff_entradas.reset()
+            raise
+
+    async def _verificar_expedientes_internal(self) -> list[ExpedienteResumen]:
+        """Método interno de verificación de expedientes (sin circuit breaker).
 
         Returns:
             list[ExpedienteResumen]: Lista de expedientes con cambios
 
         Raises:
-            Exception: Si falla la extracción o hay error en la sesión
+            Exception: Si falla la extracción
         """
-        logger.info("Verificando expedientes...")
 
         try:
             # Determinar fecha de corte (priorizar fecha_desde_expedientes)
@@ -305,6 +350,38 @@ class MonitorPJN:
                     mensaje=f"Error inesperado: {e}"
                 )
             raise VerificationError(f"Error inesperado en verificación: {e}") from e
+
+    async def verificar_expedientes(self) -> list[ExpedienteResumen]:
+        """Verifica si hay cambios en expedientes.
+
+        Este método usa circuit breaker para prevenir cascadas de errores.
+
+        Este método:
+        1. Extrae los expedientes actuales
+        2. Los compara con los conocidos
+        3. Detecta expedientes con cambios en ultima_actuacion
+        4. Actualiza el historial
+        5. Envía notificación si corresponde
+
+        Returns:
+            list[ExpedienteResumen]: Lista de expedientes con cambios
+
+        Raises:
+            SchedulerError: Si el circuit breaker está abierto
+            Exception: Si falla la extracción o hay error en la sesión
+        """
+        logger.info("Verificando expedientes...")
+
+        try:
+            # Usar circuit breaker para proteger la llamada
+            return await self.circuit_breaker_expedientes.call_async(
+                self._verificar_expedientes_internal
+            )
+        except Exception:
+            # Reset backoff en caso de éxito después de errores
+            if self.circuit_breaker_expedientes.state.value == "closed":
+                self.backoff_expedientes.reset()
+            raise
 
     def detener(self) -> None:
         """Detiene el monitor.

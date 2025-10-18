@@ -15,6 +15,17 @@ from .detector import DetectorCambios
 from .notifier import NotificadorPlyer
 from .scheduler import SchedulerMonitor
 from .storage import EstadoMonitor, StorageManager
+from .circuit_breaker import CircuitBreaker, CircuitBreakerConfig, ExponentialBackoff, CircuitState
+from .validators import (
+    validar_intervalo,
+    validar_max_reintentos,
+    validar_formato_fecha,
+    validar_rango_fechas,
+    validar_formato_hora,
+    validar_rango_horas,
+    validar_dias_laborales,
+    validar_directorio,
+)
 
 # System tray es opcional
 try:
@@ -27,6 +38,18 @@ try:
         "SchedulerMonitor",
         "EstadoMonitor",
         "StorageManager",
+        "CircuitBreaker",
+        "CircuitBreakerConfig",
+        "ExponentialBackoff",
+        "CircuitState",
+        "validar_intervalo",
+        "validar_max_reintentos",
+        "validar_formato_fecha",
+        "validar_rango_fechas",
+        "validar_formato_hora",
+        "validar_rango_horas",
+        "validar_dias_laborales",
+        "validar_directorio",
         "MonitorSystemTray",
         "TRAY_AVAILABLE",
     ]
@@ -39,4 +62,16 @@ except ImportError:
         "SchedulerMonitor",
         "EstadoMonitor",
         "StorageManager",
+        "CircuitBreaker",
+        "CircuitBreakerConfig",
+        "ExponentialBackoff",
+        "CircuitState",
+        "validar_intervalo",
+        "validar_max_reintentos",
+        "validar_formato_fecha",
+        "validar_rango_fechas",
+        "validar_formato_hora",
+        "validar_rango_horas",
+        "validar_dias_laborales",
+        "validar_directorio",
     ]

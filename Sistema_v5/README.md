@@ -70,6 +70,126 @@ if __name__ == "__main__":
 
 ---
 
+## ⚙️ Configuración del Sistema
+
+Sistema_v5 incluye un **configurador gráfico completo** para gestionar todas las opciones del sistema sin editar archivos JSON manualmente.
+
+### 🖥️ Interfaz Gráfica de Configuración
+
+```bash
+# Abrir el configurador
+python scripts/configurar_sistema.py
+
+# Usar un archivo de configuración específico
+python scripts/configurar_sistema.py --config mi_config.json
+```
+
+El configurador proporciona una interfaz con pestañas para configurar:
+
+#### 📁 **Directorios**
+- Extracción inicial (fuente para comparaciones)
+- Expedientes individuales
+- Comparaciones y reportes
+- Logs, backups, cache
+- Descargas de PDFs
+
+#### 🔍 **Monitoreo**
+- Modo de operación (automático, laboral, no laboral)
+- Intervalos de verificación (laboral/no laboral)
+- Horario laboral (días y horas)
+- Notificaciones (entradas, expedientes, errores)
+
+#### ⚙️ **Extracción**
+- Modo headless del browser
+- Límites de páginas
+- Timeouts (default, login, descarga)
+- Reintentos (expedientes, entradas, descargas)
+
+#### 🔧 **Sistema**
+- Nivel de logging
+- Rotación y tamaño de logs
+- Backups automáticos
+- Sesión del portal
+- Límites de recursos
+- Generación de reportes
+
+### 📝 Configuración Programática
+
+También puedes usar `SystemConfig` directamente en tu código:
+
+```python
+from pjn import SystemConfig
+
+# Cargar configuración existente
+config = SystemConfig.from_file("config/sistema.json")
+
+# Crear configuración personalizada
+config = SystemConfig(
+    directorio_expedientes_base="mi_data/expedientes",
+    modo_monitor="laboral",
+    intervalos_laboral_expedientes=30,
+    headless=True,
+    nivel_log="DEBUG"
+)
+
+# Guardar configuración
+config.to_file("config/mi_config.json")
+
+# Crear directorios
+config.crear_directorios()
+
+# Hacer backup
+backup_path = config.hacer_backup()
+```
+
+### 🔄 Migración desde Configuración Anterior
+
+Si tienes un `config/monitor.json` existente, puedes migrarlo automáticamente:
+
+```bash
+python scripts/migrar_configuraciones.py
+
+# O especificar rutas
+python scripts/migrar_configuraciones.py --input config/monitor.json --output config/sistema.json
+```
+
+El script:
+1. ✅ Lee tu configuración existente
+2. ✅ Crea un backup automático
+3. ✅ Migra todos los valores a `SystemConfig`
+4. ✅ Crea la estructura de directorios
+5. ✅ Guarda la nueva configuración
+
+### 📂 Estructura de Directorios Sugerida
+
+```
+Sistema_v5/
+├── config/
+│   ├── sistema.json          # ⭐ Nueva configuración unificada
+│   ├── monitor.json           # (legacy, retrocompatible)
+│   └── templates/             # Templates predefinidos
+│       ├── desarrollo.json
+│       ├── produccion.json
+│       └── testing.json
+│
+├── data/
+│   ├── inicial/               # Extracciones iniciales
+│   ├── expedientes/           # Carpetas por expediente
+│   │   ├── EXP-001/
+│   │   ├── EXP-002/
+│   │   └── ...
+│   ├── comparaciones/         # Resultados de comparaciones
+│   ├── reportes/              # Reportes generados
+│   └── monitor/               # Datos del monitor
+│
+├── logs/                      # Logs del sistema
+├── .cache/                    # Cache de sesiones
+├── backups/                   # Backups automáticos
+└── descargas/                 # PDFs descargados
+```
+
+---
+
 ## 📚 Documentación
 
 Toda la documentación está organizada en la carpeta [`docs/`](docs/):

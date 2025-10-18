@@ -12,6 +12,17 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Literal
 
+from .validators import (
+    validar_intervalo,
+    validar_max_reintentos,
+    validar_formato_fecha,
+    validar_rango_fechas,
+    validar_formato_hora,
+    validar_rango_horas,
+    validar_dias_laborales,
+    validar_directorio,
+)
+
 ModoMonitor = Literal["automatico", "laboral", "no_laboral"]
 
 
@@ -101,6 +112,101 @@ class MonitorConfig:
     # Filtros de rango de fechas para expedientes
     fecha_desde_expedientes: str | None = None  # Formato: YYYY-MM-DD o DD/MM/YYYY
     fecha_hasta_expedientes: str | None = None  # Formato: YYYY-MM-DD o DD/MM/YYYY
+
+    def __post_init__(self):
+        """Valida la configuración después de la inicialización.
+
+        Raises:
+            ValidationError: Si algún parámetro es inválido
+            IntervalError: Si los intervalos están fuera de rango
+            DateRangeError: Si las fechas son inválidas
+            WorkHoursError: Si las horas laborales son inválidas
+        """
+        # Validar directorio
+        validar_directorio(self.directorio_datos, "directorio_datos")
+
+        # Validar intervalos (convertir minutos a segundos para validación)
+        validar_intervalo(
+            self.intervalos_laboral_expedientes * 60,
+            "intervalos_laboral_expedientes",
+            min_val=60,  # Mínimo 1 minuto
+            max_val=1440 * 60  # Máximo 24 horas
+        )
+        validar_intervalo(
+            self.intervalos_laboral_entradas * 60,
+            "intervalos_laboral_entradas",
+            min_val=60,
+            max_val=1440 * 60
+        )
+        validar_intervalo(
+            self.intervalos_no_laboral_expedientes * 60,
+            "intervalos_no_laboral_expedientes",
+            min_val=60,
+            max_val=1440 * 60
+        )
+        validar_intervalo(
+            self.intervalos_no_laboral_entradas * 60,
+            "intervalos_no_laboral_entradas",
+            min_val=60,
+            max_val=1440 * 60
+        )
+
+        # Validar espera de reintentos (en segundos)
+        validar_intervalo(
+            self.espera_reintentos_expedientes,
+            "espera_reintentos_expedientes",
+            min_val=1,
+            max_val=300  # Máximo 5 minutos
+        )
+        validar_intervalo(
+            self.espera_reintentos_entradas,
+            "espera_reintentos_entradas",
+            min_val=1,
+            max_val=300
+        )
+
+        # Validar número de reintentos
+        validar_max_reintentos(
+            self.max_reintentos_expedientes,
+            "max_reintentos_expedientes"
+        )
+        validar_max_reintentos(
+            self.max_reintentos_entradas,
+            "max_reintentos_entradas"
+        )
+
+        # Validar días laborales
+        validar_dias_laborales(self.dias_laborales, "dias_laborales")
+
+        # Validar formato de horas
+        validar_formato_hora(self.hora_inicio, "hora_inicio")
+        validar_formato_hora(self.hora_fin, "hora_fin")
+
+        # Validar rango de horas
+        validar_rango_horas(self.hora_inicio, self.hora_fin)
+
+        # Validar fechas de entradas
+        validar_formato_fecha(self.fecha_desde_entradas, "fecha_desde_entradas")
+        validar_formato_fecha(self.fecha_hasta_entradas, "fecha_hasta_entradas")
+        validar_rango_fechas(
+            self.fecha_desde_entradas,
+            self.fecha_hasta_entradas,
+            "fecha_desde_entradas",
+            "fecha_hasta_entradas"
+        )
+
+        # Validar fechas de expedientes
+        validar_formato_fecha(self.fecha_desde_expedientes, "fecha_desde_expedientes")
+        validar_formato_fecha(self.fecha_hasta_expedientes, "fecha_hasta_expedientes")
+        validar_rango_fechas(
+            self.fecha_desde_expedientes,
+            self.fecha_hasta_expedientes,
+            "fecha_desde_expedientes",
+            "fecha_hasta_expedientes"
+        )
+
+        # Validar fecha_corte_expedientes (formato legacy)
+        validar_formato_fecha(self.fecha_corte_expedientes, "fecha_corte_expedientes")
 
     @classmethod
     def from_file(cls, path: str | Path = "config/monitor.json") -> "MonitorConfig":

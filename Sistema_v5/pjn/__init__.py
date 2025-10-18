@@ -3,6 +3,9 @@
 # Exportar constantes globales
 from . import constants
 
+# Exportar configuración unificada
+from .system_config import SystemConfig
+
 # Exportar excepciones para fácil acceso
 from .exceptions import (
     ActuacionesNoDisponibles,
@@ -29,6 +32,8 @@ from .exceptions import (
 __all__ = [
     # Constantes
     "constants",
+    # Configuración
+    "SystemConfig",
     # Excepciones
     "PJNError",
     "AutenticacionError",
