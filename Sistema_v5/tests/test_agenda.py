@@ -191,6 +191,61 @@ class TestAgendaService:
                 fecha_vencimiento=date(2024, 1, 9),
             )
 
+    def test_actualizar_item(self):
+        item = self.agenda.registrar_tarea(
+            titulo="Redactar demanda",
+            fecha_inicio=date(2024, 2, 1),
+            etiquetas=["civil"],
+        )
+
+        actualizado = self.agenda.actualizar_item(
+            item.id,
+            titulo="Redactar demanda actualizada",
+            fecha_vencimiento=date(2024, 2, 5),
+            etiquetas=["civil", "prioridad"],
+            metadata={"expediente": "55/2024"},
+        )
+
+        assert actualizado.titulo == "Redactar demanda actualizada"
+        assert actualizado.fecha_vencimiento == date(2024, 2, 5)
+        assert actualizado.etiquetas == ("civil", "prioridad")
+        assert actualizado.metadata == {"expediente": "55/2024"}
+
+        recuperado = self.agenda.obtener(item.id)
+        assert recuperado == actualizado
+
+    def test_gestion_feriados(self):
+        self.agenda.sincronizar_feriados({date(2024, 1, 1)})
+        self.agenda.agregar_feriado(date(2024, 3, 24))
+        self.agenda.agregar_feriados([date(2024, 5, 1), date(2024, 12, 8)])
+        self.agenda.quitar_feriado(date(2024, 1, 1))
+
+        feriados = self.agenda.listar_feriados()
+
+        assert feriados == (
+            date(2024, 3, 24),
+            date(2024, 5, 1),
+            date(2024, 12, 8),
+        )
+
+    def test_ids_no_se_pisan_con_datos_iguales(self):
+        primero = self.agenda.registrar_nota(
+            titulo="Reunión", fecha=date(2024, 6, 1)
+        )
+        segundo = self.agenda.registrar_nota(
+            titulo="Reunión", fecha=date(2024, 6, 1)
+        )
+
+        assert primero.id != segundo.id
+
+    def test_metadata_invalida(self):
+        with pytest.raises(TypeError):
+            self.agenda.registrar_tarea(
+                titulo="Metadatos inválidos",
+                fecha_inicio=date(2024, 4, 10),
+                metadata=["no", "es", "mapping"],
+            )
+
 
 class TestIntegracionCompartida:
     """Confirma que la agenda global puede reutilizarse."""
@@ -251,3 +306,25 @@ class TestJSONAgendaRepository:
 
         nuevo_repo = JSONAgendaRepository(archivo)
         assert len(nuevo_repo.all()) == 1
+
+    def test_actualizar_item_persistencia(self, tmp_path: Path):
+        archivo = tmp_path / "agenda.json"
+        agenda = AgendaService(repository=JSONAgendaRepository(archivo))
+
+        item = agenda.registrar_tarea(
+            titulo="Coordinar testigo",
+            fecha_inicio=date(2024, 9, 10),
+        )
+
+        agenda.actualizar_item(
+            item.id,
+            descripcion="Confirmar asistencia",
+            metadata={"testigo": "Juan Perez"},
+        )
+
+        recargada = AgendaService(repository=JSONAgendaRepository(archivo))
+        recuperado = recargada.obtener(item.id)
+
+        assert recuperado is not None
+        assert recuperado.descripcion == "Confirmar asistencia"
+        assert recuperado.metadata == {"testigo": "Juan Perez"}

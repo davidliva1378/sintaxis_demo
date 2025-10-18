@@ -3,11 +3,10 @@
 Este documento resume problemas detectados, oportunidades de mejora y puntos a tener en cuenta al integrar o ampliar la agenda jurídica incluida en `Sistema_v5`.
 
 ## Limitaciones actuales
-- **Persistencia en memoria:** El `AgendaRepository` mantiene los elementos únicamente en memoria, por lo que se pierden ante un reinicio del proceso y no hay concurrencia segura para múltiples trabajadores o hilos. Conviene evaluar un backend persistente (base de datos o almacenamiento en disco) y mecanismos de locking o transacciones.【F:Sistema_v5/agenda/agenda.py†L56-L86】
-- **Identificadores deterministas:** Los identificadores se generan con `_generar_identificador` a partir de la fecha, tipo y título. Si se registran eventos con datos repetidos, se sobrescriben en el repositorio. Sería más seguro incorporar un sufijo aleatorio o un contador incremental.【F:Sistema_v5/agenda/agenda.py†L160-L189】【F:Sistema_v5/agenda/agenda.py†L232-L236】
-- **Ausencia de actualización:** El servicio permite crear y eliminar ítems, pero no modificarlos. Falta una operación `actualizar_item` o similar que respete validaciones y mantenga historial.【F:Sistema_v5/agenda/agenda.py†L102-L151】【F:Sistema_v5/agenda/agenda.py†L214-L222】
-- **Metadatos sin esquema:** El campo `metadata` acepta cualquier mapping sin validación. Para integraciones complejas se recomienda definir contratos claros o dataclasses específicas según cada categoría.【F:Sistema_v5/agenda/agenda.py†L32-L150】
-- **Feriados estáticos:** Los feriados se reciben como lista en el constructor y no existe una API para actualizarlos dinámicamente; tampoco se contemplan calendarios por jurisdicción. Se sugiere exponer métodos para sincronizar feriados y soportar múltiples calendarios.【F:Sistema_v5/agenda/agenda.py†L67-L123】【F:Sistema_v5/agenda/agenda.py†L236-L277】
+- **Persistencia avanzada pendiente:** El `JSONAgendaRepository` brinda persistencia básica con escritura atómica, pero no ofrece concurrencia, transacciones ni bloqueo entre procesos. Para despliegues multiusuario se recomienda migrar a un motor de base de datos real.【F:Sistema_v5/agenda/agenda.py†L86-L178】
+- **Historial y auditoría:** `actualizar_item` sobrescribe el registro original sin conservar versiones previas ni la autoría de los cambios. Cualquier integración que requiera trazabilidad deberá incorporar auditorías externas.【F:Sistema_v5/agenda/agenda.py†L214-L308】
+- **Metadatos sin esquema:** El campo `metadata` continúa aceptando cualquier mapping. Para integraciones complejas conviene definir contratos claros o dataclasses específicas según cada categoría.【F:Sistema_v5/agenda/agenda.py†L32-L308】
+- **Zonas horarias y horarios:** El modelo usa `date` y no captura horas, husos ni duración de eventos. Antes de calendarizar audiencias reales será necesario extender el modelo a `datetime` con soporte de zonas horarias.【F:Sistema_v5/agenda/agenda.py†L32-L308】
 
 ## Riesgos funcionales
 - **Validaciones mínimas:** Solo se valida que la fecha de vencimiento no sea anterior a la de inicio y que la categoría sea conocida. No hay chequeos sobre superposición de audiencias, duplicados por expediente o conflictos de recursos (salas, profesionales).【F:Sistema_v5/agenda/agenda.py†L120-L184】
@@ -15,7 +14,7 @@ Este documento resume problemas detectados, oportunidades de mejora y puntos a t
 - **Agenda global mutable:** La agenda global es un singleton en módulo. En contextos de pruebas o aplicaciones multicliente podría provocar fugas de estado o datos cruzados. Evaluar factoría por sesión o inyección explícita de dependencias.【F:Sistema_v5/agenda/agenda.py†L309-L350】
 
 ## Oportunidades de ampliación
-- **Integración con notificaciones:** Aprovechar `registrar_recordatorio` para disparar eventos hacia módulos de notificaciones (email, SMS, panel) y permitir recordatorios periódicos.【F:Sistema_v5/agenda/agenda.py†L200-L277】
+- **Integración con notificaciones:** Aprovechar `registrar_recordatorio` para disparar eventos hacia módulos de notificaciones (email, SMS, panel) y permitir recordatorios periódicos.【F:Sistema_v5/agenda/agenda.py†L236-L308】
 - **Reportes y dashboards:** Agregar consultas agregadas (próximos vencimientos, carga por profesional, KPIs) que faciliten la visualización en paneles de control.
 - **Soporte para adjuntos:** Permitir vincular archivos (escritos, oficios) a cada ítem mediante referencias al gestor documental del sistema.
 - **APIs de integración:** Publicar endpoints REST/gRPC o servicios internos que permitan a otros módulos registrar y consultar eventos sin depender de la instancia global.

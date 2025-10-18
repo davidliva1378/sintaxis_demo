@@ -10,13 +10,16 @@ utilidades de fechas para calcular plazos en días hábiles y corridos.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping, MutableSequence, Sequence
+from uuid import uuid4
 
 CategoriaAgenda = str
+
+_NO_CAMBIO = object()
 
 # Categorías sugeridas para uso inmediato dentro del sistema. El usuario
 # puede agregar más a través del servicio expuesto.
@@ -76,6 +79,13 @@ class AgendaRepository:
         self._items: dict[str, AgendaItem] = {}
 
     def add(self, item: AgendaItem) -> None:
+        if item.id in self._items:
+            raise ValueError(f"Ya existe un ítem con id '{item.id}'")
+        self._items[item.id] = item
+
+    def update(self, item: AgendaItem) -> None:
+        if item.id not in self._items:
+            raise KeyError(f"El ítem '{item.id}' no existe y no puede actualizarse")
         self._items[item.id] = item
 
     def get(self, item_id: str) -> AgendaItem | None:
@@ -125,6 +135,9 @@ def _item_to_dict(item: AgendaItem) -> dict[str, Any]:
 
 
 def _item_from_dict(data: Mapping[str, Any]) -> AgendaItem:
+    metadata = data.get("metadata")
+    if metadata is not None and not isinstance(metadata, Mapping):
+        raise ValueError("El campo 'metadata' debe ser un objeto JSON")
     return AgendaItem(
         id=str(data["id"]),
         tipo=str(data["tipo"]),
@@ -133,7 +146,7 @@ def _item_from_dict(data: Mapping[str, Any]) -> AgendaItem:
         fecha_vencimiento=date.fromisoformat(str(data["fecha_vencimiento"])),
         descripcion=data.get("descripcion") or None,
         etiquetas=tuple(str(valor) for valor in (data.get("etiquetas", []) or ())),
-        metadata=data.get("metadata"),
+        metadata=dict(metadata) if metadata is not None else None,
     )
 
 
@@ -143,6 +156,13 @@ def _json_default(value: Any) -> Any:
     if isinstance(value, timedelta):
         return value.total_seconds()
     return str(value)
+
+
+def _normalizar_etiquetas(etiquetas: Sequence[str] | None) -> tuple[str, ...]:
+    if not etiquetas:
+        return ()
+    normalizadas = {etiqueta.strip().lower() for etiqueta in etiquetas if etiqueta and etiqueta.strip()}
+    return tuple(sorted(normalizadas))
 
 
 class JSONAgendaRepository(AgendaRepository):
@@ -162,6 +182,11 @@ class JSONAgendaRepository(AgendaRepository):
 
     def remove(self, item_id: str) -> None:  # type: ignore[override]
         super().remove(item_id)
+        if self._auto_flush:
+            self.flush()
+
+    def update(self, item: AgendaItem) -> None:  # type: ignore[override]
+        super().update(item)
         if self._auto_flush:
             self.flush()
 
@@ -201,6 +226,10 @@ class JSONAgendaRepository(AgendaRepository):
                     "Cada elemento del archivo de agenda debe ser un objeto JSON"
                 )
             item = _item_from_dict(registro)
+            if item.id in self._items:
+                raise ValueError(
+                    f"El archivo contiene IDs duplicados: '{item.id}'"
+                )
             self._items[item.id] = item
 
 
@@ -234,6 +263,42 @@ class AgendaService:
 
         return tuple(sorted(self._categorias))
 
+    def eliminar_categoria(self, categoria: CategoriaAgenda) -> None:
+        """Permite retirar una categoría personalizada."""
+
+        categoria_normalizada = categoria.strip().lower()
+        if categoria_normalizada in CATEGORIAS_BASE:
+            raise ValueError("No se pueden eliminar las categorías base del sistema")
+        self._categorias.discard(categoria_normalizada)
+
+    # ------------------------------------------------------------------
+    # Gestión de feriados
+    # ------------------------------------------------------------------
+    def sincronizar_feriados(self, feriados: Iterable[date]) -> None:
+        """Reemplaza la lista actual de feriados por la colección indicada."""
+
+        self._feriados = set(feriados)
+
+    def agregar_feriados(self, feriados: Iterable[date]) -> None:
+        """Agrega varios feriados al calendario en memoria."""
+
+        self._feriados.update(feriados)
+
+    def agregar_feriado(self, feriado: date) -> None:
+        """Agrega un único feriado al calendario."""
+
+        self._feriados.add(feriado)
+
+    def quitar_feriado(self, feriado: date) -> None:
+        """Elimina un feriado del calendario, si existe."""
+
+        self._feriados.discard(feriado)
+
+    def listar_feriados(self) -> tuple[date, ...]:
+        """Devuelve los feriados registrados ordenados cronológicamente."""
+
+        return tuple(sorted(self._feriados))
+
     # ------------------------------------------------------------------
     # Gestión de ítems
     # ------------------------------------------------------------------
@@ -247,6 +312,7 @@ class AgendaService:
         descripcion: str | None = None,
         etiquetas: Sequence[str] | None = None,
         metadata: Mapping[str, Any] | None = None,
+        identificador: str | None = None,
     ) -> AgendaItem:
         """Registra un ítem en la agenda con validaciones básicas."""
 
@@ -263,15 +329,18 @@ class AgendaService:
         if fecha_vencimiento < fecha_inicio:
             raise ValueError("La fecha de vencimiento no puede ser anterior al inicio")
 
+        if metadata is not None and not isinstance(metadata, Mapping):
+            raise TypeError("metadata debe ser un mapeo (dict, Mapping)")
+
         item = AgendaItem(
-            id=_generar_identificador(fecha_inicio, titulo, tipo_normalizado),
+            id=_resolver_identificador(identificador, fecha_inicio, titulo, tipo_normalizado),
             tipo=tipo_normalizado,
             titulo=titulo.strip(),
             fecha_inicio=fecha_inicio,
             fecha_vencimiento=fecha_vencimiento,
             descripcion=descripcion.strip() if descripcion else None,
-            etiquetas=tuple(sorted(set(e.strip().lower() for e in etiquetas or [] if e.strip()))),
-            metadata=metadata,
+            etiquetas=_normalizar_etiquetas(etiquetas),
+            metadata=dict(metadata) if metadata is not None else None,
         )
         self._repository.add(item)
         return item
@@ -394,6 +463,72 @@ class AgendaService:
     def eliminar(self, item_id: str) -> None:
         self._repository.remove(item_id)
 
+    def actualizar_item(
+        self,
+        item_id: str,
+        *,
+        tipo: CategoriaAgenda | None = None,
+        titulo: str | None = None,
+        fecha_inicio: date | None = None,
+        fecha_vencimiento: date | None = None,
+        descripcion: str | None | object = _NO_CAMBIO,
+        etiquetas: Sequence[str] | None | object = _NO_CAMBIO,
+        metadata: Mapping[str, Any] | None | object = _NO_CAMBIO,
+    ) -> AgendaItem:
+        """Actualiza un ítem existente aplicando las mismas validaciones básicas."""
+
+        original = self._repository.get(item_id)
+        if original is None:
+            raise KeyError(f"No existe un ítem con id '{item_id}'")
+
+        nuevo_tipo = original.tipo if tipo is None else tipo.strip().lower()
+        if nuevo_tipo not in self._categorias:
+            raise ValueError(
+                f"La categoría '{nuevo_tipo}' no está registrada. Use 'agregar_categoria' para habilitarla."
+            )
+
+        nuevo_titulo = original.titulo if titulo is None else titulo.strip()
+        if not nuevo_titulo:
+            raise ValueError("El título es obligatorio")
+
+        nuevo_inicio = original.fecha_inicio if fecha_inicio is None else fecha_inicio
+        nuevo_vencimiento = (
+            original.fecha_vencimiento if fecha_vencimiento is None else fecha_vencimiento
+        )
+        if nuevo_vencimiento < nuevo_inicio:
+            raise ValueError("La fecha de vencimiento no puede ser anterior al inicio")
+
+        if metadata is _NO_CAMBIO:
+            nuevo_metadata = original.metadata
+        else:
+            if metadata is not None and not isinstance(metadata, Mapping):
+                raise TypeError("metadata debe ser un mapeo (dict, Mapping)")
+            nuevo_metadata = dict(metadata) if metadata is not None else None
+
+        if descripcion is _NO_CAMBIO:
+            nueva_descripcion = original.descripcion
+        else:
+            nueva_descripcion = descripcion.strip() if descripcion else None
+
+        if etiquetas is _NO_CAMBIO:
+            nuevas_etiquetas = original.etiquetas
+        else:
+            nuevas_etiquetas = _normalizar_etiquetas(etiquetas)
+
+        actualizado = replace(
+            original,
+            tipo=nuevo_tipo,
+            titulo=nuevo_titulo,
+            fecha_inicio=nuevo_inicio,
+            fecha_vencimiento=nuevo_vencimiento,
+            descripcion=nueva_descripcion,
+            etiquetas=nuevas_etiquetas,
+            metadata=nuevo_metadata,
+        )
+
+        self._repository.update(actualizado)
+        return actualizado
+
     # ------------------------------------------------------------------
     # Utilidades de fechas expuestas a otros módulos
     # ------------------------------------------------------------------
@@ -412,11 +547,21 @@ class AgendaService:
         return calcular_fecha_plazo(fecha_inicio, dias, tipo_plazo, feriados=self._feriados)
 
 
-def _generar_identificador(fecha: date, titulo: str, tipo: str) -> str:
-    """Genera un identificador determinista para facilitar testing."""
+def _resolver_identificador(
+    identificador: str | None, fecha: date, titulo: str, tipo: str
+) -> str:
+    if identificador is not None:
+        limpio = identificador.strip()
+        if not limpio:
+            raise ValueError("El identificador no puede estar vacío")
+        return limpio
+    return _generar_identificador(fecha, titulo, tipo)
 
-    base = f"{fecha.isoformat()}-{tipo}-{titulo}".lower()
-    return base.replace(" ", "-")
+
+def _generar_identificador(fecha: date, titulo: str, tipo: str) -> str:
+    base = f"{fecha.isoformat()}-{tipo}-{titulo}".lower().replace(" ", "-")
+    sufijo = uuid4().hex[:8]
+    return f"{base}-{sufijo}"
 
 
 # ----------------------------------------------------------------------
