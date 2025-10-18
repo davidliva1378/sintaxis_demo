@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Script para ejecutar el monitor PJN en modo continuo."""
+"""Script para ejecutar el monitor PJN en modo continuo.
+
+Soporta tanto monitor.json (legacy) como sistema.json (nuevo).
+"""
 
 import asyncio
 import signal
@@ -9,6 +12,7 @@ from pathlib import Path
 # Agregar directorio al path
 sys.path.insert(0, str(Path(__file__).parent))
 
+from pjn import SystemConfig
 from pjn.monitor.config import MonitorConfig
 from pjn.monitor.core import MonitorPJN
 from pjn.monitor.scheduler import SchedulerMonitor
@@ -31,11 +35,29 @@ async def main():
     logger.info("INICIANDO MONITOR PJN - MODO CONTINUO")
     logger.info("=" * 60)
 
-    # Cargar configuracion
-    config = MonitorConfig.from_file("config/monitor.json")
-    logger.info(f"Configuracion cargada - Modo: {config.modo}")
-    logger.info(f"Verificar entradas: {config.verificar_entradas}")
-    logger.info(f"Verificar expedientes: {config.verificar_expedientes}")
+    # Cargar configuracion - priorizar sistema.json si existe
+    sistema_path = Path("config/sistema.json")
+    monitor_path = Path("config/monitor.json")
+
+    if sistema_path.exists():
+        logger.info("Cargando configuración desde sistema.json")
+        config = SystemConfig.from_file(sistema_path)
+        modo = config.modo_monitor
+        verificar_entradas = config.verificar_entradas
+        verificar_expedientes = config.verificar_expedientes
+    elif monitor_path.exists():
+        logger.info("Cargando configuración desde monitor.json (legacy)")
+        config = MonitorConfig.from_file(monitor_path)
+        modo = config.modo
+        verificar_entradas = config.verificar_entradas
+        verificar_expedientes = config.verificar_expedientes
+    else:
+        logger.error("No se encontró archivo de configuración (sistema.json o monitor.json)")
+        return 1
+
+    logger.info(f"Configuracion cargada - Modo: {modo}")
+    logger.info(f"Verificar entradas: {verificar_entradas}")
+    logger.info(f"Verificar expedientes: {verificar_expedientes}")
 
     # Crear monitor
     monitor = MonitorPJN(config)

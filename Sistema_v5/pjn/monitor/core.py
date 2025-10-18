@@ -30,6 +30,11 @@ from .exceptions import (
     NetworkError,
 )
 
+# Para type hints
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from ..system_config import SystemConfig
+
 logger = get_logger(__name__)
 
 
@@ -38,14 +43,33 @@ class MonitorPJN:
 
     Este motor coordina la verificación periódica del portal PJN,
     detecta cambios y envía notificaciones según configuración.
+
+    Acepta tanto MonitorConfig como SystemConfig para máxima flexibilidad.
     """
 
-    def __init__(self, config: MonitorConfig):
+    def __init__(self, config: "MonitorConfig | SystemConfig"):
         """Inicializa el monitor.
 
         Args:
-            config: Configuración del monitor
+            config: Configuración del monitor (MonitorConfig o SystemConfig)
+
+        Example:
+            >>> # Con MonitorConfig (legacy)
+            >>> from pjn.monitor import MonitorConfig, MonitorPJN
+            >>> config = MonitorConfig.from_file("config/monitor.json")
+            >>> monitor = MonitorPJN(config)
+
+            >>> # Con SystemConfig (recomendado)
+            >>> from pjn import SystemConfig
+            >>> from pjn.monitor import MonitorPJN
+            >>> system_config = SystemConfig.from_file("config/sistema.json")
+            >>> monitor = MonitorPJN(system_config)
         """
+        # Si recibimos SystemConfig, convertir a MonitorConfig
+        if type(config).__name__ == "SystemConfig":
+            logger.info("SystemConfig detectado, convirtiendo a MonitorConfig")
+            config = MonitorConfig.from_system_config(config)
+
         self.config = config
         self.storage = StorageManager(Path(config.directorio_datos))
         self.detector = DetectorCambios()

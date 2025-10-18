@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Script simple para ejecutar el monitor PJN."""
+"""Script simple para ejecutar el monitor PJN.
+
+Soporta tanto monitor.json (legacy) como sistema.json (nuevo).
+"""
 
 import asyncio
 import sys
@@ -8,6 +11,7 @@ from pathlib import Path
 # Agregar directorio al path si es necesario
 sys.path.insert(0, str(Path(__file__).parent))
 
+from pjn import SystemConfig
 from pjn.monitor.config import MonitorConfig
 from pjn.monitor.core import MonitorPJN
 from pjn.utils.logging import setup_logging, get_logger
@@ -23,16 +27,38 @@ async def main():
     logger.info("INICIANDO MONITOR PJN")
     logger.info("=" * 60)
 
-    # Cargar configuracion
-    config = MonitorConfig.from_file("config/monitor.json")
-    logger.info(f"Configuracion cargada - Modo: {config.modo}")
+    # Cargar configuracion - priorizar sistema.json si existe
+    sistema_path = Path("config/sistema.json")
+    monitor_path = Path("config/monitor.json")
+
+    if sistema_path.exists():
+        logger.info("Cargando configuración desde sistema.json")
+        config = SystemConfig.from_file(sistema_path)
+        modo = config.modo_monitor
+    elif monitor_path.exists():
+        logger.info("Cargando configuración desde monitor.json (legacy)")
+        config = MonitorConfig.from_file(monitor_path)
+        modo = config.modo
+    else:
+        logger.error("No se encontró archivo de configuración (sistema.json o monitor.json)")
+        return 1
+
+    logger.info(f"Configuracion cargada - Modo: {modo}")
 
     # Crear monitor
     monitor = MonitorPJN(config)
 
+    # Determinar flags de verificación según tipo de config
+    if isinstance(config, SystemConfig):
+        verificar_entradas = config.verificar_entradas
+        verificar_expedientes = config.verificar_expedientes
+    else:
+        verificar_entradas = config.verificar_entradas
+        verificar_expedientes = config.verificar_expedientes
+
     try:
         # Verificar entradas si esta habilitado
-        if config.verificar_entradas:
+        if verificar_entradas:
             logger.info("\nVerificando entradas...")
             nuevas_entradas = await monitor.verificar_entradas()
 
@@ -46,7 +72,7 @@ async def main():
                 logger.info("✓ Sin nuevas entradas")
 
         # Verificar expedientes si esta habilitado
-        if config.verificar_expedientes:
+        if verificar_expedientes:
             logger.info("\nVerificando expedientes...")
             cambios = await monitor.verificar_expedientes()
 

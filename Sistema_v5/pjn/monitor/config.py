@@ -302,5 +302,52 @@ class MonitorConfig:
         """
         return asdict(self)
 
+    @classmethod
+    def from_system_config(cls, system_config) -> "MonitorConfig":
+        """Crea MonitorConfig desde SystemConfig.
+
+        Este método permite usar SystemConfig con código que espera MonitorConfig,
+        manteniendo retrocompatibilidad.
+
+        Args:
+            system_config: Instancia de SystemConfig
+
+        Returns:
+            MonitorConfig: Configuración del monitor extraída de SystemConfig
+
+        Example:
+            >>> from pjn import SystemConfig
+            >>> system_config = SystemConfig.from_file("config/sistema.json")
+            >>> monitor_config = MonitorConfig.from_system_config(system_config)
+            >>> monitor = MonitorPJN(monitor_config)
+        """
+        return cls(
+            modo=system_config.modo_monitor,
+            headless=system_config.headless,
+            directorio_datos=system_config.directorio_monitor_datos,
+            intervalos_laboral_expedientes=system_config.intervalos_laboral_expedientes,
+            intervalos_laboral_entradas=system_config.intervalos_laboral_entradas,
+            intervalos_no_laboral_expedientes=system_config.intervalos_no_laboral_expedientes,
+            intervalos_no_laboral_entradas=system_config.intervalos_no_laboral_entradas,
+            dias_laborales=system_config.dias_laborales.copy(),
+            hora_inicio=system_config.hora_inicio,
+            hora_fin=system_config.hora_fin,
+            max_reintentos_expedientes=system_config.max_reintentos_expedientes,
+            espera_reintentos_expedientes=system_config.espera_reintentos_expedientes,
+            max_reintentos_entradas=system_config.max_reintentos_entradas,
+            espera_reintentos_entradas=system_config.espera_reintentos_entradas,
+            notificar_nuevas_entradas=system_config.notificar_nuevas_entradas,
+            notificar_cambios_expedientes=system_config.notificar_cambios_expedientes,
+            notificar_errores=system_config.notificar_errores,
+            verificar_entradas=system_config.verificar_entradas,
+            verificar_expedientes=system_config.verificar_expedientes,
+            comparacion_automatica=system_config.comparacion_automatica,
+            fecha_corte_expedientes=system_config.fecha_corte_expedientes,
+            fecha_desde_entradas=system_config.fecha_desde_entradas,
+            fecha_hasta_entradas=system_config.fecha_hasta_entradas,
+            fecha_desde_expedientes=system_config.fecha_desde_expedientes,
+            fecha_hasta_expedientes=system_config.fecha_hasta_expedientes,
+        )
+
 
 __all__ = ["MonitorConfig", "ModoMonitor"]
