@@ -9,8 +9,11 @@ utilidades de fechas para calcular plazos en días hábiles y corridos.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from json import JSONDecodeError
+from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping, MutableSequence, Sequence
 
 CategoriaAgenda = str
@@ -106,6 +109,99 @@ class AgendaRepository:
 
     def __iter__(self) -> Iterator[AgendaItem]:
         yield from self._items.values()
+
+
+def _item_to_dict(item: AgendaItem) -> dict[str, Any]:
+    return {
+        "id": item.id,
+        "tipo": item.tipo,
+        "titulo": item.titulo,
+        "fecha_inicio": item.fecha_inicio.isoformat(),
+        "fecha_vencimiento": item.fecha_vencimiento.isoformat(),
+        "descripcion": item.descripcion,
+        "etiquetas": list(item.etiquetas),
+        "metadata": dict(item.metadata) if item.metadata is not None else None,
+    }
+
+
+def _item_from_dict(data: Mapping[str, Any]) -> AgendaItem:
+    return AgendaItem(
+        id=str(data["id"]),
+        tipo=str(data["tipo"]),
+        titulo=str(data["titulo"]),
+        fecha_inicio=date.fromisoformat(str(data["fecha_inicio"])),
+        fecha_vencimiento=date.fromisoformat(str(data["fecha_vencimiento"])),
+        descripcion=data.get("descripcion") or None,
+        etiquetas=tuple(str(valor) for valor in (data.get("etiquetas", []) or ())),
+        metadata=data.get("metadata"),
+    )
+
+
+def _json_default(value: Any) -> Any:
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, timedelta):
+        return value.total_seconds()
+    return str(value)
+
+
+class JSONAgendaRepository(AgendaRepository):
+    """Repositorio respaldado por un archivo JSON para simular persistencia."""
+
+    def __init__(self, archivo: str | Path, *, auto_flush: bool = True) -> None:
+        super().__init__()
+        self._ruta = Path(archivo)
+        self._auto_flush = auto_flush
+        self._ruta.parent.mkdir(parents=True, exist_ok=True)
+        self._cargar_desde_disco()
+
+    def add(self, item: AgendaItem) -> None:  # type: ignore[override]
+        super().add(item)
+        if self._auto_flush:
+            self.flush()
+
+    def remove(self, item_id: str) -> None:  # type: ignore[override]
+        super().remove(item_id)
+        if self._auto_flush:
+            self.flush()
+
+    def flush(self) -> None:
+        """Guarda el estado actual en el archivo JSON."""
+
+        datos = [_item_to_dict(item) for item in self._items.values()]
+        temporal = self._ruta.parent / f"{self._ruta.name}.tmp"
+        with temporal.open("w", encoding="utf-8") as salida:
+            json.dump(datos, salida, ensure_ascii=False, indent=2, default=_json_default)
+        temporal.replace(self._ruta)
+
+    def _cargar_desde_disco(self) -> None:
+        if not self._ruta.exists():
+            return
+        try:
+            contenido = self._ruta.read_text(encoding="utf-8")
+            if not contenido.strip():
+                return
+            datos = json.loads(contenido)
+        except FileNotFoundError:
+            return
+        except JSONDecodeError as exc:  # pragma: no cover - error crítico
+            raise ValueError(
+                f"El archivo de agenda JSON está corrupto: {self._ruta}"
+            ) from exc
+
+        if not isinstance(datos, list):
+            raise ValueError(
+                "El archivo de agenda JSON debe contener una lista de elementos"
+            )
+
+        self._items = {}
+        for registro in datos:
+            if not isinstance(registro, Mapping):
+                raise ValueError(
+                    "Cada elemento del archivo de agenda debe ser un objeto JSON"
+                )
+            item = _item_from_dict(registro)
+            self._items[item.id] = item
 
 
 class AgendaService:
@@ -426,10 +522,19 @@ def contar_dias_corridos(inicio: date, fin: date) -> int:
 _AGENDA_GLOBAL: AgendaService | None = None
 
 
-def crear_agenda_default(*, feriados: Iterable[date] | None = None) -> AgendaService:
-    """Crea un servicio de agenda listo para usar."""
+def crear_agenda_default(
+    *,
+    feriados: Iterable[date] | None = None,
+    repository: AgendaRepository | None = None,
+    categorias: Iterable[CategoriaAgenda] | None = None,
+) -> AgendaService:
+    """Crea un servicio de agenda listo para usar con opciones personalizadas."""
 
-    return AgendaService(feriados=feriados)
+    return AgendaService(
+        repository=repository,
+        feriados=feriados,
+        categorias=categorias,
+    )
 
 
 def obtener_agenda_global() -> AgendaService:

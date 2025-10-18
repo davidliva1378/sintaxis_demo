@@ -19,6 +19,7 @@ if __package__ in {None, ""}:
 from Sistema_v5.agenda import (
     AgendaQuery,
     AgendaService,
+    JSONAgendaRepository,
     calcular_fecha_plazo,
     contar_dias_corridos,
     contar_dias_habiles,
@@ -200,3 +201,53 @@ class TestIntegracionCompartida:
 
         assert agenda_1 is agenda_2
         assert isinstance(agenda_1, AgendaService)
+
+
+class TestJSONAgendaRepository:
+    """Verifica el repositorio que simula persistencia en JSON."""
+
+    def test_persiste_y_recupera_items(self, tmp_path: Path):
+        archivo = tmp_path / "agenda.json"
+        repo = JSONAgendaRepository(archivo)
+        agenda = AgendaService(repository=repo)
+
+        agenda.registrar_tarea(
+            titulo="Preparar alegatos",
+            fecha_inicio=date(2024, 9, 1),
+            fecha_vencimiento=date(2024, 9, 5),
+            etiquetas=["juicio", "prioridad"],
+            metadata={"expediente": "123/2024"},
+        )
+
+        assert archivo.exists()
+
+        repo_recargado = JSONAgendaRepository(archivo)
+        agenda_recargada = AgendaService(repository=repo_recargado)
+
+        items = agenda_recargada.listar()
+
+        assert len(items) == 1
+        recuperado = items[0]
+        assert recuperado.titulo == "Preparar alegatos"
+        assert recuperado.etiquetas == ("juicio", "prioridad")
+        assert recuperado.metadata == {"expediente": "123/2024"}
+
+    def test_flush_manual_con_auto_flush_desactivado(self, tmp_path: Path):
+        archivo = tmp_path / "agenda.json"
+        repo = JSONAgendaRepository(archivo, auto_flush=False)
+        agenda = AgendaService(repository=repo)
+
+        agenda.registrar_nota(
+            titulo="Contactar perito",
+            fecha=date(2024, 8, 20),
+        )
+
+        # Sin flush no debería existir el archivo
+        assert not archivo.exists()
+
+        repo.flush()
+
+        assert archivo.exists()
+
+        nuevo_repo = JSONAgendaRepository(archivo)
+        assert len(nuevo_repo.all()) == 1
