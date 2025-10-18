@@ -1,7 +1,7 @@
 # Sistema_v5 - Web Scraping Framework para PJN
 
 **Versión:** 5.5.1
-**Estado:** ✅ Producción Ready
+**Estado:** 🟡 En evolución (beta estable)
 **Líneas de código:** ~5,800 líneas Python
 
 ---
@@ -20,6 +20,7 @@ Framework completo de web scraping para el **Portal Judicial Nacional (PJN)** de
 - ✅ **Persistencia Separada** - Funciones de I/O independientes
 - ✅ **Type Hints Completos** - Totalmente tipado
 - ✅ **Retrocompatible** - Código legacy sigue funcionando
+- ✅ **Control desde bandeja** - Iniciar/detener scheduler y abrir logs desde el tray
 
 ---
 
@@ -56,6 +57,18 @@ playwright install chromium
   ```
 
 > Estas dependencias son necesarias para los scripts de bandeja (`ejecutar_monitor_tray.py`, `ejecutar_monitor_statusbar.py`, `ejecutar_monitor_universal.py`).
+
+### Control desde la bandeja del sistema
+
+Los scripts de bandeja permiten operar el monitor sin consola abierta. El menú incluye:
+
+- ▶️ **Iniciar/Detener scheduler** directamente desde el icono.
+- 🔁 **Verificar ahora** para ejecutar una verificación manual si el monitor está activo.
+- 📂 **Abrir carpeta de datos** y acceso rápido al directorio configurado.
+- 🗒️ **Ver logs** que abre el archivo o carpeta de logs según la configuración actual.
+- ⏻ **Salir** para cerrar el monitor y detener el scheduler.
+
+Si el scheduler se detiene desde el menú, puede reiniciarse en el mismo lugar sin reiniciar la aplicación.
 
 ### Primer Script
 

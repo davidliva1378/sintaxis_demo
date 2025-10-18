@@ -12,6 +12,8 @@ Requiere: pystray, pillow
 from __future__ import annotations
 
 import asyncio
+import logging
+import os
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -153,9 +155,10 @@ class MonitorSystemTray:
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                "Iniciar" if not self.scheduler else "Detener",
+                self._get_scheduler_label(),
                 self._on_toggle_scheduler,
-                visible=lambda item: self.scheduler is not None
+                visible=lambda item: self.scheduler is not None,
+                enabled=lambda item: self.scheduler is not None,
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
@@ -247,8 +250,49 @@ class MonitorSystemTray:
             logger.warning("Scheduler no disponible")
             return
 
-        # TODO: Implementar start/stop del scheduler
         logger.info("Toggle scheduler solicitado")
+
+        mensaje = ""
+        try:
+            if self._is_scheduler_running():
+                logger.info("Deteniendo scheduler desde tray")
+                self.scheduler.detener()
+                self.monitor.detener()
+                self.update_icon("gray")
+                self.monitor.running = False
+                mensaje = "Scheduler detenido"
+            else:
+                logger.info("Iniciando scheduler desde tray")
+                self.monitor.running = True
+                self.scheduler.iniciar()
+                self.update_icon("green")
+                mensaje = "Scheduler iniciado"
+        except Exception as exc:  # pragma: no cover - protección runtime
+            logger.error(f"Error al alternar scheduler: {exc}", exc_info=True)
+
+            # Intentar recrear el scheduler como fallback
+            try:
+                from .scheduler import SchedulerMonitor
+
+                logger.info("Recreando instancia de scheduler tras error")
+                self.scheduler = SchedulerMonitor(self.monitor)
+                self.monitor.running = True
+                self.scheduler.iniciar()
+                self.update_icon("green")
+                mensaje = "Scheduler reiniciado"
+            except Exception as inner_exc:  # pragma: no cover - doble fallo
+                logger.error(
+                    f"No se pudo recuperar el scheduler: {inner_exc}",
+                    exc_info=True
+                )
+                self.update_icon("red")
+                self.monitor.running = False
+                mensaje = "Error al controlar el scheduler"
+
+        self._refresh_menu()
+
+        if self.icon and mensaje:
+            self.icon.notify(mensaje, "Monitor PJN")
 
     def _on_abrir_datos(self, icon, item):
         """Handler para 'Abrir carpeta de datos'."""
@@ -270,13 +314,40 @@ class MonitorSystemTray:
 
     def _on_ver_logs(self, icon, item):
         """Handler para 'Ver logs'."""
-        # TODO: Implementar visualizador de logs
+        import subprocess
+        import sys
+
         logger.info("Ver logs solicitado")
-        if self.icon:
-            self.icon.notify(
-                "Funcionalidad en desarrollo",
-                "Monitor PJN"
-            )
+
+        log_target = self._find_log_target()
+        if log_target.is_file():
+            log_target.parent.mkdir(parents=True, exist_ok=True)
+            if not log_target.exists():
+                log_target.touch()
+            mensaje = "Abriendo archivo de logs"
+        else:
+            log_target.mkdir(parents=True, exist_ok=True)
+            mensaje = "Abriendo carpeta de logs"
+
+        logger.info(f"Abriendo logs en: {log_target}")
+
+        try:
+            if sys.platform == "win32":
+                os.startfile(str(log_target))  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.run(["open", str(log_target)], check=False)
+            else:
+                subprocess.run(["xdg-open", str(log_target)], check=False)
+        except Exception as exc:  # pragma: no cover - interacción SO
+            logger.error(f"No se pudo abrir los logs: {exc}", exc_info=True)
+            if self.icon:
+                self.icon.notify(
+                    "No se pudo abrir los logs",
+                    "Monitor PJN"
+                )
+        else:
+            if self.icon:
+                self.icon.notify(mensaje, "Monitor PJN")
 
     def _on_salir(self, icon, item):
         """Handler para 'Salir'."""
@@ -364,6 +435,48 @@ class MonitorSystemTray:
             self.monitor.detener()
 
         self._running = False
+
+    def _is_scheduler_running(self) -> bool:
+        """Indica si el scheduler está actualmente en ejecución."""
+        if not self.scheduler:
+            return False
+
+        try:
+            return bool(getattr(self.scheduler.scheduler, "running", False))
+        except Exception:  # pragma: no cover - defensa
+            return False
+
+    def _get_scheduler_label(self) -> str:
+        """Obtiene la etiqueta dinámica para el control del scheduler."""
+        if not self.scheduler:
+            return "Scheduler no disponible"
+
+        return "Detener scheduler" if self._is_scheduler_running() else "Iniciar scheduler"
+
+    def _refresh_menu(self) -> None:
+        """Regenera el menú cuando cambia el estado del scheduler."""
+        if self.icon:
+            self.icon.menu = self._create_menu()
+
+    def _find_log_target(self) -> Path:
+        """Determina el archivo o carpeta de logs a abrir."""
+        for handler in logging.getLogger().handlers:
+            if isinstance(handler, logging.FileHandler):
+                try:
+                    return Path(handler.baseFilename)
+                except AttributeError:
+                    continue
+
+        candidatos = [
+            Path(self.monitor.config.directorio_datos) / "logs" / "monitor.log",
+            Path("logs") / "monitor.log",
+        ]
+
+        for candidato in candidatos:
+            if candidato.exists():
+                return candidato
+
+        return Path(self.monitor.config.directorio_datos) / "logs"
 
 
 __all__ = ["MonitorSystemTray", "create_icon_image", "TRAY_AVAILABLE"]
