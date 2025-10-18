@@ -29,12 +29,16 @@ from flask import (
 )
 
 # Agregar el directorio padre al path para importar pjn
-sys.path.insert(0, str(Path(__file__).parent.parent))
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 
 # noinspection PyUnresolvedReferences
 from pjn.monitor.config import MonitorConfig
 # noinspection PyUnresolvedReferences
 from pjn.monitor.core import MonitorPJN
+# noinspection PyUnresolvedReferences
+from pjn.monitor.exceptions import ConfigurationError, MonitorError, StorageError
 # noinspection PyUnresolvedReferences
 from pjn.monitor.storage import StorageManager
 
@@ -42,9 +46,25 @@ app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # Para caracteres UTF-8
 
 # Rutas de configuración
-CONFIG_PATH = Path(__file__).parent.parent / "config" / "monitor.json"
-MONITOR_SCRIPT = Path(__file__).parent.parent / "ejecutar_monitor_continuo.py"
-LOGS_DIR = Path(__file__).parent.parent / "logs"
+
+
+def _resolve_path_from_env(env_var: str, default: Path) -> Path:
+    """Resuelve rutas permitiendo sobreescritura por variables de entorno."""
+
+    override = os.getenv(env_var)
+    if not override:
+        return default
+
+    candidate = Path(override)
+    if not candidate.is_absolute():
+        candidate = BASE_DIR / candidate
+
+    return candidate
+
+
+CONFIG_PATH = _resolve_path_from_env("MONITOR_CONFIG_PATH", BASE_DIR / "config" / "monitor.json")
+MONITOR_SCRIPT = _resolve_path_from_env("MONITOR_SCRIPT_PATH", BASE_DIR / "ejecutar_monitor_continuo.py")
+LOGS_DIR = _resolve_path_from_env("MONITOR_LOGS_DIR", BASE_DIR / "logs")
 RUNTIME_INFO_PATH = LOGS_DIR / "monitor_runtime.json"
 EVENTS_LOG_PATH = LOGS_DIR / "monitor_web_actions.log"
 
@@ -54,17 +74,31 @@ monitor_lock = Lock()
 
 
 def get_monitor_config() -> MonitorConfig:
-    """Carga la configuración del monitor."""
-    return MonitorConfig.from_file(CONFIG_PATH)
+    """Carga la configuración del monitor con manejo robusto de errores."""
+
+    try:
+        return MonitorConfig.from_file(CONFIG_PATH)
+    except (json.JSONDecodeError, TypeError, ValueError, OSError) as exc:
+        app.logger.exception("Error accediendo al archivo de configuración")
+        raise ConfigurationError(f"No se pudo cargar la configuración: {exc}") from exc
+    except MonitorError as exc:
+        app.logger.exception("Configuración inválida")
+        raise ConfigurationError(f"La configuración del monitor es inválida: {exc}") from exc
 
 
 def get_storage() -> StorageManager:
     """Obtiene el StorageManager resolviendo rutas relativas al proyecto."""
+
     config = get_monitor_config()
     data_dir = Path(config.directorio_datos)
     if not data_dir.is_absolute():
-        data_dir = Path(__file__).parent.parent / data_dir
-    return StorageManager(data_dir)
+        data_dir = BASE_DIR / data_dir
+
+    try:
+        return StorageManager(data_dir)
+    except OSError as exc:
+        app.logger.exception("No se pudo inicializar el almacenamiento del monitor")
+        raise StorageError(f"No se pudo acceder al directorio de datos: {exc}") from exc
 
 
 def _build_monitor(config: MonitorConfig | None = None) -> MonitorPJN:
@@ -76,7 +110,7 @@ def _build_monitor(config: MonitorConfig | None = None) -> MonitorPJN:
 
     data_dir = Path(working_config.directorio_datos)
     if not data_dir.is_absolute():
-        data_dir = Path(__file__).parent.parent / data_dir
+        data_dir = BASE_DIR / data_dir
     working_config.directorio_datos = str(data_dir)
 
     return MonitorPJN(working_config)
@@ -102,9 +136,15 @@ def _parse_datetime(value: str | None) -> datetime:
 def _write_runtime_info(pid: int, started_at: str) -> None:
     """Persiste metadatos del proceso del monitor para futuras consultas."""
 
-    LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    payload = {"pid": pid, "started_at": started_at}
-    RUNTIME_INFO_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        payload = {"pid": pid, "started_at": started_at}
+        RUNTIME_INFO_PATH.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        app.logger.exception("No se pudo guardar la información de ejecución del monitor")
 
 
 def _load_runtime_info() -> dict[str, object]:
@@ -116,6 +156,10 @@ def _load_runtime_info() -> dict[str, object]:
     try:
         return json.loads(RUNTIME_INFO_PATH.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
+        app.logger.warning("Archivo runtime info corrupto, se ignorará")
+        return {}
+    except OSError as exc:
+        app.logger.exception("No se pudo leer información de ejecución previa")
         return {}
 
 
@@ -127,23 +171,28 @@ def _clear_runtime_info() -> None:
     except TypeError:
         if RUNTIME_INFO_PATH.exists():
             RUNTIME_INFO_PATH.unlink()
+    except OSError as exc:
+        app.logger.exception("No se pudo limpiar la información de ejecución del monitor")
 
 
 def _log_monitor_event(action: str, success: bool, message: str, pid: int | None = None) -> None:
     """Registra intentos de arranque/detención en un log dedicado."""
 
-    LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    entry = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "action": action,
-        "success": success,
-        "message": message,
-    }
-    if pid is not None:
-        entry["pid"] = pid
+    try:
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "action": action,
+            "success": success,
+            "message": message,
+        }
+        if pid is not None:
+            entry["pid"] = pid
 
-    with EVENTS_LOG_PATH.open("a", encoding="utf-8") as log_file:
-        log_file.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        with EVENTS_LOG_PATH.open("a", encoding="utf-8") as log_file:
+            log_file.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        app.logger.exception("No se pudo registrar evento del monitor")
 
 
 def _is_process_alive(pid: int | None) -> bool:
@@ -162,7 +211,7 @@ def _is_process_alive(pid: int | None) -> bool:
                 return False
             ctypes.windll.kernel32.CloseHandle(handle)
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False
 
     try:
@@ -343,86 +392,130 @@ def index():
 @app.route('/dashboard')
 def dashboard():
     """Dashboard principal con resumen del estado del monitor."""
-    config = get_monitor_config()
-    storage = get_storage()
-    estado = storage.cargar_estado()
 
-    # Cargar datos
-    entradas = storage.cargar_entradas_conocidas()
-    expedientes = storage.cargar_expedientes_conocidos()
+    try:
+        config = get_monitor_config()
+        storage = get_storage()
+        estado = storage.cargar_estado()
 
-    # Estadísticas
-    stats = {
-        'total_entradas': len(entradas),
-        'total_expedientes': len(expedientes),
-        'ultima_verificacion_entradas': estado.ultima_verificacion_entradas,
-        'ultima_verificacion_expedientes': estado.ultima_verificacion_expedientes,
-        'errores_entradas': estado.errores_consecutivos_entradas,
-        'errores_expedientes': estado.errores_consecutivos_expedientes,
-        'verificar_entradas': config.verificar_entradas,
-        'verificar_expedientes': config.verificar_expedientes,
-        'modo': config.modo,
-    }
+        # Cargar datos
+        entradas = storage.cargar_entradas_conocidas()
+        expedientes = storage.cargar_expedientes_conocidos()
 
-    # Entradas recientes (últimas 10)
-    entradas_recientes = sorted(
-        entradas,
-        key=lambda e: _parse_datetime(e.fecha),
-        reverse=True
-    )[:10]
+        # Estadísticas
+        stats = {
+            'total_entradas': len(entradas),
+            'total_expedientes': len(expedientes),
+            'ultima_verificacion_entradas': estado.ultima_verificacion_entradas,
+            'ultima_verificacion_expedientes': estado.ultima_verificacion_expedientes,
+            'errores_entradas': estado.errores_consecutivos_entradas,
+            'errores_expedientes': estado.errores_consecutivos_expedientes,
+            'verificar_entradas': config.verificar_entradas,
+            'verificar_expedientes': config.verificar_expedientes,
+            'modo': config.modo,
+        }
 
-    # Expedientes con cambios recientes (últimos 10)
-    expedientes_recientes = sorted(
-        expedientes,
-        key=lambda e: _parse_datetime(e.ultima_actuacion),
-        reverse=True
-    )[:10]
+        # Entradas recientes (últimas 10)
+        entradas_recientes = sorted(
+            entradas,
+            key=lambda e: _parse_datetime(e.fecha),
+            reverse=True
+        )[:10]
 
-    return render_template(
-        'dashboard.html',
-        stats=stats,
-        entradas_recientes=entradas_recientes,
-        expedientes_recientes=expedientes_recientes
-    )
+        # Expedientes con cambios recientes (últimos 10)
+        expedientes_recientes = sorted(
+            expedientes,
+            key=lambda e: _parse_datetime(e.ultima_actuacion),
+            reverse=True
+        )[:10]
+
+        return render_template(
+            'dashboard.html',
+            stats=stats,
+            entradas_recientes=entradas_recientes,
+            expedientes_recientes=expedientes_recientes
+        )
+    except (ConfigurationError, StorageError) as exc:
+        app.logger.exception("Error al construir el dashboard")
+        return render_template('error.html', error_message=str(exc)), 500
+    except Exception as exc:  # noqa: BLE001
+        app.logger.exception("Fallo inesperado en el dashboard")
+        return render_template(
+            'error.html',
+            error_message="Ocurrió un error inesperado al cargar el panel.",
+        ), 500
 
 
 @app.route('/entradas')
 def entradas():
     """Página de listado de entradas."""
-    storage = get_storage()
-    entradas_list = storage.cargar_entradas_conocidas()
 
-    # Ordenar por fecha descendente
-    entradas_list = sorted(
-        entradas_list,
-        key=lambda e: _parse_datetime(e.fecha),
-        reverse=True
-    )
+    try:
+        storage = get_storage()
+        entradas_list = storage.cargar_entradas_conocidas()
 
-    return render_template('entradas.html', entradas=entradas_list)
+        # Ordenar por fecha descendente
+        entradas_list = sorted(
+            entradas_list,
+            key=lambda e: _parse_datetime(e.fecha),
+            reverse=True
+        )
+
+        return render_template('entradas.html', entradas=entradas_list)
+    except (ConfigurationError, StorageError) as exc:
+        app.logger.exception("No se pudieron cargar las entradas")
+        return render_template('error.html', error_message=str(exc)), 500
+    except Exception as exc:  # noqa: BLE001
+        app.logger.exception("Error inesperado al listar entradas")
+        return render_template(
+            'error.html',
+            error_message="No se pudieron cargar las entradas por un error inesperado.",
+        ), 500
 
 
 @app.route('/expedientes')
 def expedientes():
     """Página de listado de expedientes."""
-    storage = get_storage()
-    expedientes_list = storage.cargar_expedientes_conocidos()
 
-    # Ordenar por última actuación descendente
-    expedientes_list = sorted(
-        expedientes_list,
-        key=lambda e: _parse_datetime(e.ultima_actuacion),
-        reverse=True
-    )
+    try:
+        storage = get_storage()
+        expedientes_list = storage.cargar_expedientes_conocidos()
 
-    return render_template('expedientes.html', expedientes=expedientes_list)
+        # Ordenar por última actuación descendente
+        expedientes_list = sorted(
+            expedientes_list,
+            key=lambda e: _parse_datetime(e.ultima_actuacion),
+            reverse=True
+        )
+
+        return render_template('expedientes.html', expedientes=expedientes_list)
+    except (ConfigurationError, StorageError) as exc:
+        app.logger.exception("No se pudieron cargar los expedientes")
+        return render_template('error.html', error_message=str(exc)), 500
+    except Exception as exc:  # noqa: BLE001
+        app.logger.exception("Error inesperado al listar expedientes")
+        return render_template(
+            'error.html',
+            error_message="No se pudieron cargar los expedientes por un error inesperado.",
+        ), 500
 
 
 @app.route('/config')
 def config():
     """Página de configuración."""
-    config = get_monitor_config()
-    return render_template('config.html', config=config)
+
+    try:
+        monitor_config = get_monitor_config()
+        return render_template('config.html', config=monitor_config)
+    except ConfigurationError as exc:
+        app.logger.exception("No se pudo cargar la configuración para la vista")
+        return render_template('error.html', error_message=str(exc)), 500
+    except Exception as exc:  # noqa: BLE001
+        app.logger.exception("Fallo inesperado al mostrar la configuración")
+        return render_template(
+            'error.html',
+            error_message="No se pudo cargar la configuración por un error inesperado.",
+        ), 500
 
 
 @app.route('/config/update', methods=['POST'])
@@ -491,24 +584,41 @@ def config_update():
 
         return jsonify({'success': True, 'message': 'Configuración actualizada correctamente'})
 
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Error al actualizar configuración: {str(e)}'}), 500
+    except ConfigurationError as exc:
+        app.logger.exception("No se pudo cargar la configuración existente para actualizar")
+        return jsonify({'success': False, 'message': str(exc)}), 500
+    except StorageError as exc:
+        app.logger.exception("No se pudo acceder al almacenamiento de configuración")
+        return jsonify({'success': False, 'message': str(exc)}), 500
+    except OSError as exc:
+        app.logger.exception("No se pudo guardar la configuración actualizada")
+        return jsonify({'success': False, 'message': f'No se pudo escribir el archivo de configuración: {exc}'}), 500
+    except Exception as exc:  # noqa: BLE001
+        app.logger.exception("Error inesperado al actualizar la configuración")
+        return jsonify({'success': False, 'message': 'Error al actualizar configuración'}), 500
 
 
 @app.route('/config/download', methods=['GET'])
 def config_download():
     """Permite descargar el archivo de configuración actual."""
 
-    if not CONFIG_PATH.exists():
-        config = get_monitor_config()
-        config.to_file(CONFIG_PATH)
+    try:
+        if not CONFIG_PATH.exists():
+            config_obj = get_monitor_config()
+            config_obj.to_file(CONFIG_PATH)
 
-    return send_file(
-        CONFIG_PATH,
-        mimetype='application/json',
-        as_attachment=True,
-        download_name='monitor.json'
-    )
+        return send_file(
+            CONFIG_PATH,
+            mimetype='application/json',
+            as_attachment=True,
+            download_name='monitor.json'
+        )
+    except (ConfigurationError, StorageError) as exc:
+        app.logger.exception("No se pudo preparar la descarga de configuración")
+        return jsonify({'success': False, 'message': str(exc)}), 500
+    except OSError as exc:
+        app.logger.exception("No se pudo enviar el archivo de configuración")
+        return jsonify({'success': False, 'message': f'Error al acceder al archivo: {exc}'}), 500
 
 
 @app.route('/config/upload', methods=['POST'])
@@ -534,8 +644,14 @@ def config_upload():
         new_config = MonitorConfig(**data)
     except TypeError as exc:
         return jsonify({'success': False, 'message': f'Configuración incompatible: {exc}'}), 400
+    except MonitorError as exc:
+        return jsonify({'success': False, 'message': f'Configuración inválida: {exc}'}), 400
 
-    new_config.to_file(CONFIG_PATH)
+    try:
+        new_config.to_file(CONFIG_PATH)
+    except OSError as exc:
+        app.logger.exception("No se pudo guardar la configuración cargada")
+        return jsonify({'success': False, 'message': f'No se pudo guardar el archivo: {exc}'}), 500
 
     return jsonify({'success': True, 'message': 'Configuración cargada correctamente'})
 
@@ -544,12 +660,16 @@ def config_upload():
 def logs():
     """Página de logs."""
     # Por ahora solo mostramos el último archivo de log si existe
-    log_path = Path(__file__).parent.parent / "logs" / "monitor.log"
+    log_path = LOGS_DIR / "monitor.log"
 
     log_lines = []
     if log_path.exists():
-        with log_path.open('r', encoding='utf-8') as f:
-            log_lines = f.readlines()[-100:]  # Últimas 100 líneas
+        try:
+            with log_path.open('r', encoding='utf-8') as f:
+                log_lines = f.readlines()[-100:]  # Últimas 100 líneas
+        except OSError as exc:
+            app.logger.exception("No se pudo leer el archivo de logs")
+            log_lines = [f"Error leyendo log: {exc}"]
 
     return render_template('logs.html', log_lines=log_lines)
 
@@ -557,81 +677,103 @@ def logs():
 @app.route('/api/stats')
 def api_stats():
     """API endpoint para estadísticas actuales."""
-    storage = get_storage()
-    estado = storage.cargar_estado()
-    entradas = storage.cargar_entradas_conocidas()
-    expedientes = storage.cargar_expedientes_conocidos()
+    try:
+        storage = get_storage()
+        estado = storage.cargar_estado()
+        entradas = storage.cargar_entradas_conocidas()
+        expedientes = storage.cargar_expedientes_conocidos()
 
-    return jsonify({
-        'total_entradas': len(entradas),
-        'total_expedientes': len(expedientes),
-        'ultima_verificacion_entradas': estado.ultima_verificacion_entradas,
-        'ultima_verificacion_expedientes': estado.ultima_verificacion_expedientes,
-        'errores_entradas': estado.errores_consecutivos_entradas,
-        'errores_expedientes': estado.errores_consecutivos_expedientes,
-    })
+        return jsonify({
+            'total_entradas': len(entradas),
+            'total_expedientes': len(expedientes),
+            'ultima_verificacion_entradas': estado.ultima_verificacion_entradas,
+            'ultima_verificacion_expedientes': estado.ultima_verificacion_expedientes,
+            'errores_entradas': estado.errores_consecutivos_entradas,
+            'errores_expedientes': estado.errores_consecutivos_expedientes,
+        })
+    except (ConfigurationError, StorageError) as exc:
+        app.logger.exception("No se pudieron obtener las estadísticas")
+        return jsonify({'success': False, 'message': str(exc)}), 500
+    except Exception as exc:  # noqa: BLE001
+        app.logger.exception("Fallo inesperado al obtener estadísticas")
+        return jsonify({'success': False, 'message': 'No se pudieron obtener las estadísticas'}), 500
 
 
 @app.route('/api/metrics')
 def api_metrics():
     """Entrega métricas resumidas para paneles externos."""
 
-    storage = get_storage()
-    entradas = storage.cargar_entradas_conocidas()
-    expedientes = storage.cargar_expedientes_conocidos()
+    try:
+        storage = get_storage()
+        entradas = storage.cargar_entradas_conocidas()
+        expedientes = storage.cargar_expedientes_conocidos()
 
-    cutoff = datetime.utcnow() - timedelta(hours=24)
+        cutoff = datetime.utcnow() - timedelta(hours=24)
 
-    def _normalize(dt: datetime) -> datetime:
-        return dt.astimezone(timezone.utc).replace(tzinfo=None) if dt.tzinfo else dt
+        def _normalize(dt: datetime) -> datetime:
+            return dt.astimezone(timezone.utc).replace(tzinfo=None) if dt.tzinfo else dt
 
-    entradas_24h = 0
-    for entrada in entradas:
-        dt = _parse_datetime(entrada.extraida_en or entrada.fecha)
-        dt = _normalize(dt)
-        if dt >= cutoff:
-            entradas_24h += 1
+        entradas_24h = 0
+        for entrada in entradas:
+            dt = _parse_datetime(entrada.extraida_en or entrada.fecha)
+            dt = _normalize(dt)
+            if dt >= cutoff:
+                entradas_24h += 1
 
-    expedientes_24h = 0
-    for expediente in expedientes:
-        dt = _parse_datetime(expediente.ultima_actuacion)
-        dt = _normalize(dt)
-        if dt >= cutoff:
-            expedientes_24h += 1
+        expedientes_24h = 0
+        for expediente in expedientes:
+            dt = _parse_datetime(expediente.ultima_actuacion)
+            dt = _normalize(dt)
+            if dt >= cutoff:
+                expedientes_24h += 1
 
-    return jsonify({
-        'generated_at': datetime.now(timezone.utc).isoformat(),
-        'entradas_total': len(entradas),
-        'expedientes_total': len(expedientes),
-        'entradas_ultimas_24h': entradas_24h,
-        'expedientes_actualizados_24h': expedientes_24h,
-    })
+        return jsonify({
+            'generated_at': datetime.now(timezone.utc).isoformat(),
+            'entradas_total': len(entradas),
+            'expedientes_total': len(expedientes),
+            'entradas_ultimas_24h': entradas_24h,
+            'expedientes_actualizados_24h': expedientes_24h,
+        })
+    except (ConfigurationError, StorageError) as exc:
+        app.logger.exception("No se pudieron obtener las métricas")
+        return jsonify({'success': False, 'message': str(exc)}), 500
+    except Exception as exc:  # noqa: BLE001
+        app.logger.exception("Fallo inesperado al obtener métricas")
+        return jsonify({'success': False, 'message': 'No se pudieron obtener las métricas'}), 500
 
 
 @app.route('/api/activity')
 def api_activity():
     """API endpoint para actividad reciente del monitor."""
-    storage = get_storage()
-    estado = storage.cargar_estado()
+    try:
+        storage = get_storage()
+        estado = storage.cargar_estado()
 
-    # Leer últimas líneas del log
-    log_path = Path(__file__).parent.parent / "logs" / "monitor.log"
-    log_lines = []
-    if log_path.exists():
-        try:
-            with log_path.open('r', encoding='utf-8') as f:
-                all_lines = f.readlines()
-                log_lines = all_lines[-20:]  # Últimas 20 líneas
-        except Exception as e:
-            log_lines = [f"Error leyendo log: {str(e)}"]
+        # Leer últimas líneas del log
+        log_path = LOGS_DIR / "monitor.log"
+        log_lines = []
+        if log_path.exists():
+            try:
+                with log_path.open('r', encoding='utf-8') as f:
+                    all_lines = f.readlines()
+                    log_lines = all_lines[-20:]  # Últimas 20 líneas
+            except OSError as exc:
+                app.logger.exception("No se pudo leer el archivo de logs para actividad")
+                log_lines = [f"Error leyendo log: {exc}"]
 
-    return jsonify({
-        'ultima_verificacion_entradas': estado.ultima_verificacion_entradas,
-        'ultima_verificacion_expedientes': estado.ultima_verificacion_expedientes,
-        'errores_entradas': estado.errores_consecutivos_entradas,
-        'errores_expedientes': estado.errores_consecutivos_expedientes,
-        'log_lines': log_lines
-    })
+        return jsonify({
+            'ultima_verificacion_entradas': estado.ultima_verificacion_entradas,
+            'ultima_verificacion_expedientes': estado.ultima_verificacion_expedientes,
+            'errores_entradas': estado.errores_consecutivos_entradas,
+            'errores_expedientes': estado.errores_consecutivos_expedientes,
+            'log_lines': log_lines
+        })
+    except (ConfigurationError, StorageError) as exc:
+        app.logger.exception("No se pudo obtener la actividad del monitor")
+        return jsonify({'success': False, 'message': str(exc)}), 500
+    except Exception as exc:  # noqa: BLE001
+        app.logger.exception("Fallo inesperado al obtener la actividad")
+        return jsonify({'success': False, 'message': 'No se pudo obtener la actividad del monitor'}), 500
 
 
 # ===== Control del Monitor =====
@@ -645,18 +787,25 @@ def get_monitor_status():
 @app.route('/api/monitor/status')
 def api_monitor_status():
     """API endpoint para obtener el estado del monitor."""
-    state = _current_monitor_state()
-    config = get_monitor_config()
+    try:
+        state = _current_monitor_state()
+        config_obj = get_monitor_config()
 
-    return jsonify({
-        "status": state["status"],
-        "running": state["running"],
-        "pid": state["pid"],
-        "started_at": state["started_at"],
-        "source": state["source"],
-        "verificar_entradas": config.verificar_entradas,
-        "verificar_expedientes": config.verificar_expedientes,
-    })
+        return jsonify({
+            "status": state["status"],
+            "running": state["running"],
+            "pid": state["pid"],
+            "started_at": state["started_at"],
+            "source": state["source"],
+            "verificar_entradas": config_obj.verificar_entradas,
+            "verificar_expedientes": config_obj.verificar_expedientes,
+        })
+    except ConfigurationError as exc:
+        app.logger.exception("No se pudo recuperar la configuración del monitor")
+        return jsonify({'success': False, 'message': str(exc)}), 500
+    except Exception as exc:  # noqa: BLE001
+        app.logger.exception("Fallo inesperado consultando estado del monitor")
+        return jsonify({'success': False, 'message': 'No se pudo obtener el estado del monitor'}), 500
 
 
 @app.route('/api/monitor/verify/entradas', methods=['POST'])
@@ -670,14 +819,22 @@ def api_monitor_verify_entradas():
             "message": "Detén el monitor antes de ejecutar una verificación manual.",
         }), 400
 
-    config = get_monitor_config()
-    if not config.verificar_entradas:
+    try:
+        config_obj = get_monitor_config()
+    except ConfigurationError as exc:
+        app.logger.exception("No se pudo obtener la configuración para verificar entradas")
+        return jsonify({'success': False, 'message': str(exc)}), 500
+    except Exception as exc:  # noqa: BLE001
+        app.logger.exception("Error inesperado al preparar verificación de entradas")
+        return jsonify({'success': False, 'message': 'No se pudo preparar la verificación de entradas'}), 500
+
+    if not config_obj.verificar_entradas:
         return jsonify({
             "success": False,
             "message": "La verificación de entradas está deshabilitada en la configuración.",
         }), 400
 
-    monitor = _build_monitor(config)
+    monitor = _build_monitor(config_obj)
 
     try:
         nuevas = _run_monitor_coroutine(monitor.verificar_entradas())
@@ -715,14 +872,22 @@ def api_monitor_verify_expedientes():
             "message": "Detén el monitor antes de ejecutar una verificación manual.",
         }), 400
 
-    config = get_monitor_config()
-    if not config.verificar_expedientes:
+    try:
+        config_obj = get_monitor_config()
+    except ConfigurationError as exc:
+        app.logger.exception("No se pudo obtener la configuración para verificar expedientes")
+        return jsonify({'success': False, 'message': str(exc)}), 500
+    except Exception as exc:  # noqa: BLE001
+        app.logger.exception("Error inesperado al preparar verificación de expedientes")
+        return jsonify({'success': False, 'message': 'No se pudo preparar la verificación de expedientes'}), 500
+
+    if not config_obj.verificar_expedientes:
         return jsonify({
             "success": False,
             "message": "La verificación de expedientes está deshabilitada en la configuración.",
         }), 400
 
-    monitor = _build_monitor(config)
+    monitor = _build_monitor(config_obj)
 
     try:
         cambios = _run_monitor_coroutine(monitor.verificar_expedientes())
@@ -797,11 +962,12 @@ def api_monitor_start():
                 'started_at': started_at
             })
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
+        app.logger.exception("Error al iniciar el monitor")
         _log_monitor_event('start', False, f'Error al iniciar monitor: {str(e)}')
         return jsonify({
             'success': False,
-            'message': f'Error al iniciar monitor: {str(e)}'
+            'message': 'Error al iniciar monitor'
         }), 500
 
 
@@ -882,11 +1048,12 @@ def api_monitor_stop():
                 'started_at': started_at
             })
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
+        app.logger.exception("Error al detener el monitor")
         _log_monitor_event('stop', False, f'Error al detener monitor: {str(e)}')
         return jsonify({
             'success': False,
-            'message': f'Error al detener monitor: {str(e)}'
+            'message': 'Error al detener monitor'
         }), 500
 
 

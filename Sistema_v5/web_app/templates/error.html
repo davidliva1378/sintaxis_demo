@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="alert alert-danger" role="alert">
+    <h4 class="alert-heading">Ocurrió un problema</h4>
+    <p>{{ error_message }}</p>
+    <hr>
+    <p class="mb-0">Intenta recargar la página o revisa los registros para más detalles.</p>
+  </div>
+</div>
+{% endblock %}
