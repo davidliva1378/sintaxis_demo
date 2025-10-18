@@ -38,7 +38,7 @@ async def run_monitor_with_tray():
     # Verificar que pystray esté disponible
     if not TRAY_AVAILABLE:
         logger.error(
-            "❌ pystray y pillow son requeridos para la bandeja del sistema.\n"
+            "[ERROR] pystray y pillow son requeridos para la bandeja del sistema.\n"
             "   Instalar con: pip install pystray pillow\n"
             "   O usar: python scripts/monitor_cli.py"
         )
@@ -51,10 +51,10 @@ async def run_monitor_with_tray():
     # Cargar configuración
     try:
         config = MonitorConfig.from_file("config/monitor.json")
-        logger.info(f"✅ Configuración cargada desde config/monitor.json")
+        logger.info(f"[OK] Configuración cargada desde config/monitor.json")
     except Exception as e:
-        logger.warning(f"⚠️  Error al cargar configuración: {e}")
-        logger.info("📝 Creando configuración por defecto...")
+        logger.warning(f"[ADVERTENCIA] Error al cargar configuración: {e}")
+        logger.info("[INFO] Creando configuración por defecto...")
         config = MonitorConfig()
         config.to_file("config/monitor.json")
 
@@ -79,7 +79,7 @@ async def run_monitor_with_tray():
 
     # Configurar señales para shutdown graceful
     def signal_handler(signum, frame):
-        logger.info(f"\n⚠️  Señal {signum} recibida, deteniendo...")
+        logger.info(f"\n[ADVERTENCIA] Señal {signum} recibida, deteniendo...")
         tray.stop()
 
     signal.signal(signal.SIGINT, signal_handler)
@@ -87,42 +87,42 @@ async def run_monitor_with_tray():
 
     try:
         # Ejecutar verificación inicial
-        logger.info("\n🚀 Ejecutando verificación inicial...")
+        logger.info("\n>>> Ejecutando verificación inicial...")
 
         if config.verificar_entradas:
             nuevas = await monitor.verificar_entradas()
             if nuevas:
-                logger.info(f"✅ {len(nuevas)} nuevas entradas detectadas")
+                logger.info(f"[OK] {len(nuevas)} nuevas entradas detectadas")
                 tray.update_icon("yellow")
                 await asyncio.sleep(2)
                 tray.update_icon("green")
             else:
-                logger.info("✅ Sin nuevas entradas")
+                logger.info("[OK] Sin nuevas entradas")
 
         if config.verificar_expedientes:
             cambios = await monitor.verificar_expedientes()
             if cambios:
-                logger.info(f"✅ {len(cambios)} expedientes con cambios")
+                logger.info(f"[OK] {len(cambios)} expedientes con cambios")
                 tray.update_icon("yellow")
                 await asyncio.sleep(2)
                 tray.update_icon("green")
             else:
-                logger.info("✅ Sin cambios en expedientes")
+                logger.info("[OK] Sin cambios en expedientes")
 
         # Iniciar scheduler
-        logger.info("\n⏰ Iniciando scheduler...")
+        logger.info("\n[TIMER] Iniciando scheduler...")
         scheduler.iniciar()
-        logger.info("✅ Scheduler iniciado")
+        logger.info("[OK] Scheduler iniciado")
 
         logger.info("\n" + "=" * 60)
-        logger.info("✅ MONITOR ACTIVO")
+        logger.info("[OK] MONITOR ACTIVO")
         logger.info("=" * 60)
-        logger.info("\n📌 Busca el icono en la bandeja del sistema")
+        logger.info("\n* Busca el icono en la bandeja del sistema")
         logger.info("   Click derecho para ver opciones:\n")
-        logger.info("   • Verificar ahora - Ejecuta verificación inmediata")
-        logger.info("   • Estado - Ver estado del monitor")
-        logger.info("   • Abrir carpeta de datos - Ver archivos guardados")
-        logger.info("   • Salir - Detener monitor\n")
+        logger.info("   - Verificar ahora - Ejecuta verificación inmediata")
+        logger.info("   - Estado - Ver estado del monitor")
+        logger.info("   - Abrir carpeta de datos - Ver archivos guardados")
+        logger.info("   - Salir - Detener monitor\n")
         logger.info("=" * 60)
 
         # Ejecutar tray en thread separado
@@ -132,16 +132,16 @@ async def run_monitor_with_tray():
         while monitor.running and tray._running:
             await asyncio.sleep(1)
 
-        logger.info("\n⚠️  Monitor detenido")
+        logger.info("\n[ADVERTENCIA] Monitor detenido")
         return 0
 
     except KeyboardInterrupt:
-        logger.info("\n⚠️  Interrupción por teclado")
+        logger.info("\n[ADVERTENCIA] Interrupción por teclado")
         tray.stop()
         return 0
 
     except Exception as e:
-        logger.error(f"\n❌ Error fatal: {e}", exc_info=True)
+        logger.error(f"\n[ERROR] Error fatal: {e}", exc_info=True)
         tray.stop()
         return 1
 
@@ -159,7 +159,7 @@ def main():
         exit_code = asyncio.run(run_monitor_with_tray())
         sys.exit(exit_code)
     except Exception as e:
-        logger.error(f"❌ Error fatal: {e}", exc_info=True)
+        logger.error(f"[ERROR] Error fatal: {e}", exc_info=True)
         sys.exit(1)
 
 

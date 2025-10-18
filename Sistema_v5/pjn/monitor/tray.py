@@ -205,13 +205,13 @@ class MonitorSystemTray:
                 nuevas = await self.monitor.verificar_entradas()
                 if nuevas:
                     self.update_icon("yellow")
-                    logger.info(f"✅ {len(nuevas)} nuevas entradas")
+                    logger.info(f"[OK] {len(nuevas)} nuevas entradas")
 
             if self.monitor.config.verificar_expedientes:
                 cambios = await self.monitor.verificar_expedientes()
                 if cambios:
                     self.update_icon("yellow")
-                    logger.info(f"✅ {len(cambios)} expedientes con cambios")
+                    logger.info(f"[OK] {len(cambios)} expedientes con cambios")
 
             # Volver a verde después de 3 segundos
             await asyncio.sleep(3)
@@ -400,10 +400,11 @@ class MonitorSystemTray:
         self._tray_thread = None
 
         logger.info("Iniciando system tray (bloqueante)...")
-        logger.info("🔍 BUSCANDO ICONO:")
+        logger.info("BUSCANDO ICONO:")
+        logger.info("   Windows: Busca en la bandeja del sistema (esquina inferior derecha)")
         logger.info("   macOS: Busca en la barra superior DERECHA (menu bar)")
         logger.info("   Puede estar al lado del reloj, WiFi, batería, etc.")
-        logger.info("   Si no lo ves, intenta hacer click en el icono de la flecha >> para expandir")
+        logger.info("   Si no lo ves, intenta hacer click en el icono de la flecha ^ para expandir")
         logger.info("   El icono es un CÍRCULO VERDE")
         logger.info("")
         logger.info("   Una vez que lo veas:")

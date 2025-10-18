@@ -25,7 +25,7 @@ def main():
     print("")
 
     if os_name == "Darwin":  # macOS
-        print("✅ Usando implementación nativa de macOS (rumps)")
+        print("[OK] Usando implementación nativa de macOS (rumps)")
         print("   Script: ejecutar_monitor_statusbar.py")
         print("")
         print("Requisitos:")
@@ -35,7 +35,7 @@ def main():
         try:
             import rumps
         except ImportError:
-            print("❌ ERROR: rumps no está instalado")
+            print("[ERROR] rumps no está instalado")
             print("   Ejecuta: pip install rumps")
             return 1
 
@@ -44,7 +44,7 @@ def main():
         return ejecutar_monitor_statusbar.main()
 
     elif os_name in ("Windows", "Linux"):
-        print(f"✅ Usando implementación multiplataforma (pystray)")
+        print(f"[OK] Usando implementación multiplataforma (pystray)")
         print("   Script: ejecutar_monitor_tray.py")
         print("")
         print("Requisitos:")
@@ -55,7 +55,7 @@ def main():
             import pystray
             from PIL import Image
         except ImportError:
-            print("❌ ERROR: pystray o pillow no están instalados")
+            print("[ERROR] pystray o pillow no están instalados")
             print("   Ejecuta: pip install pystray pillow")
             return 1
 
@@ -66,7 +66,7 @@ def main():
         return asyncio.run(ejecutar_monitor_tray.main())
 
     else:
-        print(f"❌ Sistema operativo no soportado: {os_name}")
+        print(f"[ERROR] Sistema operativo no soportado: {os_name}")
         print("   Soportados: Windows, macOS, Linux")
         return 1
 
@@ -76,10 +76,10 @@ if __name__ == "__main__":
         exit_code = main()
         sys.exit(exit_code)
     except KeyboardInterrupt:
-        print("\n⚠️  Cancelado por usuario")
+        print("\n[ADVERTENCIA] Cancelado por usuario")
         sys.exit(0)
     except Exception as e:
-        print(f"\n❌ Error fatal: {e}")
+        print(f"\n[ERROR] Error fatal: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
