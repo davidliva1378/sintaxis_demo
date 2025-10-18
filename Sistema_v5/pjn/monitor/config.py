@@ -208,6 +208,16 @@ class MonitorConfig:
         # Validar fecha_corte_expedientes (formato legacy)
         validar_formato_fecha(self.fecha_corte_expedientes, "fecha_corte_expedientes")
 
+    @staticmethod
+    def _sanitize_data(data: dict) -> dict:
+        """Elimina claves usadas como comentarios en las plantillas JSON."""
+
+        return {
+            key: value
+            for key, value in data.items()
+            if not key.startswith("//") and not key.startswith("__")
+        }
+
     @classmethod
     def from_file(cls, path: str | Path = "config/monitor.json") -> "MonitorConfig":
         """Carga configuración desde archivo JSON.
@@ -236,7 +246,9 @@ class MonitorConfig:
                 return config
 
         with path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
+            raw_data = json.load(f)
+
+        data = cls._sanitize_data(raw_data)
 
         return cls(**data)
 

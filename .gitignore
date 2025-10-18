@@ -29,6 +29,8 @@ base_datos_simulada/
 datos_extraidos/
 backup_*/
 *.json
+!config/sistema.json
+!config/monitor.json
 !tests/fixtures/**/*.json
 
 # Archivos comprimidos y exportaciones
