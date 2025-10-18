@@ -24,6 +24,7 @@ Este documento resume problemas detectados, oportunidades de mejora y puntos a t
 - Inicializar la agenda con las categorías propias del organismo y feriados actualizados antes de registrar eventos.【F:Sistema_v5/agenda/agenda.py†L67-L108】
 - Evitar depender de la agenda global en escenarios multiusuario; inyectar `AgendaService` en cada contexto de trabajo o solicitud.【F:Sistema_v5/agenda/agenda.py†L309-L342】
 - Serializar o exportar periódicamente la información de la agenda hasta contar con una capa de persistencia robusta.
+- Mantener sincronizados `CONSIDERACIONES.md` e `INVENTARIO_FUNCIONES.md` ante cualquier cambio del módulo para garantizar documentación vigente.
 
 ## Próximos pasos sugeridos
 1. Diseñar una capa de persistencia que permita CRUD completo, versionado de cambios y auditoría.
