@@ -1,7 +1,7 @@
 """Sistema v5 de extracción de datos del Portal PJN."""
 
 # Exportar constantes globales
-from . import constants
+from . import agenda, constants
 
 # Exportar configuración unificada
 from .system_config import SystemConfig
@@ -31,6 +31,7 @@ from .exceptions import (
 
 __all__ = [
     # Constantes
+    "agenda",
     "constants",
     # Configuración
     "SystemConfig",
