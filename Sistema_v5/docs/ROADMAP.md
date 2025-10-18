@@ -438,7 +438,7 @@ TOTAL: 60% (9/15 mejoras)
 
 ---
 
-## 🟢 Monitor PJN - Fase 3: Interfaz Web y Visualización
+## 🟢 Monitor PJN - Fase 3: Interfaz de Usuario
 
 ### ✅ Mejora #M8: Interfaz Web con Flask
 - **Estado:** ✅ COMPLETADA
@@ -473,7 +473,43 @@ TOTAL: 60% (9/15 mejoras)
 
 ---
 
-### 🟡 Mejora #M9: Dashboard de Estadísticas
+### ✅ Mejora #M9: Indicador de Bandeja del Sistema (System Tray)
+- **Estado:** ✅ COMPLETADA
+- **Fecha:** 2025-10-17
+- **Prioridad:** 🟠 ALTA
+- **Tiempo estimado:** 45 minutos
+- **Descripción:** Icono en la bandeja del sistema para control rápido del monitor
+- **Archivos creados:**
+  - `pjn/monitor/tray.py` - Implementación del system tray (350+ líneas)
+  - `ejecutar_monitor_tray.py` - Script de ejecución con tray
+- **Funcionalidades implementadas:**
+  - ✅ Icono en bandeja con 4 estados de color (verde/amarillo/rojo/gris)
+  - ✅ Menú contextual con 7 opciones
+  - ✅ Verificación manual desde el menú
+  - ✅ Visualización de estado del monitor
+  - ✅ Acceso rápido a carpeta de datos
+  - ✅ Control del monitor (salir)
+  - ✅ Notificaciones visuales (cambio de color del icono)
+  - ✅ Integración con scheduler asíncrono
+- **Menú del tray:**
+  - Monitor PJN (título)
+  - Verificar ahora
+  - Estado
+  - Iniciar/Detener (si hay scheduler)
+  - Abrir carpeta de datos
+  - Ver logs (TODO)
+  - Salir
+- **Requisitos:** `pip install pystray pillow`
+- **Características técnicas:**
+  - Fallback graceful si dependencias no están instaladas
+  - Thread separado para no bloquear event loop
+  - Integración completa con asyncio
+  - Colores dinámicos según estado (verde=ok, amarillo=actividad, rojo=error)
+- **Impacto:** 🔥 ALTO - UX profesional, control sin terminal
+
+---
+
+### 🟡 Mejora #M10: Dashboard de Estadísticas
 - **Estado:** 🟡 PENDIENTE
 - **Prioridad:** 🟢 BAJA
 - **Tiempo estimado:** 1 hora
@@ -489,7 +525,7 @@ TOTAL: 60% (9/15 mejoras)
 
 ## 🟠 Monitor PJN - Fase 4: Notificaciones Avanzadas
 
-### 🟡 Mejora #M10: Notificaciones por Email
+### 🟡 Mejora #M11: Notificaciones por Email
 - **Estado:** 🟡 PENDIENTE
 - **Prioridad:** 🟠 MEDIA
 - **Tiempo estimado:** 30 minutos
@@ -502,7 +538,7 @@ TOTAL: 60% (9/15 mejoras)
 
 ---
 
-### 🟡 Mejora #M11: Notificaciones por Telegram
+### 🟡 Mejora #M12: Notificaciones por Telegram
 - **Estado:** 🟡 PENDIENTE
 - **Prioridad:** 🟠 MEDIA
 - **Tiempo estimado:** 30 minutos
@@ -515,7 +551,7 @@ TOTAL: 60% (9/15 mejoras)
 
 ---
 
-### 🟡 Mejora #M12: Webhooks (Slack/Discord)
+### 🟡 Mejora #M13: Webhooks (Slack/Discord)
 - **Estado:** 🟡 PENDIENTE
 - **Prioridad:** 🟢 BAJA
 - **Tiempo estimado:** 20 minutos
@@ -529,7 +565,7 @@ TOTAL: 60% (9/15 mejoras)
 
 ## 🔵 Monitor PJN - Fase 5: Inteligencia y Automatización
 
-### 🟡 Mejora #M13: Sistema de Alertas Inteligentes
+### 🟡 Mejora #M14: Sistema de Alertas Inteligentes
 - **Estado:** 🟡 PENDIENTE
 - **Prioridad:** 🟠 MEDIA
 - **Tiempo estimado:** 45 minutos
@@ -545,7 +581,7 @@ TOTAL: 60% (9/15 mejoras)
 
 ## 🟣 Monitor PJN - Fase 6: API REST
 
-### 🟡 Mejora #M14: API REST con FastAPI
+### 🟡 Mejora #M15: API REST con FastAPI
 - **Estado:** 🟡 PENDIENTE
 - **Prioridad:** 🟢 BAJA
 - **Tiempo estimado:** 1 hora
@@ -561,7 +597,7 @@ TOTAL: 60% (9/15 mejoras)
 
 ## 🧪 Monitor PJN - Fase 7: Testing
 
-### 🟡 Mejora #M15: Tests Unitarios
+### 🟡 Mejora #M16: Tests Unitarios
 - **Estado:** 🟡 PENDIENTE
 - **Prioridad:** 🟠 MEDIA
 - **Tiempo estimado:** 1 hora
@@ -579,14 +615,26 @@ TOTAL: 60% (9/15 mejoras)
 
 **Fase 1 (Core):**  ████████████████████ 100% ✅ (5/5 mejoras)
 **Fase 2 (Bugs):**  ████████████████████ 100% ✅ (2/2 mejoras - M6 y M7 completadas)
-**Fase 3 (Web):**   ██████████░░░░░░░░░░  50% ✅ (1/2 mejoras - M8 completada)
+**Fase 3 (UI):**    ████████████████████ 100% ✅ (2/2 mejoras - M8 y M9 completadas)
 **Fase 4 (Notif):** ░░░░░░░░░░░░░░░░░░░░   0% 🟡 (0/3 mejoras)
 **Fase 5 (AI):**    ░░░░░░░░░░░░░░░░░░░░   0% 🟡 (0/1 mejora)
 **Fase 6 (API):**   ░░░░░░░░░░░░░░░░░░░░   0% 🟡 (0/1 mejora)
 **Fase 7 (Test):**  ░░░░░░░░░░░░░░░░░░░░   0% 🟡 (0/1 mejora)
 
-**Total Monitor:** ██████░░░░░░░░░░░░░░  33% (8/15 mejoras completadas)
+**Total Monitor:** ██████████░░░░░░░░░░  56% (9/16 mejoras completadas)
 
 ---
 
-**Última actualización:** 2025-10-16
+**Última actualización:** 2025-10-17
+
+---
+
+## 🎉 Mejoras Recientes
+
+**2025-10-17:**
+- ✅ Mejora #M9: System Tray completado
+  - Icono en bandeja del sistema
+  - Menú contextual completo
+  - Integración con asyncio
+  - Estados visuales (verde/amarillo/rojo)
+  - Fase 3 (UI) completada 100%

@@ -29,20 +29,20 @@ async def main():
     """Ejecuta el monitor con configuracion personalizada."""
 
     # Opcion 1: Cargar desde archivo JSON
-    config = MonitorConfig.from_file(CONFIG_FILE)
+    #config = MonitorConfig.from_file(CONFIG_FILE)
 
     # Opcion 2: Crear configuracion programaticamente (descomentar si prefieres esto)
-    # config = MonitorConfig(
-    #     modo="automatico",
-    #     headless=True,
-    #     verificar_entradas=True,
-    #     verificar_expedientes=False,
-    #     intervalos_laboral_entradas=10,
-    #     fecha_desde_entradas="15/10/2025",
-    #     fecha_hasta_entradas="16/10/2025",
-    #     notificar_nuevas_entradas=True,
-    #     notificar_errores=True
-    # )
+    config = MonitorConfig(
+        modo="automatico",
+        headless=False,
+        verificar_entradas=True,
+        verificar_expedientes=False,
+        intervalos_laboral_entradas=10,
+        fecha_desde_entradas="13/10/2025",
+        fecha_hasta_entradas="17/10/2025",
+        notificar_nuevas_entradas=True,
+        notificar_errores=True
+    )
 
     logger.info("Iniciando monitor...")
     logger.info(f"  Modo: {config.modo}")
