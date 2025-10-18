@@ -30,12 +30,32 @@ Framework completo de web scraping para el **Portal Judicial Nacional (PJN)** de
 ```bash
 # Clonar repositorio
 git clone <repo-url>
-cd Sistema_v5
+cd sintaXis
 
-# Instalar dependencias
-pip install playwright pandas
+# Instalar dependencias (elige el comando según tu sistema operativo)
+python -m pip install -r requirements.txt      # Windows PowerShell
+python3 -m pip install -r requirements.txt     # Linux/macOS
+
+# Instalar el navegador requerido por Playwright
 playwright install chromium
 ```
+
+### Dependencias para la bandeja del sistema
+
+- **Windows / Linux**
+  ```bash
+  python -m pip install pystray pillow plyer
+  ```
+  - En distribuciones Linux basadas en Debian/Ubuntu instala los componentes gráficos del sistema:
+    ```bash
+    sudo apt install python3-tk gir1.2-appindicator3-0.1
+    ```
+- **macOS**
+  ```bash
+  python3 -m pip install rumps pillow plyer
+  ```
+
+> Estas dependencias son necesarias para los scripts de bandeja (`ejecutar_monitor_tray.py`, `ejecutar_monitor_statusbar.py`, `ejecutar_monitor_universal.py`).
 
 ### Primer Script
 
