@@ -86,8 +86,14 @@ async def run_monitor_with_tray():
     signal.signal(signal.SIGTERM, signal_handler)
 
     try:
+        # IMPORTANTE: Iniciar el tray PRIMERO para que el icono sea visible inmediatamente
+        logger.info("\n* Iniciando icono en bandeja del sistema...")
+        tray.run_detached(loop)
+        logger.info("* Icono iniciado - búscalo en la bandeja del sistema (esquina inferior derecha)")
+        logger.info("  Si no lo ves, haz click en la flecha ^ para expandir iconos ocultos\n")
+
         # Ejecutar verificación inicial
-        logger.info("\n>>> Ejecutando verificación inicial...")
+        logger.info(">>> Ejecutando verificación inicial...")
 
         if config.verificar_entradas:
             nuevas = await monitor.verificar_entradas()
@@ -117,16 +123,13 @@ async def run_monitor_with_tray():
         logger.info("\n" + "=" * 60)
         logger.info("[OK] MONITOR ACTIVO")
         logger.info("=" * 60)
-        logger.info("\n* Busca el icono en la bandeja del sistema")
-        logger.info("   Click derecho para ver opciones:\n")
+        logger.info("\n* El icono en la bandeja del sistema tiene estas opciones:")
+        logger.info("   Click derecho para ver:\n")
         logger.info("   - Verificar ahora - Ejecuta verificación inmediata")
         logger.info("   - Estado - Ver estado del monitor")
         logger.info("   - Abrir carpeta de datos - Ver archivos guardados")
         logger.info("   - Salir - Detener monitor\n")
         logger.info("=" * 60)
-
-        # Ejecutar tray en thread separado
-        tray.run_detached(loop)
 
         # Mantener el programa corriendo
         while monitor.running and tray._running:
