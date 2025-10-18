@@ -128,8 +128,6 @@ class MonitorSystemTray:
         self.icon = None
         self.loop = None
         self._running = False
-        self._tray_thread = None
-        self._ready_event = None
 
         logger.info("System tray inicializado")
 
@@ -369,35 +367,27 @@ class MonitorSystemTray:
         if new_image:
             self.icon.icon = new_image
 
-    def _build_icon(self) -> pystray.Icon:
-        """Crea la instancia de icono de pystray."""
-        image = create_icon_image("green")
-        menu = self._create_menu()
-
-        return pystray.Icon(
-            name="monitor_pjn",
-            icon=image,
-            title="Monitor PJN - Click aquí",
-            menu=menu
-        )
-
-    def _on_icon_ready(self, icon: "pystray.Icon") -> None:
-        """Callback ejecutado cuando el icono está listo."""
-        logger.info("System tray listo - icono visible en bandeja")
-        icon.visible = True
-        self.update_icon("green")
-
-        if self._ready_event:
-            self._ready_event.set()
-
     def run(self, event_loop: asyncio.AbstractEventLoop | None = None):
-        """Inicia el indicador de bandeja (bloqueante)."""
+        """Inicia el indicador de bandeja.
+
+        Este método bloquea hasta que se cierra el icono.
+
+        Args:
+            event_loop: Event loop de asyncio para operaciones async
+        """
         self.loop = event_loop
         self._running = True
 
-        self.icon = self._build_icon()
-        self._ready_event = threading.Event()
-        self._tray_thread = None
+        # Crear icono
+        image = create_icon_image("green")
+        menu = self._create_menu()
+
+        self.icon = pystray.Icon(
+            name="monitor_pjn",
+            icon=image,
+            title="Monitor PJN - Click aquí",  # Más descriptivo
+            menu=menu
+        )
 
         logger.info("Iniciando system tray (bloqueante)...")
         logger.info("BUSCANDO ICONO:")
@@ -411,44 +401,25 @@ class MonitorSystemTray:
         logger.info("   - Click DERECHO (o Control + Click) para ver menú")
         logger.info("   - Opciones: Verificar ahora, Estado, Salir")
 
-        self.icon.run(setup=self._on_icon_ready)
+        # Ejecutar (bloqueante)
+        self.icon.run()
 
         logger.info("System tray detenido")
         self._running = False
-        self.icon = None
-        self._ready_event = None
 
     def run_detached(self, event_loop: asyncio.AbstractEventLoop):
-        """Inicia el indicador en segundo plano (no bloqueante)."""
-        self.loop = event_loop
-        self._running = True
+        """Inicia el indicador en un thread separado.
 
-        self.icon = self._build_icon()
-        self._ready_event = threading.Event()
+        Args:
+            event_loop: Event loop de asyncio para operaciones async
+        """
+        def _run_in_thread():
+            self.run(event_loop)
 
-        logger.info("Iniciando system tray en segundo plano...")
+        thread = threading.Thread(target=_run_in_thread, daemon=True)
+        thread.start()
 
-        def _run_icon():
-            try:
-                self.icon.run(setup=self._on_icon_ready)
-            finally:
-                logger.info("Hilo de system tray finalizado")
-                self._running = False
-
-        self._tray_thread = threading.Thread(
-            target=_run_icon,
-            name="monitor-tray-thread",
-            daemon=True,
-        )
-        self._tray_thread.start()
-
-        if self._ready_event.wait(timeout=5):
-            logger.info("System tray iniciado en background")
-        else:
-            logger.warning(
-                "System tray no confirmó estar listo tras 5s; "
-                "si no ves el icono verifica que Windows no lo oculte."
-            )
+        logger.info("System tray iniciado en thread separado")
 
     def stop(self):
         """Detiene el indicador de bandeja."""
@@ -456,15 +427,6 @@ class MonitorSystemTray:
 
         if self.icon:
             self.icon.stop()
-            self.icon = None
-
-        if self._tray_thread and self._tray_thread.is_alive():
-            self._tray_thread.join(timeout=1)
-            self._tray_thread = None
-
-        if self._ready_event:
-            self._ready_event.set()
-            self._ready_event = None
 
         # Detener monitor y scheduler
         if self.scheduler:
