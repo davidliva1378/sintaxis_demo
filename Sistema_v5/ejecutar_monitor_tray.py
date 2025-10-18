@@ -58,8 +58,7 @@ async def run_monitor_with_tray():
         config = MonitorConfig()
         config.to_file("config/monitor.json")
 
-    # Configuración recomendada para tray
-    config.headless = True  # Siempre headless con tray
+    # Mostrar configuración
     logger.info(f"  Modo: {config.modo}")
     logger.info(f"  Headless: {config.headless}")
     logger.info(f"  Verificar entradas: {config.verificar_entradas}")
