@@ -1,55 +1,31 @@
-"""Script launcher para el configurador del sistema PJN.
+"""Script legado - redirige al nuevo configurador CLI."""
 
-Este script abre la interfaz gráfica de configuración del sistema.
+from __future__ import annotations
 
-Uso:
-    python scripts/configurar_sistema.py
-    python scripts/configurar_sistema.py --config config/mi_config.json
-"""
-
-import sys
-from pathlib import Path
-
-# Agregar el directorio padre al path para importar pjn
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from pjn.gui.config_form import ConfigForm
+from textwrap import dedent
 
 
-def main():
-    """Función principal."""
-    import argparse
+def main() -> None:
+    """Informa la nueva ruta del configurador y finaliza."""
 
-    parser = argparse.ArgumentParser(
-        description="Configurador del Sistema PJN"
-    )
-    parser.add_argument(
-        "--config",
-        "-c",
-        default="config/sistema.json",
-        help="Ruta al archivo de configuración (default: config/sistema.json)"
-    )
+    mensaje = dedent(
+        """
+        El configurador gráfico ha sido reemplazado por el asistente CLI.
 
-    args = parser.parse_args()
+        Ejecuta la nueva herramienta con:
 
-    print("=" * 70)
-    print("CONFIGURADOR DEL SISTEMA PJN")
-    print("=" * 70)
-    print()
-    print(f"Archivo de configuración: {args.config}")
-    print()
-    print("Abriendo interfaz gráfica...")
-    print()
+            python -m Sistema_v5.cli.configuracion wizard
 
-    # Crear y ejecutar la aplicación
-    try:
-        app = ConfigForm(config_path=args.config)
-        app.mainloop()
-    except Exception as e:
-        print(f"\n❌ Error al iniciar el configurador: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+        También puedes mostrar la configuración actual o actualizar campos puntuales:
+
+            python -m Sistema_v5.cli.configuracion show
+            python -m Sistema_v5.cli.configuracion set campo=valor
+
+        Consulta --help para más opciones.
+        """
+    ).strip()
+
+    print(mensaje)
 
 
 if __name__ == "__main__":
