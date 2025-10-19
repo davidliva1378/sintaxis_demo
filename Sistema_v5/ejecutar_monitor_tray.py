@@ -1,35 +1,72 @@
 #!/usr/bin/env python3
-"""Ejecuta el monitor con indicador de bandeja del sistema.
+"""Ejecuta el monitor con indicador de bandeja usando configuración unificada.
 
-Este script inicia el monitor PJN con un icono en la bandeja del sistema
-que permite:
-- Verificar manualmente
-- Ver estado
-- Controlar el scheduler
-- Salir del monitor
-
-Requisitos:
-    pip install pystray pillow
-
-Uso:
-    python ejecutar_monitor_tray.py
+El script lee overrides desde variables ``SISTEMA_*`` o desde ``config/sistema.json``
+y sólo recurre a ``config/monitor.json`` en modo legacy. Muestra un icono en la bandeja
+para controlar el monitor.
 """
 
 import asyncio
+import os
 import signal
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+from pjn import SystemConfig
 from pjn.monitor.config import MonitorConfig
 from pjn.monitor.core import MonitorPJN
 from pjn.monitor.scheduler import SchedulerMonitor
 from pjn.monitor.tray import MonitorSystemTray, TRAY_AVAILABLE
+from pjn.system_config import ENV_FIELD_MAP
 from pjn.utils.logging import setup_logging, get_logger
 
 setup_logging(level="INFO")
 logger = get_logger(__name__)
+
+
+def cargar_configuracion() -> tuple[MonitorConfig, str]:
+    """Obtiene la configuración del monitor y la fuente utilizada."""
+
+    sistema_path = Path("config/sistema.json")
+    monitor_path = Path("config/monitor.json")
+    env_prefix = "SISTEMA_"
+
+    env_overrides = [
+        f"{env_prefix}{suffix}" for suffix in ENV_FIELD_MAP.values()
+        if os.getenv(f"{env_prefix}{suffix}") is not None
+    ]
+
+    if env_overrides:
+        logger.info(
+            "[OK] Configuración unificada desde variables de entorno (prefijo %s)",
+            env_prefix,
+        )
+        system_config = SystemConfig.from_env(prefix=env_prefix)
+        return MonitorConfig.from_system_config(system_config), "variables de entorno"
+
+    if sistema_path.exists():
+        logger.info("[OK] Configuración unificada desde %s", sistema_path)
+        system_config = SystemConfig.from_file(sistema_path)
+        return MonitorConfig.from_system_config(system_config), str(sistema_path)
+
+    if monitor_path.exists():
+        logger.warning(
+            "[ADVERTENCIA] No se encontró %s. Usando configuración legacy %s",
+            sistema_path,
+            monitor_path,
+        )
+        return MonitorConfig.from_file(monitor_path), str(monitor_path)
+
+    logger.warning(
+        "[ADVERTENCIA] No existe configuración. Creando %s con valores por defecto.",
+        sistema_path,
+    )
+    system_config = SystemConfig()
+    sistema_path.parent.mkdir(parents=True, exist_ok=True)
+    system_config.to_file(sistema_path)
+    return MonitorConfig.from_system_config(system_config), str(sistema_path)
 
 
 async def run_monitor_with_tray():
@@ -49,16 +86,10 @@ async def run_monitor_with_tray():
     logger.info("=" * 60)
 
     # Cargar configuración
-    try:
-        config = MonitorConfig.from_file("config/monitor.json")
-        logger.info(f"[OK] Configuración cargada desde config/monitor.json")
-    except Exception as e:
-        logger.warning(f"[ADVERTENCIA] Error al cargar configuración: {e}")
-        logger.info("[INFO] Creando configuración por defecto...")
-        config = MonitorConfig()
-        config.to_file("config/monitor.json")
+    config, fuente = cargar_configuracion()
 
     # Mostrar configuración
+    logger.info(f"  Fuente: {fuente}")
     logger.info(f"  Modo: {config.modo}")
     logger.info(f"  Headless: {config.headless}")
     logger.info(f"  Verificar entradas: {config.verificar_entradas}")

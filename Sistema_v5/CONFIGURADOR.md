@@ -6,7 +6,7 @@ Este documento describe el sistema de configuración unificado del Sistema_v5.
 
 - [Descripción General](#descripción-general)
 - [Inicio Rápido](#inicio-rápido)
-- [Interfaz Gráfica](#interfaz-gráfica)
+- [Asistente CLI](#asistente-cli)
 - [Uso Programático](#uso-programático)
 - [Migración](#migración)
 - [Opciones de Configuración](#opciones-de-configuración)
@@ -20,7 +20,7 @@ El configurador proporciona una forma centralizada y unificada de gestionar **to
 
 ### ✨ Características
 
-- ✅ **Interfaz gráfica completa** con pestañas organizadas
+- ✅ **Asistente CLI interactivo** con categorías organizadas
 - ✅ **50+ opciones configurables** (directorios, monitoreo, extracción, sistema)
 - ✅ **Validación automática** de todos los parámetros
 - ✅ **Migración desde monitor.json** con backup automático
@@ -35,11 +35,14 @@ El configurador proporciona una forma centralizada y unificada de gestionar **to
 ### 1. Abrir el Configurador
 
 ```bash
-# Abrir GUI con configuración por defecto
-python scripts/configurar_sistema.py
+# Ejecutar el asistente completo (todas las categorías)
+python -m Sistema_v5.cli.configuracion wizard
 
-# Usar un archivo específico
-python scripts/configurar_sistema.py --config mi_config.json
+# Limitar a categorías específicas
+python -m Sistema_v5.cli.configuracion wizard --categorias directorios monitoreo
+
+# Editar campos puntuales sin asistente
+python -m Sistema_v5.cli.configuracion set modo_monitor=laboral nivel_log=DEBUG
 ```
 
 ### 2. Migrar desde monitor.json (si aplica)
@@ -70,11 +73,11 @@ print(config.nivel_log)
 
 ---
 
-## 🖥️ Interfaz Gráfica
+## 🧭 Asistente CLI
 
-La GUI está organizada en **4 pestañas**:
+El asistente muestra las opciones agrupadas en **4 categorías** y permite mantener o modificar cada valor. Pulsa **Enter** para conservar el actual, escribe un valor nuevo para reemplazarlo y utiliza `-` o `none` para limpiar campos opcionales.
 
-### 📁 Pestaña Directorios
+### 📁 Categoría Directorios
 
 Configura dónde se guardan los archivos del sistema:
 
@@ -91,16 +94,9 @@ Configura dónde se guardan los archivos del sistema:
 | `directorio_descargas` | PDFs descargados | `descargas` |
 | `directorio_monitor_datos` | Datos del monitor | `data/monitor` |
 
-**Cada campo incluye:**
-- Campo de texto editable
-- Botón 📂 para explorar directorios
-- Tooltip descriptivo
+**Cómo completarlos:** introduce la ruta deseada (se aceptan rutas relativas o con `~`). El sistema las normaliza y crea las carpetas si no existen.
 
-> 🗂️ **Tip**: Puedes indicar rutas relativas o con `~`. El sistema las
-> convierte automáticamente en rutas absolutas y crea las carpetas si no
-> existen.
-
-### 🔍 Pestaña Monitoreo
+### 🔍 Categoría Monitoreo
 
 Configura el comportamiento del monitor:
 
@@ -131,7 +127,7 @@ Configura el comportamiento del monitor:
 - ☑️ Notificar cambios en expedientes
 - ☑️ Notificar errores
 
-### ⚙️ Pestaña Extracción
+### ⚙️ Categoría Extracción
 
 Configura el scraping y extracción:
 
@@ -151,7 +147,7 @@ Configura el scraping y extracción:
 - **Entradas**: 3 reintentos (default)
 - **Descargas**: 3 reintentos (default)
 
-### 🔧 Pestaña Sistema
+### 🔧 Categoría Sistema
 
 Configura el sistema en general:
 
@@ -565,20 +561,17 @@ config = SystemConfig(
 )
 ```
 
-### GUI no se abre
+### El asistente CLI no se ejecuta
 
-**Causa**: tkinter no está disponible.
+**Causa**: El módulo `Sistema_v5` no está en el `PYTHONPATH`.
 
 **Solución**:
 ```bash
-# En macOS
-brew install python-tk
+# Ejecutar desde la raíz del repo
+python -m Sistema_v5.cli.configuracion show
 
-# En Ubuntu/Debian
-sudo apt-get install python3-tk
-
-# Verificar
-python -c "import tkinter; print('OK')"
+# O definir PYTHONPATH manualmente
+PYTHONPATH=Sistema_v5 python -m Sistema_v5.cli.configuracion wizard
 ```
 
 ---
@@ -596,7 +589,7 @@ python -c "import tkinter; print('OK')"
 El configurador proporciona:
 
 ✅ **50+ opciones** organizadas en 4 categorías
-✅ **Interfaz gráfica** simple y completa
+✅ **Asistente CLI** simple e integral
 ✅ **Validación automática** de todos los parámetros
 ✅ **Migración automática** desde configuraciones antiguas
 ✅ **Backups automáticos** con timestamp
