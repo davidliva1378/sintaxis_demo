@@ -198,6 +198,49 @@ class TestSystemConfigFileOperations:
         assert data["modo_monitor"] == "no_laboral"
         assert data["nivel_log"] == "DEBUG"
 
+
+class TestSystemConfigFromEnv:
+    """Tests para la carga de configuración desde variables de entorno."""
+
+    def test_from_env_reads_directories_and_numbers(self, monkeypatch):
+        """from_env() mapea directorios, enteros y booleanos."""
+
+        monkeypatch.setenv("SISTEMA_DIRECTORIO_LOGS", "/var/log/pjn")
+        monkeypatch.setenv("SISTEMA_INTERVALO_BACKUP_AUTOMATICO", "14")
+        monkeypatch.setenv("SISTEMA_ROTACION_LOGS", "0")
+        monkeypatch.setenv("SISTEMA_DIAS_LABORALES", "lunes,viernes")
+        monkeypatch.setenv("SISTEMA_NIVEL_LOG", "warning")
+
+        config = SystemConfig.from_env()
+
+        assert config.directorio_logs == "/var/log/pjn"
+        assert config.intervalo_backup_automatico == 14
+        assert config.rotacion_logs is False
+        assert config.dias_laborales == ["lunes", "viernes"]
+        assert config.nivel_log == "WARNING"
+
+    def test_from_env_optional_fields_accept_none(self, monkeypatch):
+        """from_env() interpreta valores nulos para campos opcionales."""
+
+        monkeypatch.setenv("SISTEMA_FECHA_DESDE_ENTRADAS", "none")
+        monkeypatch.setenv("SISTEMA_FECHA_ULTIMO_BACKUP", "")
+
+        config = SystemConfig.from_env()
+
+        assert config.fecha_desde_entradas is None
+        assert config.fecha_ultimo_backup is None
+
+    def test_from_env_custom_prefix(self, monkeypatch):
+        """from_env() permite personalizar el prefijo."""
+
+        monkeypatch.setenv("CUSTOM_HEADLESS", "false")
+        monkeypatch.setenv("CUSTOM_MAX_PAGINAS_EXPEDIENTES", "75")
+
+        config = SystemConfig.from_env(prefix="CUSTOM_")
+
+        assert config.headless is False
+        assert config.max_paginas_expedientes == 75
+
     def test_config_from_file(self, tmp_path):
         """from_file() carga correctamente desde JSON."""
         config_file = tmp_path / "test_sistema.json"
