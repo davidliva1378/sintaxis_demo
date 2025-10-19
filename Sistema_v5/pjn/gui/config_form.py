@@ -361,6 +361,57 @@ class ConfigForm(tk.Tk):
             variable=self.mon_widgets["notificar_errores"]
         ).pack(anchor=tk.W)
 
+        # Comparación y filtros
+        frame = ttk.LabelFrame(scrollable_frame, text="Comparación y filtros", padding=10)
+        frame.pack(fill=tk.X, padx=5, pady=5)
+
+        self.mon_widgets["comparacion_automatica"] = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            frame,
+            text="Ejecutar comparación automática tras cada verificación",
+            variable=self.mon_widgets["comparacion_automatica"]
+        ).pack(anchor=tk.W)
+
+        ttk.Label(frame, text="Modo de comparación:").pack(anchor=tk.W, pady=(10, 5))
+        self.mon_widgets["modo_comparacion"] = ttk.Combobox(
+            frame,
+            values=["automatico", "manual", "deshabilitado"],
+            state="readonly",
+            width=20
+        )
+        self.mon_widgets["modo_comparacion"].set("manual")
+        self.mon_widgets["modo_comparacion"].pack(anchor=tk.W, padx=20, pady=(0, 10))
+
+        ttk.Label(frame, text="Filtros de fecha para entradas:").pack(anchor=tk.W)
+        entradas_frame = ttk.Frame(frame)
+        entradas_frame.pack(fill=tk.X, padx=20, pady=(5, 10))
+
+        ttk.Label(entradas_frame, text="Desde:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.mon_widgets["fecha_desde_entradas"] = DatePicker(entradas_frame)
+        self.mon_widgets["fecha_desde_entradas"].grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
+
+        ttk.Label(entradas_frame, text="Hasta:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        self.mon_widgets["fecha_hasta_entradas"] = DatePicker(entradas_frame)
+        self.mon_widgets["fecha_hasta_entradas"].grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
+
+        ttk.Label(frame, text="Filtros de fecha para expedientes:").pack(anchor=tk.W)
+        expedientes_frame = ttk.Frame(frame)
+        expedientes_frame.pack(fill=tk.X, padx=20, pady=(5, 10))
+
+        ttk.Label(expedientes_frame, text="Desde:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.mon_widgets["fecha_desde_expedientes"] = DatePicker(expedientes_frame)
+        self.mon_widgets["fecha_desde_expedientes"].grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
+
+        ttk.Label(expedientes_frame, text="Hasta:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        self.mon_widgets["fecha_hasta_expedientes"] = DatePicker(expedientes_frame)
+        self.mon_widgets["fecha_hasta_expedientes"].grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
+
+        ttk.Label(frame, text="Fecha de corte para expedientes:").pack(anchor=tk.W)
+        corte_frame = ttk.Frame(frame)
+        corte_frame.pack(fill=tk.X, padx=20, pady=(5, 0))
+        self.mon_widgets["fecha_corte_expedientes"] = DatePicker(corte_frame)
+        self.mon_widgets["fecha_corte_expedientes"].pack(anchor=tk.W)
+
     # =========================================================================
     # PESTAÑA DE EXTRACCIÓN
     # =========================================================================
@@ -466,6 +517,15 @@ class ConfigForm(tk.Tk):
             max_value=20
         )
         self.ext_widgets["max_reintentos_expedientes"].grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
+        ttk.Label(subframe, text="Espera:").grid(row=0, column=2, sticky=tk.W, padx=(20, 0), pady=2)
+        self.ext_widgets["espera_reintentos_expedientes"] = IntervalInput(
+            subframe,
+            initial_value=30,
+            unit="segundos",
+            min_value=1,
+            max_value=300
+        )
+        self.ext_widgets["espera_reintentos_expedientes"].grid(row=0, column=3, sticky=tk.W, padx=(10, 0))
 
         ttk.Label(subframe, text="Entradas:").grid(row=1, column=0, sticky=tk.W, pady=2)
         self.ext_widgets["max_reintentos_entradas"] = IntervalInput(
@@ -476,6 +536,15 @@ class ConfigForm(tk.Tk):
             max_value=20
         )
         self.ext_widgets["max_reintentos_entradas"].grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
+        ttk.Label(subframe, text="Espera:").grid(row=1, column=2, sticky=tk.W, padx=(20, 0), pady=2)
+        self.ext_widgets["espera_reintentos_entradas"] = IntervalInput(
+            subframe,
+            initial_value=30,
+            unit="segundos",
+            min_value=1,
+            max_value=300
+        )
+        self.ext_widgets["espera_reintentos_entradas"].grid(row=1, column=3, sticky=tk.W, padx=(10, 0))
 
         ttk.Label(subframe, text="Descargas:").grid(row=2, column=0, sticky=tk.W, pady=2)
         self.ext_widgets["max_reintentos_descarga"] = IntervalInput(
@@ -486,6 +555,7 @@ class ConfigForm(tk.Tk):
             max_value=20
         )
         self.ext_widgets["max_reintentos_descarga"].grid(row=2, column=1, sticky=tk.W, padx=(10, 0))
+        subframe.columnconfigure(3, weight=1)
 
     # =========================================================================
     # PESTAÑA DE SISTEMA
@@ -635,6 +705,32 @@ class ConfigForm(tk.Tk):
         self.sys_widgets["formato_reportes"].set("json")
         self.sys_widgets["formato_reportes"].pack(anchor=tk.W, padx=20)
 
+        # Información del sistema
+        frame = ttk.LabelFrame(scrollable_frame, text="Información del sistema", padding=10)
+        frame.pack(fill=tk.X, padx=5, pady=5)
+
+        self.sys_widgets["fecha_inicio_sistema"] = tk.StringVar(value="-")
+        self.sys_widgets["fecha_ultimo_backup"] = tk.StringVar(value="-")
+
+        info_frame = ttk.Frame(frame)
+        info_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+
+        ttk.Label(info_frame, text="Fecha de inicio:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        ttk.Entry(
+            info_frame,
+            textvariable=self.sys_widgets["fecha_inicio_sistema"],
+            state="readonly",
+            width=25
+        ).grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
+
+        ttk.Label(info_frame, text="Último backup:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        ttk.Entry(
+            info_frame,
+            textvariable=self.sys_widgets["fecha_ultimo_backup"],
+            state="readonly",
+            width=25
+        ).grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
+
     # =========================================================================
     # MÉTODOS DE CARGA/GUARDADO
     # =========================================================================
@@ -667,6 +763,13 @@ class ConfigForm(tk.Tk):
             self.mon_widgets["notificar_nuevas_entradas"].set(self.config.notificar_nuevas_entradas)
             self.mon_widgets["notificar_cambios_expedientes"].set(self.config.notificar_cambios_expedientes)
             self.mon_widgets["notificar_errores"].set(self.config.notificar_errores)
+            self.mon_widgets["comparacion_automatica"].set(self.config.comparacion_automatica)
+            self.mon_widgets["modo_comparacion"].set(self.config.modo_comparacion)
+            self.mon_widgets["fecha_desde_entradas"].set(self.config.fecha_desde_entradas)
+            self.mon_widgets["fecha_hasta_entradas"].set(self.config.fecha_hasta_entradas)
+            self.mon_widgets["fecha_desde_expedientes"].set(self.config.fecha_desde_expedientes)
+            self.mon_widgets["fecha_hasta_expedientes"].set(self.config.fecha_hasta_expedientes)
+            self.mon_widgets["fecha_corte_expedientes"].set(self.config.fecha_corte_expedientes)
 
             # Actualizar widgets de extracción
             self.ext_widgets["headless"].set(self.config.headless)
@@ -677,6 +780,8 @@ class ConfigForm(tk.Tk):
             self.ext_widgets["max_reintentos_expedientes"].set(self.config.max_reintentos_expedientes)
             self.ext_widgets["max_reintentos_entradas"].set(self.config.max_reintentos_entradas)
             self.ext_widgets["max_reintentos_descarga"].set(self.config.max_reintentos_descarga)
+            self.ext_widgets["espera_reintentos_expedientes"].set(self.config.espera_reintentos_expedientes)
+            self.ext_widgets["espera_reintentos_entradas"].set(self.config.espera_reintentos_entradas)
 
             # Actualizar widgets de sistema
             self.sys_widgets["nivel_log"].set(self.config.nivel_log)
@@ -690,6 +795,8 @@ class ConfigForm(tk.Tk):
             self.sys_widgets["max_archivos_cache"].set(self.config.max_archivos_cache)
             self.sys_widgets["generar_reportes_automaticos"].set(self.config.generar_reportes_automaticos)
             self.sys_widgets["formato_reportes"].set(self.config.formato_reportes)
+            self.sys_widgets["fecha_inicio_sistema"].set(self.config.fecha_inicio_sistema or "-")
+            self.sys_widgets["fecha_ultimo_backup"].set(self.config.fecha_ultimo_backup or "-")
 
             messagebox.showinfo("Éxito", "Configuración cargada correctamente")
 
@@ -720,6 +827,13 @@ class ConfigForm(tk.Tk):
             config_data["notificar_nuevas_entradas"] = self.mon_widgets["notificar_nuevas_entradas"].get()
             config_data["notificar_cambios_expedientes"] = self.mon_widgets["notificar_cambios_expedientes"].get()
             config_data["notificar_errores"] = self.mon_widgets["notificar_errores"].get()
+            config_data["comparacion_automatica"] = self.mon_widgets["comparacion_automatica"].get()
+            config_data["modo_comparacion"] = self.mon_widgets["modo_comparacion"].get()
+            config_data["fecha_desde_entradas"] = self.mon_widgets["fecha_desde_entradas"].get()
+            config_data["fecha_hasta_entradas"] = self.mon_widgets["fecha_hasta_entradas"].get()
+            config_data["fecha_desde_expedientes"] = self.mon_widgets["fecha_desde_expedientes"].get()
+            config_data["fecha_hasta_expedientes"] = self.mon_widgets["fecha_hasta_expedientes"].get()
+            config_data["fecha_corte_expedientes"] = self.mon_widgets["fecha_corte_expedientes"].get()
 
             # Extracción
             config_data["headless"] = self.ext_widgets["headless"].get()
@@ -730,6 +844,8 @@ class ConfigForm(tk.Tk):
             config_data["max_reintentos_expedientes"] = self.ext_widgets["max_reintentos_expedientes"].get()
             config_data["max_reintentos_entradas"] = self.ext_widgets["max_reintentos_entradas"].get()
             config_data["max_reintentos_descarga"] = self.ext_widgets["max_reintentos_descarga"].get()
+            config_data["espera_reintentos_expedientes"] = self.ext_widgets["espera_reintentos_expedientes"].get()
+            config_data["espera_reintentos_entradas"] = self.ext_widgets["espera_reintentos_entradas"].get()
 
             # Sistema
             config_data["nivel_log"] = self.sys_widgets["nivel_log"].get()
@@ -747,6 +863,8 @@ class ConfigForm(tk.Tk):
             # Preservar fecha_inicio_sistema si existe
             if self.config and self.config.fecha_inicio_sistema:
                 config_data["fecha_inicio_sistema"] = self.config.fecha_inicio_sistema
+            if self.config and self.config.fecha_ultimo_backup:
+                config_data["fecha_ultimo_backup"] = self.config.fecha_ultimo_backup
 
             # Crear y guardar configuración
             new_config = SystemConfig(**config_data)
