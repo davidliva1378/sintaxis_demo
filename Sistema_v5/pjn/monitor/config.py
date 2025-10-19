@@ -8,26 +8,14 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Literal
 
-from .validators import (
-    validar_intervalo,
-    validar_max_reintentos,
-    validar_formato_fecha,
-    validar_rango_fechas,
-    validar_formato_hora,
-    validar_rango_horas,
-    validar_dias_laborales,
-    validar_directorio,
-)
-
-ModoMonitor = Literal["automatico", "laboral", "no_laboral"]
+from .shared_config import ModoMonitor, MonitorSharedConfig
 
 
 @dataclass
-class MonitorConfig:
+class MonitorConfig(MonitorSharedConfig):
     """Configuración completa del monitor PJN.
 
     Attributes:
@@ -69,144 +57,80 @@ class MonitorConfig:
     """
 
     # Básico
-    modo: ModoMonitor = "automatico"
-    headless: bool = True
-    directorio_datos: str = "data/monitor"
-
-    # Intervalos en minutos
-    intervalos_laboral_expedientes: int = 15
-    intervalos_laboral_entradas: int = 10
-    intervalos_no_laboral_expedientes: int = 60
-    intervalos_no_laboral_entradas: int = 30
-
-    # Horario laboral
-    dias_laborales: list[str] = field(default_factory=lambda: [
-        "lunes", "martes", "miercoles", "jueves", "viernes"
-    ])
-    hora_inicio: str = "08:00"
-    hora_fin: str = "18:00"
-
-    # Reintentos
-    max_reintentos_expedientes: int = 3
-    espera_reintentos_expedientes: int = 30  # segundos
-    max_reintentos_entradas: int = 3
-    espera_reintentos_entradas: int = 30  # segundos
-
-    # Notificaciones
-    notificar_nuevas_entradas: bool = True
-    notificar_cambios_expedientes: bool = True
-    notificar_errores: bool = True
-
-    # Verificaciones (habilitar/deshabilitar)
-    verificar_entradas: bool = True
-    verificar_expedientes: bool = True
-
-    # Avanzado
-    comparacion_automatica: bool = False
-    fecha_corte_expedientes: str | None = None
-
-    # Filtros de rango de fechas para entradas
-    fecha_desde_entradas: str | None = None  # Formato: YYYY-MM-DD o DD/MM/YYYY
-    fecha_hasta_entradas: str | None = None  # Formato: YYYY-MM-DD o DD/MM/YYYY
-
-    # Filtros de rango de fechas para expedientes
-    fecha_desde_expedientes: str | None = None  # Formato: YYYY-MM-DD o DD/MM/YYYY
-    fecha_hasta_expedientes: str | None = None  # Formato: YYYY-MM-DD o DD/MM/YYYY
-
-    def __post_init__(self):
-        """Valida la configuración después de la inicialización.
-
-        Raises:
-            ValidationError: Si algún parámetro es inválido
-            IntervalError: Si los intervalos están fuera de rango
-            DateRangeError: Si las fechas son inválidas
-            WorkHoursError: Si las horas laborales son inválidas
-        """
-        # Validar directorio
-        validar_directorio(self.directorio_datos, "directorio_datos")
-
-        # Validar intervalos (convertir minutos a segundos para validación)
-        validar_intervalo(
-            self.intervalos_laboral_expedientes * 60,
-            "intervalos_laboral_expedientes",
-            min_val=60,  # Mínimo 1 minuto
-            max_val=1440 * 60  # Máximo 24 horas
+    def __init__(
+        self,
+        modo: ModoMonitor = "automatico",
+        headless: bool = True,
+        directorio_datos: str = "data/monitor",
+        intervalos_laboral_expedientes: int = 15,
+        intervalos_laboral_entradas: int = 10,
+        intervalos_no_laboral_expedientes: int = 60,
+        intervalos_no_laboral_entradas: int = 30,
+        dias_laborales: list[str] | None = None,
+        hora_inicio: str = "08:00",
+        hora_fin: str = "18:00",
+        max_reintentos_expedientes: int = 3,
+        espera_reintentos_expedientes: int = 30,
+        max_reintentos_entradas: int = 3,
+        espera_reintentos_entradas: int = 30,
+        notificar_nuevas_entradas: bool = True,
+        notificar_cambios_expedientes: bool = True,
+        notificar_errores: bool = True,
+        verificar_entradas: bool = True,
+        verificar_expedientes: bool = True,
+        comparacion_automatica: bool = False,
+        fecha_corte_expedientes: str | None = None,
+        fecha_desde_entradas: str | None = None,
+        fecha_hasta_entradas: str | None = None,
+        fecha_desde_expedientes: str | None = None,
+        fecha_hasta_expedientes: str | None = None,
+    ) -> None:
+        shared_kwargs = dict(
+            modo_monitor=modo,
+            headless=headless,
+            directorio_monitor_datos=directorio_datos,
+            intervalos_laboral_expedientes=intervalos_laboral_expedientes,
+            intervalos_laboral_entradas=intervalos_laboral_entradas,
+            intervalos_no_laboral_expedientes=intervalos_no_laboral_expedientes,
+            intervalos_no_laboral_entradas=intervalos_no_laboral_entradas,
+            hora_inicio=hora_inicio,
+            hora_fin=hora_fin,
+            max_reintentos_expedientes=max_reintentos_expedientes,
+            espera_reintentos_expedientes=espera_reintentos_expedientes,
+            max_reintentos_entradas=max_reintentos_entradas,
+            espera_reintentos_entradas=espera_reintentos_entradas,
+            notificar_nuevas_entradas=notificar_nuevas_entradas,
+            notificar_cambios_expedientes=notificar_cambios_expedientes,
+            notificar_errores=notificar_errores,
+            verificar_entradas=verificar_entradas,
+            verificar_expedientes=verificar_expedientes,
+            comparacion_automatica=comparacion_automatica,
+            fecha_corte_expedientes=fecha_corte_expedientes,
+            fecha_desde_entradas=fecha_desde_entradas,
+            fecha_hasta_entradas=fecha_hasta_entradas,
+            fecha_desde_expedientes=fecha_desde_expedientes,
+            fecha_hasta_expedientes=fecha_hasta_expedientes,
         )
-        validar_intervalo(
-            self.intervalos_laboral_entradas * 60,
-            "intervalos_laboral_entradas",
-            min_val=60,
-            max_val=1440 * 60
-        )
-        validar_intervalo(
-            self.intervalos_no_laboral_expedientes * 60,
-            "intervalos_no_laboral_expedientes",
-            min_val=60,
-            max_val=1440 * 60
-        )
-        validar_intervalo(
-            self.intervalos_no_laboral_entradas * 60,
-            "intervalos_no_laboral_entradas",
-            min_val=60,
-            max_val=1440 * 60
-        )
+        if dias_laborales is not None:
+            shared_kwargs["dias_laborales"] = dias_laborales
 
-        # Validar espera de reintentos (en segundos)
-        validar_intervalo(
-            self.espera_reintentos_expedientes,
-            "espera_reintentos_expedientes",
-            min_val=1,
-            max_val=300  # Máximo 5 minutos
-        )
-        validar_intervalo(
-            self.espera_reintentos_entradas,
-            "espera_reintentos_entradas",
-            min_val=1,
-            max_val=300
-        )
+        super().__init__(**shared_kwargs)
 
-        # Validar número de reintentos
-        validar_max_reintentos(
-            self.max_reintentos_expedientes,
-            "max_reintentos_expedientes"
-        )
-        validar_max_reintentos(
-            self.max_reintentos_entradas,
-            "max_reintentos_entradas"
-        )
+    @property
+    def modo(self) -> ModoMonitor:
+        return self.modo_monitor
 
-        # Validar días laborales
-        validar_dias_laborales(self.dias_laborales, "dias_laborales")
+    @modo.setter
+    def modo(self, value: ModoMonitor) -> None:
+        self.modo_monitor = value
 
-        # Validar formato de horas
-        validar_formato_hora(self.hora_inicio, "hora_inicio")
-        validar_formato_hora(self.hora_fin, "hora_fin")
+    @property
+    def directorio_datos(self) -> str:
+        return self.directorio_monitor_datos
 
-        # Validar rango de horas
-        validar_rango_horas(self.hora_inicio, self.hora_fin)
-
-        # Validar fechas de entradas
-        validar_formato_fecha(self.fecha_desde_entradas, "fecha_desde_entradas")
-        validar_formato_fecha(self.fecha_hasta_entradas, "fecha_hasta_entradas")
-        validar_rango_fechas(
-            self.fecha_desde_entradas,
-            self.fecha_hasta_entradas,
-            "fecha_desde_entradas",
-            "fecha_hasta_entradas"
-        )
-
-        # Validar fechas de expedientes
-        validar_formato_fecha(self.fecha_desde_expedientes, "fecha_desde_expedientes")
-        validar_formato_fecha(self.fecha_hasta_expedientes, "fecha_hasta_expedientes")
-        validar_rango_fechas(
-            self.fecha_desde_expedientes,
-            self.fecha_hasta_expedientes,
-            "fecha_desde_expedientes",
-            "fecha_hasta_expedientes"
-        )
-
-        # Validar fecha_corte_expedientes (formato legacy)
-        validar_formato_fecha(self.fecha_corte_expedientes, "fecha_corte_expedientes")
+    @directorio_datos.setter
+    def directorio_datos(self, value: str) -> None:
+        self.directorio_monitor_datos = value
 
     @staticmethod
     def _sanitize_data(data: dict) -> dict:
@@ -304,7 +228,7 @@ class MonitorConfig:
         path.parent.mkdir(parents=True, exist_ok=True)
 
         with path.open("w", encoding="utf-8") as f:
-            json.dump(asdict(self), f, indent=2, ensure_ascii=False)
+            json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
 
     def to_dict(self) -> dict:
         """Convierte la configuración a diccionario.
@@ -312,7 +236,10 @@ class MonitorConfig:
         Returns:
             dict: Configuración como diccionario
         """
-        return asdict(self)
+        data = asdict(self)
+        data["modo"] = data.pop("modo_monitor")
+        data["directorio_datos"] = data.pop("directorio_monitor_datos")
+        return data
 
     @classmethod
     def from_system_config(cls, system_config) -> "MonitorConfig":
