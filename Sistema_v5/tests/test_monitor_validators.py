@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from pjn.monitor.validators import (
+from configuracion.monitor.validators import (
     validar_intervalo,
     validar_max_reintentos,
     validar_formato_fecha,
@@ -18,7 +18,7 @@ from pjn.monitor.validators import (
     validar_dias_laborales,
     validar_directorio,
 )
-from pjn.monitor.exceptions import (
+from configuracion.monitor.exceptions import (
     IntervalError,
     DateRangeError,
     WorkHoursError,

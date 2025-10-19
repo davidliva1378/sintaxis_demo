@@ -13,7 +13,7 @@ from pathlib import Path
 # Agregar el directorio padre al path para importar pjn
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from pjn.system_config import SystemConfig
+from configuracion.core import SystemConfig
 
 
 def migrar_configuracion(monitor_path: str = "config/monitor.json", output_path: str = "config/sistema.json"):

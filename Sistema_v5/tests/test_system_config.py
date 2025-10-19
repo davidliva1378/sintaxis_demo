@@ -9,8 +9,8 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-from pjn.system_config import SystemConfig, ModoMonitor, ModoComparacion, FormatoReporte, NivelLog
-from pjn.monitor.exceptions import (
+from configuracion.core import SystemConfig, ModoMonitor, ModoComparacion, FormatoReporte, NivelLog
+from configuracion.monitor.exceptions import (
     ValidationError,
     IntervalError,
     DateRangeError,

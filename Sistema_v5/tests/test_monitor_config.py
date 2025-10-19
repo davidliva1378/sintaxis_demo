@@ -9,7 +9,7 @@ import pytest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from pjn.monitor.config import MonitorConfig
+from configuracion.monitor import MonitorConfig
 
 
 class TestMonitorConfig:

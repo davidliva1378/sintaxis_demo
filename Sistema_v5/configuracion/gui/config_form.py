@@ -19,7 +19,7 @@ if __package__ in (None, ""):
     if _project_root_str not in sys.path:
         sys.path.append(_project_root_str)
 
-from Sistema_v5.pjn.system_config import (
+from ..core.system_config import (
     SystemConfig,
     ModoMonitor,
     ModoComparacion,

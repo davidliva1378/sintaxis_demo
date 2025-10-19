@@ -10,7 +10,7 @@ Este módulo verifica que el objeto de configuración funciona correctamente:
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pjn.models.extraccion_config import ExtraccionExpedientesConfig
+from configuracion.core import ExtraccionExpedientesConfig
 from pjn.models.expediente import ExpedienteResumen
 
 

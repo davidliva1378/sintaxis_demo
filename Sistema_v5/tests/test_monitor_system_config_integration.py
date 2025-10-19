@@ -11,8 +11,8 @@ import pytest
 from pathlib import Path
 import json
 
-from pjn import SystemConfig
-from pjn.monitor.config import MonitorConfig
+from configuracion.core import SystemConfig
+from configuracion.monitor import MonitorConfig
 from pjn.monitor.core import MonitorPJN
 
 

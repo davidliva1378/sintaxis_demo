@@ -28,7 +28,7 @@ from pathlib import Path
 # Agregar directorio raíz al path para imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from pjn.monitor.config import MonitorConfig
+from configuracion.monitor import MonitorConfig
 from pjn.monitor.core import MonitorPJN
 from pjn.monitor.scheduler import SchedulerMonitor
 from pjn.utils.logging import get_logger, setup_logging

@@ -8,7 +8,7 @@ import pytest
 from datetime import datetime, time
 from unittest.mock import Mock, patch, AsyncMock
 
-from pjn.monitor.config import MonitorConfig
+from configuracion.monitor import MonitorConfig
 from pjn.monitor.core import MonitorPJN
 from pjn.monitor.scheduler import SchedulerMonitor
 
