@@ -67,7 +67,7 @@ class MonitorSharedConfig:
     def __post_init__(self) -> None:
         """Ejecuta las validaciones comunes para el monitoreo."""
 
-        validar_directorio(
+        self.directorio_monitor_datos = validar_directorio(
             self.directorio_monitor_datos, "directorio_monitor_datos"
         )
 

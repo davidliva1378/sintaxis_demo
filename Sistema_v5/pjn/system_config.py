@@ -380,7 +380,12 @@ class SystemConfig(MonitorSharedConfig):
             "directorio_monitor_datos",
         ]:
             dir_value = getattr(self, dir_attr)
-            validar_directorio(dir_value, dir_attr)
+            normalized = validar_directorio(
+                dir_value,
+                dir_attr,
+                create=True,
+            )
+            setattr(self, dir_attr, normalized)
 
         validar_max_reintentos(
             self.max_reintentos_descarga,

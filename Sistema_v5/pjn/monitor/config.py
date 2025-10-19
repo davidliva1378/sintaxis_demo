@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .shared_config import ModoMonitor, MonitorSharedConfig
+from .validators import validar_directorio
 from ..utils.env import parse_bool, parse_int
 
 
@@ -132,6 +133,14 @@ class MonitorConfig(MonitorSharedConfig):
     @directorio_datos.setter
     def directorio_datos(self, value: str) -> None:
         self.directorio_monitor_datos = value
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.directorio_datos = validar_directorio(
+            self.directorio_datos,
+            "directorio_datos",
+            create=True,
+        )
 
     @staticmethod
     def _sanitize_data(data: dict) -> dict:
