@@ -10,7 +10,7 @@ import sys
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Sequence
 
 if __package__ in (None, ""):
     _PACKAGE_ROOT = Path(__file__).resolve().parents[2]
@@ -919,9 +919,40 @@ class ConfigForm(tk.Tk):
                 messagebox.showerror("Error", f"Error al importar:\n{e}")
 
 
-def main():
-    """Función principal para ejecutar el formulario."""
-    app = ConfigForm()
+def main(argv: Sequence[str] | None = None) -> None:
+    """Punto de entrada de línea de comandos para el formulario.
+
+    Parameters
+    ----------
+    argv:
+        Argumentos recibidos desde la CLI. Se admite ``None`` para utilizar
+        ``sys.argv[1:]`` por defecto.
+    """
+
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Configurador del Sistema PJN"
+    )
+    parser.add_argument(
+        "--config",
+        "-c",
+        default="config/sistema.json",
+        help="Ruta al archivo de configuración (default: config/sistema.json)",
+    )
+
+    args = parser.parse_args(list(argv) if argv is not None else None)
+
+    print("=" * 70)
+    print("CONFIGURADOR DEL SISTEMA PJN")
+    print("=" * 70)
+    print()
+    print(f"Archivo de configuración: {args.config}")
+    print()
+    print("Abriendo interfaz gráfica...")
+    print()
+
+    app = ConfigForm(config_path=args.config)
     app.mainloop()
 
 

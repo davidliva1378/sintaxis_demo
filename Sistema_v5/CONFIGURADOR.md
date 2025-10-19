@@ -58,6 +58,11 @@ Sistema_v5/
   `backup`, pensados para automatización y entornos sin interfaz gráfica.
 - **GUI** (`Sistema_v5.configuracion.gui.config_form`): formulario con pestañas
   que opera sobre `config/sistema.json` y permite importar/exportar configuraciones.
+- **Compatibilidad legada**: `Sistema_v5.pjn.gui.config_form` y el script
+  `scripts/configurar_sistema.py` siguen disponibles y delegan en la nueva
+  implementación, por lo que podés ejecutar `python Sistema_v5/pjn/gui/config_form.py`
+  o `python Sistema_v5/scripts/configurar_sistema.py` si tenés automatizaciones
+  existentes.
 
 > El módulo `Sistema_v5.pjn.gui` se mantiene como envoltorio de compatibilidad,
 > pero la implementación oficial vive ahora bajo `Sistema_v5/configuracion`.
