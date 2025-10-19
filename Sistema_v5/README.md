@@ -105,19 +105,23 @@ if __name__ == "__main__":
 
 ## ⚙️ Configuración del Sistema
 
-Sistema_v5 incluye un **configurador gráfico completo** para gestionar todas las opciones del sistema sin editar archivos JSON manualmente.
+Sistema_v5 incluye un **configurador CLI completo** para gestionar todas las opciones del sistema sin editar archivos JSON manualmente.
 
-### 🖥️ Interfaz Gráfica de Configuración
+### 🛠️ Configurador por Línea de Comandos
 
 ```bash
-# Abrir el configurador
-python scripts/configurar_sistema.py
+# Ejecutar el asistente interactivo (recorre todas las categorías)
+python -m Sistema_v5.cli.configuracion wizard
 
-# Usar un archivo de configuración específico
-python scripts/configurar_sistema.py --config mi_config.json
+# Mostrar la configuración actual en tabla o JSON
+python -m Sistema_v5.cli.configuracion show --format table
+python -m Sistema_v5.cli.configuracion show --format json
+
+# Actualizar campos puntuales sin asistente
+python -m Sistema_v5.cli.configuracion set modo_monitor=laboral nivel_log=DEBUG
 ```
 
-El configurador proporciona una interfaz con pestañas para configurar:
+El asistente recorre todas las secciones y permite aceptar el valor actual, limpiarlo o introducir uno nuevo. Además, el subcomando `set` acepta pares `campo=valor` para automatizar cambios en CI/CD.
 
 #### 📁 **Directorios**
 - Extracción inicial (fuente para comparaciones)

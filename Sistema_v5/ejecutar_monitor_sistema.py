@@ -78,7 +78,10 @@ async def main():
             print(f"✅ Configuración por defecto creada en: {args.config}")
             print()
             print("Por favor edita la configuración y vuelve a ejecutar.")
-            print(f"  python scripts/configurar_sistema.py --config {args.config}")
+            print(
+                "  python -m Sistema_v5.cli.configuracion wizard "
+                f"--config {args.config}"
+            )
             return
 
     monitor_config = MonitorConfig.from_system_config(system_config)
