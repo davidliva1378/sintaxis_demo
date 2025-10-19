@@ -15,7 +15,7 @@ import warnings
 
 warnings.warn(
     "Importing from pjn.models.extraccion_config is deprecated. "
-    "Use 'from Sistema_v5.configuracion.core.extraccion_config import ExtraccionExpedientesConfig' instead.",
+    "Use 'from configuracion.core.extraccion_config import ExtraccionExpedientesConfig' instead.",
     DeprecationWarning,
     stacklevel=2
 )

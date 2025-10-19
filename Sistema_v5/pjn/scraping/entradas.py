@@ -537,9 +537,9 @@ async def extraer_entradas_datos(
                                             if f < rango_desde:
                                                 filas_consecutivas_antiguas += 1
                                                 logger.debug(f"  -> Filtrada (antigua): {fecha_iso} (consecutivas: {filas_consecutivas_antiguas})")
-                                                # Corte temprano: si encontramos 10 filas consecutivas más antiguas que fecha_desde
-                                                if filas_consecutivas_antiguas >= 10:
-                                                    logger.info(f"Corte temprano: 10 filas consecutivas más antiguas que {rango_desde}")
+                                                # Corte temprano: si encontramos 3 filas consecutivas más antiguas que fecha_desde
+                                                if filas_consecutivas_antiguas >= 3:
+                                                    logger.info(f"⏹️ Corte temprano: 3 filas consecutivas más antiguas que {rango_desde}")
                                                     break
                         except Exception:
                             pass
@@ -569,7 +569,7 @@ async def extraer_entradas_datos(
                 continue
 
         # Si se activó el corte temprano, salir del while
-        if rango_desde and filas_consecutivas_antiguas >= 10:
+        if rango_desde and filas_consecutivas_antiguas >= 3:
             break
 
         # Detección de fin
