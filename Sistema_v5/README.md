@@ -138,6 +138,20 @@ El configurador proporciona una interfaz con pestañas para configurar:
 - Timeouts (default, login, descarga)
 - Reintentos (expedientes, entradas, descargas)
 
+### 🔁 Carga unificada en scripts
+
+Los scripts `mi_monitor.py`, `ejecutar_monitor_continuo.py`, `ejecutar_monitor_tray.py`,
+`ejecutar_monitor_statusbar.py` y `ejecutar_monitor_sistema.py` siguen el mismo flujo:
+
+1. ✅ Buscan overrides en variables de entorno con prefijo `SISTEMA_` (por ejemplo,
+   `SISTEMA_MODO_MONITOR=laboral`).
+2. ✅ Si no hay overrides, leen `config/sistema.json` (se crea automáticamente con
+   valores por defecto si no existe).
+3. ♻️ Mantienen compatibilidad con `config/monitor.json` como último recurso legacy.
+
+> Consejo: puedes cambiar el prefijo usado por los scripts CLI con `--env-prefix` y
+> compartir la misma configuración en distintos entornos sin duplicar archivos.
+
 #### 🔧 **Sistema**
 - Nivel de logging
 - Rotación y tamaño de logs
