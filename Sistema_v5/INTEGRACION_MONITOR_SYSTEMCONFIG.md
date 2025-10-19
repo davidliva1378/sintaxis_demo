@@ -303,8 +303,8 @@ config.to_file("config/sistema.json")
 ### Para Nuevos Proyectos
 
 ```bash
-# 1. Crear sistema.json
-python scripts/configurar_sistema.py
+# 1. Crear/editar sistema.json con el asistente
+python -m Sistema_v5.cli.configuracion wizard
 
 # 2. Usar script nuevo
 python ejecutar_monitor_sistema.py
@@ -347,8 +347,8 @@ python ejecutar_monitor_sistema.py  # Usa sistema.json
 
 **Solución**:
 ```bash
-# Opción 1: Crear sistema.json con GUI
-python scripts/configurar_sistema.py
+# Opción 1: Crear sistema.json con el asistente CLI
+python -m Sistema_v5.cli.configuracion wizard
 
 # Opción 2: Crear por defecto
 python -c "from pjn import SystemConfig; SystemConfig().to_file('config/sistema.json')"
@@ -366,7 +366,7 @@ python -c "from pjn import SystemConfig; SystemConfig().to_file('config/sistema.
 
 **Solución**: Los campos adicionales tienen valores por defecto. Para personalizar:
 ```bash
-python scripts/configurar_sistema.py
+python -m Sistema_v5.cli.configuracion wizard
 ```
 
 ---

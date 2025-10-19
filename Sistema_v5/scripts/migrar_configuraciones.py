@@ -100,7 +100,7 @@ def migrar_configuracion(monitor_path: str = "config/monitor.json", output_path:
     print("=" * 70)
     print()
     print(f"Para editar la configuración, use:")
-    print(f"  python scripts/configurar_sistema.py")
+    print(f"  python -m Sistema_v5.cli.configuracion wizard")
     print()
 
 
