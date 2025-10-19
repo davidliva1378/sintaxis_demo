@@ -105,19 +105,23 @@ if __name__ == "__main__":
 
 ## ⚙️ Configuración del Sistema
 
-Sistema_v5 incluye un **configurador gráfico completo** para gestionar todas las opciones del sistema sin editar archivos JSON manualmente.
+Sistema_v5 incluye un **configurador CLI completo** para gestionar todas las opciones del sistema sin editar archivos JSON manualmente.
 
-### 🖥️ Interfaz Gráfica de Configuración
+### 🛠️ Configurador por Línea de Comandos
 
 ```bash
-# Abrir el configurador
-python scripts/configurar_sistema.py
+# Ejecutar el asistente interactivo (recorre todas las categorías)
+python -m Sistema_v5.cli.configuracion wizard
 
-# Usar un archivo de configuración específico
-python scripts/configurar_sistema.py --config mi_config.json
+# Mostrar la configuración actual en tabla o JSON
+python -m Sistema_v5.cli.configuracion show --format table
+python -m Sistema_v5.cli.configuracion show --format json
+
+# Actualizar campos puntuales sin asistente
+python -m Sistema_v5.cli.configuracion set modo_monitor=laboral nivel_log=DEBUG
 ```
 
-El configurador proporciona una interfaz con pestañas para configurar:
+El asistente recorre todas las secciones y permite aceptar el valor actual, limpiarlo o introducir uno nuevo. Además, el subcomando `set` acepta pares `campo=valor` para automatizar cambios en CI/CD.
 
 #### 📁 **Directorios**
 - Extracción inicial (fuente para comparaciones)
@@ -138,6 +142,20 @@ El configurador proporciona una interfaz con pestañas para configurar:
 - Timeouts (default, login, descarga)
 - Reintentos (expedientes, entradas, descargas)
 
+### 🔁 Carga unificada en scripts
+
+Los scripts `mi_monitor.py`, `ejecutar_monitor_continuo.py`, `ejecutar_monitor_tray.py`,
+`ejecutar_monitor_statusbar.py` y `ejecutar_monitor_sistema.py` siguen el mismo flujo:
+
+1. ✅ Buscan overrides en variables de entorno con prefijo `SISTEMA_` (por ejemplo,
+   `SISTEMA_MODO_MONITOR=laboral`).
+2. ✅ Si no hay overrides, leen `config/sistema.json` (se crea automáticamente con
+   valores por defecto si no existe).
+3. ♻️ Mantienen compatibilidad con `config/monitor.json` como último recurso legacy.
+
+> Consejo: puedes cambiar el prefijo usado por los scripts CLI con `--env-prefix` y
+> compartir la misma configuración en distintos entornos sin duplicar archivos.
+
 #### 🔧 **Sistema**
 - Nivel de logging
 - Rotación y tamaño de logs
@@ -145,6 +163,24 @@ El configurador proporciona una interfaz con pestañas para configurar:
 - Sesión del portal
 - Límites de recursos
 - Generación de reportes
+
+### 🖥️ Configurador Gráfico
+
+Si preferís una interfaz visual, el asistente Tkinter vive ahora en
+[`Sistema_v5/configuracion/gui/config_form.py`](configuracion/gui/config_form.py).
+
+```bash
+# Abrir la interfaz gráfica desde cualquier entorno virtual
+python -m Sistema_v5.configuracion.gui.config_form
+
+# También podés ejecutarlo directamente si estás en la raíz del repo
+python Sistema_v5/configuracion/gui/config_form.py
+```
+
+Ambos comandos cargan la misma ventana con pestañas para directorios,
+monitoreo, extracción y sistema. El formulario lee y guarda el archivo
+`config/sistema.json`, preserva los metadatos automáticos y permite
+importar/exportar configuraciones.
 
 ### 📝 Configuración Programática
 
@@ -276,6 +312,11 @@ Sistema_v5/
 │   │   └── pagination.py         # Estrategias de paginación
 │   ├── persistence/              # Persistencia de datos
 │   └── utils/                    # Utilidades
+│
+├── configuracion/                # Herramientas de configuración (GUI)
+│   └── gui/config_form.py        # Formulario Tkinter
+├── cli/                          # Herramientas de configuración (CLI)
+│   └── configuracion.py          # Asistente y utilidades por terminal
 │
 ├── docs/                         # 📚 Documentación completa
 │   ├── README_DOCUMENTACION.md   # 👈 Índice de documentación

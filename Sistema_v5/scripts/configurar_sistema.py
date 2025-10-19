@@ -1,55 +1,29 @@
-"""Script launcher para el configurador del sistema PJN.
+"""Script legado - redirige al nuevo configurador CLI."""
 
-Este script abre la interfaz gráfica de configuración del sistema.
+from __future__ import annotations
 
-Uso:
-    python scripts/configurar_sistema.py
-    python scripts/configurar_sistema.py --config config/mi_config.json
-"""
-
-import sys
-from pathlib import Path
-
-# Agregar el directorio padre al path para importar pjn
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from pjn.gui.config_form import ConfigForm
+from textwrap import dedent
 
 
-def main():
-    """Función principal."""
-    import argparse
+def main() -> None:
+    """Informa la nueva ruta del configurador y finaliza."""
 
-    parser = argparse.ArgumentParser(
-        description="Configurador del Sistema PJN"
-    )
-    parser.add_argument(
-        "--config",
-        "-c",
-        default="config/sistema.json",
-        help="Ruta al archivo de configuración (default: config/sistema.json)"
-    )
+    mensaje = dedent(
+        """
+        El configurador se centralizó en el paquete Sistema_v5/configuracion/.
 
-    args = parser.parse_args()
+        Opciones disponibles:
 
-    print("=" * 70)
-    print("CONFIGURADOR DEL SISTEMA PJN")
-    print("=" * 70)
-    print()
-    print(f"Archivo de configuración: {args.config}")
-    print()
-    print("Abriendo interfaz gráfica...")
-    print()
+            python -m Sistema_v5.cli.configuracion wizard   # Asistente por terminal
+            python -m Sistema_v5.cli.configuracion show     # Ver configuración
+            python -m Sistema_v5.cli.configuracion set ...  # Actualizar campos
+            python -m Sistema_v5.configuracion.gui.config_form  # Interfaz gráfica
 
-    # Crear y ejecutar la aplicación
-    try:
-        app = ConfigForm(config_path=args.config)
-        app.mainloop()
-    except Exception as e:
-        print(f"\n❌ Error al iniciar el configurador: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+        Consulta --help en la CLI para ver todos los subcomandos.
+        """
+    ).strip()
+
+    print(mensaje)
 
 
 if __name__ == "__main__":
