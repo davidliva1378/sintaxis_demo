@@ -96,6 +96,10 @@ Configura dónde se guardan los archivos del sistema:
 - Botón 📂 para explorar directorios
 - Tooltip descriptivo
 
+> 🗂️ **Tip**: Puedes indicar rutas relativas o con `~`. El sistema las
+> convierte automáticamente en rutas absolutas y crea las carpetas si no
+> existen.
+
 ### 🔍 Pestaña Monitoreo
 
 Configura el comportamiento del monitor:

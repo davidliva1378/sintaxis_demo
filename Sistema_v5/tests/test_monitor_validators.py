@@ -4,6 +4,8 @@ Este módulo prueba todas las funciones de validación para parámetros
 de configuración del monitor PJN.
 """
 
+from pathlib import Path
+
 import pytest
 
 from pjn.monitor.validators import (
@@ -357,12 +359,45 @@ class TestValidarDirectorio:
     # Casos exitosos
     # =========================================================================
 
-    def test_directorio_valido(self):
-        """Directorios válidos."""
-        validar_directorio("data/monitor")
-        validar_directorio("/tmp/monitor")
-        validar_directorio("C:\\Users\\Monitor")
-        validar_directorio("./monitor")
+    def test_directorio_pathlike_valido(self, tmp_path):
+        """Permite PathLike y devuelve la ruta absoluta normalizada."""
+        carpeta = tmp_path / "monitor"
+        carpeta.mkdir()
+
+        resultado = validar_directorio(carpeta)
+
+        assert isinstance(resultado, str)
+        assert resultado == str(carpeta.resolve())
+
+    def test_directorio_relativo_se_normaliza(self, tmp_path, monkeypatch):
+        """Las rutas relativas se resuelven contra el cwd actual."""
+        monkeypatch.chdir(tmp_path)
+
+        ruta_relativa = Path("./sub/../datos/monitor")
+        resultado = validar_directorio(ruta_relativa)
+
+        esperado = (tmp_path / "datos" / "monitor").resolve()
+        assert resultado == str(esperado)
+        assert not esperado.exists()
+
+    def test_directorio_con_home_se_expande(self, tmp_path, monkeypatch):
+        """El caracter ~ se expande usando HOME."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+
+        resultado = validar_directorio("~/monitor_datos", create=True)
+
+        esperado = (tmp_path / "monitor_datos").resolve()
+        assert resultado == str(esperado)
+        assert esperado.exists()
+
+    def test_directorio_inexistente_se_crea(self, tmp_path):
+        """Con create=True se crea la carpeta (y padres)."""
+        destino = tmp_path / "nuevo" / "monitor"
+
+        resultado = validar_directorio(destino, create=True)
+
+        assert resultado == str(destino.resolve())
+        assert destino.exists()
 
     # =========================================================================
     # Casos de error
@@ -378,7 +413,7 @@ class TestValidarDirectorio:
 
     def test_directorio_tipo_incorrecto(self):
         """Tipo incorrecto lanza ValidationError."""
-        with pytest.raises(ValidationError, match="debe ser un string"):
+        with pytest.raises(ValidationError, match="string o PathLike"):
             validar_directorio(123)  # type: ignore
 
     def test_directorio_caracteres_invalidos(self):

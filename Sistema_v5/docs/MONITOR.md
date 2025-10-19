@@ -425,6 +425,10 @@ El monitor se configura mediante `config/monitor.json`:
 }
 ```
 
+> ℹ️ **Nota sobre rutas**: puedes definir rutas relativas o con `~`.
+> El sistema las expandirá automáticamente a rutas absolutas y creará
+> las carpetas necesarias durante la primera ejecución.
+
 ### Parametros principales
 
 #### Modo de operacion

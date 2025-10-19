@@ -6,8 +6,10 @@ de configuración del monitor PJN.
 
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime, time
+from pathlib import Path
 from typing import Any
 
 from .exceptions import ValidationError, IntervalError, DateRangeError, WorkHoursError
@@ -300,22 +302,34 @@ def validar_dias_laborales(dias: list[str] | None, nombre: str = "dias_laborales
 # Validación de directorios
 # ============================================================================
 
-def validar_directorio(directorio: str, nombre: str = "directorio_datos") -> None:
-    """Valida que un directorio sea una ruta válida.
+def validar_directorio(
+    directorio: str | os.PathLike[str],
+    nombre: str = "directorio_datos",
+    *,
+    create: bool = False,
+) -> str:
+    """Valida y normaliza una ruta de directorio.
 
     Args:
-        directorio: Ruta del directorio
+        directorio: Ruta del directorio (str o PathLike)
         nombre: Nombre del parámetro para mensajes de error
+        create: Si ``True``, crea el directorio (incluyendo padres)
+
+    Returns:
+        str: Ruta normalizada y absoluta del directorio
 
     Raises:
         ValidationError: Si la ruta es inválida
     """
-    if not isinstance(directorio, str):
+
+    if not isinstance(directorio, (str, os.PathLike)):
         raise ValidationError(
-            f"{nombre} debe ser un string, recibido: {type(directorio).__name__}"
+            f"{nombre} debe ser un string o PathLike, recibido: {type(directorio).__name__}"
         )
 
-    if not directorio or directorio.isspace():
+    directorio_str = os.fspath(directorio)
+
+    if not directorio_str or directorio_str.isspace():
         raise ValidationError(
             f"{nombre} no puede estar vacío"
         )
@@ -323,10 +337,17 @@ def validar_directorio(directorio: str, nombre: str = "directorio_datos") -> Non
     # Validar caracteres inválidos para rutas
     caracteres_invalidos = ["\0", "\n", "\r"]
     for char in caracteres_invalidos:
-        if char in directorio:
+        if char in directorio_str:
             raise ValidationError(
                 f"{nombre} contiene caracteres inválidos"
             )
+
+    ruta = Path(directorio_str).expanduser().resolve()
+
+    if create:
+        ruta.mkdir(parents=True, exist_ok=True)
+
+    return str(ruta)
 
 
 __all__ = [
