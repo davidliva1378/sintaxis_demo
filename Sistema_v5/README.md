@@ -164,6 +164,24 @@ Los scripts `mi_monitor.py`, `ejecutar_monitor_continuo.py`, `ejecutar_monitor_t
 - Límites de recursos
 - Generación de reportes
 
+### 🖥️ Configurador Gráfico
+
+Si preferís una interfaz visual, el asistente Tkinter vive ahora en
+[`Sistema_v5/configuracion/gui/config_form.py`](configuracion/gui/config_form.py).
+
+```bash
+# Abrir la interfaz gráfica desde cualquier entorno virtual
+python -m Sistema_v5.configuracion.gui.config_form
+
+# También podés ejecutarlo directamente si estás en la raíz del repo
+python Sistema_v5/configuracion/gui/config_form.py
+```
+
+Ambos comandos cargan la misma ventana con pestañas para directorios,
+monitoreo, extracción y sistema. El formulario lee y guarda el archivo
+`config/sistema.json`, preserva los metadatos automáticos y permite
+importar/exportar configuraciones.
+
 ### 📝 Configuración Programática
 
 También puedes usar `SystemConfig` directamente en tu código:
@@ -294,6 +312,11 @@ Sistema_v5/
 │   │   └── pagination.py         # Estrategias de paginación
 │   ├── persistence/              # Persistencia de datos
 │   └── utils/                    # Utilidades
+│
+├── configuracion/                # Herramientas de configuración (GUI)
+│   └── gui/config_form.py        # Formulario Tkinter
+├── cli/                          # Herramientas de configuración (CLI)
+│   └── configuracion.py          # Asistente y utilidades por terminal
 │
 ├── docs/                         # 📚 Documentación completa
 │   ├── README_DOCUMENTACION.md   # 👈 Índice de documentación
