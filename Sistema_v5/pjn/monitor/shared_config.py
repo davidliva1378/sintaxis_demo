@@ -20,9 +20,15 @@ warnings.warn(
     stacklevel=2
 )
 
-from Sistema_v5.configuracion.monitor.shared_config import (
-    ModoMonitor,
-    MonitorSharedConfig,
-)
+try:
+    from ...configuracion.monitor.shared_config import (
+        ModoMonitor,
+        MonitorSharedConfig,
+    )
+except ImportError:
+    from configuracion.monitor.shared_config import (
+        ModoMonitor,
+        MonitorSharedConfig,
+    )
 
 __all__ = ["ModoMonitor", "MonitorSharedConfig"]

@@ -20,15 +20,38 @@ warnings.warn(
     stacklevel=2
 )
 
-from Sistema_v5.configuracion.monitor.exceptions import (
-    ValidationError,
-    IntervalError,
-    DateRangeError,
-    WorkHoursError,
-    SchedulerError,
-    NotificationError,
-    StorageError,
-)
+# Intentar import relativo primero (cuando Sistema_v5 es un paquete real)
+# Si falla, intentar import absoluto (cuando Sistema_v5 está en sys.path)
+try:
+    from ...configuracion.monitor.exceptions import (
+        ValidationError,
+        IntervalError,
+        DateRangeError,
+        WorkHoursError,
+        SchedulerError,
+        NotificationError,
+        StorageError,
+        ConfigurationError,
+        VerificationError,
+        AuthenticationError,
+        ExtractionError,
+        NetworkError,
+    )
+except ImportError:
+    from configuracion.monitor.exceptions import (
+        ValidationError,
+        IntervalError,
+        DateRangeError,
+        WorkHoursError,
+        SchedulerError,
+        NotificationError,
+        StorageError,
+        ConfigurationError,
+        VerificationError,
+        AuthenticationError,
+        ExtractionError,
+        NetworkError,
+    )
 
 __all__ = [
     "ValidationError",
@@ -38,4 +61,9 @@ __all__ = [
     "SchedulerError",
     "NotificationError",
     "StorageError",
+    "ConfigurationError",
+    "VerificationError",
+    "AuthenticationError",
+    "ExtractionError",
+    "NetworkError",
 ]

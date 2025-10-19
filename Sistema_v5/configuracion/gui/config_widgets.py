@@ -297,13 +297,13 @@ class IntervalInput(ttk.Frame):
         self.min_value = min_value
         self.max_value = max_value
 
-        # Variable de control
-        self.value_var = tk.IntVar(value=initial_value)
+        # Variable de control (usar 0 si initial_value es None)
+        self.value_var = tk.IntVar(value=initial_value if initial_value is not None else 0)
 
-        # Spinbox
+        # Spinbox (permitir 0 para "no configurado")
         self.spinbox = ttk.Spinbox(
             self,
-            from_=min_value,
+            from_=0,  # Permitir 0 para "no configurado"
             to=max_value,
             width=10,
             textvariable=self.value_var
@@ -313,25 +313,36 @@ class IntervalInput(ttk.Frame):
         # Label de unidad
         ttk.Label(self, text=unit).pack(side=tk.LEFT)
 
-    def get(self) -> int:
+    def get(self) -> int | None:
         """Obtiene el valor del intervalo.
 
         Returns:
-            int: Valor del intervalo
+            int | None: Valor del intervalo, o None si es 0 (no configurado)
         """
         try:
             value = int(self.value_var.get())
-            return max(self.min_value, min(value, self.max_value))
+            # Primero chequear si es 0 (no configurado)
+            if value == 0:
+                return None
+            # Aplicar límites solo si no es 0
+            if value < self.min_value:
+                value = self.min_value
+            if value > self.max_value:
+                value = self.max_value
+            return value
         except:
-            return self.min_value
+            return None
 
-    def set(self, value: int) -> None:
+    def set(self, value: int | None) -> None:
         """Establece el valor del intervalo.
 
         Args:
-            value: Nuevo valor
+            value: Nuevo valor (None para dejar vacío)
         """
-        self.value_var.set(max(self.min_value, min(value, self.max_value)))
+        if value is None or value == 0:
+            self.value_var.set(0)  # 0 representa "no configurado"
+        else:
+            self.value_var.set(max(self.min_value, min(value, self.max_value)))
 
 
 class DaysSelector(ttk.Frame):

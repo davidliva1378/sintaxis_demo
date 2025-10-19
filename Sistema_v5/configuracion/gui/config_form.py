@@ -389,7 +389,27 @@ class ConfigForm(tk.Tk):
         self.mon_widgets["fecha_hasta_entradas"] = DatePicker(entradas_frame)
         self.mon_widgets["fecha_hasta_entradas"].grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
 
-        ttk.Label(frame, text="Filtros de fecha para expedientes:").pack(anchor=tk.W)
+        # Días hacia atrás (alternativa a fechas específicas)
+        ttk.Label(entradas_frame, text="O días atrás:").grid(row=2, column=0, sticky=tk.W, pady=2)
+        self.mon_widgets["dias_atras_entradas"] = IntervalInput(
+            entradas_frame,
+            initial_value=None,
+            unit="días",
+            min_value=1,
+            max_value=365
+        )
+        self.mon_widgets["dias_atras_entradas"].grid(row=2, column=1, sticky=tk.W, padx=(10, 0))
+
+        # Nota explicativa
+        nota_label = ttk.Label(
+            entradas_frame,
+            text="(Si especifica 'días atrás', anula 'Desde')",
+            font=("TkDefaultFont", 8, "italic"),
+            foreground="gray"
+        )
+        nota_label.grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=(2, 0))
+
+        ttk.Label(frame, text="Filtros de fecha para expedientes:").pack(anchor=tk.W, pady=(10, 0))
         expedientes_frame = ttk.Frame(frame)
         expedientes_frame.pack(fill=tk.X, padx=20, pady=(5, 10))
 
@@ -406,6 +426,77 @@ class ConfigForm(tk.Tk):
         corte_frame.pack(fill=tk.X, padx=20, pady=(5, 0))
         self.mon_widgets["fecha_corte_expedientes"] = DatePicker(corte_frame)
         self.mon_widgets["fecha_corte_expedientes"].pack(anchor=tk.W)
+
+        # Días hacia atrás para expedientes
+        ttk.Label(frame, text="O días atrás para expedientes:").pack(anchor=tk.W, pady=(10, 5))
+        dias_atras_exp_frame = ttk.Frame(frame)
+        dias_atras_exp_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
+
+        self.mon_widgets["dias_atras_expedientes"] = IntervalInput(
+            dias_atras_exp_frame,
+            initial_value=None,
+            unit="días",
+            min_value=1,
+            max_value=365
+        )
+        self.mon_widgets["dias_atras_expedientes"].pack(anchor=tk.W)
+
+        # Configuración avanzada de extracción de expedientes
+        frame_exp_avanzado = ttk.LabelFrame(scrollable_frame, text="Extracción de Expedientes - Avanzado", padding=10)
+        frame_exp_avanzado.pack(fill=tk.X, padx=5, pady=5)
+
+        # Extracción completa
+        self.mon_widgets["extraccion_expedientes_completa"] = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            frame_exp_avanzado,
+            text="Extracción completa (sin límite de páginas)",
+            variable=self.mon_widgets["extraccion_expedientes_completa"]
+        ).pack(anchor=tk.W, pady=(0, 10))
+
+        # Ordenamiento
+        orden_subframe = ttk.Frame(frame_exp_avanzado)
+        orden_subframe.pack(fill=tk.X, pady=(0, 10))
+
+        ttk.Label(orden_subframe, text="Ordenar por:").pack(side=tk.LEFT, padx=(0, 10))
+        self.mon_widgets["expedientes_orden"] = ttk.Combobox(
+            orden_subframe,
+            values=["Sin orden", "Fecha", "Carátula", "Oficina", "Situación"],
+            state="readonly",
+            width=20
+        )
+        self.mon_widgets["expedientes_orden"].set("Fecha")
+        self.mon_widgets["expedientes_orden"].pack(side=tk.LEFT)
+
+        # Detener en duplicados
+        self.mon_widgets["expedientes_detener_duplicados"] = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            frame_exp_avanzado,
+            text="Detener al encontrar expedientes duplicados",
+            variable=self.mon_widgets["expedientes_detener_duplicados"]
+        ).pack(anchor=tk.W, pady=(0, 10))
+
+        # Máximo de páginas (solo si no es extracción completa)
+        max_pag_subframe = ttk.Frame(frame_exp_avanzado)
+        max_pag_subframe.pack(fill=tk.X)
+
+        ttk.Label(max_pag_subframe, text="Máximo de páginas:").pack(side=tk.LEFT, padx=(0, 10))
+        self.mon_widgets["expedientes_max_paginas"] = IntervalInput(
+            max_pag_subframe,
+            initial_value=50,
+            unit="páginas",
+            min_value=1,
+            max_value=1000
+        )
+        self.mon_widgets["expedientes_max_paginas"].pack(side=tk.LEFT)
+
+        # Nota explicativa
+        nota_max_pag = ttk.Label(
+            frame_exp_avanzado,
+            text="(Se ignora si 'Extracción completa' está activado)",
+            font=("TkDefaultFont", 8, "italic"),
+            foreground="gray"
+        )
+        nota_max_pag.pack(anchor=tk.W, pady=(2, 0))
 
     # =========================================================================
     # PESTAÑA DE EXTRACCIÓN
@@ -766,6 +857,21 @@ class ConfigForm(tk.Tk):
             self.mon_widgets["fecha_hasta_expedientes"].set(self.config.fecha_hasta_expedientes)
             self.mon_widgets["fecha_corte_expedientes"].set(self.config.fecha_corte_expedientes)
 
+            # Nuevos campos - días atrás y configuración avanzada expedientes
+            self.mon_widgets["dias_atras_entradas"].set(self.config.dias_atras_entradas)
+            self.mon_widgets["dias_atras_expedientes"].set(self.config.dias_atras_expedientes)
+            self.mon_widgets["extraccion_expedientes_completa"].set(self.config.extraccion_expedientes_completa)
+
+            # Mapear valor de orden a texto del combobox
+            orden_map = {None: "Sin orden", "fecha": "Fecha", "caratula": "Carátula",
+                        "oficina": "Oficina", "situacion": "Situación"}
+            orden_texto = orden_map.get(self.config.expedientes_orden, "Fecha")
+            self.mon_widgets["expedientes_orden"].set(orden_texto)
+
+            self.mon_widgets["expedientes_detener_duplicados"].set(self.config.expedientes_detener_duplicados)
+            if self.config.expedientes_max_paginas is not None:
+                self.mon_widgets["expedientes_max_paginas"].set(self.config.expedientes_max_paginas)
+
             # Actualizar widgets de extracción
             self.ext_widgets["headless"].set(self.config.headless)
             self.ext_widgets["max_paginas_expedientes"].set(self.config.max_paginas_expedientes)
@@ -829,6 +935,20 @@ class ConfigForm(tk.Tk):
             config_data["fecha_desde_expedientes"] = self.mon_widgets["fecha_desde_expedientes"].get()
             config_data["fecha_hasta_expedientes"] = self.mon_widgets["fecha_hasta_expedientes"].get()
             config_data["fecha_corte_expedientes"] = self.mon_widgets["fecha_corte_expedientes"].get()
+
+            # Nuevos campos - días atrás y configuración avanzada expedientes
+            config_data["dias_atras_entradas"] = self.mon_widgets["dias_atras_entradas"].get()
+            config_data["dias_atras_expedientes"] = self.mon_widgets["dias_atras_expedientes"].get()
+            config_data["extraccion_expedientes_completa"] = self.mon_widgets["extraccion_expedientes_completa"].get()
+
+            # Mapear texto del combobox a valor de orden
+            orden_text = self.mon_widgets["expedientes_orden"].get()
+            orden_inverso_map = {"Sin orden": None, "Fecha": "fecha", "Carátula": "caratula",
+                                "Oficina": "oficina", "Situación": "situacion"}
+            config_data["expedientes_orden"] = orden_inverso_map.get(orden_text, None)
+
+            config_data["expedientes_detener_duplicados"] = self.mon_widgets["expedientes_detener_duplicados"].get()
+            config_data["expedientes_max_paginas"] = self.mon_widgets["expedientes_max_paginas"].get()
 
             # Extracción
             config_data["headless"] = self.ext_widgets["headless"].get()

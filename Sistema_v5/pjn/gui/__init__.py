@@ -9,20 +9,37 @@ from __future__ import annotations
 
 from warnings import warn
 
-from Sistema_v5.configuracion.gui.config_widgets import (
-    DirectorySelector,
-    DatePicker,
-    TimePicker,
-    IntervalInput,
-    DaysSelector,
-    ValidatedEntry,
-)
+try:
+    from ...configuracion.gui.config_widgets import (
+        DirectorySelector,
+        DatePicker,
+        TimePicker,
+        IntervalInput,
+        DaysSelector,
+        ValidatedEntry,
+    )
+except ImportError:
+    from configuracion.gui.config_widgets import (
+        DirectorySelector,
+        DatePicker,
+        TimePicker,
+        IntervalInput,
+        DaysSelector,
+        ValidatedEntry,
+    )
 
 try:
-    from Sistema_v5.configuracion.gui.config_form import ConfigForm
-except ImportError:  # pragma: no cover - tkinter puede no estar disponible
-    ConfigForm = None  # type: ignore[assignment]
-else:
+    from ...configuracion.gui.config_form import ConfigForm
+    _config_form_imported = True
+except ImportError:
+    try:
+        from configuracion.gui.config_form import ConfigForm
+        _config_form_imported = True
+    except ImportError:  # pragma: no cover - tkinter puede no estar disponible
+        ConfigForm = None  # type: ignore[assignment]
+        _config_form_imported = False
+
+if _config_form_imported:
     warn(
         "Sistema_v5.pjn.gui está deprecado; usa Sistema_v5.configuracion.gui",
         DeprecationWarning,

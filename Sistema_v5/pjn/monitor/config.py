@@ -20,6 +20,9 @@ warnings.warn(
     stacklevel=2
 )
 
-from Sistema_v5.configuracion.monitor.config import MonitorConfig
+try:
+    from ...configuracion.monitor.config import MonitorConfig
+except ImportError:
+    from configuracion.monitor.config import MonitorConfig
 
 __all__ = ["MonitorConfig"]

@@ -18,7 +18,10 @@ if __package__ in (None, ""):
     if project_root_str not in sys.path:
         sys.path.insert(0, project_root_str)
 
-from Sistema_v5.configuracion.gui.config_form import ConfigForm, main as _run_main
+try:
+    from ...configuracion.gui.config_form import ConfigForm, main as _run_main
+except ImportError:
+    from configuracion.gui.config_form import ConfigForm, main as _run_main
 
 __all__ = ["ConfigForm", "main"]
 

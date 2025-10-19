@@ -20,10 +20,17 @@ warnings.warn(
     stacklevel=2
 )
 
-from Sistema_v5.configuracion.utils.env import (
-    parse_bool,
-    parse_int,
-    parse_str_list,
-)
+try:
+    from ...configuracion.utils.env import (
+        parse_bool,
+        parse_int,
+        parse_str_list,
+    )
+except ImportError:
+    from configuracion.utils.env import (
+        parse_bool,
+        parse_int,
+        parse_str_list,
+    )
 
 __all__ = ["parse_bool", "parse_int", "parse_str_list"]

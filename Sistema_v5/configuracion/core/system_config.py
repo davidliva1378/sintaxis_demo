@@ -74,8 +74,14 @@ ENV_FIELD_MAP: dict[str, str] = {
     "fecha_hasta_entradas": "FECHA_HASTA_ENTRADAS",
     "fecha_desde_expedientes": "FECHA_DESDE_EXPEDIENTES",
     "fecha_hasta_expedientes": "FECHA_HASTA_EXPEDIENTES",
+    "dias_atras_entradas": "DIAS_ATRAS_ENTRADAS",
+    "dias_atras_expedientes": "DIAS_ATRAS_EXPEDIENTES",
     # Extracción y scraping
     "max_paginas_expedientes": "MAX_PAGINAS_EXPEDIENTES",
+    "extraccion_expedientes_completa": "EXTRACCION_EXPEDIENTES_COMPLETA",
+    "expedientes_orden": "EXPEDIENTES_ORDEN",
+    "expedientes_detener_duplicados": "EXPEDIENTES_DETENER_DUPLICADOS",
+    "expedientes_max_paginas": "EXPEDIENTES_MAX_PAGINAS",
     "timeout_default": "TIMEOUT_DEFAULT",
     "timeout_login": "TIMEOUT_LOGIN",
     "timeout_descarga": "TIMEOUT_DESCARGA",
@@ -110,6 +116,8 @@ BOOL_FIELDS = {
     "generar_reportes_automaticos",
     "rotacion_logs",
     "guardar_sesion",
+    "extraccion_expedientes_completa",
+    "expedientes_detener_duplicados",
 }
 
 
@@ -133,6 +141,9 @@ INT_FIELDS = {
     "duracion_sesion_horas",
     "limite_memoria_mb",
     "max_archivos_cache",
+    "dias_atras_entradas",
+    "dias_atras_expedientes",
+    "expedientes_max_paginas",
 }
 
 
@@ -143,6 +154,7 @@ LOWER_FIELDS = {
     "modo_monitor",
     "modo_comparacion",
     "formato_reportes",
+    "expedientes_orden",
 }
 
 

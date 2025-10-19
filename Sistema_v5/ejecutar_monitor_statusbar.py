@@ -13,7 +13,10 @@ import sys
 from pathlib import Path
 from typing import Tuple
 
-sys.path.insert(0, str(Path(__file__).parent))
+# Agregar directorio Sistema_v5 al path para imports
+_sistema_v5_dir = Path(__file__).parent
+if str(_sistema_v5_dir) not in sys.path:
+    sys.path.insert(0, str(_sistema_v5_dir))
 
 from pjn import SystemConfig
 from pjn.monitor.config import MonitorConfig

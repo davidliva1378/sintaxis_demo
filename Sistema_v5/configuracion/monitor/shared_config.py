@@ -64,6 +64,16 @@ class MonitorSharedConfig:
     fecha_desde_expedientes: str | None = None
     fecha_hasta_expedientes: str | None = None
 
+    # Nuevos campos - días hacia atrás
+    dias_atras_entradas: int | None = None
+    dias_atras_expedientes: int | None = None
+
+    # Nuevos campos - configuración avanzada de expedientes
+    extraccion_expedientes_completa: bool = False
+    expedientes_orden: str | None = None  # fecha, caratula, oficina, situacion
+    expedientes_detener_duplicados: bool = True
+    expedientes_max_paginas: int | None = None
+
     def __post_init__(self) -> None:
         """Ejecuta las validaciones comunes para el monitoreo."""
 
@@ -140,6 +150,48 @@ class MonitorSharedConfig:
         validar_formato_fecha(
             self.fecha_corte_expedientes, "fecha_corte_expedientes"
         )
+
+        # Validar días hacia atrás
+        if self.dias_atras_entradas is not None:
+            if not isinstance(self.dias_atras_entradas, int) or self.dias_atras_entradas < 1:
+                raise ValueError(
+                    f"dias_atras_entradas debe ser un entero positivo, "
+                    f"recibido: {self.dias_atras_entradas}"
+                )
+            if self.dias_atras_entradas > 365:
+                raise ValueError(
+                    f"dias_atras_entradas no puede exceder 365 días, "
+                    f"recibido: {self.dias_atras_entradas}"
+                )
+
+        if self.dias_atras_expedientes is not None:
+            if not isinstance(self.dias_atras_expedientes, int) or self.dias_atras_expedientes < 1:
+                raise ValueError(
+                    f"dias_atras_expedientes debe ser un entero positivo, "
+                    f"recibido: {self.dias_atras_expedientes}"
+                )
+            if self.dias_atras_expedientes > 365:
+                raise ValueError(
+                    f"dias_atras_expedientes no puede exceder 365 días, "
+                    f"recibido: {self.dias_atras_expedientes}"
+                )
+
+        # Validar criterio de orden de expedientes
+        if self.expedientes_orden:
+            validos = {"fecha", "caratula", "oficina", "situacion"}
+            if self.expedientes_orden.lower() not in validos:
+                raise ValueError(
+                    f"expedientes_orden inválido: '{self.expedientes_orden}'. "
+                    f"Debe ser uno de: {', '.join(sorted(validos))}"
+                )
+
+        # Validar max_paginas de expedientes
+        if self.expedientes_max_paginas is not None:
+            if not isinstance(self.expedientes_max_paginas, int) or self.expedientes_max_paginas < 1:
+                raise ValueError(
+                    f"expedientes_max_paginas debe ser un entero positivo, "
+                    f"recibido: {self.expedientes_max_paginas}"
+                )
 
 
 __all__ = ["ModoMonitor", "MonitorSharedConfig"]

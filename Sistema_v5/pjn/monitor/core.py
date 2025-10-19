@@ -6,7 +6,7 @@ la verificación de entradas y expedientes.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError, Error as PlaywrightError
@@ -119,6 +119,21 @@ class MonitorPJN:
         """
 
         try:
+            # Calcular fechas dinámicamente si dias_atras_entradas está configurado
+            fecha_desde = self.config.fecha_desde_entradas
+            fecha_hasta = self.config.fecha_hasta_entradas
+
+            if self.config.dias_atras_entradas is not None:
+                # Calcular fecha_desde como N días hacia atrás desde hoy
+                hoy = datetime.now().date()
+                fecha_desde_calculada = hoy - timedelta(days=self.config.dias_atras_entradas)
+                fecha_desde = fecha_desde_calculada.strftime("%Y-%m-%d")
+                # fecha_hasta = hoy por defecto (None deja que el extractor use todas)
+                logger.info(
+                    f"📅 Usando días hacia atrás: {self.config.dias_atras_entradas} días "
+                    f"(desde {fecha_desde})"
+                )
+
             # Extraer entradas actuales
             async with obtener_pagina_autenticada(
                 headless=self.config.headless
@@ -130,8 +145,8 @@ class MonitorPJN:
                     page,
                     duplicados=False,
                     incluir_tipos=("N",),  # Solo notificaciones
-                    fecha_desde=self.config.fecha_desde_entradas,
-                    fecha_hasta=self.config.fecha_hasta_entradas
+                    fecha_desde=fecha_desde,
+                    fecha_hasta=fecha_hasta
                 )
 
             logger.info(f"Extraídas {len(entradas_actuales)} entradas del portal")
@@ -267,8 +282,32 @@ class MonitorPJN:
                 or self.config.fecha_corte_expedientes
             )
 
+            # Calcular fecha_corte dinámicamente si dias_atras_expedientes está configurado
+            if self.config.dias_atras_expedientes is not None:
+                hoy = datetime.now().date()
+                fecha_corte_calculada = hoy - timedelta(days=self.config.dias_atras_expedientes)
+                fecha_corte = fecha_corte_calculada.strftime("%Y-%m-%d")
+                logger.info(
+                    f"📅 Usando días hacia atrás para expedientes: {self.config.dias_atras_expedientes} días "
+                    f"(desde {fecha_corte})"
+                )
+
             if fecha_corte:
                 logger.debug(f"Usando fecha de corte para expedientes: {fecha_corte}")
+
+            # Determinar configuraciones de extracción
+            max_paginas = self.config.expedientes_max_paginas
+            if max_paginas is None:
+                max_paginas = None if self.config.extraccion_expedientes_completa else 50
+
+            orden = self.config.expedientes_orden or "fecha"
+            detener_duplicados = self.config.expedientes_detener_duplicados
+
+            logger.debug(
+                f"Configuración de extracción: max_paginas={max_paginas}, "
+                f"orden={orden}, detener_duplicados={detener_duplicados}, "
+                f"completa={self.config.extraccion_expedientes_completa}"
+            )
 
             # Extraer expedientes actuales
             async with obtener_pagina_autenticada(
@@ -279,9 +318,10 @@ class MonitorPJN:
 
                 expedientes, motivo, metadata = await extraer_expedientes_completos_modelos(
                     page,
-                    max_paginas=50,
-                    orden="fecha",
-                    fecha_corte=fecha_corte
+                    max_paginas=max_paginas,
+                    orden=orden,
+                    fecha_corte=fecha_corte,
+                    detener_en_duplicado=detener_duplicados
                 )
 
             logger.info(

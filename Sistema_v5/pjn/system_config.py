@@ -20,20 +20,37 @@ warnings.warn(
     stacklevel=2
 )
 
-from Sistema_v5.configuracion.core.system_config import (
-    SystemConfig,
-    ModoMonitor,
-    ModoComparacion,
-    FormatoReporte,
-    NivelLog,
-    ENV_FIELD_MAP,
-    BOOL_FIELDS,
-    INT_FIELDS,
-    LIST_FIELDS,
-    LOWER_FIELDS,
-    UPPER_FIELDS,
-    OPTIONAL_STR_FIELDS,
-)
+# Intentar import relativo primero, luego absoluto
+try:
+    from ..configuracion.core.system_config import (
+        SystemConfig,
+        ModoMonitor,
+        ModoComparacion,
+        FormatoReporte,
+        NivelLog,
+        ENV_FIELD_MAP,
+        BOOL_FIELDS,
+        INT_FIELDS,
+        LIST_FIELDS,
+        LOWER_FIELDS,
+        UPPER_FIELDS,
+        OPTIONAL_STR_FIELDS,
+    )
+except ImportError:
+    from configuracion.core.system_config import (
+        SystemConfig,
+        ModoMonitor,
+        ModoComparacion,
+        FormatoReporte,
+        NivelLog,
+        ENV_FIELD_MAP,
+        BOOL_FIELDS,
+        INT_FIELDS,
+        LIST_FIELDS,
+        LOWER_FIELDS,
+        UPPER_FIELDS,
+        OPTIONAL_STR_FIELDS,
+    )
 
 __all__ = [
     "SystemConfig",

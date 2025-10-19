@@ -20,20 +20,36 @@ warnings.warn(
     stacklevel=2
 )
 
-from Sistema_v5.configuracion.monitor.validators import (
-    ValidationError,
-    IntervalError,
-    DateRangeError,
-    WorkHoursError,
-    validar_intervalo,
-    validar_max_reintentos,
-    validar_formato_fecha,
-    validar_rango_fechas,
-    validar_formato_hora,
-    validar_rango_horas,
-    validar_dias_laborales,
-    validar_directorio,
-)
+try:
+    from ...configuracion.monitor.validators import (
+        ValidationError,
+        IntervalError,
+        DateRangeError,
+        WorkHoursError,
+        validar_intervalo,
+        validar_max_reintentos,
+        validar_formato_fecha,
+        validar_rango_fechas,
+        validar_formato_hora,
+        validar_rango_horas,
+        validar_dias_laborales,
+        validar_directorio,
+    )
+except ImportError:
+    from configuracion.monitor.validators import (
+        ValidationError,
+        IntervalError,
+        DateRangeError,
+        WorkHoursError,
+        validar_intervalo,
+        validar_max_reintentos,
+        validar_formato_fecha,
+        validar_rango_fechas,
+        validar_formato_hora,
+        validar_rango_horas,
+        validar_dias_laborales,
+        validar_directorio,
+    )
 
 __all__ = [
     "ValidationError",

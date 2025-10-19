@@ -86,6 +86,13 @@ class MonitorConfig(MonitorSharedConfig):
         fecha_hasta_entradas: str | None = None,
         fecha_desde_expedientes: str | None = None,
         fecha_hasta_expedientes: str | None = None,
+        # Nuevos parámetros
+        dias_atras_entradas: int | None = None,
+        dias_atras_expedientes: int | None = None,
+        extraccion_expedientes_completa: bool = False,
+        expedientes_orden: str | None = None,
+        expedientes_detener_duplicados: bool = True,
+        expedientes_max_paginas: int | None = None,
     ) -> None:
         shared_kwargs = dict(
             modo_monitor=modo,
@@ -112,6 +119,13 @@ class MonitorConfig(MonitorSharedConfig):
             fecha_hasta_entradas=fecha_hasta_entradas,
             fecha_desde_expedientes=fecha_desde_expedientes,
             fecha_hasta_expedientes=fecha_hasta_expedientes,
+            # Nuevos campos
+            dias_atras_entradas=dias_atras_entradas,
+            dias_atras_expedientes=dias_atras_expedientes,
+            extraccion_expedientes_completa=extraccion_expedientes_completa,
+            expedientes_orden=expedientes_orden,
+            expedientes_detener_duplicados=expedientes_detener_duplicados,
+            expedientes_max_paginas=expedientes_max_paginas,
         )
         if dias_laborales is not None:
             shared_kwargs["dias_laborales"] = dias_laborales
@@ -302,6 +316,13 @@ class MonitorConfig(MonitorSharedConfig):
             fecha_hasta_entradas=system_config.fecha_hasta_entradas,
             fecha_desde_expedientes=system_config.fecha_desde_expedientes,
             fecha_hasta_expedientes=system_config.fecha_hasta_expedientes,
+            # Nuevos campos
+            dias_atras_entradas=system_config.dias_atras_entradas,
+            dias_atras_expedientes=system_config.dias_atras_expedientes,
+            extraccion_expedientes_completa=system_config.extraccion_expedientes_completa,
+            expedientes_orden=system_config.expedientes_orden,
+            expedientes_detener_duplicados=system_config.expedientes_detener_duplicados,
+            expedientes_max_paginas=system_config.expedientes_max_paginas,
         )
 
 

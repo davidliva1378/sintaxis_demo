@@ -20,16 +20,28 @@ warnings.warn(
     stacklevel=2
 )
 
-from Sistema_v5.configuracion.core.scraping_config import (
-    ScrapingConfig,
-    BrowserConfig,
-    AuthConfig,
-    ArchivosConfig,
-    Config,
-    get_config,
-    set_config,
-    reset_config,
-)
+try:
+    from ..configuracion.core.scraping_config import (
+        ScrapingConfig,
+        BrowserConfig,
+        AuthConfig,
+        ArchivosConfig,
+        Config,
+        get_config,
+        set_config,
+        reset_config,
+    )
+except ImportError:
+    from configuracion.core.scraping_config import (
+        ScrapingConfig,
+        BrowserConfig,
+        AuthConfig,
+        ArchivosConfig,
+        Config,
+        get_config,
+        set_config,
+        reset_config,
+    )
 
 __all__ = [
     "ScrapingConfig",

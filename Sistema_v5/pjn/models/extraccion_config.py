@@ -20,6 +20,9 @@ warnings.warn(
     stacklevel=2
 )
 
-from Sistema_v5.configuracion.core.extraccion_config import ExtraccionExpedientesConfig
+try:
+    from ...configuracion.core.extraccion_config import ExtraccionExpedientesConfig
+except ImportError:
+    from configuracion.core.extraccion_config import ExtraccionExpedientesConfig
 
 __all__ = ["ExtraccionExpedientesConfig"]
