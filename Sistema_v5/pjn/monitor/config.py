@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .shared_config import ModoMonitor, MonitorSharedConfig
+from ..utils.env import parse_bool, parse_int
 
 
 @dataclass
@@ -177,7 +178,7 @@ class MonitorConfig(MonitorSharedConfig):
         return cls(**data)
 
     @classmethod
-    def from_env(cls) -> "MonitorConfig":
+    def from_env(cls, prefix: str = "MONITOR_") -> "MonitorConfig":
         """Carga configuración desde variables de entorno.
 
         Variables de entorno soportadas:
@@ -191,32 +192,38 @@ class MonitorConfig(MonitorSharedConfig):
         Returns:
             MonitorConfig: Instancia con configuración desde env
         """
-        config = cls()
+        data: dict[str, object] = {}
 
         # Modo
-        if modo := os.getenv("MONITOR_MODO"):
-            if modo in ("automatico", "laboral", "no_laboral"):
-                config.modo = modo  # type: ignore
+        if modo := os.getenv(f"{prefix}MODO"):
+            modo_normalized = modo.strip().lower()
+            if modo_normalized in ("automatico", "laboral", "no_laboral"):
+                data["modo"] = modo_normalized
 
         # Headless
-        if headless_env := os.getenv("MONITOR_HEADLESS"):
-            config.headless = headless_env.lower() in ("1", "true", "yes", "y")
+        headless_env = os.getenv(f"{prefix}HEADLESS")
+        if headless_env is not None:
+            data["headless"] = parse_bool(headless_env)
 
         # Intervalos
-        if intervalo := os.getenv("MONITOR_INTERVALO_LAB_EXP"):
-            config.intervalos_laboral_expedientes = int(intervalo)
+        intervalo = os.getenv(f"{prefix}INTERVALO_LAB_EXP")
+        if intervalo is not None:
+            data["intervalos_laboral_expedientes"] = parse_int(intervalo)
 
-        if intervalo := os.getenv("MONITOR_INTERVALO_LAB_ENT"):
-            config.intervalos_laboral_entradas = int(intervalo)
+        intervalo = os.getenv(f"{prefix}INTERVALO_LAB_ENT")
+        if intervalo is not None:
+            data["intervalos_laboral_entradas"] = parse_int(intervalo)
 
         # Notificaciones
-        if notif := os.getenv("MONITOR_NOTIF_ENTRADAS"):
-            config.notificar_nuevas_entradas = notif.lower() in ("1", "true", "yes", "y")
+        notif = os.getenv(f"{prefix}NOTIF_ENTRADAS")
+        if notif is not None:
+            data["notificar_nuevas_entradas"] = parse_bool(notif)
 
-        if notif := os.getenv("MONITOR_NOTIF_EXPEDIENTES"):
-            config.notificar_cambios_expedientes = notif.lower() in ("1", "true", "yes", "y")
+        notif = os.getenv(f"{prefix}NOTIF_EXPEDIENTES")
+        if notif is not None:
+            data["notificar_cambios_expedientes"] = parse_bool(notif)
 
-        return config
+        return cls(**data)
 
     def to_file(self, path: str | Path = "config/monitor.json") -> None:
         """Guarda configuración a archivo JSON.

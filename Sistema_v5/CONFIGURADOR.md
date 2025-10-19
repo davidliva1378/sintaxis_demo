@@ -209,6 +209,49 @@ config = SystemConfig(
 )
 ```
 
+### Cargar desde variables de entorno
+
+`SystemConfig.from_env()` permite definir ajustes sin tocar archivos, ideal para
+despliegues en servidores o contenedores. Por defecto busca variables que
+comienzan con `SISTEMA_` y mapea cada clave al atributo equivalente.
+
+| Variable de entorno | Campo en SystemConfig | Ejemplo |
+|---------------------|-----------------------|---------|
+| `SISTEMA_DIRECTORIO_LOGS` | `directorio_logs` | `/var/log/pjn` |
+| `SISTEMA_INTERVALO_BACKUP_AUTOMATICO` | `intervalo_backup_automatico` | `14` |
+| `SISTEMA_ROTACION_LOGS` | `rotacion_logs` | `0`, `false`, `no` |
+| `SISTEMA_DIAS_LABORALES` | `dias_laborales` | `lunes,viernes` |
+| `SISTEMA_NIVEL_LOG` | `nivel_log` | `debug`, `INFO` |
+
+Los valores booleanos aceptan `1/0`, `true/false`, `yes/no`, `on/off` (sin
+distinción de mayúsculas). Las listas pueden expresarse como coma separada o
+como JSON (`["lunes","martes"]`). Para campos opcionales puedes usar `none` o
+una cadena vacía para limpiarlos.
+
+```bash
+export SISTEMA_DIRECTORIO_LOGS=/var/pjn/logs
+export SISTEMA_ROTACION_LOGS=0
+export SISTEMA_DIAS_LABORALES="lunes,viernes"
+
+python - <<'PY'
+from pjn.system_config import SystemConfig
+
+config = SystemConfig.from_env()
+print(config.directorio_logs)          # /var/pjn/logs
+print(config.rotacion_logs)            # False
+print(config.dias_laborales)           # ['lunes', 'viernes']
+PY
+```
+
+¿Necesitas un prefijo distinto? Simplemente indícalo:
+
+```python
+config = SystemConfig.from_env(prefix="MIAPP_")
+```
+
+> 🔁 Los mismos parseos se reutilizan en `MonitorConfig.from_env()`, de modo que
+> puedes usar convenciones homogéneas en todos los componentes.
+
 ### Guardar y Cargar
 
 ```python

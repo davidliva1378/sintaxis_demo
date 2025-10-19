@@ -26,6 +26,7 @@ from .monitor.validators import (
     validar_formato_fecha,
     validar_directorio,
 )
+from .utils.env import parse_bool, parse_int, parse_str_list
 
 # ============================================================================
 # Tipos
@@ -34,6 +35,129 @@ from .monitor.validators import (
 ModoComparacion = Literal["automatico", "manual", "deshabilitado"]
 FormatoReporte = Literal["json", "excel", "pdf"]
 NivelLog = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+
+
+ENV_FIELD_MAP: dict[str, str] = {
+    # Directorios
+    "directorio_extraccion_inicial": "DIRECTORIO_EXTRACCION_INICIAL",
+    "directorio_extracciones_temporales": "DIRECTORIO_EXTRACCIONES_TEMPORALES",
+    "directorio_expedientes_base": "DIRECTORIO_EXPEDIENTES_BASE",
+    "directorio_comparaciones": "DIRECTORIO_COMPARACIONES",
+    "directorio_reportes": "DIRECTORIO_REPORTES",
+    "directorio_logs": "DIRECTORIO_LOGS",
+    "directorio_backups": "DIRECTORIO_BACKUPS",
+    "directorio_cache": "DIRECTORIO_CACHE",
+    "directorio_descargas": "DIRECTORIO_DESCARGAS",
+    "directorio_monitor_datos": "DIRECTORIO_MONITOR_DATOS",
+    # Monitoreo
+    "modo_monitor": "MODO_MONITOR",
+    "headless": "HEADLESS",
+    "intervalos_laboral_expedientes": "INTERVALOS_LABORAL_EXPEDIENTES",
+    "intervalos_laboral_entradas": "INTERVALOS_LABORAL_ENTRADAS",
+    "intervalos_no_laboral_expedientes": "INTERVALOS_NO_LABORAL_EXPEDIENTES",
+    "intervalos_no_laboral_entradas": "INTERVALOS_NO_LABORAL_ENTRADAS",
+    "dias_laborales": "DIAS_LABORALES",
+    "hora_inicio": "HORA_INICIO",
+    "hora_fin": "HORA_FIN",
+    "max_reintentos_expedientes": "MAX_REINTENTOS_EXPEDIENTES",
+    "espera_reintentos_expedientes": "ESPERA_REINTENTOS_EXPEDIENTES",
+    "max_reintentos_entradas": "MAX_REINTENTOS_ENTRADAS",
+    "espera_reintentos_entradas": "ESPERA_REINTENTOS_ENTRADAS",
+    "notificar_nuevas_entradas": "NOTIFICAR_NUEVAS_ENTRADAS",
+    "notificar_cambios_expedientes": "NOTIFICAR_CAMBIOS_EXPEDIENTES",
+    "notificar_errores": "NOTIFICAR_ERRORES",
+    "verificar_entradas": "VERIFICAR_ENTRADAS",
+    "verificar_expedientes": "VERIFICAR_EXPEDIENTES",
+    "comparacion_automatica": "COMPARACION_AUTOMATICA",
+    "fecha_corte_expedientes": "FECHA_CORTE_EXPEDIENTES",
+    "fecha_desde_entradas": "FECHA_DESDE_ENTRADAS",
+    "fecha_hasta_entradas": "FECHA_HASTA_ENTRADAS",
+    "fecha_desde_expedientes": "FECHA_DESDE_EXPEDIENTES",
+    "fecha_hasta_expedientes": "FECHA_HASTA_EXPEDIENTES",
+    # Extracción y scraping
+    "max_paginas_expedientes": "MAX_PAGINAS_EXPEDIENTES",
+    "timeout_default": "TIMEOUT_DEFAULT",
+    "timeout_login": "TIMEOUT_LOGIN",
+    "timeout_descarga": "TIMEOUT_DESCARGA",
+    "max_reintentos_descarga": "MAX_REINTENTOS_DESCARGA",
+    "generar_reportes_automaticos": "GENERAR_REPORTES_AUTOMATICOS",
+    # Comparaciones y reportes
+    "modo_comparacion": "MODO_COMPARACION",
+    "formato_reportes": "FORMATO_REPORTES",
+    # Sistema
+    "fecha_inicio_sistema": "FECHA_INICIO_SISTEMA",
+    "fecha_ultimo_backup": "FECHA_ULTIMO_BACKUP",
+    "intervalo_backup_automatico": "INTERVALO_BACKUP_AUTOMATICO",
+    "retener_historico_dias": "RETENER_HISTORICO_DIAS",
+    "nivel_log": "NIVEL_LOG",
+    "max_tamaño_log_mb": "MAX_TAMANO_LOG_MB",
+    "rotacion_logs": "ROTACION_LOGS",
+    "guardar_sesion": "GUARDAR_SESION",
+    "duracion_sesion_horas": "DURACION_SESION_HORAS",
+    "limite_memoria_mb": "LIMITE_MEMORIA_MB",
+    "max_archivos_cache": "MAX_ARCHIVOS_CACHE",
+}
+
+
+BOOL_FIELDS = {
+    "headless",
+    "notificar_nuevas_entradas",
+    "notificar_cambios_expedientes",
+    "notificar_errores",
+    "verificar_entradas",
+    "verificar_expedientes",
+    "comparacion_automatica",
+    "generar_reportes_automaticos",
+    "rotacion_logs",
+    "guardar_sesion",
+}
+
+
+INT_FIELDS = {
+    "intervalos_laboral_expedientes",
+    "intervalos_laboral_entradas",
+    "intervalos_no_laboral_expedientes",
+    "intervalos_no_laboral_entradas",
+    "max_reintentos_expedientes",
+    "espera_reintentos_expedientes",
+    "max_reintentos_entradas",
+    "espera_reintentos_entradas",
+    "max_paginas_expedientes",
+    "timeout_default",
+    "timeout_login",
+    "timeout_descarga",
+    "max_reintentos_descarga",
+    "intervalo_backup_automatico",
+    "retener_historico_dias",
+    "max_tamaño_log_mb",
+    "duracion_sesion_horas",
+    "limite_memoria_mb",
+    "max_archivos_cache",
+}
+
+
+LIST_FIELDS = {"dias_laborales"}
+
+
+LOWER_FIELDS = {
+    "modo_monitor",
+    "modo_comparacion",
+    "formato_reportes",
+}
+
+
+UPPER_FIELDS = {"nivel_log"}
+
+
+OPTIONAL_STR_FIELDS = {
+    "fecha_corte_expedientes",
+    "fecha_desde_entradas",
+    "fecha_hasta_entradas",
+    "fecha_desde_expedientes",
+    "fecha_hasta_expedientes",
+    "fecha_inicio_sistema",
+    "fecha_ultimo_backup",
+}
 
 
 # ============================================================================
@@ -280,6 +404,51 @@ class SystemConfig(MonitorSharedConfig):
             for key, value in data.items()
             if not key.startswith("//") and not key.startswith("__")
         }
+
+    @classmethod
+    def from_env(cls, prefix: str = "SISTEMA_") -> "SystemConfig":
+        """Crea una configuración leyendo variables de entorno.
+
+        Args:
+            prefix: Prefijo de las variables de entorno. Por defecto ``SISTEMA_``.
+
+        Returns:
+            SystemConfig: Instancia con los valores cargados desde el entorno.
+        """
+
+        overrides: dict[str, object] = {}
+        normalized_prefix = prefix or ""
+
+        for field_name, env_suffix in ENV_FIELD_MAP.items():
+            env_key = f"{normalized_prefix}{env_suffix}"
+            raw_value = os.getenv(env_key)
+
+            if raw_value is None:
+                continue
+
+            stripped_value = raw_value.strip()
+
+            if field_name in OPTIONAL_STR_FIELDS and stripped_value.lower() in {"", "none", "null"}:
+                overrides[field_name] = None
+                continue
+
+            if field_name in BOOL_FIELDS:
+                overrides[field_name] = parse_bool(stripped_value)
+            elif field_name in INT_FIELDS:
+                overrides[field_name] = parse_int(stripped_value)
+            elif field_name in LIST_FIELDS:
+                overrides[field_name] = parse_str_list(stripped_value)
+            elif field_name in LOWER_FIELDS:
+                overrides[field_name] = stripped_value.lower()
+            elif field_name in UPPER_FIELDS:
+                overrides[field_name] = stripped_value.upper()
+            else:
+                overrides[field_name] = stripped_value
+
+        if not overrides:
+            return cls()
+
+        return cls(**overrides)
 
     @classmethod
     def from_file(cls, path: str | Path = "config/sistema.json") -> "SystemConfig":
