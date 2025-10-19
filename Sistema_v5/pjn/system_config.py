@@ -15,19 +15,15 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Literal
 from datetime import datetime
 
+from .monitor.shared_config import ModoMonitor, MonitorSharedConfig
 from .monitor.validators import (
-    validar_intervalo,
     validar_max_reintentos,
     validar_formato_fecha,
-    validar_rango_fechas,
-    validar_formato_hora,
-    validar_rango_horas,
-    validar_dias_laborales,
     validar_directorio,
 )
 
@@ -35,7 +31,6 @@ from .monitor.validators import (
 # Tipos
 # ============================================================================
 
-ModoMonitor = Literal["automatico", "laboral", "no_laboral"]
 ModoComparacion = Literal["automatico", "manual", "deshabilitado"]
 FormatoReporte = Literal["json", "excel", "pdf"]
 NivelLog = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -46,7 +41,7 @@ NivelLog = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 # ============================================================================
 
 @dataclass
-class SystemConfig:
+class SystemConfig(MonitorSharedConfig):
     """Configuración completa y unificada del sistema PJN.
 
     Esta clase unifica todas las configuraciones del sistema en un único lugar,
@@ -149,69 +144,6 @@ class SystemConfig:
     directorio_descargas: str = "descargas"
     """PDFs y archivos descargados del portal."""
 
-    directorio_monitor_datos: str = "data/monitor"
-    """Datos del monitor (estado, historial de entradas/expedientes)."""
-
-    # =========================================================================
-    # MONITOREO
-    # =========================================================================
-
-    modo_monitor: ModoMonitor = "automatico"
-    """Modo de operación: automatico, laboral, no_laboral."""
-
-    intervalos_laboral_expedientes: int = 15
-    """Intervalo en minutos para verificar expedientes (horario laboral)."""
-
-    intervalos_laboral_entradas: int = 10
-    """Intervalo en minutos para verificar entradas (horario laboral)."""
-
-    intervalos_no_laboral_expedientes: int = 60
-    """Intervalo en minutos para verificar expedientes (fuera de horario laboral)."""
-
-    intervalos_no_laboral_entradas: int = 30
-    """Intervalo en minutos para verificar entradas (fuera de horario laboral)."""
-
-    dias_laborales: list[str] = field(default_factory=lambda: [
-        "lunes", "martes", "miercoles", "jueves", "viernes"
-    ])
-    """Días considerados laborales."""
-
-    hora_inicio: str = "08:00"
-    """Hora de inicio del horario laboral (formato HH:MM)."""
-
-    hora_fin: str = "18:00"
-    """Hora de fin del horario laboral (formato HH:MM)."""
-
-    verificar_entradas: bool = True
-    """Si habilitar verificación de entradas."""
-
-    verificar_expedientes: bool = True
-    """Si habilitar verificación de expedientes."""
-
-    notificar_nuevas_entradas: bool = True
-    """Si notificar cuando hay nuevas entradas."""
-
-    notificar_cambios_expedientes: bool = True
-    """Si notificar cambios en expedientes."""
-
-    notificar_errores: bool = True
-    """Si notificar errores del monitor."""
-
-    fecha_desde_entradas: str | None = None
-    """Filtro de fecha desde para entradas (YYYY-MM-DD o DD/MM/YYYY)."""
-
-    fecha_hasta_entradas: str | None = None
-    """Filtro de fecha hasta para entradas (YYYY-MM-DD o DD/MM/YYYY)."""
-
-    fecha_desde_expedientes: str | None = None
-    """Filtro de fecha desde para expedientes (YYYY-MM-DD o DD/MM/YYYY)."""
-
-    fecha_hasta_expedientes: str | None = None
-    """Filtro de fecha hasta para expedientes (YYYY-MM-DD o DD/MM/YYYY)."""
-
-    fecha_corte_expedientes: str | None = None
-    """Fecha de corte para extracción de expedientes (legacy, usar fecha_desde)."""
-
     # =========================================================================
     # EXTRACCIÓN Y SCRAPING
     # =========================================================================
@@ -308,6 +240,8 @@ class SystemConfig:
             DateRangeError: Si las fechas son inválidas
             WorkHoursError: Si las horas laborales son inválidas
         """
+        super().__post_init__()
+
         # Validar directorios
         for dir_attr in [
             "directorio_extraccion_inicial",
@@ -324,79 +258,10 @@ class SystemConfig:
             dir_value = getattr(self, dir_attr)
             validar_directorio(dir_value, dir_attr)
 
-        # Validar intervalos de monitoreo (convertir minutos a segundos)
-        for intervalo_attr in [
-            "intervalos_laboral_expedientes",
-            "intervalos_laboral_entradas",
-            "intervalos_no_laboral_expedientes",
-            "intervalos_no_laboral_entradas",
-        ]:
-            intervalo_value = getattr(self, intervalo_attr)
-            validar_intervalo(
-                intervalo_value * 60,
-                intervalo_attr,
-                min_val=60,  # Mínimo 1 minuto
-                max_val=1440 * 60  # Máximo 24 horas
-            )
-
-        # Validar espera de reintentos (en segundos)
-        validar_intervalo(
-            self.espera_reintentos_expedientes,
-            "espera_reintentos_expedientes",
-            min_val=1,
-            max_val=300
-        )
-        validar_intervalo(
-            self.espera_reintentos_entradas,
-            "espera_reintentos_entradas",
-            min_val=1,
-            max_val=300
-        )
-
-        # Validar número de reintentos
-        validar_max_reintentos(
-            self.max_reintentos_expedientes,
-            "max_reintentos_expedientes"
-        )
-        validar_max_reintentos(
-            self.max_reintentos_entradas,
-            "max_reintentos_entradas"
-        )
         validar_max_reintentos(
             self.max_reintentos_descarga,
             "max_reintentos_descarga"
         )
-
-        # Validar días laborales
-        validar_dias_laborales(self.dias_laborales, "dias_laborales")
-
-        # Validar formato y rango de horas
-        validar_formato_hora(self.hora_inicio, "hora_inicio")
-        validar_formato_hora(self.hora_fin, "hora_fin")
-        validar_rango_horas(self.hora_inicio, self.hora_fin)
-
-        # Validar fechas de entradas
-        validar_formato_fecha(self.fecha_desde_entradas, "fecha_desde_entradas")
-        validar_formato_fecha(self.fecha_hasta_entradas, "fecha_hasta_entradas")
-        validar_rango_fechas(
-            self.fecha_desde_entradas,
-            self.fecha_hasta_entradas,
-            "fecha_desde_entradas",
-            "fecha_hasta_entradas"
-        )
-
-        # Validar fechas de expedientes
-        validar_formato_fecha(self.fecha_desde_expedientes, "fecha_desde_expedientes")
-        validar_formato_fecha(self.fecha_hasta_expedientes, "fecha_hasta_expedientes")
-        validar_rango_fechas(
-            self.fecha_desde_expedientes,
-            self.fecha_hasta_expedientes,
-            "fecha_desde_expedientes",
-            "fecha_hasta_expedientes"
-        )
-
-        # Validar fecha_corte_expedientes (legacy)
-        validar_formato_fecha(self.fecha_corte_expedientes, "fecha_corte_expedientes")
 
         # Validar fechas de sistema
         validar_formato_fecha(self.fecha_inicio_sistema, "fecha_inicio_sistema")
