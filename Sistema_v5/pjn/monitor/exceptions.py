@@ -24,6 +24,7 @@ warnings.warn(
 # Si falla, intentar import absoluto (cuando Sistema_v5 está en sys.path)
 try:
     from ...configuracion.monitor.exceptions import (
+        MonitorError,
         ValidationError,
         IntervalError,
         DateRangeError,
@@ -39,6 +40,7 @@ try:
     )
 except ImportError:
     from configuracion.monitor.exceptions import (
+        MonitorError,
         ValidationError,
         IntervalError,
         DateRangeError,
@@ -54,6 +56,7 @@ except ImportError:
     )
 
 __all__ = [
+    "MonitorError",
     "ValidationError",
     "IntervalError",
     "DateRangeError",
