@@ -63,7 +63,7 @@ def _resolve_path_from_env(env_var: str, default: Path) -> Path:
 
 
 CONFIG_PATH = _resolve_path_from_env("MONITOR_CONFIG_PATH", BASE_DIR / "config" / "monitor.json")
-MONITOR_SCRIPT = _resolve_path_from_env("MONITOR_SCRIPT_PATH", BASE_DIR / "ejecutar_monitor_continuo.py")
+MONITOR_SCRIPT = _resolve_path_from_env("MONITOR_SCRIPT_PATH", BASE_DIR / "ejecutar_monitor_universal.py")
 LOGS_DIR = _resolve_path_from_env("MONITOR_LOGS_DIR", BASE_DIR / "logs")
 RUNTIME_INFO_PATH = LOGS_DIR / "monitor_runtime.json"
 EVENTS_LOG_PATH = LOGS_DIR / "monitor_web_actions.log"
@@ -1058,4 +1058,9 @@ def api_monitor_stop():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Permitir configurar el puerto desde variable de entorno
+    port = int(os.getenv('FLASK_PORT', '5000'))
+    host = os.getenv('FLASK_HOST', '0.0.0.0')
+    debug = os.getenv('FLASK_DEBUG', 'true').lower() in ('true', '1', 'yes')
+
+    app.run(debug=debug, host=host, port=port)
