@@ -280,13 +280,13 @@ La carpeta `actuaciones/documentos_usuario` se reservó para que el equipo
 pueda adjuntar escritos propios o descargas externas, manteniéndolos
 separados del material obtenido automáticamente del PJN.
 
-Usa el gestor incluido en `Sistema_v5/gestor_directorios_expedientes.py`
+Usa el gestor incluido en `Sistema_v5/gestor_directorios/expedientes.py`
 para crear esta estructura desde la configuración unificada:
 
 ```python
 from pathlib import Path
 from Sistema_v5.configuracion.core import SystemConfig
-from Sistema_v5.gestor_directorios_expedientes import GestorDirectoriosExpedientes
+from Sistema_v5.gestor_directorios import GestorDirectoriosExpedientes
 
 project_root = Path(__file__).resolve().parent
 config = SystemConfig.from_file(project_root / "config" / "sistema.json")
