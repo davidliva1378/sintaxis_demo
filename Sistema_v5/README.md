@@ -257,6 +257,47 @@ Sistema_v5/
 └── descargas/                 # PDFs descargados
 ```
 
+### 📁 Árbol por Expediente
+
+Cada expediente dentro de `data/expedientes` sigue la siguiente estructura
+estándar, pensada para agrupar los distintos insumos generados por el
+scraper y los archivos agregados manualmente:
+
+```
+<numero_normalizado>/
+├── actuaciones/
+│   ├── adjuntos/
+│   ├── documentos_usuario/
+│   └── json/
+├── entradas/
+│   └── json/
+└── expedientes/
+    ├── json/
+    └── reportes/
+```
+
+La carpeta `actuaciones/documentos_usuario` se reservó para que el equipo
+pueda adjuntar escritos propios o descargas externas, manteniéndolos
+separados del material obtenido automáticamente del PJN.
+
+Usa el gestor incluido en `Sistema_v5/gestor_directorios_expedientes.py`
+para crear esta estructura desde la configuración unificada:
+
+```python
+from pathlib import Path
+from Sistema_v5.configuracion.core import SystemConfig
+from Sistema_v5.gestor_directorios_expedientes import GestorDirectoriosExpedientes
+
+project_root = Path(__file__).resolve().parent
+config = SystemConfig.from_file(project_root / "config" / "sistema.json")
+gestor = GestorDirectoriosExpedientes.desde_config(config, base_dir=project_root)
+ruta_expediente, manifest = gestor.crear_para_expediente("EXP 123/2024")
+```
+
+El manifiesto `manifest.json` guardado en cada expediente incluye la lista de
+carpetas creadas y metadatos útiles (`numero_expediente` y
+`numero_normalizado`) para integrarlo con el resto del sistema.
+
 ---
 
 ## 📚 Documentación
