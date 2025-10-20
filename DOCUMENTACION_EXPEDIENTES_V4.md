@@ -52,6 +52,25 @@ Sistema_v4/
     └── __init__.py
 ```
 
+### Árbol de archivos generado para cada expediente
+
+La utilidad de gestión de directorios crea un árbol base para cada expediente que almacena los datos descargados. La estructura actual incluye una carpeta dedicada para documentos cargados manualmente por el equipo:
+
+```
+<expediente>/
+├── actuaciones/
+│   ├── adjuntos/
+│   ├── documentos_usuario/
+│   └── json/
+├── entradas/
+│   └── json/
+└── expedientes/
+    ├── json/
+    └── reportes/
+```
+
+La carpeta `actuaciones/documentos_usuario` está pensada para almacenar escritos o archivos complementarios agregados por la mesa de trabajo que no provienen del portal del PJN.
+
 ### Principios de Diseño
 
 1. **Separación de Responsabilidades**: Cada módulo tiene una función específica
