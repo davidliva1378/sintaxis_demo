@@ -12,31 +12,41 @@ from tkinter import ttk, messagebox, filedialog
 from pathlib import Path
 from typing import Callable, Sequence
 
-if __package__ in (None, ""):
+try:
+    if __package__ not in (None, ""):
+        from ..core.system_config import (
+            SystemConfig,
+            ModoMonitor,
+            ModoComparacion,
+            FormatoReporte,
+            NivelLog,
+        )
+
+        from .config_widgets import (
+            DirectorySelector,
+            DatePicker,
+            TimePicker,
+            IntervalInput,
+            DaysSelector,
+        )
+    else:
+        raise ImportError
+except ImportError:
     _PACKAGE_ROOT = Path(__file__).resolve().parents[2]
     _PROJECT_ROOT = _PACKAGE_ROOT.parent
     _project_root_str = str(_PROJECT_ROOT)
     if _project_root_str not in sys.path:
         sys.path.append(_project_root_str)
 
-from ..core.system_config import (
-    SystemConfig,
-    ModoMonitor,
-    ModoComparacion,
-    FormatoReporte,
-    NivelLog,
-)
-
-try:
-    from .config_widgets import (
-        DirectorySelector,
-        DatePicker,
-        TimePicker,
-        IntervalInput,
-        DaysSelector,
+    from Sistema_v5.configuracion.core.system_config import (  # type: ignore[import-not-found]
+        SystemConfig,
+        ModoMonitor,
+        ModoComparacion,
+        FormatoReporte,
+        NivelLog,
     )
-except ImportError:  # pragma: no cover - ejecución directa fuera del paquete
-    from Sistema_v5.configuracion.gui.config_widgets import (
+
+    from Sistema_v5.configuracion.gui.config_widgets import (  # type: ignore[import-not-found]
         DirectorySelector,
         DatePicker,
         TimePicker,
