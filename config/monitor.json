@@ -31,5 +31,13 @@
   "fecha_desde_entradas": null,
   "fecha_hasta_entradas": null,
   "fecha_desde_expedientes": null,
-  "fecha_hasta_expedientes": null
+  "fecha_hasta_expedientes": null,
+  "__comentario_dias_atras": "Limita la búsqueda a los últimos N días; sobrescribe las fechas 'desde'.",
+  "dias_atras_entradas": null,
+  "dias_atras_expedientes": null,
+  "__comentario_expedientes_avanzado": "Ajustes adicionales para la extracción de expedientes.",
+  "extraccion_expedientes_completa": false,
+  "expedientes_orden": "fecha",
+  "expedientes_detener_duplicados": true,
+  "expedientes_max_paginas": 50
 }
