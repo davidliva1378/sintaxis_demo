@@ -14,6 +14,7 @@ if __package__ in {None, ""}:
 from Sistema_v5.configuracion.monitor.config import MonitorConfig
 from Sistema_v5.pjn.models import Entrada, ExpedienteResumen
 from Sistema_v5.pjn.monitor.storage import StorageManager
+from Sistema_v5.pjn.monitor.storage_selecciones import SeleccionesStorageManager
 
 
 def _create_storage_manager(config_path: Path | str) -> StorageManager:
@@ -21,6 +22,16 @@ def _create_storage_manager(config_path: Path | str) -> StorageManager:
     config = MonitorConfig.from_file(config_path)
     datos_dir = Path(config.directorio_datos)
     return StorageManager(datos_dir)
+
+
+def _create_selecciones_manager(
+    config_path: Path | str,
+) -> SeleccionesStorageManager:
+    """Crea un ``SeleccionesStorageManager`` a partir de la configuración."""
+
+    config = MonitorConfig.from_file(config_path)
+    datos_dir = Path(config.directorio_datos)
+    return SeleccionesStorageManager(datos_dir)
 
 
 def cargar_historiales_monitor(
@@ -46,7 +57,29 @@ def guardar_historiales_monitor(
     storage.guardar_expedientes(expedientes_list)
 
 
+def cargar_selecciones_monitor(
+    config_path: Path | str = Path("config/monitor.json"),
+) -> tuple[list[str], list[str]]:
+    """Obtiene las selecciones persistidas para la interfaz."""
+
+    storage = _create_selecciones_manager(config_path)
+    return storage.cargar_selecciones()
+
+
+def guardar_selecciones_monitor(
+    config_path: Path | str,
+    entradas_ids: Iterable[object] | None = None,
+    expedientes_ids: Iterable[object] | None = None,
+) -> None:
+    """Persiste las selecciones realizadas desde la interfaz."""
+
+    storage = _create_selecciones_manager(config_path)
+    storage.guardar_selecciones(entradas_ids, expedientes_ids)
+
+
 __all__ = [
     "cargar_historiales_monitor",
     "guardar_historiales_monitor",
+    "cargar_selecciones_monitor",
+    "guardar_selecciones_monitor",
 ]

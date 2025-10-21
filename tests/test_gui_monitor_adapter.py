@@ -15,6 +15,8 @@ from Sistema_v5.pjn.models import Entrada, ExpedienteResumen
 from Sistema_v5.pjn.services.gui_monitor_adapter import (
     cargar_historiales_monitor,
     guardar_historiales_monitor,
+    cargar_selecciones_monitor,
+    guardar_selecciones_monitor,
 )
 
 
@@ -85,3 +87,42 @@ def test_guardar_historiales_monitor(
 
     assert json.loads(entradas_path.read_text(encoding="utf-8")) == [entrada.to_dict()]
     assert json.loads(expedientes_path.read_text(encoding="utf-8")) == [expediente.to_dict()]
+
+
+def test_cargar_selecciones_monitor(tmp_path: Path, monitor_config: Path) -> None:
+    """Debe recuperar las selecciones almacenadas para la interfaz."""
+
+    data_dir = tmp_path / "datos_monitor"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    selecciones = {
+        "entradas_ids": ["ENT-1", 42],
+        "expedientes_ids": ["EXP-7"],
+    }
+    (data_dir / "selecciones_monitor.json").write_text(
+        json.dumps(selecciones, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    entradas_ids, expedientes_ids = cargar_selecciones_monitor(monitor_config)
+
+    assert entradas_ids == ["ENT-1", "42"]
+    assert expedientes_ids == ["EXP-7"]
+
+
+def test_guardar_selecciones_monitor(tmp_path: Path, monitor_config: Path) -> None:
+    """Debe persistir las selecciones realizadas en la GUI."""
+
+    guardar_selecciones_monitor(
+        monitor_config,
+        entradas_ids=["ENT-9", 1234],
+        expedientes_ids=["EXP-55"],
+    )
+
+    data_dir = tmp_path / "datos_monitor"
+    selecciones_path = data_dir / "selecciones_monitor.json"
+
+    data = json.loads(selecciones_path.read_text(encoding="utf-8"))
+    assert data == {
+        "entradas_ids": ["ENT-9", "1234"],
+        "expedientes_ids": ["EXP-55"],
+    }
