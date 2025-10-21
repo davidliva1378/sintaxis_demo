@@ -183,12 +183,16 @@ class MonitorConfig(MonitorSharedConfig):
         path = Path(path)
 
         if not path.exists():
-            # Intentar buscar desde el directorio del proyecto
-            alt_path = Path(__file__).parent.parent.parent / path
-            if alt_path.exists():
-                path = alt_path
+            project_root = Path(__file__).resolve().parents[3]
+
+            # Para rutas relativas, intentar resolverlas desde la raíz del proyecto
+            candidate = path if path.is_absolute() else project_root / path
+
+            if candidate.exists():
+                path = candidate
             else:
-                # Crear configuración por defecto
+                # Crear configuración por defecto en la ubicación resuelta
+                path = candidate
                 config = cls()
                 config.to_file(path)
                 return config
