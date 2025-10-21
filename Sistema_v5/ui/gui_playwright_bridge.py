@@ -140,8 +140,10 @@ class GUIPlaywrightBridge:
 
     async def _initialize(self) -> None:
         self._lock = asyncio.Lock()
-        login_url = self.login_url
-        cm = obtener_pagina_autenticada(headless=self.headless, login_url=login_url)
+        cm_kwargs: dict[str, Any] = {"headless": self.headless}
+        if self.login_url:
+            cm_kwargs["login_url"] = self.login_url
+        cm = obtener_pagina_autenticada(**cm_kwargs)
         self._session_cm = cm
         page, _context, _browser = await cm.__aenter__()
         self._page = page
