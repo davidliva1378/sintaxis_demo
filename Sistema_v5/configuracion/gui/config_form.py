@@ -73,7 +73,7 @@ class ConfigForm(tk.Tk):
         """
         super().__init__()
 
-        self.project_root = Path(__file__).resolve().parents[3]
+        self.project_root = Path(__file__).resolve().parents[2]
         self.config_path = Path(config_path)
         self.config: SystemConfig | None = None
 
@@ -849,7 +849,13 @@ class ConfigForm(tk.Tk):
         if candidate.is_absolute():
             return candidate.resolve()
 
-        return (self.project_root / candidate).resolve()
+        # Normalizar rutas relativas dentro del directorio de configuraciones
+        config_root = self.project_root / "config"
+
+        if candidate.parts and candidate.parts[0] == "config":
+            candidate = Path(*candidate.parts[1:])
+
+        return (config_root / candidate).resolve()
 
     def _load_config(self) -> None:
         """Carga la configuración desde archivo."""
