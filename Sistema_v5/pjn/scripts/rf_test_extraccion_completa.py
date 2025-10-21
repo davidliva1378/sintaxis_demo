@@ -16,11 +16,8 @@ from Sistema_v5.pjn import (
     SesionInvalida,
 )
 from Sistema_v5.pjn.scraping import obtener_pagina_autenticada, normalizar_numero_expediente
-from Sistema_v5.pjn.utils.logging import get_logger, setup_logging
-from Sistema_v5.pjn.scraping.actuaciones import (
-    descargar_archivos_de_json,
-    extraer_actuaciones_completas,
-)
+from Sistema_v5.pjn.services.actuaciones import procesar_actuaciones_expediente
+from Sistema_v5.pjn.utils.logging import get_logger
 from Sistema_v5.pjn.scraping.expedientes import (
     SeleccionEstrategia,
     buscar_expedientes,
@@ -95,27 +92,40 @@ async def _buscar_y_seleccionar_expediente(page: Page) -> dict[str, Any] | None:
 
 
 async def _extraer_actuaciones(page: Page, datos_expediente: dict[str, Any]) -> None:
+    descargar = _leer_dato(
+        "\n¿Deseás descargar los archivos vinculados automáticamente después de la extracción? (s/n): "
+    ).lower()
+    descargar_adjuntos = descargar == "s"
+
     logger.info("\n📂 Extrayendo actuaciones actuales e históricas...")
-    actuales, historicas, error = await extraer_actuaciones_completas(
-        page_expediente=page,
-        expediente_datos=datos_expediente,
-        incluir_historicas=True,
+
+    json_path, resumen = await procesar_actuaciones_expediente(
+        {**datos_expediente, "page": page},
+        descargar_adjuntos=descargar_adjuntos,
     )
 
-    if error:
-        logger.error("❌ Error en la extracción: %s", error)
+    if resumen["error"]:
+        logger.error("❌ Error en la extracción: %s", resumen["error"])
         return
 
-    logger.info("✅ Se extrajeron %d actuaciones actuales.", len(actuales))
-    logger.info("📜 Se extrajeron %d actuaciones históricas.", len(historicas))
+    logger.info("✅ Se extrajeron %d actuaciones actuales.", resumen["actuaciones_actuales"])
+    logger.info("📜 Se extrajeron %d actuaciones históricas.", resumen["actuaciones_historicas"])
 
-    numero_normalizado = normalizar_numero_expediente(datos_expediente.get("numero"))
-    carpeta = os.path.join("ActuacionesCompletas", numero_normalizado)
-    logger.info("📁 JSONs guardados en: %s", carpeta)
+    if json_path:
+        logger.info("📄 JSON generado: %s", json_path)
+        if resumen["descargas_ejecutadas"]:
+            logger.info("📥 Descarga de adjuntos completada en: %s", json_path.parent)
+    else:
+        numero_normalizado = normalizar_numero_expediente(datos_expediente.get("numero"))
+        logger.info(
+            "📁 Carpeta generada para el expediente: %s",
+            os.path.join("ActuacionesCompletas", numero_normalizado),
+        )
 
-    descargar = _leer_dato("\n¿Deseás descargar los archivos vinculados? (s/n): ").lower()
-    if descargar == "s":
-        await descargar_archivos_de_json(page, carpeta)
+    if descargar_adjuntos and not resumen["descargas_ejecutadas"]:
+        logger.warning(
+            "⚠️ No fue posible descargar adjuntos automáticamente. Revise los logs para más detalles."
+        )
 
 
 async def main() -> None:
