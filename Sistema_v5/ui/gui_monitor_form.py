@@ -17,6 +17,11 @@ O bien indicar una ruta de configuración explícita::
 
     python -m Sistema_v5.ui.gui_monitor_form --config config/monitor.json
 
+Si se prefiere omitir el archivo de configuración, es posible apuntar
+directamente al directorio con los ``historial_*.json`` y ``selecciones.json``::
+
+    python -m Sistema_v5.ui.gui_monitor_form --datos Sistema_v5/data/monitor
+
 También se incluye un punto de entrada temporal en :mod:`scripts.monitor_gui`
 para facilitar la apertura desde la raíz del proyecto.
 
@@ -51,9 +56,13 @@ from typing import Callable, Iterable, Literal
 
 from Sistema_v5.pjn.models import Entrada, ExpedienteResumen
 from Sistema_v5.pjn.services.gui_monitor_adapter import (
+    cargar_historiales_desde_directorio,
     cargar_historiales_monitor,
+    cargar_selecciones_desde_directorio,
     cargar_selecciones_monitor,
+    guardar_historiales_en_directorio,
     guardar_historiales_monitor,
+    guardar_selecciones_en_directorio,
     guardar_selecciones_monitor,
 )
 from Sistema_v5.pjn.services import ResultadoProcesamiento, procesar_actuaciones_expediente
@@ -96,7 +105,10 @@ class MonitorForm(tk.Tk):
     def __init__(
         self,
         config_path: Path | str,
+        datos_dir: Path | str | None = None,
         expediente_payload_factory: Callable[[ExpedienteResumen], dict[str, object]] | None = None,
+        historiales_loader: Callable[[Path | str], tuple[list[Entrada], list[ExpedienteResumen]]] = cargar_historiales_monitor,
+        historiales_saver: Callable[[Path | str, Iterable[Entrada] | None, Iterable[ExpedienteResumen] | None], None] = guardar_historiales_monitor,
         selecciones_loader: Callable[[Path | str], tuple[list[str], list[str]]] = cargar_selecciones_monitor,
         selecciones_saver: Callable[[Path | str, Iterable[object] | None, Iterable[object] | None], None] = guardar_selecciones_monitor,
     ) -> None:
@@ -104,6 +116,10 @@ class MonitorForm(tk.Tk):
         self.title("Monitor PJN – Historiales")
         self.minsize(980, 540)
         self.config_path = Path(config_path)
+        self._datos_dir = Path(datos_dir) if datos_dir is not None else None
+        self._storage_target: Path = self._datos_dir or self.config_path
+        self._historiales_loader = historiales_loader
+        self._historiales_saver = historiales_saver
         self._expediente_payload_factory: Callable[[ExpedienteResumen], dict[str, object]] | None = (
             expediente_payload_factory
         )
@@ -140,7 +156,7 @@ class MonitorForm(tk.Tk):
     # Datos y estado
     # ------------------------------------------------------------------
     def _load_data(self) -> None:
-        self.entradas, self.expedientes = cargar_historiales_monitor(self.config_path)
+        self.entradas, self.expedientes = self._historiales_loader(self._storage_target)
         entradas_selected, expedientes_selected = self._load_selecciones()
 
         self._entradas_items = [
@@ -328,7 +344,7 @@ class MonitorForm(tk.Tk):
 
     def _load_selecciones(self) -> tuple[set[str], set[str]]:
         try:
-            entradas_ids, expedientes_ids = self._selecciones_loader(self.config_path)
+            entradas_ids, expedientes_ids = self._selecciones_loader(self._storage_target)
         except FileNotFoundError:
             return set(), set()
         except OSError as exc:  # pragma: no cover - comunicación con UI real
@@ -561,7 +577,7 @@ class MonitorForm(tk.Tk):
 
         try:
             self._selecciones_saver(
-                self.config_path,
+                self._storage_target,
                 entradas_ids=entradas_ids,
                 expedientes_ids=expedientes_ids,
             )
@@ -591,8 +607,8 @@ class MonitorForm(tk.Tk):
 
     def _persist_historiales(self) -> bool:
         try:
-            guardar_historiales_monitor(
-                self.config_path,
+            self._historiales_saver(
+                self._storage_target,
                 entradas=self.entradas,
                 expedientes=self.expedientes,
             )
@@ -664,11 +680,26 @@ class _ProcessingEvent:
 def launch_monitor_form(
     config_path: Path | str = Path("config/monitor.json"),
     *,
+    datos_dir: Path | str | None = None,
     expediente_payload_factory: Callable[[ExpedienteResumen], dict[str, object]] | None = None,
 ) -> None:
     """Inicia el formulario gráfico con la configuración indicada."""
 
-    app = MonitorForm(config_path, expediente_payload_factory=expediente_payload_factory)
+    if datos_dir is not None:
+        app = MonitorForm(
+            config_path,
+            datos_dir=datos_dir,
+            expediente_payload_factory=expediente_payload_factory,
+            historiales_loader=cargar_historiales_desde_directorio,
+            historiales_saver=guardar_historiales_en_directorio,
+            selecciones_loader=cargar_selecciones_desde_directorio,
+            selecciones_saver=guardar_selecciones_en_directorio,
+        )
+    else:
+        app = MonitorForm(
+            config_path,
+            expediente_payload_factory=expediente_payload_factory,
+        )
     app.mainloop()
 
 
@@ -678,7 +709,18 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         "--config",
         default="config/monitor.json",
         type=Path,
-        help="Ruta al archivo de configuración del monitor (monitor.json).",
+        help=(
+            "Ruta al archivo de configuración del monitor (monitor.json). "
+            "Se ignora si se especifica --datos."
+        ),
+    )
+    parser.add_argument(
+        "--datos",
+        type=Path,
+        help=(
+            "Directorio con los archivos historial_*.json y selecciones.json. "
+            "Útil para apuntar a Sistema_v5/data/monitor u otra ubicación personalizada."
+        ),
     )
     return parser
 
@@ -688,7 +730,7 @@ def main() -> None:
 
     parser = _build_argument_parser()
     args = parser.parse_args()
-    launch_monitor_form(args.config)
+    launch_monitor_form(args.config, datos_dir=args.datos)
 
 
 if __name__ == "__main__":  # pragma: no cover - ejecución directa

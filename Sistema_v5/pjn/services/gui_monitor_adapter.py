@@ -24,6 +24,12 @@ def _create_storage_manager(config_path: Path | str) -> StorageManager:
     return StorageManager(datos_dir)
 
 
+def _create_storage_manager_from_directory(datos_dir: Path | str) -> StorageManager:
+    """Crea un ``StorageManager`` directamente desde un directorio de datos."""
+
+    return StorageManager(Path(datos_dir))
+
+
 def _create_selecciones_manager(
     config_path: Path | str,
 ) -> SeleccionesStorageManager:
@@ -34,11 +40,30 @@ def _create_selecciones_manager(
     return SeleccionesStorageManager(datos_dir)
 
 
+def _create_selecciones_manager_from_directory(
+    datos_dir: Path | str,
+) -> SeleccionesStorageManager:
+    """Crea un ``SeleccionesStorageManager`` desde un directorio de datos."""
+
+    return SeleccionesStorageManager(Path(datos_dir))
+
+
 def cargar_historiales_monitor(
     config_path: Path | str = Path("config/monitor.json"),
 ) -> tuple[list[Entrada], list[ExpedienteResumen]]:
     """Carga los historiales persistidos para ser usados por la GUI."""
     storage = _create_storage_manager(config_path)
+    entradas = storage.cargar_entradas_conocidas()
+    expedientes = storage.cargar_expedientes_conocidos()
+    return entradas, expedientes
+
+
+def cargar_historiales_desde_directorio(
+    datos_dir: Path | str,
+) -> tuple[list[Entrada], list[ExpedienteResumen]]:
+    """Carga los historiales usando directamente un directorio de datos."""
+
+    storage = _create_storage_manager_from_directory(datos_dir)
     entradas = storage.cargar_entradas_conocidas()
     expedientes = storage.cargar_expedientes_conocidos()
     return entradas, expedientes
@@ -57,12 +82,35 @@ def guardar_historiales_monitor(
     storage.guardar_expedientes(expedientes_list)
 
 
+def guardar_historiales_en_directorio(
+    datos_dir: Path | str,
+    entradas: Iterable[Entrada] | None = None,
+    expedientes: Iterable[ExpedienteResumen] | None = None,
+) -> None:
+    """Persiste los historiales directamente en un directorio de datos."""
+
+    storage = _create_storage_manager_from_directory(datos_dir)
+    entradas_list = list(entradas or [])
+    expedientes_list = list(expedientes or [])
+    storage.guardar_entradas(entradas_list)
+    storage.guardar_expedientes(expedientes_list)
+
+
 def cargar_selecciones_monitor(
     config_path: Path | str = Path("config/monitor.json"),
 ) -> tuple[list[str], list[str]]:
     """Obtiene las selecciones persistidas para la interfaz."""
 
     storage = _create_selecciones_manager(config_path)
+    return storage.cargar_selecciones()
+
+
+def cargar_selecciones_desde_directorio(
+    datos_dir: Path | str,
+) -> tuple[list[str], list[str]]:
+    """Obtiene las selecciones persistidas desde un directorio específico."""
+
+    storage = _create_selecciones_manager_from_directory(datos_dir)
     return storage.cargar_selecciones()
 
 
@@ -77,9 +125,24 @@ def guardar_selecciones_monitor(
     storage.guardar_selecciones(entradas_ids, expedientes_ids)
 
 
+def guardar_selecciones_en_directorio(
+    datos_dir: Path | str,
+    entradas_ids: Iterable[object] | None = None,
+    expedientes_ids: Iterable[object] | None = None,
+) -> None:
+    """Persiste las selecciones realizadas directamente en un directorio."""
+
+    storage = _create_selecciones_manager_from_directory(datos_dir)
+    storage.guardar_selecciones(entradas_ids, expedientes_ids)
+
+
 __all__ = [
     "cargar_historiales_monitor",
     "guardar_historiales_monitor",
     "cargar_selecciones_monitor",
     "guardar_selecciones_monitor",
+    "cargar_historiales_desde_directorio",
+    "guardar_historiales_en_directorio",
+    "cargar_selecciones_desde_directorio",
+    "guardar_selecciones_en_directorio",
 ]
