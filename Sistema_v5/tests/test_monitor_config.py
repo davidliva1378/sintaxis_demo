@@ -170,6 +170,24 @@ class TestMonitorConfig:
             assert config.headless is True  # default
             assert config.hora_inicio == "08:00"  # default
 
+    def test_from_file_detects_project_root_with_relative_path(self, tmp_path, monkeypatch):
+        """from_file() busca la configuración relativa en la raíz del proyecto."""
+        project_root = Path(__file__).resolve().parents[2]
+        project_config = project_root / "config" / "monitor.json"
+        assert project_config.exists(), "La plantilla de monitor debe existir en la raíz del proyecto"
+
+        monkeypatch.chdir(tmp_path)
+
+        config = MonitorConfig.from_file("config/monitor.json")
+
+        assert config.modo == "automatico"
+
+        tmp_config = tmp_path / "config" / "monitor.json"
+        assert not tmp_config.exists()
+
+        internal_config = Path(__file__).resolve().parents[1] / "config" / "monitor.json"
+        assert not internal_config.exists()
+
     # =========================================================================
     # Tests de carga desde variables de entorno
     # =========================================================================
