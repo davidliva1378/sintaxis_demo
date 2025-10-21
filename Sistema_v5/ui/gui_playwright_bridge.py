@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import re
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Awaitable, Coroutine
 
 from playwright.async_api import Page
@@ -49,13 +49,16 @@ class GUIPlaywrightBridge:
 
     headless: bool = False
     login_url: str | None = None
+    _loop: asyncio.AbstractEventLoop | None = field(init=False, default=None, repr=False)
+    _thread: threading.Thread | None = field(init=False, default=None, repr=False)
+    _session_cm: Any | None = field(init=False, default=None, repr=False)
+    _page: Page | None = field(init=False, default=None, repr=False)
+    _lock: asyncio.Lock | None = field(init=False, default=None, repr=False)
+    _closed: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._loop: asyncio.AbstractEventLoop | None = None
-        self._thread: threading.Thread | None = None
-        self._session_cm = None
-        self._page: Page | None = None
-        self._lock: asyncio.Lock | None = None
+        # El ciclo de vida real se controla en :meth:`start`, pero mantenemos
+        # esta función para documentar que la instancia inicia “apagada”.
         self._closed = False
 
     # ------------------------------------------------------------------
