@@ -29,6 +29,11 @@ Ejemplo utilizando el script::
 
     python scripts/monitor_gui.py
 
+Si los historiales no aparecen automáticamente al iniciar la interfaz, utilice
+el botón «Cargar historiales…» para seleccionar manualmente los archivos
+``historial_entradas.json`` y ``historial_expedientes.json`` almacenados, por
+ejemplo, en ``Sistema_v5/data/monitor``.
+
 Dependencias
 ============
 
@@ -41,17 +46,18 @@ provisional mientras se diseña la interfaz definitiva del monitor.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
 import argparse
 import asyncio
+import json
 import os
 import queue
 import subprocess
 import sys
 import threading
 import tkinter as tk
-from tkinter import messagebox
+from dataclasses import dataclass
+from pathlib import Path
+from tkinter import filedialog, messagebox
 from typing import Callable, Iterable, Literal
 
 from Sistema_v5.pjn.models import Entrada, ExpedienteResumen
@@ -147,6 +153,9 @@ class MonitorForm(tk.Tk):
         self._processing_active = False
         self._resultados_items: list[_ResultadoItem] = []
 
+        self._entradas_manual_path: Path | None = None
+        self._expedientes_manual_path: Path | None = None
+
         self._load_data()
         self._build_layout()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -206,38 +215,46 @@ class MonitorForm(tk.Tk):
 
         acciones_frame = tk.Frame(container)
         acciones_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(12, 0))
-        acciones_frame.columnconfigure(0, weight=1)
-        acciones_frame.columnconfigure(1, weight=0)
+        acciones_frame.columnconfigure(0, weight=0)
+        acciones_frame.columnconfigure(1, weight=1)
         acciones_frame.columnconfigure(2, weight=0)
         acciones_frame.columnconfigure(3, weight=0)
         acciones_frame.columnconfigure(4, weight=0)
+        acciones_frame.columnconfigure(5, weight=0)
+
+        cargar_historiales_btn = tk.Button(
+            acciones_frame,
+            text="Cargar historiales…",
+            command=self._prompt_manual_historial_load,
+        )
+        cargar_historiales_btn.grid(row=0, column=0, padx=(0, 12), sticky="w")
 
         marcar_leidas_btn = tk.Button(
             acciones_frame,
             text="Marcar entradas seleccionadas como leídas",
             command=self._mark_selected_as_read,
         )
-        marcar_leidas_btn.grid(row=0, column=0, sticky="w")
+        marcar_leidas_btn.grid(row=0, column=1, sticky="w")
 
         marcar_no_leidas_btn = tk.Button(
             acciones_frame,
             text="Marcar entradas como no leídas",
             command=self._mark_selected_as_unread,
         )
-        marcar_no_leidas_btn.grid(row=0, column=1, padx=(12, 0), sticky="w")
+        marcar_no_leidas_btn.grid(row=0, column=2, padx=(12, 0), sticky="w")
 
         self._procesar_btn = tk.Button(
             acciones_frame,
             text="Procesar expediente(s)",
             command=self._process_selected_expedientes,
         )
-        self._procesar_btn.grid(row=0, column=2, padx=(12, 0))
+        self._procesar_btn.grid(row=0, column=3, padx=(12, 0))
 
         guardar_btn = tk.Button(acciones_frame, text="Guardar selecciones", command=self._save_changes)
-        guardar_btn.grid(row=0, column=3, padx=(12, 0))
+        guardar_btn.grid(row=0, column=4, padx=(12, 0))
 
         cerrar_btn = tk.Button(acciones_frame, text="Cerrar", command=self._on_close)
-        cerrar_btn.grid(row=0, column=4, padx=(12, 0))
+        cerrar_btn.grid(row=0, column=5, padx=(12, 0))
 
         opciones_frame = tk.Frame(container)
         opciones_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(12, 0))
@@ -307,6 +324,155 @@ class MonitorForm(tk.Tk):
             listbox.insert(tk.END, item.render())
             if item.id in selected_ids:
                 listbox.selection_set(index)
+
+    def _prompt_manual_historial_load(self) -> None:  # pragma: no cover - interacción UI
+        if (
+            self._entradas_manual_path
+            and self._expedientes_manual_path
+            and self._entradas_manual_path.exists()
+            and self._expedientes_manual_path.exists()
+        ):
+            if messagebox.askyesno(
+                "Monitor PJN",
+                "¿Desea recargar los historiales desde los últimos archivos seleccionados?",
+            ):
+                self._load_historiales_desde_archivos(
+                    self._entradas_manual_path, self._expedientes_manual_path
+                )
+                return
+
+        initial_dir: Path | None
+        if self._entradas_manual_path and self._entradas_manual_path.exists():
+            initial_dir = self._entradas_manual_path.parent
+        elif self._expedientes_manual_path and self._expedientes_manual_path.exists():
+            initial_dir = self._expedientes_manual_path.parent
+        elif self._datos_dir is not None:
+            initial_dir = self._datos_dir
+        elif self._storage_target.is_dir():
+            initial_dir = self._storage_target
+        else:
+            initial_dir = self.config_path.parent
+
+        entradas_path_str = filedialog.askopenfilename(
+            title="Seleccionar historial de entradas",
+            filetypes=(("Archivos JSON", "*.json"), ("Todos los archivos", "*.*")),
+            initialdir=str(initial_dir) if initial_dir else None,
+        )
+        if not entradas_path_str:
+            return
+
+        entradas_path = Path(entradas_path_str)
+        expedientes_initial_dir: Path | None
+        if self._expedientes_manual_path and self._expedientes_manual_path.exists():
+            expedientes_initial_dir = self._expedientes_manual_path.parent
+        else:
+            expedientes_initial_dir = entradas_path.parent
+
+        expedientes_path_str = filedialog.askopenfilename(
+            title="Seleccionar historial de expedientes",
+            filetypes=(("Archivos JSON", "*.json"), ("Todos los archivos", "*.*")),
+            initialdir=str(expedientes_initial_dir) if expedientes_initial_dir else None,
+        )
+        if not expedientes_path_str:
+            return
+
+        self._load_historiales_desde_archivos(entradas_path, Path(expedientes_path_str))
+
+    def _load_historiales_desde_archivos(
+        self, entradas_path: Path | str, expedientes_path: Path | str
+    ) -> bool:
+        entradas_path = Path(entradas_path)
+        expedientes_path = Path(expedientes_path)
+
+        def _read_json(path: Path, etiqueta: str) -> list[object] | None:
+            try:
+                with path.open("r", encoding="utf-8") as file:
+                    data = json.load(file)
+            except FileNotFoundError:
+                messagebox.showerror(
+                    "Monitor PJN",
+                    f"No se encontró el archivo {etiqueta}.\nUbicación: {path}",
+                )
+                return None
+            except json.JSONDecodeError as exc:
+                messagebox.showerror(
+                    "Monitor PJN",
+                    f"El archivo {etiqueta} no contiene un JSON válido.\nDetalle: {exc}",
+                )
+                return None
+            except OSError as exc:  # pragma: no cover - comunicación con UI real
+                messagebox.showerror(
+                    "Monitor PJN",
+                    f"No fue posible leer el archivo {etiqueta}.\nDetalle: {exc}",
+                )
+                return None
+
+            if not isinstance(data, list):
+                messagebox.showerror(
+                    "Monitor PJN",
+                    f"El archivo {etiqueta} debe contener una lista JSON de elementos.",
+                )
+                return None
+
+            return data
+
+        entradas_data = _read_json(entradas_path, "de entradas")
+        if entradas_data is None:
+            return False
+
+        expedientes_data = _read_json(expedientes_path, "de expedientes")
+        if expedientes_data is None:
+            return False
+
+        try:
+            entradas = [Entrada.from_dict(item) for item in entradas_data]
+        except Exception as exc:  # pragma: no cover - comunicación con UI real
+            messagebox.showerror(
+                "Monitor PJN",
+                "No fue posible interpretar el historial de entradas proporcionado.\n"
+                f"Detalle: {exc}",
+            )
+            return False
+
+        try:
+            expedientes = [ExpedienteResumen.from_dict(item) for item in expedientes_data]
+        except Exception as exc:  # pragma: no cover - comunicación con UI real
+            messagebox.showerror(
+                "Monitor PJN",
+                "No fue posible interpretar el historial de expedientes proporcionado.\n"
+                f"Detalle: {exc}",
+            )
+            return False
+
+        self.entradas = entradas
+        self.expedientes = expedientes
+        self._entradas_items = [
+            _EntradaItem(id=_infer_item_id(entrada.numero, idx, prefix="entrada"), entrada=entrada)
+            for idx, entrada in enumerate(self.entradas)
+        ]
+        self._expedientes_items = [
+            _ExpedienteItem(
+                id=_infer_item_id(expediente.numero, idx, prefix="expediente"),
+                expediente=expediente,
+            )
+            for idx, expediente in enumerate(self.expedientes)
+        ]
+
+        self._entradas_selected = set()
+        self._expedientes_selected = set()
+        self._populate_listbox(self._entradas_listbox, self._entradas_items, self._entradas_selected)
+        self._populate_listbox(
+            self._expedientes_listbox, self._expedientes_items, self._expedientes_selected
+        )
+
+        self._historial_dirty = False
+        self._entradas_manual_path = entradas_path
+        self._expedientes_manual_path = expedientes_path
+        messagebox.showinfo(
+            "Monitor PJN",
+            "Historiales cargados correctamente desde los archivos seleccionados.",
+        )
+        return True
 
     # ------------------------------------------------------------------
     # Acciones
