@@ -14,6 +14,7 @@ from .core import MonitorPJN
 from .detector import DetectorCambios
 from .notifier import NotificadorPlyer
 from .storage import EstadoMonitor, StorageManager
+from .storage_selecciones import SeleccionesStorageManager
 from .circuit_breaker import CircuitBreaker, CircuitBreakerConfig, ExponentialBackoff, CircuitState
 from .validators import (
     validar_intervalo,
@@ -45,6 +46,7 @@ try:
         "SCHEDULER_AVAILABLE",
         "EstadoMonitor",
         "StorageManager",
+        "SeleccionesStorageManager",
         "CircuitBreaker",
         "CircuitBreakerConfig",
         "ExponentialBackoff",
@@ -70,6 +72,7 @@ except ImportError:
         "SCHEDULER_AVAILABLE",
         "EstadoMonitor",
         "StorageManager",
+        "SeleccionesStorageManager",
         "CircuitBreaker",
         "CircuitBreakerConfig",
         "ExponentialBackoff",
