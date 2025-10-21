@@ -60,6 +60,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Callable, Iterable, Literal
 
+from Sistema_v5.configuracion.monitor.config import MonitorConfig
 from Sistema_v5.pjn.models import Entrada, ExpedienteResumen
 from Sistema_v5.pjn.services.gui_monitor_adapter import (
     cargar_historiales_desde_directorio,
@@ -72,6 +73,13 @@ from Sistema_v5.pjn.services.gui_monitor_adapter import (
     guardar_selecciones_monitor,
 )
 from Sistema_v5.pjn.services import ResultadoProcesamiento, procesar_actuaciones_expediente
+from Sistema_v5.ui.gui_playwright_bridge import (
+    GUIPlaywrightBridge,
+    ExpedienteNavigationError,
+    ExpedienteNotFoundError,
+    PlaywrightBridgeError,
+    PlaywrightSessionError,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,6 +121,7 @@ class MonitorForm(tk.Tk):
         config_path: Path | str,
         datos_dir: Path | str | None = None,
         expediente_payload_factory: Callable[[ExpedienteResumen], dict[str, object]] | None = None,
+        playwright_bridge: GUIPlaywrightBridge | None = None,
         historiales_loader: Callable[[Path | str], tuple[list[Entrada], list[ExpedienteResumen]]] = cargar_historiales_monitor,
         historiales_saver: Callable[[Path | str, Iterable[Entrada] | None, Iterable[ExpedienteResumen] | None], None] = guardar_historiales_monitor,
         selecciones_loader: Callable[[Path | str], tuple[list[str], list[str]]] = cargar_selecciones_monitor,
@@ -129,6 +138,7 @@ class MonitorForm(tk.Tk):
         self._expediente_payload_factory: Callable[[ExpedienteResumen], dict[str, object]] | None = (
             expediente_payload_factory
         )
+        self._playwright_bridge = playwright_bridge
         self._selecciones_loader = selecciones_loader
         self._selecciones_saver = selecciones_saver
 
@@ -568,55 +578,175 @@ class MonitorForm(tk.Tk):
     def _run_processing_worker(
         self, items: list[_ExpedienteItem], descargar_adjuntos: bool
     ) -> None:
-        async def _runner() -> None:
-            for item in items:
-                self._processing_queue.put(
-                    _ProcessingEvent(
-                        tipo="progress",
-                        expediente=item,
-                        mensaje=f"Procesando expediente {item.expediente.numero}...",
-                    )
-                )
-                try:
-                    datos_expediente = self._build_datos_expediente(item)
-                except Exception as exc:  # pragma: no cover - comunicación con UI
-                    self._processing_queue.put(
-                        _ProcessingEvent(
-                            tipo="error",
-                            expediente=item,
-                            mensaje=str(exc),
-                        )
-                    )
-                    continue
-
-                try:
-                    json_path, resumen = await procesar_actuaciones_expediente(
-                        datos_expediente,
-                        descargar_adjuntos=descargar_adjuntos,
-                    )
-                except Exception as exc:  # pragma: no cover - comunicación con UI
-                    self._processing_queue.put(
-                        _ProcessingEvent(
-                            tipo="error",
-                            expediente=item,
-                            mensaje=str(exc),
-                        )
-                    )
-                else:
-                    self._processing_queue.put(
-                        _ProcessingEvent(
-                            tipo="success",
-                            expediente=item,
-                            mensaje=f"Expediente {item.expediente.numero} procesado correctamente.",
-                            resumen=resumen,
-                            json_path=str(json_path) if json_path else None,
-                        )
-                    )
-
-        asyncio.run(_runner())
+        if self._playwright_bridge is not None:
+            self._run_processing_with_bridge(items, descargar_adjuntos)
+        else:
+            asyncio.run(
+                self._run_processing_async(items, descargar_adjuntos)
+            )
         self._processing_queue.put(
             _ProcessingEvent(tipo="done", expediente=None, mensaje="Procesamiento finalizado."),
         )
+
+    async def _run_processing_async(
+        self, items: list[_ExpedienteItem], descargar_adjuntos: bool
+    ) -> None:
+        for item in items:
+            self._processing_queue.put(
+                _ProcessingEvent(
+                    tipo="progress",
+                    expediente=item,
+                    mensaje=f"Procesando expediente {item.expediente.numero}...",
+                )
+            )
+            try:
+                datos_expediente = self._build_datos_expediente(item)
+            except Exception as exc:  # pragma: no cover - comunicación con UI
+                self._processing_queue.put(
+                    _ProcessingEvent(
+                        tipo="error",
+                        expediente=item,
+                        mensaje=str(exc),
+                    )
+                )
+                continue
+
+            try:
+                json_path, resumen = await procesar_actuaciones_expediente(
+                    datos_expediente,
+                    descargar_adjuntos=descargar_adjuntos,
+                )
+            except Exception as exc:  # pragma: no cover - comunicación con UI
+                self._processing_queue.put(
+                    _ProcessingEvent(
+                        tipo="error",
+                        expediente=item,
+                        mensaje=str(exc),
+                    )
+                )
+            else:
+                self._processing_queue.put(
+                    _ProcessingEvent(
+                        tipo="success",
+                        expediente=item,
+                        mensaje=f"Expediente {item.expediente.numero} procesado correctamente.",
+                        resumen=resumen,
+                        json_path=str(json_path) if json_path else None,
+                    )
+                )
+
+    def _run_processing_with_bridge(
+        self, items: list[_ExpedienteItem], descargar_adjuntos: bool
+    ) -> None:
+        assert self._playwright_bridge is not None
+        bridge = self._playwright_bridge
+
+        for item in items:
+            self._processing_queue.put(
+                _ProcessingEvent(
+                    tipo="progress",
+                    expediente=item,
+                    mensaje=f"Procesando expediente {item.expediente.numero}...",
+                )
+            )
+            try:
+                datos_expediente = self._build_datos_expediente(item)
+            except PlaywrightSessionError as exc:
+                self._processing_queue.put(
+                    _ProcessingEvent(
+                        tipo="error",
+                        expediente=item,
+                        mensaje=str(exc),
+                        alert="error",
+                    )
+                )
+                break
+            except ExpedienteNotFoundError as exc:
+                self._processing_queue.put(
+                    _ProcessingEvent(
+                        tipo="error",
+                        expediente=item,
+                        mensaje=str(exc),
+                        alert="warning",
+                    )
+                )
+                continue
+            except ExpedienteNavigationError as exc:
+                self._processing_queue.put(
+                    _ProcessingEvent(
+                        tipo="error",
+                        expediente=item,
+                        mensaje=str(exc),
+                        alert="error",
+                    )
+                )
+                continue
+            except PlaywrightBridgeError as exc:
+                self._processing_queue.put(
+                    _ProcessingEvent(
+                        tipo="error",
+                        expediente=item,
+                        mensaje=str(exc),
+                        alert="error",
+                    )
+                )
+                continue
+            except Exception as exc:  # pragma: no cover - comunicación con UI
+                self._processing_queue.put(
+                    _ProcessingEvent(
+                        tipo="error",
+                        expediente=item,
+                        mensaje=str(exc),
+                        alert="error",
+                    )
+                )
+                continue
+
+            try:
+                json_path, resumen = bridge.run_coroutine(
+                    procesar_actuaciones_expediente(
+                        datos_expediente,
+                        descargar_adjuntos=descargar_adjuntos,
+                    )
+                )
+            except PlaywrightSessionError as exc:
+                self._processing_queue.put(
+                    _ProcessingEvent(
+                        tipo="error",
+                        expediente=item,
+                        mensaje=str(exc),
+                        alert="error",
+                    )
+                )
+                break
+            except PlaywrightBridgeError as exc:
+                self._processing_queue.put(
+                    _ProcessingEvent(
+                        tipo="error",
+                        expediente=item,
+                        mensaje=str(exc),
+                        alert="error",
+                    )
+                )
+            except Exception as exc:  # pragma: no cover - comunicación con UI
+                self._processing_queue.put(
+                    _ProcessingEvent(
+                        tipo="error",
+                        expediente=item,
+                        mensaje=str(exc),
+                        alert="error",
+                    )
+                )
+            else:
+                self._processing_queue.put(
+                    _ProcessingEvent(
+                        tipo="success",
+                        expediente=item,
+                        mensaje=f"Expediente {item.expediente.numero} procesado correctamente.",
+                        resumen=resumen,
+                        json_path=str(json_path) if json_path else None,
+                    )
+                )
 
     def _build_datos_expediente(self, item: _ExpedienteItem) -> dict[str, object]:
         if self._expediente_payload_factory is None:
@@ -671,6 +801,13 @@ class MonitorForm(tk.Tk):
             self._processing_active = False
             self._procesar_btn.config(state=tk.NORMAL)
             self._processing_thread = None
+
+        if event.alert == "error":
+            messagebox.showerror("Monitor PJN", event.mensaje)
+        elif event.alert == "warning":
+            messagebox.showwarning("Monitor PJN", event.mensaje)
+        elif event.alert == "info":
+            messagebox.showinfo("Monitor PJN", event.mensaje)
 
     def _append_resultado(self, item: "_ResultadoItem") -> None:
         self._resultados_items.append(item)
@@ -841,6 +978,7 @@ class _ProcessingEvent:
     mensaje: str
     resumen: ResultadoProcesamiento | None = None
     json_path: str | None = None
+    alert: Literal["info", "warning", "error"] | None = None
 
 
 def launch_monitor_form(
@@ -851,11 +989,37 @@ def launch_monitor_form(
 ) -> None:
     """Inicia el formulario gráfico con la configuración indicada."""
 
+    bridge: GUIPlaywrightBridge | None = None
+    bridge_error: Exception | None = None
+
+    if expediente_payload_factory is None:
+        try:
+            monitor_config = MonitorConfig.from_file(config_path)
+        except Exception as exc:  # pragma: no cover - carga defensiva
+            monitor_config = MonitorConfig()
+            bridge_error = exc
+
+        bridge = GUIPlaywrightBridge(headless=monitor_config.headless)
+        try:
+            bridge.start()
+        except PlaywrightSessionError as exc:
+            bridge.close()
+            bridge = None
+            bridge_error = exc
+
+            def _raise_session_error(_: ExpedienteResumen) -> dict[str, object]:
+                raise PlaywrightSessionError(str(exc))
+
+            expediente_payload_factory = _raise_session_error
+        else:
+            expediente_payload_factory = bridge.get_expediente_payload
+
     if datos_dir is not None:
         app = MonitorForm(
             config_path,
             datos_dir=datos_dir,
             expediente_payload_factory=expediente_payload_factory,
+            playwright_bridge=bridge,
             historiales_loader=cargar_historiales_desde_directorio,
             historiales_saver=guardar_historiales_en_directorio,
             selecciones_loader=cargar_selecciones_desde_directorio,
@@ -865,8 +1029,23 @@ def launch_monitor_form(
         app = MonitorForm(
             config_path,
             expediente_payload_factory=expediente_payload_factory,
+            playwright_bridge=bridge,
         )
-    app.mainloop()
+
+    if bridge_error is not None:
+        mensaje = (
+            "No se pudo preparar la sesión de Playwright. "
+            f"Detalle: {bridge_error}"
+            if isinstance(bridge_error, PlaywrightSessionError)
+            else f"No se pudo leer la configuración del monitor: {bridge_error}"
+        )
+        app.after(0, lambda: messagebox.showerror("Monitor PJN", mensaje))
+
+    try:
+        app.mainloop()
+    finally:
+        if bridge is not None:
+            bridge.close()
 
 
 def _build_argument_parser() -> argparse.ArgumentParser:
