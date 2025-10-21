@@ -10,9 +10,14 @@ import os
 import re
 from datetime import datetime, time
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
-from .exceptions import ValidationError, IntervalError, DateRangeError, WorkHoursError
+from .exceptions import (
+    ValidationError,
+    IntervalError,
+    DateRangeError,
+    WorkHoursError,
+)
 
 
 # ============================================================================
@@ -196,6 +201,43 @@ def validar_formato_hora(hora_str: str | None, nombre: str) -> None:
         raise WorkHoursError(
             f"{nombre} debe estar en formato HH:MM (00:00-23:59), recibido: {hora_str}"
         )
+
+
+# ============================================================================
+# Validación de tipos de entradas
+# ============================================================================
+
+def validar_tipos_entradas(
+    tipos: Iterable[str] | str,
+    nombre: str = "tipos_entradas",
+) -> tuple[str, ...]:
+    """Valida y normaliza los tipos de entradas permitidos."""
+
+    if isinstance(tipos, str):
+        candidatos = [item.strip() for item in tipos.split(",") if item.strip()]
+    elif isinstance(tipos, Iterable):
+        candidatos = [str(item).strip() for item in tipos if str(item).strip()]
+    else:
+        raise ValidationError(
+            f"{nombre} debe ser una colección de strings o una cadena, recibido: {type(tipos).__name__}"
+        )
+
+    if not candidatos:
+        raise ValidationError(f"{nombre} no puede estar vacío")
+
+    permitidos = {"N", "D"}
+    normalizados: list[str] = []
+
+    for item in candidatos:
+        valor = item.upper()
+        if valor not in permitidos:
+            raise ValidationError(
+                f"{nombre} contiene un valor inválido: '{item}'. Valores permitidos: N, D"
+            )
+        if valor not in normalizados:
+            normalizados.append(valor)
+
+    return tuple(normalizados)
 
 
 def validar_rango_horas(

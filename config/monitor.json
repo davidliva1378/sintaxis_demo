@@ -25,6 +25,8 @@
   "notificar_errores": true,
   "verificar_entradas": true,
   "verificar_expedientes": true,
+  "__comentario_tipos": "Define qué tipos de entradas monitorear: 'N' (notificaciones), 'D' (despachos).",
+  "tipos_entradas": ["N"],
   "__comentario_avanzado": "Opciones avanzadas de comparación y filtros de fechas.",
   "comparacion_automatica": false,
   "fecha_corte_expedientes": null,

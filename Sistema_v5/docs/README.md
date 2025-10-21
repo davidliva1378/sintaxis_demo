@@ -299,8 +299,11 @@ entradas = await extraer_entradas_datos(page)
 # Solo notificaciones
 notificaciones = await extraer_entradas_datos(
     page,
-    incluir_tipos=("N",)
+    incluir_tipos=("N", "D")
 )
+
+# Configura los valores por defecto en tus archivos JSON
+# mediante la clave `tipos_entradas`.
 
 # Rango de fechas
 entradas_mes = await extraer_entradas_datos(
