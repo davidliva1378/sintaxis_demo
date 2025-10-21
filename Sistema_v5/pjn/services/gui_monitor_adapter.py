@@ -3,11 +3,17 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
+import sys
+
+if __package__ in {None, ""}:
+    # Permite ejecutar el módulo directamente resolviendo la raíz del proyecto.
+    project_root = Path(__file__).resolve().parents[3]
+    if str(project_root) not in sys.path:
+        sys.path.append(str(project_root))
 
 from Sistema_v5.configuracion.monitor.config import MonitorConfig
-
-from ..models import Entrada, ExpedienteResumen
-from ..monitor.storage import StorageManager
+from Sistema_v5.pjn.models import Entrada, ExpedienteResumen
+from Sistema_v5.pjn.monitor.storage import StorageManager
 
 
 def _create_storage_manager(config_path: Path | str) -> StorageManager:
