@@ -144,7 +144,7 @@ class MonitorPJN:
                 entradas_actuales = await extraer_entradas_datos(
                     page,
                     duplicados=False,
-                    incluir_tipos=("N",),  # Solo notificaciones
+                    incluir_tipos=self.config.tipos_entradas,
                     fecha_desde=fecha_desde,
                     fecha_hasta=fecha_hasta
                 )

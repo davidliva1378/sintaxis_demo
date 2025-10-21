@@ -342,6 +342,33 @@ class ConfigForm(tk.Tk):
             variable=self.mon_widgets["verificar_expedientes"]
         ).pack(anchor=tk.W)
 
+        tipos_frame = ttk.LabelFrame(frame, text="Tipos de entradas a incluir", padding=10)
+        tipos_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
+
+        self.mon_widgets["tipos_entradas"] = {
+            "N": tk.BooleanVar(value=True),
+            "D": tk.BooleanVar(value=False),
+        }
+
+        ttk.Checkbutton(
+            tipos_frame,
+            text="Notificaciones (N)",
+            variable=self.mon_widgets["tipos_entradas"]["N"],
+        ).pack(anchor=tk.W)
+
+        ttk.Checkbutton(
+            tipos_frame,
+            text="Despachos (D)",
+            variable=self.mon_widgets["tipos_entradas"]["D"],
+        ).pack(anchor=tk.W)
+
+        ttk.Label(
+            tipos_frame,
+            text="Seleccione una o ambas opciones según los tipos que desee monitorear.",
+            font=("TkDefaultFont", 8, "italic"),
+            foreground="gray",
+        ).pack(anchor=tk.W, pady=(5, 0))
+
         # Notificaciones
         frame = ttk.LabelFrame(scrollable_frame, text="Notificaciones", padding=10)
         frame.pack(fill=tk.X, padx=5, pady=5)
@@ -882,6 +909,9 @@ class ConfigForm(tk.Tk):
             self.mon_widgets["dias_laborales"].set(self.config.dias_laborales)
             self.mon_widgets["verificar_entradas"].set(self.config.verificar_entradas)
             self.mon_widgets["verificar_expedientes"].set(self.config.verificar_expedientes)
+            tipos_vars = self.mon_widgets["tipos_entradas"]
+            tipos_vars["N"].set("N" in self.config.tipos_entradas)
+            tipos_vars["D"].set("D" in self.config.tipos_entradas)
             self.mon_widgets["notificar_nuevas_entradas"].set(self.config.notificar_nuevas_entradas)
             self.mon_widgets["notificar_cambios_expedientes"].set(self.config.notificar_cambios_expedientes)
             self.mon_widgets["notificar_errores"].set(self.config.notificar_errores)
@@ -965,6 +995,15 @@ class ConfigForm(tk.Tk):
             config_data["dias_laborales"] = self.mon_widgets["dias_laborales"].get()
             config_data["verificar_entradas"] = self.mon_widgets["verificar_entradas"].get()
             config_data["verificar_expedientes"] = self.mon_widgets["verificar_expedientes"].get()
+            tipos_vars = self.mon_widgets["tipos_entradas"]
+            tipos_seleccionados = [tipo for tipo, var in tipos_vars.items() if var.get()]
+            if not tipos_seleccionados:
+                messagebox.showerror(
+                    "Error",
+                    "Seleccione al menos un tipo de entrada (Notificaciones y/o Despachos).",
+                )
+                return
+            config_data["tipos_entradas"] = tipos_seleccionados
             config_data["notificar_nuevas_entradas"] = self.mon_widgets["notificar_nuevas_entradas"].get()
             config_data["notificar_cambios_expedientes"] = self.mon_widgets["notificar_cambios_expedientes"].get()
             config_data["notificar_errores"] = self.mon_widgets["notificar_errores"].get()
