@@ -257,6 +257,52 @@ Sistema_v5/
 └── descargas/                 # PDFs descargados
 ```
 
+### 📁 Árbol por Expediente
+
+Cada expediente dentro de `data/expedientes` sigue la siguiente estructura
+estándar, pensada para agrupar los distintos insumos generados por el
+scraper y los archivos agregados manualmente:
+
+```
+<numero_normalizado>/
+├── actuaciones/
+│   ├── adjuntos/
+│   └── json/
+├── documentos_usuario/
+└── reportes/
+```
+
+La carpeta `documentos_usuario` se reservó para que el equipo
+pueda adjuntar escritos propios o descargas externas, manteniéndolos
+separados del material obtenido automáticamente del PJN.
+
+> 💡 Según el flujo de trabajo, se pueden sumar carpetas opcionales como
+> `documentos_firmados/` para copias firmadas digitalmente o `tmp/` para
+> archivos temporales compartidos con automatizaciones externas. Desde la
+> versión 5.5 podés hacerlo en tiempo de ejecución usando
+> ``GestorDirectoriosExpedientes.actualizar_estructura`` o los parámetros
+> ``estructura``/``fusionar_estructura`` de ``generar_arbol``.
+
+Usa el gestor incluido en `Sistema_v5/gestor_directorios/expedientes.py`
+para crear esta estructura desde la configuración unificada:
+
+```python
+from pathlib import Path
+from Sistema_v5.configuracion.core import SystemConfig
+from Sistema_v5.gestor_directorios import GestorDirectoriosExpedientes
+
+project_root = Path(__file__).resolve().parent
+config = SystemConfig.from_file(project_root / "config" / "sistema.json")
+gestor = GestorDirectoriosExpedientes.desde_config(config, base_dir=project_root)
+ruta_expediente, manifest = gestor.crear_para_expediente("EXP 123/2024")
+```
+
+El manifiesto `manifest.json` guardado en cada expediente incluye la lista de
+carpetas creadas y metadatos útiles (`numero_expediente` y
+`numero_normalizado`) para integrarlo con el resto del sistema. Si extendés la
+estructura en tiempo de ejecución, el manifiesto reflejará automáticamente los
+directorios adicionales generados.
+
 ---
 
 ## 📚 Documentación
