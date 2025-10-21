@@ -19,13 +19,22 @@ if __package__ in (None, ""):
     if _project_root_str not in sys.path:
         sys.path.append(_project_root_str)
 
-from ..core.system_config import (
-    SystemConfig,
-    ModoMonitor,
-    ModoComparacion,
-    FormatoReporte,
-    NivelLog,
-)
+try:
+    from ..core.system_config import (
+        SystemConfig,
+        ModoMonitor,
+        ModoComparacion,
+        FormatoReporte,
+        NivelLog,
+    )
+except ImportError:  # pragma: no cover - ejecución directa fuera del paquete
+    from Sistema_v5.configuracion.core.system_config import (
+        SystemConfig,
+        ModoMonitor,
+        ModoComparacion,
+        FormatoReporte,
+        NivelLog,
+    )
 
 try:
     from .config_widgets import (
