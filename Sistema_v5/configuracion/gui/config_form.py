@@ -73,6 +73,7 @@ class ConfigForm(tk.Tk):
         """
         super().__init__()
 
+        self.project_root = Path(__file__).resolve().parents[3]
         self.config_path = Path(config_path)
         self.config: SystemConfig | None = None
 
@@ -834,11 +835,12 @@ class ConfigForm(tk.Tk):
     def _load_config(self) -> None:
         """Carga la configuración desde archivo."""
         try:
-            # Cargar configuración
-            if self.config_path.exists():
-                self.config = SystemConfig.from_file(self.config_path)
-            else:
-                self.config = SystemConfig()
+            # Normalizar ruta de configuración
+            if not self.config_path.is_absolute():
+                self.config_path = (self.project_root / self.config_path).resolve()
+
+            # Cargar configuración aprovechando la lógica interna de fallback
+            self.config = SystemConfig.from_file(self.config_path)
 
             # Actualizar widgets de directorios
             for key, widget in self.dir_widgets.items():
