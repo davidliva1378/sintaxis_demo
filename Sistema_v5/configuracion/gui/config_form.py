@@ -899,8 +899,9 @@ class ConfigForm(tk.Tk):
             self.mon_widgets["expedientes_orden"].set(orden_texto)
 
             self.mon_widgets["expedientes_detener_duplicados"].set(self.config.expedientes_detener_duplicados)
-            if self.config.expedientes_max_paginas is not None:
-                self.mon_widgets["expedientes_max_paginas"].set(self.config.expedientes_max_paginas)
+            self.mon_widgets["expedientes_max_paginas"].set(
+                self.config.expedientes_max_paginas
+            )
 
             # Actualizar widgets de extracción
             self.ext_widgets["headless"].set(self.config.headless)
@@ -981,7 +982,19 @@ class ConfigForm(tk.Tk):
             config_data["expedientes_orden"] = orden_inverso_map.get(orden_text, None)
 
             config_data["expedientes_detener_duplicados"] = self.mon_widgets["expedientes_detener_duplicados"].get()
-            config_data["expedientes_max_paginas"] = self.mon_widgets["expedientes_max_paginas"].get()
+            exp_max_paginas = self.mon_widgets["expedientes_max_paginas"].get()
+
+            if self.mon_widgets["extraccion_expedientes_completa"].get():
+                exp_max_paginas = None
+            elif (
+                exp_max_paginas is None
+                and self.config
+                and self.config.expedientes_max_paginas is not None
+            ):
+                # Conservar el valor previo si el widget quedó vacío
+                exp_max_paginas = self.config.expedientes_max_paginas
+
+            config_data["expedientes_max_paginas"] = exp_max_paginas
 
             # Extracción
             config_data["headless"] = self.ext_widgets["headless"].get()
