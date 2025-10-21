@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import json
+from copy import deepcopy
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,8 +42,35 @@ def test_generar_arbol_crea_estructura_basica(tmp_path: Path) -> None:
     contenido_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert "directories" in contenido_manifest
     assert set(contenido_manifest["directories"]) >= rutas_esperadas
-    assert "actuaciones/documentos_usuario" in contenido_manifest["directories"]
-    assert "actuaciones/documentos_usuario" in manifest["directories"]
+    assert "documentos_usuario" in contenido_manifest["directories"]
+    assert "documentos_usuario" in manifest["directories"]
+
+
+def test_generar_arbol_permita_extender_estructura(tmp_path: Path) -> None:
+    gestor = GestorDirectoriosExpedientes(tmp_path)
+
+    estructura_extra = {
+        "documentos_usuario": {
+            "firmados": None,
+        },
+        "audiencias": {
+            "multimedia": None,
+        },
+    }
+
+    manifest = gestor.generar_arbol(estructura=estructura_extra)
+
+    estructura_combinada = deepcopy(ESTRUCTURA_POR_DEFECTO)
+    estructura_combinada["documentos_usuario"] = {"firmados": None}
+    estructura_combinada["audiencias"] = {"multimedia": None}
+
+    rutas_combinadas = _listar_directorios(estructura_combinada)
+
+    for ruta in rutas_combinadas:
+        assert (tmp_path / ruta).is_dir()
+
+    assert "audiencias" in manifest["directories"]
+    assert "documentos_usuario/firmados" in manifest["directories"]
 
 
 def test_crear_para_expediente_normaliza_y_agrega_metadata(tmp_path: Path) -> None:
@@ -60,6 +88,20 @@ def test_crear_para_expediente_normaliza_y_agrega_metadata(tmp_path: Path) -> No
     assert contenido_manifest == manifest
 
 
+def test_actualizar_estructura_permita_reemplazar(tmp_path: Path) -> None:
+    gestor = GestorDirectoriosExpedientes(tmp_path)
+    gestor.actualizar_estructura({"personalizado": {"docs": None}}, reemplazar=True)
+
+    manifest = gestor.generar_arbol()
+
+    assert set(manifest["directories"]) == {
+        "personalizado",
+        "personalizado/docs",
+    }
+
+    assert (tmp_path / "actuaciones").exists() is False
+
+
 def test_desde_config_resuelve_ruta_relativa(tmp_path: Path) -> None:
     config = SystemConfig()
     config.directorio_expedientes_base = "data/expedientes"
@@ -73,4 +115,4 @@ def test_desde_config_resuelve_ruta_relativa(tmp_path: Path) -> None:
 
     ruta, manifest = gestor.crear_para_expediente("123")
     assert ruta == tmp_path / "data" / "expedientes" / "123"
-    assert "actuaciones/documentos_usuario" in manifest["directories"]
+    assert "documentos_usuario" in manifest["directories"]

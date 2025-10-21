@@ -267,18 +267,21 @@ scraper y los archivos agregados manualmente:
 <numero_normalizado>/
 ├── actuaciones/
 │   ├── adjuntos/
-│   ├── documentos_usuario/
 │   └── json/
-├── entradas/
-│   └── json/
-└── expedientes/
-    ├── json/
-    └── reportes/
+├── documentos_usuario/
+└── reportes/
 ```
 
-La carpeta `actuaciones/documentos_usuario` se reservó para que el equipo
+La carpeta `documentos_usuario` se reservó para que el equipo
 pueda adjuntar escritos propios o descargas externas, manteniéndolos
 separados del material obtenido automáticamente del PJN.
+
+> 💡 Según el flujo de trabajo, se pueden sumar carpetas opcionales como
+> `documentos_firmados/` para copias firmadas digitalmente o `tmp/` para
+> archivos temporales compartidos con automatizaciones externas. Desde la
+> versión 5.5 podés hacerlo en tiempo de ejecución usando
+> ``GestorDirectoriosExpedientes.actualizar_estructura`` o los parámetros
+> ``estructura``/``fusionar_estructura`` de ``generar_arbol``.
 
 Usa el gestor incluido en `Sistema_v5/gestor_directorios/expedientes.py`
 para crear esta estructura desde la configuración unificada:
@@ -296,7 +299,9 @@ ruta_expediente, manifest = gestor.crear_para_expediente("EXP 123/2024")
 
 El manifiesto `manifest.json` guardado en cada expediente incluye la lista de
 carpetas creadas y metadatos útiles (`numero_expediente` y
-`numero_normalizado`) para integrarlo con el resto del sistema.
+`numero_normalizado`) para integrarlo con el resto del sistema. Si extendés la
+estructura en tiempo de ejecución, el manifiesto reflejará automáticamente los
+directorios adicionales generados.
 
 ---
 

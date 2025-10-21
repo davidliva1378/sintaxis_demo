@@ -60,16 +60,14 @@ La utilidad de gestión de directorios crea un árbol base para cada expediente 
 <expediente>/
 ├── actuaciones/
 │   ├── adjuntos/
-│   ├── documentos_usuario/
 │   └── json/
-├── entradas/
-│   └── json/
-└── expedientes/
-    ├── json/
-    └── reportes/
+├── documentos_usuario/
+└── reportes/
 ```
 
-La carpeta `actuaciones/documentos_usuario` está pensada para almacenar escritos o archivos complementarios agregados por la mesa de trabajo que no provienen del portal del PJN.
+La carpeta `documentos_usuario` queda disponible para almacenar escritos o archivos complementarios agregados por la mesa de trabajo que no provienen del portal del PJN, manteniéndolos separados de las actuaciones oficiales.
+
+> 💡 Además del árbol base anterior, suele resultar útil preparar directorios opcionales como `documentos_firmados/` (para versiones selladas o con firma digital) o `tmp/` (para insumos intermedios compartidos con procesos externos). El módulo `Sistema_v5.gestor_directorios` permite incorporarlos dinámicamente usando `GestorDirectoriosExpedientes.actualizar_estructura` o pasando un diccionario personalizado en `generar_arbol`.
 
 ### Principios de Diseño
 

@@ -27,16 +27,38 @@ ESTRUCTURA_POR_DEFECTO: dict[str, dict[str, object] | None] = {
     "actuaciones": {
         "json": None,
         "adjuntos": None,
-        "documentos_usuario": None,
     },
-    "expedientes": {
-        "json": None,
-        "reportes": None,
-    },
-    "entradas": {
-        "json": None,
-    },
+    "documentos_usuario": None,
+    "reportes": None,
 }
+
+
+def _fusionar_estructuras(
+    base: dict[str, object] | None,
+    extra: dict[str, object] | None,
+) -> dict[str, object] | None:
+    """Devuelve una nueva estructura combinando ``base`` y ``extra``.
+
+    Si ``extra`` es ``None`` se devuelve una copia profunda de ``base``. Cuando
+    ambos diccionarios comparten claves y sus valores son a su vez diccionarios,
+    la fusión se realiza recursivamente, permitiendo añadir o sobreescribir
+    subniveles concretos.
+    """
+
+    if extra is None:
+        return deepcopy(base) if base is not None else None
+
+    if base is None:
+        return deepcopy(extra)
+
+    combinada: dict[str, object] = deepcopy(base)
+    for nombre, valor_extra in extra.items():
+        valor_base = combinada.get(nombre)
+        if isinstance(valor_base, dict) and isinstance(valor_extra, dict):
+            combinada[nombre] = _fusionar_estructuras(valor_base, valor_extra) or {}
+        else:
+            combinada[nombre] = deepcopy(valor_extra)
+    return combinada
 
 
 @dataclass
@@ -106,6 +128,8 @@ class GestorDirectoriosExpedientes:
         destino: Path | str | None = None,
         *,
         metadata: dict[str, Any] | None = None,
+        estructura: dict[str, object] | None = None,
+        fusionar_estructura: bool = True,
     ) -> dict[str, Any]:
         """Genera la estructura de directorios y devuelve un manifiesto.
 
@@ -113,13 +137,23 @@ class GestorDirectoriosExpedientes:
             destino: Carpeta donde crear la estructura. Si se omite se utiliza
                 ``self.raiz``.
             metadata: Campos adicionales a incluir en ``manifest.json``.
+            estructura: Estructura personalizada a aplicar en lugar de la
+                almacenada en ``self.estructura``.
+            fusionar_estructura: Cuando ``True`` (por defecto) la estructura
+                personalizada se fusiona con la existente, permitiendo añadir
+                o modificar secciones puntuales. Si es ``False`` la estructura
+                proporcionada reemplaza completamente a la actual para esta
+                invocación.
         """
 
         raiz = Path(destino) if destino is not None else self.raiz
         raiz.mkdir(parents=True, exist_ok=True)
 
         directories: list[str] = []
-        self._crear_estructura(raiz, self.estructura, directories, raiz)
+        estructura_a_usar = self._obtener_estructura_efectiva(
+            estructura, fusionar_estructura
+        )
+        self._crear_estructura(raiz, estructura_a_usar, directories, raiz)
 
         manifest: dict[str, Any] = {"directories": sorted(directories)}
         if metadata:
@@ -145,6 +179,29 @@ class GestorDirectoriosExpedientes:
         manifest = self.generar_arbol(destino, metadata=metadata)
         return destino, manifest
 
+    def actualizar_estructura(
+        self,
+        estructura_personalizada: dict[str, object],
+        *,
+        reemplazar: bool = False,
+    ) -> None:
+        """Actualiza la estructura interna del gestor.
+
+        Args:
+            estructura_personalizada: Árbol de directorios a incorporar.
+            reemplazar: Cuando es ``True`` sustituye completamente la
+                estructura actual. Si es ``False`` (por defecto) se fusiona con
+                la estructura existente, lo que permite añadir carpetas nuevas o
+                redefinir sólo algunas ramas.
+        """
+
+        if reemplazar:
+            self.estructura = deepcopy(estructura_personalizada)
+        else:
+            self.estructura = _fusionar_estructuras(
+                self.estructura, estructura_personalizada
+            ) or {}
+
     def _crear_estructura(
         self,
         base: Path,
@@ -164,6 +221,21 @@ class GestorDirectoriosExpedientes:
 
             if isinstance(subestructura, dict):
                 self._crear_estructura(ruta, subestructura, manifest, raiz_manifest)
+
+    def _obtener_estructura_efectiva(
+        self,
+        estructura_personalizada: dict[str, object] | None,
+        fusionar: bool,
+    ) -> dict[str, object] | None:
+        """Determina la estructura a utilizar en una generación concreta."""
+
+        if estructura_personalizada is None:
+            return deepcopy(self.estructura)
+
+        if fusionar:
+            return _fusionar_estructuras(self.estructura, estructura_personalizada)
+
+        return deepcopy(estructura_personalizada)
 
 
 __all__ = [

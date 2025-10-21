@@ -14,18 +14,21 @@ base dentro del directorio configurado como raíz:
 <raiz>
 ├── actuaciones/
 │   ├── adjuntos/
-│   ├── documentos_usuario/
 │   └── json/
-├── entradas/
-│   └── json/
-└── expedientes/
-    ├── json/
-    └── reportes/
+├── documentos_usuario/
+└── reportes/
 ```
 
 Además de crear los directorios, el gestor escribe un archivo ``manifest.json`` que lista las
 rutas generadas y permite adjuntar metadatos adicionales (por ejemplo el número de expediente
 original y el normalizado).
+
+> 💡 Necesitás más espacios de trabajo? Algunas implementaciones agregan
+> `documentos_firmados/` para copias selladas o `tmp/` para intercambiar
+> archivos temporales con otras automatizaciones. Podés extender la
+> estructura en tiempo de ejecución usando los métodos explicados más
+> abajo para sumar estos directorios adicionales sin tocar el código
+> fuente.
 
 ## Uso básico
 
@@ -61,3 +64,41 @@ El método ``crear_para_expediente`` normaliza el número de expediente (por eje
 → ``"Exp_123_2024"``), genera el árbol completo dentro de esa carpeta y actualiza el manifiesto
 con la metadata del expediente, lista para ser consumida por otros módulos del sistema o
 interfaces externas.
+
+## Extender o reemplazar la estructura por expediente
+
+El gestor admite personalizar el árbol generado según las necesidades del flujo
+de trabajo. Existen dos caminos complementarios:
+
+1. **Ajustar la instancia para usos futuros** con ``actualizar_estructura``:
+
+   ```python
+   gestor.actualizar_estructura(
+       {
+           "documentos_usuario": {"firmados": None},
+           "audiencias": {"multimedia": None},
+       }
+   )
+   gestor.generar_arbol()  # crea las carpetas extra además de las estándar
+   ```
+
+   Si necesitás reemplazar por completo la estructura base (por ejemplo en un
+   entorno de pruebas aislado) indicá ``reemplazar=True``.
+
+2. **Personalizar cada llamada** usando los parámetros ``estructura`` y
+   ``fusionar_estructura`` de ``generar_arbol``. Esto resulta útil cuando sólo
+   ciertos expedientes requieren carpetas adicionales:
+
+   ```python
+   manifest = gestor.generar_arbol(
+       destino=base / "EXP_123_2024",
+       estructura={"pericias": {"imagenes": None}},
+   )
+   ```
+
+   Con ``fusionar_estructura=False`` podés generar árboles totalmente
+   personalizados sin alterar la configuración del gestor.
+
+Ambas variantes garantizan que el ``manifest.json`` refleje fielmente las
+carpetas creadas, manteniendo sincronizadas las integraciones que dependen del
+listado de directorios.
