@@ -39,8 +39,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import argparse
+import asyncio
+import os
+import queue
+import subprocess
+import sys
+import threading
 import tkinter as tk
 from tkinter import messagebox
+from typing import Callable, Literal
 
 from Sistema_v5.pjn.models import Entrada, ExpedienteResumen
 from Sistema_v5.pjn.services.gui_monitor_adapter import (
@@ -49,6 +56,7 @@ from Sistema_v5.pjn.services.gui_monitor_adapter import (
     guardar_historiales_monitor,
     guardar_selecciones_monitor,
 )
+from Sistema_v5.pjn.services import ResultadoProcesamiento, procesar_actuaciones_expediente
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,11 +93,18 @@ class _ExpedienteItem:
 class MonitorForm(tk.Tk):
     """Ventana principal para gestionar historiales y selecciones."""
 
-    def __init__(self, config_path: Path | str) -> None:
+    def __init__(
+        self,
+        config_path: Path | str,
+        expediente_payload_factory: Callable[[ExpedienteResumen], dict[str, object]] | None = None,
+    ) -> None:
         super().__init__()
         self.title("Monitor PJN – Historiales")
         self.minsize(980, 540)
         self.config_path = Path(config_path)
+        self._expediente_payload_factory: Callable[[ExpedienteResumen], dict[str, object]] | None = (
+            expediente_payload_factory
+        )
 
         self.entradas: list[Entrada]
         self.expedientes: list[ExpedienteResumen]
@@ -102,9 +117,19 @@ class MonitorForm(tk.Tk):
 
         self._entradas_listbox: tk.Listbox
         self._expedientes_listbox: tk.Listbox
+        self._procesar_btn: tk.Button
+        self._abrir_carpeta_btn: tk.Button
+        self._resultados_listbox: tk.Listbox
+        self._descargar_adjuntos_var = tk.BooleanVar(value=False)
+
+        self._processing_queue: queue.Queue[_ProcessingEvent] = queue.Queue()
+        self._processing_thread: threading.Thread | None = None
+        self._processing_active = False
+        self._resultados_items: list[_ResultadoItem] = []
 
         self._load_data()
         self._build_layout()
+        self.after(200, self._poll_processing_queue)
 
     # ------------------------------------------------------------------
     # Datos y estado
@@ -167,6 +192,7 @@ class MonitorForm(tk.Tk):
         acciones_frame.columnconfigure(1, weight=0)
         acciones_frame.columnconfigure(2, weight=0)
         acciones_frame.columnconfigure(3, weight=0)
+        acciones_frame.columnconfigure(4, weight=0)
 
         marcar_leidas_btn = tk.Button(
             acciones_frame,
@@ -182,11 +208,62 @@ class MonitorForm(tk.Tk):
         )
         marcar_no_leidas_btn.grid(row=0, column=1, padx=(12, 0), sticky="w")
 
+        self._procesar_btn = tk.Button(
+            acciones_frame,
+            text="Procesar expediente(s)",
+            command=self._process_selected_expedientes,
+        )
+        self._procesar_btn.grid(row=0, column=2, padx=(12, 0))
+
         guardar_btn = tk.Button(acciones_frame, text="Guardar selecciones", command=self._save_changes)
-        guardar_btn.grid(row=0, column=2, padx=(12, 0))
+        guardar_btn.grid(row=0, column=3, padx=(12, 0))
 
         cerrar_btn = tk.Button(acciones_frame, text="Cerrar", command=self.destroy)
-        cerrar_btn.grid(row=0, column=3, padx=(12, 0))
+        cerrar_btn.grid(row=0, column=4, padx=(12, 0))
+
+        opciones_frame = tk.Frame(container)
+        opciones_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(12, 0))
+        opciones_frame.columnconfigure(0, weight=1)
+
+        descargar_adjuntos_chk = tk.Checkbutton(
+            opciones_frame,
+            text="Descargar adjuntos",
+            variable=self._descargar_adjuntos_var,
+        )
+        descargar_adjuntos_chk.grid(row=0, column=0, sticky="w")
+
+        resultados_label = tk.Label(
+            container,
+            text="Resultados del procesamiento",
+            font=("TkDefaultFont", 11, "bold"),
+        )
+        resultados_label.grid(row=4, column=0, columnspan=2, sticky="w", pady=(12, 0))
+
+        resultados_frame = tk.Frame(container)
+        resultados_frame.grid(row=5, column=0, columnspan=2, sticky="nsew")
+        container.rowconfigure(5, weight=1)
+
+        self._resultados_listbox = tk.Listbox(resultados_frame, activestyle="dotbox")
+        self._resultados_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        resultados_scrollbar = tk.Scrollbar(
+            resultados_frame, orient=tk.VERTICAL, command=self._resultados_listbox.yview
+        )
+        resultados_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self._resultados_listbox.config(yscrollcommand=resultados_scrollbar.set)
+
+        botones_resultados = tk.Frame(container)
+        botones_resultados.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+
+        self._abrir_carpeta_btn = tk.Button(
+            botones_resultados,
+            text="Abrir carpeta del expediente",
+            command=self._open_selected_result_folder,
+            state=tk.DISABLED,
+        )
+        self._abrir_carpeta_btn.grid(row=0, column=0, sticky="w")
+
+        self._resultados_listbox.bind("<<ListboxSelect>>", self._on_result_selection)
 
     def _create_listbox(self, parent: tk.Misc) -> tk.Listbox:
         frame = tk.Frame(parent)
@@ -247,6 +324,204 @@ class MonitorForm(tk.Tk):
     ) -> list[str]:
         return [items[index].id for index in listbox.curselection()]
 
+    def _process_selected_expedientes(self) -> None:
+        if self._processing_active:
+            messagebox.showinfo(
+                "Monitor PJN",
+                "Ya hay un procesamiento en curso. Espere a que finalice.",
+            )
+            return
+
+        indices = self._expedientes_listbox.curselection()
+        if not indices:
+            messagebox.showinfo(
+                "Monitor PJN",
+                "Seleccione al menos un expediente para iniciar el procesamiento.",
+            )
+            return
+
+        seleccionados = [self._expedientes_items[index] for index in indices]
+        descargar_adjuntos = self._descargar_adjuntos_var.get()
+
+        self._processing_active = True
+        self._procesar_btn.config(state=tk.DISABLED)
+        self._append_resultado(
+            _ResultadoItem(
+                mensaje=f"Iniciando procesamiento de {len(seleccionados)} expediente(s)...",
+                estado="info",
+            )
+        )
+
+        self._processing_thread = threading.Thread(
+            target=self._run_processing_worker,
+            args=(seleccionados, descargar_adjuntos),
+            daemon=True,
+        )
+        self._processing_thread.start()
+
+    def _run_processing_worker(
+        self, items: list[_ExpedienteItem], descargar_adjuntos: bool
+    ) -> None:
+        async def _runner() -> None:
+            for item in items:
+                self._processing_queue.put(
+                    _ProcessingEvent(
+                        tipo="progress",
+                        expediente=item,
+                        mensaje=f"Procesando expediente {item.expediente.numero}...",
+                    )
+                )
+                try:
+                    datos_expediente = self._build_datos_expediente(item)
+                except Exception as exc:  # pragma: no cover - comunicación con UI
+                    self._processing_queue.put(
+                        _ProcessingEvent(
+                            tipo="error",
+                            expediente=item,
+                            mensaje=str(exc),
+                        )
+                    )
+                    continue
+
+                try:
+                    json_path, resumen = await procesar_actuaciones_expediente(
+                        datos_expediente,
+                        descargar_adjuntos=descargar_adjuntos,
+                    )
+                except Exception as exc:  # pragma: no cover - comunicación con UI
+                    self._processing_queue.put(
+                        _ProcessingEvent(
+                            tipo="error",
+                            expediente=item,
+                            mensaje=str(exc),
+                        )
+                    )
+                else:
+                    self._processing_queue.put(
+                        _ProcessingEvent(
+                            tipo="success",
+                            expediente=item,
+                            mensaje=f"Expediente {item.expediente.numero} procesado correctamente.",
+                            resumen=resumen,
+                            json_path=str(json_path) if json_path else None,
+                        )
+                    )
+
+        asyncio.run(_runner())
+        self._processing_queue.put(
+            _ProcessingEvent(tipo="done", expediente=None, mensaje="Procesamiento finalizado."),
+        )
+
+    def _build_datos_expediente(self, item: _ExpedienteItem) -> dict[str, object]:
+        if self._expediente_payload_factory is None:
+            raise RuntimeError(
+                "No se configuró un proveedor de datos del expediente con la página activa."
+            )
+        datos = self._expediente_payload_factory(item.expediente)
+        if not isinstance(datos, dict):
+            raise TypeError(
+                "El proveedor de expedientes debe devolver un diccionario con los datos necesarios."
+            )
+        if "page" not in datos:
+            raise RuntimeError(
+                "El proveedor de expedientes debe incluir la clave 'page' con la instancia de Playwright."
+            )
+        return datos
+
+    def _poll_processing_queue(self) -> None:
+        while True:
+            try:
+                event = self._processing_queue.get_nowait()
+            except queue.Empty:
+                break
+            self._handle_processing_event(event)
+        self.after(200, self._poll_processing_queue)
+
+    def _handle_processing_event(self, event: "_ProcessingEvent") -> None:
+        if event.tipo == "progress":
+            self._append_resultado(_ResultadoItem(mensaje=event.mensaje, estado="info"))
+        elif event.tipo == "success":
+            resumen = event.resumen or {}
+            descargas = "Sí" if resumen.get("descargas_ejecutadas") else "No"
+            mensaje = (
+                f"✓ {event.expediente.expediente.numero} — "
+                f"Act.: {resumen.get('actuaciones_actuales', 0)}/"
+                f"{resumen.get('actuaciones_historicas', 0)} — Descargas: {descargas}"
+            )
+            self._append_resultado(
+                _ResultadoItem(
+                    mensaje=mensaje,
+                    estado="success",
+                    carpeta_expediente=resumen.get("carpeta_expediente"),
+                    carpeta_json=resumen.get("carpeta_json"),
+                    json_path=event.json_path,
+                )
+            )
+        elif event.tipo == "error":
+            mensaje = f"✗ {event.expediente.expediente.numero} — Error: {event.mensaje}"
+            self._append_resultado(_ResultadoItem(mensaje=mensaje, estado="error"))
+        elif event.tipo == "done":
+            self._append_resultado(_ResultadoItem(mensaje=event.mensaje, estado="info"))
+            self._processing_active = False
+            self._procesar_btn.config(state=tk.NORMAL)
+            self._processing_thread = None
+
+    def _append_resultado(self, item: "_ResultadoItem") -> None:
+        self._resultados_items.append(item)
+        self._resultados_listbox.insert(tk.END, item.mensaje)
+        self._resultados_listbox.yview_moveto(1.0)
+        if item.carpeta_expediente:
+            self._abrir_carpeta_btn.config(state=tk.NORMAL)
+
+    def _on_result_selection(self, _event: tk.Event[object]) -> None:  # pragma: no cover - UI
+        index = self._get_selected_result_index()
+        if index is None:
+            self._abrir_carpeta_btn.config(state=tk.DISABLED)
+            return
+        item = self._resultados_items[index]
+        if item.carpeta_expediente:
+            self._abrir_carpeta_btn.config(state=tk.NORMAL)
+        else:
+            self._abrir_carpeta_btn.config(state=tk.DISABLED)
+
+    def _get_selected_result_index(self) -> int | None:
+        selection = self._resultados_listbox.curselection()
+        if not selection:
+            return None
+        return int(selection[0])
+
+    def _open_selected_result_folder(self) -> None:
+        index = self._get_selected_result_index()
+        if index is None:
+            messagebox.showinfo(
+                "Monitor PJN", "Seleccione un resultado con carpeta disponible."
+            )
+            return
+
+        item = self._resultados_items[index]
+        if not item.carpeta_expediente:
+            messagebox.showinfo(
+                "Monitor PJN",
+                "El resultado elegido no contiene información de carpeta disponible.",
+            )
+            return
+
+        path = Path(item.carpeta_expediente)
+        if not path.exists():
+            messagebox.showerror(
+                "Monitor PJN",
+                f"La carpeta indicada no existe o no es accesible.\n{path}",
+            )
+            return
+
+        try:
+            _open_path_in_explorer(path)
+        except Exception as exc:  # pragma: no cover - interacción con SO
+            messagebox.showerror(
+                "Monitor PJN",
+                f"No se pudo abrir la carpeta del expediente.\n{exc}",
+            )
+
     def _save_changes(self) -> None:
         entradas_ids = self._gather_selections(self._entradas_listbox, self._entradas_items)
         expedientes_ids = self._gather_selections(self._expedientes_listbox, self._expedientes_items)
@@ -280,10 +555,41 @@ def _infer_item_id(value: str | None, index: int, prefix: str) -> str:
     return value if value else f"{prefix}-{index}"
 
 
-def launch_monitor_form(config_path: Path | str = Path("config/monitor.json")) -> None:
+def _open_path_in_explorer(path: Path) -> None:
+    if sys.platform.startswith("win"):
+        os.startfile(path)  # type: ignore[arg-type]
+    elif sys.platform == "darwin":
+        subprocess.run(["open", str(path)], check=False)
+    else:
+        subprocess.run(["xdg-open", str(path)], check=False)
+
+
+@dataclass(slots=True)
+class _ResultadoItem:
+    mensaje: str
+    estado: Literal["info", "success", "error"]
+    carpeta_expediente: str | None = None
+    carpeta_json: str | None = None
+    json_path: str | None = None
+
+
+@dataclass(slots=True)
+class _ProcessingEvent:
+    tipo: Literal["progress", "success", "error", "done"]
+    expediente: _ExpedienteItem | None
+    mensaje: str
+    resumen: ResultadoProcesamiento | None = None
+    json_path: str | None = None
+
+
+def launch_monitor_form(
+    config_path: Path | str = Path("config/monitor.json"),
+    *,
+    expediente_payload_factory: Callable[[ExpedienteResumen], dict[str, object]] | None = None,
+) -> None:
     """Inicia el formulario gráfico con la configuración indicada."""
 
-    app = MonitorForm(config_path)
+    app = MonitorForm(config_path, expediente_payload_factory=expediente_payload_factory)
     app.mainloop()
 
 
