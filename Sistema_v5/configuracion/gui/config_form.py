@@ -832,12 +832,30 @@ class ConfigForm(tk.Tk):
     # MÉTODOS DE CARGA/GUARDADO
     # =========================================================================
 
+    def _resolve_config_path(self, path: Path | str | None = None) -> Path:
+        """Normaliza una ruta de configuración dentro del proyecto.
+
+        Args:
+            path: Ruta relativa o absoluta a normalizar. Si es ``None`` se
+                utiliza ``self.config_path``.
+
+        Returns:
+            Path: Ruta absoluta dentro del proyecto o la ruta absoluta
+                recibida si ya lo era.
+        """
+
+        candidate = Path(path) if path is not None else self.config_path
+
+        if candidate.is_absolute():
+            return candidate.resolve()
+
+        return (self.project_root / candidate).resolve()
+
     def _load_config(self) -> None:
         """Carga la configuración desde archivo."""
         try:
             # Normalizar ruta de configuración
-            if not self.config_path.is_absolute():
-                self.config_path = (self.project_root / self.config_path).resolve()
+            self.config_path = self._resolve_config_path()
 
             # Cargar configuración aprovechando la lógica interna de fallback
             self.config = SystemConfig.from_file(self.config_path)
@@ -919,6 +937,9 @@ class ConfigForm(tk.Tk):
     def _save_config(self) -> None:
         """Guarda la configuración actual."""
         try:
+            # Asegurar que el archivo de destino esté resuelto antes de guardar
+            self.config_path = self._resolve_config_path()
+
             # Crear nueva configuración con valores de los widgets
             config_data = {}
 
@@ -1045,6 +1066,7 @@ class ConfigForm(tk.Tk):
         if file_path:
             try:
                 self.config = SystemConfig.from_file(file_path)
+                self.config_path = self._resolve_config_path(file_path)
                 self._load_config()
                 messagebox.showinfo("Éxito", "Configuración importada correctamente")
             except Exception as e:
