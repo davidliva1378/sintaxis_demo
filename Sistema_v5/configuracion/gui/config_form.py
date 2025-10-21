@@ -19,24 +19,31 @@ if __package__ in (None, ""):
     if _project_root_str not in sys.path:
         sys.path.append(_project_root_str)
 
-from ..core.system_config import (
-    SystemConfig,
-    ModoMonitor,
-    ModoComparacion,
-    FormatoReporte,
-    NivelLog,
-)
+    from Sistema_v5.configuracion.core.system_config import (  # type: ignore[import-not-found]
+        SystemConfig,
+        ModoMonitor,
+        ModoComparacion,
+        FormatoReporte,
+        NivelLog,
+    )
 
-try:
-    from .config_widgets import (
+    from Sistema_v5.configuracion.gui.config_widgets import (  # type: ignore[import-not-found]
         DirectorySelector,
         DatePicker,
         TimePicker,
         IntervalInput,
         DaysSelector,
     )
-except ImportError:  # pragma: no cover - ejecución directa fuera del paquete
-    from Sistema_v5.configuracion.gui.config_widgets import (
+else:
+    from ..core.system_config import (
+        SystemConfig,
+        ModoMonitor,
+        ModoComparacion,
+        FormatoReporte,
+        NivelLog,
+    )
+
+    from .config_widgets import (
         DirectorySelector,
         DatePicker,
         TimePicker,
