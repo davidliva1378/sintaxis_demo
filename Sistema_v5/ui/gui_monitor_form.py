@@ -47,7 +47,7 @@ import sys
 import threading
 import tkinter as tk
 from tkinter import messagebox
-from typing import Callable, Literal
+from typing import Callable, Iterable, Literal
 
 from Sistema_v5.pjn.models import Entrada, ExpedienteResumen
 from Sistema_v5.pjn.services.gui_monitor_adapter import (
@@ -97,6 +97,8 @@ class MonitorForm(tk.Tk):
         self,
         config_path: Path | str,
         expediente_payload_factory: Callable[[ExpedienteResumen], dict[str, object]] | None = None,
+        selecciones_loader: Callable[[Path | str], tuple[list[str], list[str]]] = cargar_selecciones_monitor,
+        selecciones_saver: Callable[[Path | str, Iterable[object] | None, Iterable[object] | None], None] = guardar_selecciones_monitor,
     ) -> None:
         super().__init__()
         self.title("Monitor PJN – Historiales")
@@ -105,6 +107,8 @@ class MonitorForm(tk.Tk):
         self._expediente_payload_factory: Callable[[ExpedienteResumen], dict[str, object]] | None = (
             expediente_payload_factory
         )
+        self._selecciones_loader = selecciones_loader
+        self._selecciones_saver = selecciones_saver
 
         self.entradas: list[Entrada]
         self.expedientes: list[ExpedienteResumen]
@@ -129,6 +133,7 @@ class MonitorForm(tk.Tk):
 
         self._load_data()
         self._build_layout()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(200, self._poll_processing_queue)
 
     # ------------------------------------------------------------------
@@ -136,10 +141,7 @@ class MonitorForm(tk.Tk):
     # ------------------------------------------------------------------
     def _load_data(self) -> None:
         self.entradas, self.expedientes = cargar_historiales_monitor(self.config_path)
-        entradas_ids, expedientes_ids = cargar_selecciones_monitor(self.config_path)
-
-        entradas_selected = {str(_id) for _id in entradas_ids}
-        expedientes_selected = {str(_id) for _id in expedientes_ids}
+        entradas_selected, expedientes_selected = self._load_selecciones()
 
         self._entradas_items = [
             _EntradaItem(id=_infer_item_id(entrada.numero, idx, prefix="entrada"), entrada=entrada)
@@ -218,7 +220,7 @@ class MonitorForm(tk.Tk):
         guardar_btn = tk.Button(acciones_frame, text="Guardar selecciones", command=self._save_changes)
         guardar_btn.grid(row=0, column=3, padx=(12, 0))
 
-        cerrar_btn = tk.Button(acciones_frame, text="Cerrar", command=self.destroy)
+        cerrar_btn = tk.Button(acciones_frame, text="Cerrar", command=self._on_close)
         cerrar_btn.grid(row=0, column=4, padx=(12, 0))
 
         opciones_frame = tk.Frame(container)
@@ -323,6 +325,28 @@ class MonitorForm(tk.Tk):
         self, listbox: tk.Listbox, items: list[_EntradaItem] | list[_ExpedienteItem]
     ) -> list[str]:
         return [items[index].id for index in listbox.curselection()]
+
+    def _load_selecciones(self) -> tuple[set[str], set[str]]:
+        try:
+            entradas_ids, expedientes_ids = self._selecciones_loader(self.config_path)
+        except FileNotFoundError:
+            return set(), set()
+        except OSError as exc:  # pragma: no cover - comunicación con UI real
+            messagebox.showwarning(
+                "Monitor PJN",
+                "No fue posible leer las selecciones almacenadas.\n"
+                f"Detalle: {exc}",
+            )
+            return set(), set()
+        except Exception as exc:  # pragma: no cover - comunicación con UI
+            messagebox.showerror(
+                "Monitor PJN",
+                "Ocurrió un error inesperado al cargar las selecciones.\n"
+                f"Detalle: {exc}",
+            )
+            return set(), set()
+
+        return {str(_id) for _id in entradas_ids}, {str(_id) for _id in expedientes_ids}
 
     def _process_selected_expedientes(self) -> None:
         if self._processing_active:
@@ -523,27 +547,82 @@ class MonitorForm(tk.Tk):
             )
 
     def _save_changes(self) -> None:
+        if not self._persist_selecciones(show_success=False):
+            return
+
+        if self._historial_dirty and not self._persist_historiales():
+            return
+
+        messagebox.showinfo("Monitor PJN", "Cambios guardados correctamente.")
+
+    def _persist_selecciones(self, *, show_success: bool) -> bool:
         entradas_ids = self._gather_selections(self._entradas_listbox, self._entradas_items)
         expedientes_ids = self._gather_selections(self._expedientes_listbox, self._expedientes_items)
 
         try:
-            guardar_selecciones_monitor(
+            self._selecciones_saver(
                 self.config_path,
                 entradas_ids=entradas_ids,
                 expedientes_ids=expedientes_ids,
             )
-            self._entradas_selected = set(entradas_ids)
-            self._expedientes_selected = set(expedientes_ids)
-            if self._historial_dirty:
-                guardar_historiales_monitor(
-                    self.config_path,
-                    entradas=self.entradas,
-                    expedientes=self.expedientes,
-                )
-                self._historial_dirty = False
-            messagebox.showinfo("Monitor PJN", "Cambios guardados correctamente.")
+        except OSError as exc:
+            messagebox.showerror(
+                "Monitor PJN",
+                "No fue posible guardar las selecciones actuales.\n"
+                "Verifique los permisos del directorio de datos.\n"
+                f"Detalle: {exc}",
+            )
+            return False
         except Exception as exc:  # pragma: no cover - comunicación con UI
-            messagebox.showerror("Monitor PJN", f"No fue posible guardar los cambios.\n{exc}")
+            messagebox.showerror(
+                "Monitor PJN",
+                "Ocurrió un error inesperado al guardar las selecciones.\n"
+                f"Detalle: {exc}",
+            )
+            return False
+
+        self._entradas_selected = set(entradas_ids)
+        self._expedientes_selected = set(expedientes_ids)
+
+        if show_success:  # pragma: no cover - comunicación con UI
+            messagebox.showinfo("Monitor PJN", "Selecciones guardadas correctamente.")
+
+        return True
+
+    def _persist_historiales(self) -> bool:
+        try:
+            guardar_historiales_monitor(
+                self.config_path,
+                entradas=self.entradas,
+                expedientes=self.expedientes,
+            )
+        except OSError as exc:
+            messagebox.showerror(
+                "Monitor PJN",
+                "No fue posible guardar los historiales modificados.\n"
+                "Verifique los permisos del directorio de datos.\n"
+                f"Detalle: {exc}",
+            )
+            return False
+        except Exception as exc:  # pragma: no cover - comunicación con UI
+            messagebox.showerror(
+                "Monitor PJN",
+                "Ocurrió un error inesperado al guardar los historiales.\n"
+                f"Detalle: {exc}",
+            )
+            return False
+
+        self._historial_dirty = False
+        return True
+
+    def _on_close(self) -> None:
+        if not self._persist_selecciones(show_success=False):
+            return
+
+        if self._historial_dirty and not self._persist_historiales():
+            return
+
+        self.destroy()
 
 
 # ----------------------------------------------------------------------
