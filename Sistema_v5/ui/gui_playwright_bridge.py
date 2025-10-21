@@ -82,9 +82,11 @@ class GUIPlaywrightBridge:
             self._run_async(self._initialize())
         except Exception as exc:  # noqa: BLE001 - propagamos como error de sesión
             self.close()
-            raise PlaywrightSessionError(
-                "No se pudo iniciar la sesión autenticada de Playwright"
-            ) from exc
+            detalle = _format_cause(exc)
+            mensaje = "No se pudo iniciar la sesión autenticada de Playwright"
+            if detalle:
+                mensaje = f"{mensaje}. Detalle original: {detalle}"
+            raise PlaywrightSessionError(mensaje) from exc
 
     def close(self) -> None:
         """Cierra la sesión y detiene el hilo de Playwright."""
@@ -246,3 +248,12 @@ __all__ = [
     "ExpedienteNotFoundError",
     "ExpedienteNavigationError",
 ]
+
+
+def _format_cause(exc: BaseException) -> str:
+    """Normaliza el detalle de un error anidado para mostrar en la GUI."""
+
+    mensaje = str(exc).strip()
+    if mensaje:
+        return mensaje
+    return exc.__class__.__name__
