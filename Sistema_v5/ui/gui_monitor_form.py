@@ -472,6 +472,17 @@ class MonitorForm(tk.Tk):
             )
             return False
 
+        manual_dir: Path | None = None
+        if entradas_path.parent == expedientes_path.parent:
+            manual_dir = entradas_path.parent
+        else:
+            try:
+                common_dir = Path(os.path.commonpath([entradas_path.parent, expedientes_path.parent]))
+            except ValueError:
+                common_dir = None
+            else:
+                manual_dir = common_dir if common_dir.is_dir() else None
+
         self.entradas = entradas
         self.expedientes = expedientes
         self._entradas_items = [
@@ -486,8 +497,38 @@ class MonitorForm(tk.Tk):
             for idx, expediente in enumerate(self.expedientes)
         ]
 
-        self._entradas_selected = set()
-        self._expedientes_selected = set()
+        entradas_selected: set[str] = set()
+        expedientes_selected: set[str] = set()
+        if manual_dir is not None:
+            try:
+                selecciones = cargar_selecciones_desde_directorio(manual_dir)
+            except FileNotFoundError:
+                pass
+            except OSError as exc:  # pragma: no cover - comunicación con UI real
+                messagebox.showwarning(
+                    "Monitor PJN",
+                    "No fue posible leer las selecciones almacenadas.\n"
+                    f"Detalle: {exc}",
+                )
+            except Exception as exc:  # pragma: no cover - comunicación con UI real
+                messagebox.showerror(
+                    "Monitor PJN",
+                    "Ocurrió un error inesperado al cargar las selecciones.\n"
+                    f"Detalle: {exc}",
+                )
+            else:
+                if not isinstance(selecciones, tuple) or len(selecciones) != 2:
+                    messagebox.showwarning(
+                        "Monitor PJN",
+                        "Las selecciones almacenadas tienen un formato inválido y se descartarán.",
+                    )
+                else:
+                    entradas_ids, expedientes_ids = selecciones
+                    entradas_selected = {str(_id) for _id in entradas_ids}
+                    expedientes_selected = {str(_id) for _id in expedientes_ids}
+
+        self._entradas_selected = entradas_selected
+        self._expedientes_selected = expedientes_selected
         self._populate_listbox(self._entradas_listbox, self._entradas_items, self._entradas_selected)
         self._populate_listbox(
             self._expedientes_listbox, self._expedientes_items, self._expedientes_selected
