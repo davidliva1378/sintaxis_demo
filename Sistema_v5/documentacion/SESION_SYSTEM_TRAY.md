@@ -125,7 +125,7 @@ Verde → (cambios) → Amarillo → (3s) → Verde
 
 **Uso:**
 ```bash
-python ejecutar_monitor_tray.py
+python -m Sistema_v5.ejecutar_monitor_tray
 ```
 
 **Output:**
@@ -286,7 +286,7 @@ assert icon is not None
 
 ✅ **Ejecución del script**
 ```bash
-python ejecutar_monitor_tray.py
+python -m Sistema_v5.ejecutar_monitor_tray
 # Verificar que aparece icono en bandeja
 # Click derecho → Ver menú
 # Click en "Verificar ahora" → Ver cambio de color
