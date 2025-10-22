@@ -85,19 +85,27 @@ def run_ciclo_prueba(
 
     Returns:
         Ruta del archivo JSON generado durante la extracción inicial (si se
-        ejecutó la etapa correspondiente). Puede devolver ``None`` si la
-        extracción fue omitida por un error.
+        ejecutó la etapa correspondiente). Devuelve ``None`` si la extracción
+        fue omitida por un error o si la persona usuaria canceló el ciclo
+        durante el formulario de directorios.
     """
 
     sistema_path = _resolve_config_path(Path(config_sistema_path))
     monitor_path = _resolve_config_path(Path(config_monitor_path))
 
+    system_config: SystemConfig | None
     if mostrar_formulario_directorios:
         logger.info("🖥️  Abriendo formulario de directorios")
         system_config = _mostrar_formulario_directorios_gui(sistema_path)
     else:
         logger.info("📥 Cargando configuración del sistema desde %s", sistema_path)
         system_config = _load_system_config(sistema_path)
+
+    if system_config is None:
+        logger.info(
+            "🚫 Ciclo cancelado por la persona usuaria; se omiten extracción y procesamiento."
+        )
+        return None
 
     monitor_config = _prepare_monitor_config(
         monitor_path,

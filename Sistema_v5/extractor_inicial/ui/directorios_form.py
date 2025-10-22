@@ -192,7 +192,7 @@ class DirectoriosForm(tk.Toplevel):
         self.geometry(f"{width}x{height}+{x}+{y}")
 
 
-def mostrar_formulario_directorios(config_path: Path) -> SystemConfig:
+def mostrar_formulario_directorios(config_path: Path) -> SystemConfig | None:
     """Abre el formulario y devuelve la configuración resultante."""
 
     config_path = Path(config_path)
@@ -211,4 +211,7 @@ def mostrar_formulario_directorios(config_path: Path) -> SystemConfig:
     root.wait_window(form)
     root.destroy()
 
-    return form.result or config
+    if form.result is None:
+        return None
+
+    return form.result

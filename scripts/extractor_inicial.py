@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from setup_path import incluir_ruta_base
 
 incluir_ruta_base()
@@ -43,10 +44,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> None:
+def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
 
-    run_ciclo_prueba(
+    resultado = run_ciclo_prueba(
         args.config_sistema,
         args.config_monitor,
         directorio_extraccion=args.salida_extraccion,
@@ -55,6 +56,13 @@ def main(argv: list[str] | None = None) -> None:
         mostrar_formulario_filtrado=not args.sin_formularios,
     )
 
+    if resultado is None:
+        print(
+            "Ciclo cancelado por la persona usuaria; no se ejecutaron extracción ni procesamiento."
+        )
+
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
