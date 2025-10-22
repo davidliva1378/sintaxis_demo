@@ -9,11 +9,13 @@ import os
 import sys
 from pathlib import Path
 
-from Sistema_v5.pjn import SystemConfig
-from Sistema_v5.pjn.monitor.config import MonitorConfig
-from Sistema_v5.pjn.monitor.core import MonitorPJN
-from Sistema_v5.pjn.system_config import ENV_FIELD_MAP
-from Sistema_v5.pjn.utils.logging import get_logger, setup_logging
+sys.path.insert(0, str(Path(__file__).parent))
+
+from pjn import SystemConfig
+from pjn.monitor.config import MonitorConfig
+from pjn.monitor.core import MonitorPJN
+from pjn.system_config import ENV_FIELD_MAP
+from pjn.utils.logging import setup_logging, get_logger
 
 # ==== CONFIGURACION PERSONALIZADA ====
 

@@ -67,7 +67,7 @@ Editar `config/monitor.json`:
 ### Paso 6: Ejecutar
 
 ```powershell
-python -m Sistema_v5.ejecutar_monitor_tray
+python ejecutar_monitor_tray.py
 ```
 
 **Resultado:**
@@ -78,7 +78,7 @@ python -m Sistema_v5.ejecutar_monitor_tray
 
 1. Crear acceso directo de `ejecutar_monitor_tray.py`
 2. Presionar `Win + R` → `shell:startup`
-3. Copiar el acceso directo en esa carpeta apuntando a `python -m Sistema_v5.ejecutar_monitor_tray`
+3. Copiar el acceso directo en esa carpeta
 
 ---
 
@@ -145,7 +145,7 @@ Editar `config/monitor.json`:
 ### Paso 6: Ejecutar
 
 ```bash
-python -m Sistema_v5.ejecutar_monitor_statusbar
+python ejecutar_monitor_statusbar.py
 ```
 
 **Resultado:**
@@ -174,8 +174,7 @@ Crear archivo `~/Library/LaunchAgents/com.monitor.pjn.plist`:
     <key>ProgramArguments</key>
     <array>
         <string>/Users/TuUsuario/Projects/sintaXis/Sistema_v5/.venv/bin/python</string>
-        <string>-m</string>
-        <string>Sistema_v5.ejecutar_monitor_statusbar</string>
+        <string>/Users/TuUsuario/Projects/sintaXis/Sistema_v5/ejecutar_monitor_statusbar.py</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -274,7 +273,7 @@ Editar `config/monitor.json`:
 ### Paso 7: Ejecutar
 
 ```bash
-python -m Sistema_v5.ejecutar_monitor_tray
+python ejecutar_monitor_tray.py
 ```
 
 **Resultado:**
@@ -308,7 +307,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/home/tuusuario/Projects/sintaXis/Sistema_v5/.venv/bin/python -m Sistema_v5.ejecutar_monitor_tray
+ExecStart=/home/tuusuario/Projects/sintaXis/Sistema_v5/.venv/bin/python /home/tuusuario/Projects/sintaXis/Sistema_v5/ejecutar_monitor_tray.py
 Restart=on-failure
 RestartSec=10s
 
@@ -329,7 +328,7 @@ systemctl --user start monitor-pjn
 Para no preocuparte por el sistema operativo, usa el **script universal**:
 
 ```bash
-python -m Sistema_v5.ejecutar_monitor_universal
+python ejecutar_monitor_universal.py
 ```
 
 Este script:
