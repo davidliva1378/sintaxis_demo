@@ -112,3 +112,9 @@ de trabajo. Existen dos caminos complementarios:
 Ambas variantes garantizan que el ``manifest.json`` refleje fielmente las
 carpetas creadas, manteniendo sincronizadas las integraciones que dependen del
 listado de directorios.
+
+## Documentación detallada
+
+Para una referencia exhaustiva de responsabilidades, métodos públicos, helpers,
+flujos típicos y futuras extensiones consultá
+``DOCUMENTACION_GESTOR_DIRECTORIOS.md`` en este mismo directorio.
