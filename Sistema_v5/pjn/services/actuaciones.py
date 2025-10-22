@@ -91,7 +91,7 @@ async def procesar_actuaciones_expediente(
 
     carpeta_json = carpeta_expediente / "json"
     carpeta_actuaciones = carpeta_expediente / "actuaciones"
-    carpeta_adjuntos = carpeta_actuaciones / "adjuntos"
+    carpeta_adjuntos = carpeta_actuaciones
 
     actuales, historicas, error = await extraer_actuaciones_completas(
         page_expediente=page,
