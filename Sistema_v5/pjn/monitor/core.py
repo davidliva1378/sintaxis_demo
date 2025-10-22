@@ -256,14 +256,16 @@ class MonitorPJN:
 
         try:
             # Usar circuit breaker para proteger la llamada
-            return await self.circuit_breaker_entradas.call_async(
+            resultado = await self.circuit_breaker_entradas.call_async(
                 self._verificar_entradas_internal
             )
         except Exception:
+            raise
+        else:
             # Reset backoff en caso de éxito después de errores
             if self.circuit_breaker_entradas.state.value == "closed":
                 self.backoff_entradas.reset()
-            raise
+            return resultado
 
     async def _verificar_expedientes_internal(self) -> list[ExpedienteResumen]:
         """Método interno de verificación de expedientes (sin circuit breaker).
@@ -438,14 +440,16 @@ class MonitorPJN:
 
         try:
             # Usar circuit breaker para proteger la llamada
-            return await self.circuit_breaker_expedientes.call_async(
+            resultado = await self.circuit_breaker_expedientes.call_async(
                 self._verificar_expedientes_internal
             )
         except Exception:
+            raise
+        else:
             # Reset backoff en caso de éxito después de errores
             if self.circuit_breaker_expedientes.state.value == "closed":
                 self.backoff_expedientes.reset()
-            raise
+            return resultado
 
     def detener(self) -> None:
         """Detiene el monitor.
