@@ -7,11 +7,11 @@ import os
 from pathlib import Path
 from typing import Any
 
-from ..config import get_config
-from ..models import Actuacion, ActuacionesArchivo
-from ..parsers.actuaciones_parser import construir_actuaciones_archivo
-from ..scraping.base import normalizar_numero_expediente
-from ..utils.logging import get_logger
+from Sistema_v5.pjn.config import get_config
+from Sistema_v5.pjn.models import Actuacion, ActuacionesArchivo
+from Sistema_v5.pjn.parsers.actuaciones_parser import construir_actuaciones_archivo
+from Sistema_v5.pjn.scraping.base import normalizar_numero_expediente
+from Sistema_v5.pjn.utils.logging import get_logger
 
 logger = get_logger(__name__)
 _config = get_config()

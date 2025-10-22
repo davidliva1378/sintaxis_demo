@@ -138,13 +138,13 @@ else:
 **Uso**:
 ```bash
 # Usar config/sistema.json (default)
-python ejecutar_monitor_sistema.py
+python -m Sistema_v5.ejecutar_monitor_sistema
 
 # Usar archivo específico
-python ejecutar_monitor_sistema.py --config mi_sistema.json
+python -m Sistema_v5.ejecutar_monitor_sistema --config mi_sistema.json
 
 # Verificación inmediata
-python ejecutar_monitor_sistema.py --verificar-ahora
+python -m Sistema_v5.ejecutar_monitor_sistema --verificar-ahora
 ```
 
 ##### `ejecutar_monitor.py` (ACTUALIZADO)
@@ -307,7 +307,7 @@ config.to_file("config/sistema.json")
 python -m Sistema_v5.cli.configuracion wizard
 
 # 2. Usar script nuevo
-python ejecutar_monitor_sistema.py
+python -m Sistema_v5.ejecutar_monitor_sistema
 ```
 
 ### Para Proyectos Existentes
@@ -319,10 +319,10 @@ python ejecutar_monitor_sistema.py
 python scripts/migrar_configuraciones.py
 
 # 2. Verificar que funciona
-python ejecutar_monitor_sistema.py --verificar-ahora
+python -m Sistema_v5.ejecutar_monitor_sistema --verificar-ahora
 
 # 3. Usar nuevo script
-python ejecutar_monitor_sistema.py
+python -m Sistema_v5.ejecutar_monitor_sistema
 ```
 
 #### Opción B: Convivencia (Transición Gradual)
@@ -331,10 +331,10 @@ Mantener ambos archivos durante transición:
 
 ```bash
 # Scripts legacy siguen funcionando
-python ejecutar_monitor.py  # Usa monitor.json
+python -m Sistema_v5.ejecutar_monitor  # Usa monitor.json
 
 # Nuevos scripts usan sistema.json
-python ejecutar_monitor_sistema.py  # Usa sistema.json
+python -m Sistema_v5.ejecutar_monitor_sistema  # Usa sistema.json
 ```
 
 ---
@@ -351,7 +351,7 @@ python ejecutar_monitor_sistema.py  # Usa sistema.json
 python -m Sistema_v5.cli.configuracion wizard
 
 # Opción 2: Crear por defecto
-python -c "from pjn import SystemConfig; SystemConfig().to_file('config/sistema.json')"
+python -c "from Sistema_v5.pjn import SystemConfig; SystemConfig().to_file('config/sistema.json')"
 ```
 
 ### Error: "SystemConfig detectado, convirtiendo a MonitorConfig"

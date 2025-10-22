@@ -13,18 +13,13 @@ import sys
 from pathlib import Path
 from typing import Tuple
 
-# Agregar directorio Sistema_v5 al path para imports
-_sistema_v5_dir = Path(__file__).parent
-if str(_sistema_v5_dir) not in sys.path:
-    sys.path.insert(0, str(_sistema_v5_dir))
-
-from pjn import SystemConfig
-from pjn.monitor.config import MonitorConfig
-from pjn.monitor.core import MonitorPJN
-from pjn.monitor.scheduler import SchedulerMonitor
-from pjn.monitor.tray_macos import MonitorStatusBar, RUMPS_AVAILABLE
-from pjn.system_config import ENV_FIELD_MAP
-from pjn.utils.logging import setup_logging, get_logger
+from Sistema_v5.pjn import SystemConfig
+from Sistema_v5.pjn.monitor.config import MonitorConfig
+from Sistema_v5.pjn.monitor.core import MonitorPJN
+from Sistema_v5.pjn.monitor.scheduler import SchedulerMonitor
+from Sistema_v5.pjn.monitor.tray_macos import RUMPS_AVAILABLE, MonitorStatusBar
+from Sistema_v5.pjn.system_config import ENV_FIELD_MAP
+from Sistema_v5.pjn.utils.logging import get_logger, setup_logging
 
 setup_logging(level="INFO")
 logger = get_logger(__name__)
