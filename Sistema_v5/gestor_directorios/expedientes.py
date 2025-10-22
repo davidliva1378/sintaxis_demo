@@ -28,9 +28,9 @@ if TYPE_CHECKING:  # pragma: no cover - solo para hints
 
 ESTRUCTURA_POR_DEFECTO: dict[str, dict[str, object] | None] = {
     "actuaciones": {
-        "json": None,
         "adjuntos": None,
     },
+    "json": None,
     "documentos_usuario": None,
     "reportes": None,
 }

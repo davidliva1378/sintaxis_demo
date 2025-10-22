@@ -266,8 +266,8 @@ scraper y los archivos agregados manualmente:
 ```
 <numero_normalizado>/
 ├── actuaciones/
-│   ├── adjuntos/
-│   └── json/
+│   └── adjuntos/
+├── json/
 ├── documentos_usuario/
 └── reportes/
 ```

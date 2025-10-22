@@ -87,7 +87,7 @@ async def procesar_actuaciones_expediente(
     gestor = GestorDirectoriosExpedientes.desde_config()
     carpeta_expediente, manifest = gestor.crear_para_expediente(numero_expediente)
 
-    carpeta_json_base = carpeta_expediente / "actuaciones" / "json"
+    carpeta_json_base = carpeta_expediente / "json"
 
     actuales, historicas, error = await extraer_actuaciones_completas(
         page_expediente=page,
