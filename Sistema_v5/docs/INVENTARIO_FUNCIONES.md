@@ -2084,13 +2084,15 @@ Note:
 
 **Ubicación:** `pjn.scraping.actuaciones:1110`
 
-#### `async descargar_archivos_de_json(page, carpeta_destino: str)`
+#### `async descargar_archivos_de_json(page, carpeta_json: str, carpeta_adjuntos: str | None = None)`
 
 **Documentación:**
 
 ```
 Lee el archivo unificado desde la carpeta del expediente
 y descarga los archivos vinculados usando Playwright.
+Permite especificar una carpeta diferente para guardar los adjuntos;
+si no se indica, reutiliza la carpeta de los JSON.
 Marca las actuaciones descargadas como "Descargado": true.
 ```
 
