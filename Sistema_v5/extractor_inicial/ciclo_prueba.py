@@ -32,9 +32,16 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Coroutine
+
+if __package__ is None or __package__ == "":  # pragma: no cover - comportamiento CLI
+    project_root = Path(__file__).resolve().parents[2]
+    if str(project_root) not in sys.path:
+        sys.path.append(str(project_root))
+    __package__ = "Sistema_v5.extractor_inicial"
 
 from ..configuracion.core import SystemConfig
 from ..configuracion.core.extraccion_config import ExtraccionExpedientesConfig
@@ -278,3 +285,7 @@ def _run_async_task(coro: Coroutine[Any, Any, Any]) -> Any:
 
 # Exponer helpers adicionales para pruebas o reutilización externa
 __all__ = ["run_ciclo_prueba"]
+
+
+if __name__ == "__main__":  # pragma: no cover - punto de entrada CLI
+    run_ciclo_prueba()
