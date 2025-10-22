@@ -25,7 +25,8 @@ class DirectoriosForm(tk.Toplevel):
         super().__init__(master=master)
         self.title("Directorios del extractor inicial")
         self.resizable(False, False)
-        self.transient(master)
+        if master is not None and master.winfo_viewable():
+            self.transient(master)
 
         self._config_path = Path(config_path)
         self._config_copy = copy.deepcopy(config)
@@ -43,6 +44,12 @@ class DirectoriosForm(tk.Toplevel):
         self.grab_set()
         self.protocol("WM_DELETE_WINDOW", self._on_cancel)
         self._center_window()
+        self.after_idle(self._raise_and_focus)
+
+    def _raise_and_focus(self) -> None:
+        """Asegura que la ventana quede al frente y con foco."""
+        self.lift()
+        self.focus_force()
 
     # ------------------------------------------------------------------ UI --
     def _build_ui(self) -> None:
