@@ -163,26 +163,52 @@ class GestorDirectoriosExpedientes:
             manifest["metadata"] = deepcopy(metadata)
 
         manifest_path = raiz / self.manifest_filename
-        contenido_manifest = json.dumps(manifest, indent=2, ensure_ascii=False)
-        temp_path: Path | None = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                "w",
-                encoding="utf-8",
-                dir=manifest_path.parent,
-                delete=False,
-            ) as tmp_file:
-                temp_path = Path(tmp_file.name)
-                tmp_file.write(contenido_manifest)
-            os.replace(temp_path, manifest_path)
-        except Exception:
-            if temp_path is not None:
-                try:
-                    temp_path.unlink(missing_ok=True)
-                except Exception:
-                    pass
-            raise
+        self._persistir_manifest(manifest_path, manifest)
         return manifest
+
+    def actualizar_expediente(
+        self,
+        numero_expediente: str,
+        metadata_nueva: dict[str, Any],
+        estructura: dict[str, object] | None = None,
+    ) -> dict[str, Any]:
+        """Actualiza el manifiesto y estructura de un expediente existente."""
+
+        numero_normalizado = normalizar_numero_expediente(numero_expediente)
+        destino = self.raiz / numero_normalizado
+        destino.mkdir(parents=True, exist_ok=True)
+
+        manifest_path = destino / self.manifest_filename
+        manifest_existente: dict[str, Any] = {}
+        if manifest_path.exists():
+            try:
+                manifest_existente = json.loads(
+                    manifest_path.read_text(encoding="utf-8")
+                )
+            except json.JSONDecodeError:
+                manifest_existente = {}
+
+        directories_previos = set(manifest_existente.get("directories", []))
+        directories_actuales: list[str] = []
+
+        estructura_a_usar = self._obtener_estructura_efectiva(estructura, True)
+        self._crear_estructura(destino, estructura_a_usar, directories_actuales, destino)
+
+        directories_combinados = sorted(directories_previos | set(directories_actuales))
+
+        metadata_previos = {}
+        if isinstance(manifest_existente.get("metadata"), dict):
+            metadata_previos = deepcopy(manifest_existente["metadata"])
+
+        metadata_final = deepcopy(metadata_previos)
+        metadata_final.update(metadata_nueva)
+
+        manifest_final: dict[str, Any] = {"directories": directories_combinados}
+        if metadata_final:
+            manifest_final["metadata"] = metadata_final
+
+        self._persistir_manifest(manifest_path, manifest_final)
+        return manifest_final
 
     def crear_para_expediente(self, numero_expediente: str) -> tuple[Path, dict[str, Any]]:
         """Genera el árbol estándar para un expediente específico."""
@@ -276,6 +302,29 @@ class GestorDirectoriosExpedientes:
             return _fusionar_estructuras(self.estructura, estructura_personalizada)
 
         return deepcopy(estructura_personalizada)
+
+    def _persistir_manifest(self, manifest_path: Path, manifest: dict[str, Any]) -> None:
+        """Escribe el manifiesto usando una operación atómica."""
+
+        contenido_manifest = json.dumps(manifest, indent=2, ensure_ascii=False)
+        temp_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                dir=manifest_path.parent,
+                delete=False,
+            ) as tmp_file:
+                temp_path = Path(tmp_file.name)
+                tmp_file.write(contenido_manifest)
+            os.replace(temp_path, manifest_path)
+        except Exception:
+            if temp_path is not None:
+                try:
+                    temp_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+            raise
 
 
 __all__ = [
