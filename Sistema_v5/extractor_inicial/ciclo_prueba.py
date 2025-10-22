@@ -8,7 +8,7 @@ existentes:
    desde el archivo indicado, reutilizando la infraestructura unificada de
    configuraciones.
 2. **Formulario de directorios (Tarea 2)**. Se lanza la ventana
-   :class:`extractor_inicial.ui.directorios_form.DirectoriosForm` para que la
+   :class:`Sistema_v5.extractor_inicial.ui.directorios_form.DirectoriosForm` para que la
    persona operadora confirme o ajuste las rutas que utilizarán los siguientes
    pasos.
 3. **Servicio de extracción inicial (Tarea 3)**. Se ejecuta la extracción de
@@ -36,13 +36,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Coroutine
 
-from Sistema_v5.configuracion.core import SystemConfig
-from Sistema_v5.configuracion.core.extraccion_config import ExtraccionExpedientesConfig
-from Sistema_v5.configuracion.monitor.config import MonitorConfig
-from Sistema_v5.pjn.monitor.core import MonitorPJN
-from Sistema_v5.pjn.scraping import obtener_pagina_autenticada
-from Sistema_v5.pjn.scraping.expedientes import extraer_expedientes_completos_modelos
-from Sistema_v5.ui.gui_monitor_form import launch_monitor_form
+from ..configuracion.core import SystemConfig
+from ..configuracion.core.extraccion_config import ExtraccionExpedientesConfig
+from ..configuracion.monitor.config import MonitorConfig
+from ..pjn.monitor.core import MonitorPJN
+from ..pjn.scraping import obtener_pagina_autenticada
+from ..pjn.scraping.expedientes import extraer_expedientes_completos_modelos
+from ..ui.gui_monitor_form import launch_monitor_form
 from .ui.directorios_form import (
     mostrar_formulario_directorios as _mostrar_formulario_directorios_gui,
 )

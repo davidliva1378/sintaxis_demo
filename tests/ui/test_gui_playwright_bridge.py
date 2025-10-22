@@ -14,7 +14,7 @@ from Sistema_v5.ui.gui_playwright_bridge import (
     ExpedienteNotFoundError,
     GUIPlaywrightBridge,
 )
-from extractor_inicial.services import procesamiento as procesamiento_module
+from Sistema_v5.extractor_inicial.services import procesamiento as procesamiento_module
 
 
 @pytest.fixture

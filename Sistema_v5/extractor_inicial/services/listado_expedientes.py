@@ -7,13 +7,13 @@ from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-from Sistema_v5.configuracion.core import ExtraccionExpedientesConfig, SystemConfig
-from Sistema_v5.configuracion.monitor.config import MonitorConfig
-from Sistema_v5.pjn.scraping.base import obtener_pagina_autenticada
-from Sistema_v5.pjn.scraping.expedientes import extraer_expedientes_completos_modelos
+from ...configuracion.core import ExtraccionExpedientesConfig, SystemConfig
+from ...configuracion.monitor.config import MonitorConfig
+from ...pjn.scraping.base import obtener_pagina_autenticada
+from ...pjn.scraping.expedientes import extraer_expedientes_completos_modelos
 
 if TYPE_CHECKING:  # pragma: no cover - solo para tipado
-    from Sistema_v5.pjn.models.expediente import ExpedienteResumen
+    from ...pjn.models.expediente import ExpedienteResumen
 
 
 def obtener_listado_inicial(

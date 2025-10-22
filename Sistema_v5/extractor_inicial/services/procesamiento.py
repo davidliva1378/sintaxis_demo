@@ -16,9 +16,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol, TypedDict
 
-from Sistema_v5.pjn.models import ExpedienteResumen
-from Sistema_v5.pjn.services import ResultadoProcesamiento, procesar_actuaciones_expediente
-from Sistema_v5.ui.gui_playwright_bridge import (
+from ...pjn.models import ExpedienteResumen
+from ...pjn.services import ResultadoProcesamiento, procesar_actuaciones_expediente
+from ...ui.gui_playwright_bridge import (
     ExpedienteNavigationError,
     ExpedienteNotFoundError,
     GUIPlaywrightBridge,

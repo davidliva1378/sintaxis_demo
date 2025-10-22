@@ -8,9 +8,9 @@ from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from typing import Optional
 
-from Sistema_v5.configuracion.core.system_config import SystemConfig
-from Sistema_v5.configuracion.monitor.exceptions import ValidationError
-from Sistema_v5.configuracion.monitor.validators import validar_directorio
+from ...configuracion.core.system_config import SystemConfig
+from ...configuracion.monitor.exceptions import ValidationError
+from ...configuracion.monitor.validators import validar_directorio
 
 
 class DirectoriosForm(tk.Toplevel):
