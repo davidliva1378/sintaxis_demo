@@ -14,6 +14,7 @@ import tempfile
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
+from collections.abc import Iterable
 from typing import Any, TYPE_CHECKING
 
 try:  # Compatibilidad con imports absolutos y relativos
@@ -223,6 +224,95 @@ class GestorDirectoriosExpedientes:
 
         manifest = self.generar_arbol(destino, metadata=metadata)
         return destino, manifest
+
+    def crear_desde_json(
+        self, expedientes: Iterable[dict[str, Any]]
+    ) -> list[tuple[Path, dict[str, Any]]]:
+        """Crea múltiples expedientes a partir de una estructura JSON.
+
+        Cada elemento del iterable debe ser un diccionario con la clave
+        obligatoria ``"numero_expediente"`` (cadena). Opcionalmente puede
+        incluir ``"metadata"`` (diccionario con información adicional que se
+        fusionará con la metadata estándar), ``"estructura"`` (diccionario con
+        una estructura personalizada a aplicar) y ``"fusionar_estructura"``
+        (bandera booleana propagada a :meth:`generar_arbol`). Cualquier otra
+        clave se ignora.
+
+        Returns:
+            list[tuple[Path, dict[str, Any]]]: Tuplas con la ruta creada y el
+            manifiesto retornado por :meth:`generar_arbol` para cada expediente
+            procesado correctamente.
+
+        Raises:
+            ValueError: Si alguna entrada no puede procesarse. El mensaje del
+            error detalla los expedientes afectados y la causa. Es posible que
+            algunos expedientes se hayan creado antes de que se acumule el
+            error.
+        """
+
+        resultados: list[tuple[Path, dict[str, Any]]] = []
+        errores: dict[str, str] = {}
+        vistos: set[str] = set()
+
+        for indice, entrada in enumerate(expedientes):
+            numero_expediente = entrada.get("numero_expediente")
+            if not isinstance(numero_expediente, str) or not numero_expediente.strip():
+                errores[f"entrada_{indice}"] = (
+                    "Falta la clave obligatoria 'numero_expediente'"
+                )
+                continue
+
+            numero_normalizado = normalizar_numero_expediente(numero_expediente)
+            if numero_normalizado in vistos:
+                errores[numero_expediente] = "Expediente repetido en la fuente"
+                continue
+            vistos.add(numero_normalizado)
+
+            metadata_extra = entrada.get("metadata")
+            if metadata_extra is not None and not isinstance(metadata_extra, dict):
+                errores[numero_expediente] = "La metadata adicional debe ser un diccionario"
+                continue
+
+            estructura = entrada.get("estructura")
+            if estructura is not None and not isinstance(estructura, dict):
+                errores[numero_expediente] = (
+                    "La estructura personalizada debe ser un diccionario"
+                )
+                continue
+
+            fusionar = entrada.get("fusionar_estructura", True)
+            if not isinstance(fusionar, bool):
+                errores[numero_expediente] = "'fusionar_estructura' debe ser un booleano"
+                continue
+
+            destino = self.raiz / numero_normalizado
+            metadata_manifest = {
+                "numero_expediente": numero_expediente,
+                "numero_normalizado": numero_normalizado,
+            }
+            if metadata_extra:
+                metadata_manifest.update(deepcopy(metadata_extra))
+
+            try:
+                manifest = self.generar_arbol(
+                    destino,
+                    metadata=metadata_manifest,
+                    estructura=estructura,
+                    fusionar_estructura=fusionar,
+                )
+            except Exception as exc:  # pragma: no cover - propagado en pruebas
+                errores[numero_expediente] = str(exc)
+                continue
+
+            resultados.append((destino, manifest))
+
+        if errores:
+            detalles = "; ".join(f"{clave}: {mensaje}" for clave, mensaje in errores.items())
+            raise ValueError(
+                f"No se pudieron crear {len(errores)} expedientes: {detalles}"
+            )
+
+        return resultados
 
     def actualizar_estructura(
         self,
