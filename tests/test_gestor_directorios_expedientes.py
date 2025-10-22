@@ -79,8 +79,8 @@ def test_crear_para_expediente_normaliza_y_agrega_metadata(tmp_path: Path) -> No
     ruta_expediente, manifest = gestor.crear_para_expediente("Exp 123/2024")
 
     assert ruta_expediente == tmp_path / "expedientes" / "Exp_123_2024"
-    assert manifest["numero_expediente"] == "Exp 123/2024"
-    assert manifest["numero_normalizado"] == "Exp_123_2024"
+    assert manifest["metadata"]["numero_expediente"] == "Exp 123/2024"
+    assert manifest["metadata"]["numero_normalizado"] == "Exp_123_2024"
 
     manifest_path = ruta_expediente / "manifest.json"
     assert manifest_path.exists()
