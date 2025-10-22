@@ -1077,8 +1077,7 @@ async def extraer_actuaciones_completas(
 
         # Guardar a disco
         numero_normalizado = normalizar_numero_expediente(expediente_datos.get("numero"))
-        carpeta_expte = os.path.join(directorio_base, numero_normalizado)
-        os.makedirs(carpeta_expte, exist_ok=True)
+        os.makedirs(directorio_base, exist_ok=True)
 
         # Separar actuales de históricas y convertir a dicts para compatibilidad
         actuaciones_actuales = [act.to_dict() for act in archivo.actuaciones if not act.es_historica]
@@ -1087,7 +1086,7 @@ async def extraer_actuaciones_completas(
 
         estructura_json = {"Expediente": archivo.encabezado, "Actuaciones": todas}
 
-        json_path = os.path.join(carpeta_expte, f"actuaciones-{numero_normalizado}.json")
+        json_path = os.path.join(directorio_base, f"actuaciones-{numero_normalizado}.json")
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(estructura_json, f, indent=2, ensure_ascii=False)
         logger.info("📄 JSON generado: %s", json_path)

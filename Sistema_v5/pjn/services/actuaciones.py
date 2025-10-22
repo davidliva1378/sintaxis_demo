@@ -102,11 +102,7 @@ async def procesar_actuaciones_expediente(
 
     json_path: Path | None = None
     if not error:
-        json_path = (
-            carpeta_json
-            / numero_normalizado
-            / f"actuaciones-{numero_normalizado}.json"
-        )
+        json_path = carpeta_json / f"actuaciones-{numero_normalizado}.json"
         if not json_path.exists():
             json_path = None
 
@@ -114,7 +110,7 @@ async def procesar_actuaciones_expediente(
     if descargar_adjuntos and not error and json_path is not None:
         await descargar_archivos_de_json(
             page,
-            str(json_path.parent),
+            str(carpeta_json),
             str(carpeta_adjuntos),
         )
         descargas_ejecutadas = True
@@ -124,7 +120,7 @@ async def procesar_actuaciones_expediente(
         "actuaciones_historicas": len(historicas),
         "error": error,
         "carpeta_expediente": str(carpeta_expediente),
-        "carpeta_json": str(json_path.parent) if json_path else None,
+        "carpeta_json": str(carpeta_json) if json_path else None,
         "carpeta_actuaciones": str(carpeta_actuaciones),
         "carpeta_adjuntos": str(carpeta_adjuntos),
         "descargas_ejecutadas": descargas_ejecutadas,

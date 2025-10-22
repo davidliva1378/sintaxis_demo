@@ -39,7 +39,7 @@ def test_procesar_actuaciones_generates_json_and_downloads(monkeypatch, tmp_path
 
     async def fake_extraer(page_expediente, expediente_datos, incluir_historicas, directorio_base):
         numero = normalizar_numero_expediente(expediente_datos["numero"])
-        carpeta = Path(directorio_base) / numero
+        carpeta = Path(directorio_base)
         carpeta.mkdir(parents=True, exist_ok=True)
         archivo = carpeta / f"actuaciones-{numero}.json"
         archivo.write_text(json.dumps({"Actuaciones": []}), encoding="utf-8")
@@ -69,7 +69,7 @@ def test_procesar_actuaciones_generates_json_and_downloads(monkeypatch, tmp_path
     assert expected_adjuntos is not None
     descargar_mock.assert_awaited_once_with(
         datos["page"],
-        str(json_path.parent),
+        str(resumen["carpeta_json"]),
         expected_adjuntos,
     )
     assert resumen["carpeta_json"] == str(json_path.parent)
@@ -92,7 +92,7 @@ def test_procesar_actuaciones_generates_json_and_downloads(monkeypatch, tmp_path
     assert expected_adjuntos_second == expected_adjuntos
     descargar_mock.assert_awaited_once_with(
         datos["page"],
-        str(json_path.parent),
+        str(resumen_second["carpeta_json"]),
         expected_adjuntos_second,
     )
 
