@@ -31,7 +31,7 @@ El **System Tray** (indicador de bandeja del sistema) permite controlar el Monit
 El script universal detecta automáticamente tu sistema operativo:
 
 ```bash
-python ejecutar_monitor_universal.py
+python -m Sistema_v5.ejecutar_monitor_universal
 ```
 
 Instalará las dependencias correctas según tu OS.
@@ -41,19 +41,19 @@ Instalará las dependencias correctas según tu OS.
 #### Windows
 ```bash
 pip install pystray pillow
-python ejecutar_monitor_tray.py
+python -m Sistema_v5.ejecutar_monitor_tray
 ```
 
 #### macOS
 ```bash
 pip install rumps
-python ejecutar_monitor_statusbar.py
+python -m Sistema_v5.ejecutar_monitor_statusbar
 ```
 
 #### Linux
 ```bash
 pip install pystray pillow
-python ejecutar_monitor_tray.py
+python -m Sistema_v5.ejecutar_monitor_tray
 ```
 
 ### 3. Usar el Icono
@@ -339,7 +339,7 @@ while monitor.running and tray._running:
 
 **Solución 2 (Linux/macOS):** Ejecutar en background:
 ```bash
-nohup python ejecutar_monitor_tray.py &
+nohup python -m Sistema_v5.ejecutar_monitor_tray &
 ```
 
 **Solución 3 (Windows):** Crear tarea programada o usar pythonw.exe:

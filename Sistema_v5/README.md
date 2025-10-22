@@ -173,8 +173,8 @@ Si preferís una interfaz visual, el asistente Tkinter vive ahora en
 # Abrir la interfaz gráfica desde cualquier entorno virtual
 python -m Sistema_v5.configuracion.gui.config_form
 
-# También podés ejecutarlo directamente si estás en la raíz del repo
-python Sistema_v5/configuracion/gui/config_form.py
+# También podés lanzarlo mediante el wrapper histórico del paquete
+python -m Sistema_v5.scripts.configurar_sistema
 ```
 
 Ambos comandos cargan la misma ventana con pestañas para directorios,
@@ -187,7 +187,7 @@ importar/exportar configuraciones.
 También puedes usar `SystemConfig` directamente en tu código:
 
 ```python
-from pjn import SystemConfig
+from Sistema_v5.pjn import SystemConfig
 
 # Cargar configuración existente
 config = SystemConfig.from_file("config/sistema.json")
