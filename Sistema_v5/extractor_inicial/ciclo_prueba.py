@@ -45,6 +45,8 @@ if __package__ is None or __package__ == "":  # pragma: no cover - comportamient
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
 from ..configuracion.core import SystemConfig
 from ..configuracion.core.extraccion_config import ExtraccionExpedientesConfig
 from ..configuracion.monitor.config import MonitorConfig
@@ -55,6 +57,7 @@ from ..ui.gui_monitor_form import launch_monitor_form
 from .ui.directorios_form import (
     mostrar_formulario_directorios as _mostrar_formulario_directorios_gui,
 )
+from urls_pjn import URL_CONSULTAS
 
 logger = logging.getLogger(__name__)
 
@@ -205,6 +208,19 @@ async def _extraer_expedientes_iniciales(
         _context,
         _browser,
     ):
+        logger.info("🌐 Iniciando navegación al listado de consultas: %s", URL_CONSULTAS)
+        try:
+            await page.goto(URL_CONSULTAS)
+            await page.wait_for_load_state("domcontentloaded")
+            await asyncio.sleep(0.5)
+        except PlaywrightTimeoutError as exc:
+            logger.error(
+                "⏱️ Tiempo de espera agotado al cargar el listado de consultas (%s): %s",
+                URL_CONSULTAS,
+                exc,
+            )
+            raise
+        logger.info("📄 Listado de consultas cargado correctamente")
         expedientes, motivo, metadata = await extraer_expedientes_completos_modelos(
             page,
             sel_tabla=extraccion_config.sel_tabla,
