@@ -205,6 +205,9 @@ def mostrar_formulario_directorios(config_path: Path) -> SystemConfig:
     root = tk.Tk()
     root.withdraw()
     form = DirectoriosForm(root, config=config, config_path=config_path)
+    form.wait_visibility()
+    form.lift()
+    form.focus_force()
     root.wait_window(form)
     root.destroy()
 
