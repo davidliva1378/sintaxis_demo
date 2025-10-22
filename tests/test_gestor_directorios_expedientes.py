@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 from Sistema_v5.gestor_directorios import (
     ESTRUCTURA_POR_DEFECTO,
     GestorDirectoriosExpedientes,
+    inicializar_directorio_base,
 )
 from Sistema_v5.configuracion.core.system_config import SystemConfig
 
@@ -174,3 +175,56 @@ def test_resolver_ruta_expande_home_y_variables(monkeypatch, tmp_path: Path) -> 
         config_path=None,
     )
     assert ruta_home == Path.home() / "expedientes_home"
+
+
+def test_inicializar_directorio_base_sin_config_explicit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    config_path = tmp_path / "config" / "sistema.json"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(
+        json.dumps({"directorio_expedientes_base": "expedientes_desde_archivo"}),
+        encoding="utf-8",
+    )
+
+    manifest = inicializar_directorio_base(config_path=config_path)
+
+    raiz = tmp_path / "expedientes_desde_archivo"
+    rutas_esperadas = _listar_directorios(ESTRUCTURA_POR_DEFECTO)
+
+    for ruta in rutas_esperadas:
+        assert (raiz / ruta).is_dir(), f"No se creó el directorio esperado: {ruta}"
+
+    manifest_path = raiz / "manifest.json"
+    assert manifest_path.exists(), "Se esperaba el manifiesto en la raíz"
+    assert config_path.exists(), "La configuración debería haberse materializado en disco"
+
+    contenido_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert set(contenido_manifest["directories"]) >= rutas_esperadas
+    assert manifest == contenido_manifest
+
+
+def test_inicializar_directorio_base_con_base_dir_personalizado(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    config = SystemConfig()
+    config.directorio_expedientes_base = "expedientes_personalizados"
+
+    manifest = inicializar_directorio_base(
+        config=config,
+        base_dir=tmp_path,
+    )
+
+    raiz = tmp_path / "expedientes_personalizados"
+
+    for ruta in _listar_directorios(ESTRUCTURA_POR_DEFECTO):
+        assert (raiz / ruta).is_dir()
+
+    manifest_path = raiz / "manifest.json"
+    assert manifest_path.exists()
+    contenido_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest == contenido_manifest
