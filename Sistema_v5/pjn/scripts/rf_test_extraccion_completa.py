@@ -15,7 +15,11 @@ from Sistema_v5.pjn import (
     PJNError,
     SesionInvalida,
 )
-from Sistema_v5.pjn.scraping import obtener_pagina_autenticada, normalizar_numero_expediente
+from Sistema_v5.pjn.scraping import (
+    descomponer_numero_expediente,
+    normalizar_numero_expediente,
+    obtener_pagina_autenticada,
+)
 from Sistema_v5.pjn.services.actuaciones import procesar_actuaciones_expediente
 from Sistema_v5.pjn.utils.logging import get_logger
 from Sistema_v5.pjn.scraping.expedientes import (
@@ -75,8 +79,27 @@ def _leer_dato(prompt: str) -> str:
 
 async def _buscar_y_seleccionar_expediente(page: Page) -> dict[str, Any] | None:
     numero = _leer_dato("Número de expediente: ")
-    anio = _leer_dato("Año: ")
+    anio = _leer_dato(
+        "Año (dejá vacío si el número incluye formato XXXXX/YYY o prefijos como FPA): "
+    )
     caratula = _leer_dato("Carátula exacta (opcional): ") or None
+
+    numero = numero or None
+    anio = anio or None
+
+    if numero and not anio:
+        _, numero_normalizado, anio_normalizado = descomponer_numero_expediente(numero)
+        if numero_normalizado and anio_normalizado:
+            logger.info(
+                "🔢 Interpretando número ingresado como %s/%s para la búsqueda.",
+                numero_normalizado,
+                anio_normalizado,
+            )
+            numero, anio = numero_normalizado, anio_normalizado
+        else:
+            logger.warning(
+                "⚠️ No se pudo interpretar el número de expediente ingresado. Se intentará buscar con los valores originales."
+            )
 
     filas = await buscar_expedientes(page, numero, anio, caratula)
     if not filas:
