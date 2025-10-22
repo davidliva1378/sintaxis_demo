@@ -48,6 +48,21 @@ def test_generar_arbol_crea_estructura_basica(tmp_path: Path) -> None:
     assert "documentos_usuario" in manifest["directories"]
 
 
+def test_generar_arbol_reescritura_manifest_es_atomica(tmp_path: Path) -> None:
+    gestor = GestorDirectoriosExpedientes(tmp_path)
+
+    manifest_primera = gestor.generar_arbol(metadata={"ronda": 1})
+    manifest_segunda = gestor.generar_arbol(metadata={"ronda": 2})
+
+    manifest_path = tmp_path / "manifest.json"
+    contenido_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    assert contenido_manifest == manifest_segunda
+    assert "directories" in contenido_manifest
+    assert manifest_primera["directories"] == manifest_segunda["directories"]
+    assert contenido_manifest["metadata"] == {"ronda": 2}
+
+
 def test_generar_arbol_permita_extender_estructura(tmp_path: Path) -> None:
     gestor = GestorDirectoriosExpedientes(tmp_path)
 
