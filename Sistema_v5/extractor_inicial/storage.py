@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from Sistema_v5.pjn.models.expediente import ExpedienteResumen
-from Sistema_v5.pjn.monitor.storage import StorageManager
+from ..pjn.models.expediente import ExpedienteResumen
+from ..pjn.monitor.storage import StorageManager
 
 __all__ = ["cargar_historial_simulado", "guardar_historial_simulado"]
 

@@ -8,7 +8,9 @@ from setup_path import incluir_ruta_base
 
 incluir_ruta_base()
 
-from extractor_inicial import run_ciclo_prueba  # noqa: E402  (import después de ajustar sys.path)
+from Sistema_v5.extractor_inicial import (
+    run_ciclo_prueba,
+)  # noqa: E402  (import después de ajustar sys.path)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

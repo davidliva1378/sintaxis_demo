@@ -7,7 +7,7 @@ from pathlib import Path
 from tkinter import ttk, messagebox
 from typing import Iterable, Sequence
 
-from Sistema_v5.pjn.models.expediente import ExpedienteResumen
+from ...pjn.models.expediente import ExpedienteResumen
 
 from ..storage import cargar_historial_simulado, guardar_historial_simulado
 
