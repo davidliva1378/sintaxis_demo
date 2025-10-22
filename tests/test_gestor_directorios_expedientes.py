@@ -159,6 +159,67 @@ def test_generar_arbol_rechaza_componentes_multisegmento(tmp_path: Path) -> None
     assert not (tmp_path / "sub").exists()
 
 
+@pytest.mark.parametrize(
+    "entradas, espera_error, mensaje, ruta_esperada",
+    [
+        pytest.param(
+            [
+                {
+                    "numero_expediente": "Exp 123/2024",
+                    "metadata": {"actor": "PJN"},
+                }
+            ],
+            False,
+            None,
+            "Exp_123_2024",
+            id="entrada_valida",
+        ),
+        pytest.param(
+            [
+                {"numero_expediente": "Exp 123/2024"},
+                {"numero_expediente": "Exp 123/2024"},
+            ],
+            True,
+            "repetido",
+            "Exp_123_2024",
+            id="entrada_repetida",
+        ),
+        pytest.param(
+            [
+                {"metadata": {"actor": "SinNumero"}},
+            ],
+            True,
+            "numero_expediente",
+            None,
+            id="entrada_sin_numero",
+        ),
+    ],
+)
+def test_crear_desde_json(tmp_path: Path, entradas, espera_error, mensaje, ruta_esperada):
+    gestor = GestorDirectoriosExpedientes(tmp_path)
+
+    if espera_error:
+        with pytest.raises(ValueError) as excinfo:
+            gestor.crear_desde_json(entradas)
+
+        assert mensaje is not None and mensaje in str(excinfo.value)
+        if ruta_esperada is not None:
+            manifest_path = tmp_path / ruta_esperada / "manifest.json"
+            assert manifest_path.exists(), "El primer expediente debería haberse creado"
+    else:
+        resultados = gestor.crear_desde_json(entradas)
+
+        assert len(resultados) == len(entradas)
+        ruta, manifest = resultados[0]
+
+        assert ruta == tmp_path / ruta_esperada
+        assert manifest["metadata"]["numero_expediente"] == entradas[0]["numero_expediente"]
+        assert manifest["metadata"]["numero_normalizado"] == ruta_esperada
+        assert manifest["metadata"]["actor"] == "PJN"
+        manifest_path = ruta / "manifest.json"
+        assert manifest_path.exists()
+
+
 def test_resolver_ruta_expande_home_y_variables(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("EXPEDIENTES_DIR", str(tmp_path / "desde_env"))
 

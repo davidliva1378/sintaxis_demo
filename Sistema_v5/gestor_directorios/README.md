@@ -65,6 +65,16 @@ El método ``crear_para_expediente`` normaliza el número de expediente (por eje
 con la metadata del expediente, lista para ser consumida por otros módulos del sistema o
 interfaces externas.
 
+### Importación masiva desde JSON
+
+Cuando se recibe un lote serializado (por ejemplo, un archivo JSON exportado desde otro
+servicio) se puede utilizar ``crear_desde_json`` para procesar cada entrada de forma segura.
+Cada elemento debe ser un diccionario con la clave obligatoria ``numero_expediente`` y puede
+incluir metadatos adicionales bajo ``metadata`` (diccionario), una ``estructura`` personalizada
+(diccionario análogo al formato aceptado por ``generar_arbol``) y la bandera opcional
+``fusionar_estructura``. El método genera los expedientes válidos y si alguna entrada falla,
+acumula el error por número de expediente y lo reporta en una excepción descriptiva.
+
 ## Extender o reemplazar la estructura por expediente
 
 El gestor admite personalizar el árbol generado según las necesidades del flujo
