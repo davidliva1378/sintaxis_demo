@@ -61,6 +61,7 @@ from tkinter import filedialog, messagebox
 from typing import Callable, Iterable, Literal
 
 from Sistema_v5.configuracion.monitor.config import MonitorConfig
+from Sistema_v5.configuracion.monitor.exceptions import StorageError
 from Sistema_v5.pjn.models import Entrada, ExpedienteResumen
 from Sistema_v5.pjn.services.gui_monitor_adapter import (
     cargar_historiales_desde_directorio,
@@ -175,7 +176,24 @@ class MonitorForm(tk.Tk):
     # Datos y estado
     # ------------------------------------------------------------------
     def _load_data(self) -> None:
-        self.entradas, self.expedientes = self._historiales_loader(self._storage_target)
+        try:
+            entradas, expedientes = self._historiales_loader(self._storage_target)
+        except StorageError as exc:  # pragma: no cover - comunicación con UI real
+            messagebox.showerror(
+                "Monitor PJN",
+                "No fue posible cargar los historiales almacenados.\n"
+                f"Detalle: {exc}",
+            )
+            entradas, expedientes = [], []
+        except Exception as exc:  # pragma: no cover - comunicación con UI real
+            messagebox.showerror(
+                "Monitor PJN",
+                "Ocurrió un error inesperado al cargar los historiales.\n"
+                f"Detalle: {exc}",
+            )
+            entradas, expedientes = [], []
+
+        self.entradas, self.expedientes = entradas, expedientes
         entradas_selected, expedientes_selected = self._load_selecciones()
 
         self._entradas_items = [
