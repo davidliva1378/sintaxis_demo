@@ -862,6 +862,7 @@ class MonitorForm(tk.Tk):
                         mensaje=mensaje,
                         estado="success",
                         carpeta_expediente=resumen.get("carpeta_expediente"),
+                        carpeta_actuaciones=resumen.get("carpeta_actuaciones"),
                         carpeta_json=resumen.get("carpeta_json"),
                         json_path=event.json_path,
                     )
@@ -1042,6 +1043,7 @@ class _ResultadoItem:
     mensaje: str
     estado: Literal["info", "success", "error"]
     carpeta_expediente: str | None = None
+    carpeta_actuaciones: str | None = None
     carpeta_json: str | None = None
     json_path: str | None = None
 

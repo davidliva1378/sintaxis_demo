@@ -166,17 +166,25 @@ class TestValidacionesDescargarArchivos:
     async def test_descargar_crea_carpeta_si_no_existe(self, tmp_path):
         """Debe crear la carpeta si no existe."""
         page_mock = MagicMock()
-        carpeta_nueva = tmp_path / "nueva_carpeta"
+        carpeta_json = tmp_path / "json"
+        carpeta_adjuntos = tmp_path / "adjuntos"
 
         # Carpeta no existe aún
-        assert not carpeta_nueva.exists()
+        assert not carpeta_json.exists()
+        assert not carpeta_adjuntos.exists()
 
         # Debe crear la carpeta (aunque no haya archivos JSON)
-        await descargar_archivos_de_json(page_mock, str(carpeta_nueva))
+        await descargar_archivos_de_json(
+            page_mock,
+            str(carpeta_json),
+            str(carpeta_adjuntos),
+        )
 
         # Ahora debe existir
-        assert carpeta_nueva.exists()
-        assert carpeta_nueva.is_dir()
+        assert carpeta_json.exists()
+        assert carpeta_json.is_dir()
+        assert carpeta_adjuntos.exists()
+        assert carpeta_adjuntos.is_dir()
 
     @pytest.mark.asyncio
     async def test_descargar_ruta_no_es_directorio(self, tmp_path):

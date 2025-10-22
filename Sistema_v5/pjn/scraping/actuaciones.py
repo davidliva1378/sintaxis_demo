@@ -1359,39 +1359,66 @@ async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_
 
 
 
-async def descargar_archivos_de_json(page, carpeta_destino: str):
+async def descargar_archivos_de_json(
+    page,
+    carpeta_json: str,
+    carpeta_adjuntos: str | None = None,
+):
+    """Lee el archivo de actuaciones y descarga los adjuntos vinculados.
+
+    Args:
+        page: Página de Playwright desde la que se realizarán las descargas.
+        carpeta_json: Directorio que contiene el archivo ``actuaciones-*.json``.
+        carpeta_adjuntos: Carpeta en la que se guardarán los archivos descargados.
+            Si no se proporciona se reutiliza ``carpeta_json``.
     """
-    Lee el archivo unificado desde la carpeta del expediente
-    y descarga los archivos vinculados usando Playwright.
-    Marca las actuaciones descargadas como "Descargado": true.
-    """
-    if not carpeta_destino:
-        logger.warning("⚠️ Carpeta destino no proporcionada para las descargas.")
+    if not carpeta_json:
+        logger.warning("⚠️ Carpeta de JSON no proporcionada para las descargas.")
         return
 
-    # Validar que la carpeta destino existe
-    if not os.path.exists(carpeta_destino):
+    if carpeta_adjuntos is None:
+        carpeta_adjuntos = carpeta_json
+
+    # Validar que la carpeta con los JSON existe
+    if not os.path.exists(carpeta_json):
         try:
-            os.makedirs(carpeta_destino, exist_ok=True)
-            logger.debug("📁 Carpeta creada: %s", carpeta_destino)
+            os.makedirs(carpeta_json, exist_ok=True)
+            logger.debug("📁 Carpeta creada: %s", carpeta_json)
         except OSError as e:
-            logger.error("❌ Error al crear carpeta %s: %s", carpeta_destino, e)
+            logger.error("❌ Error al crear carpeta %s: %s", carpeta_json, e)
             return
 
     # Validar que es un directorio
-    if not os.path.isdir(carpeta_destino):
-        logger.error("❌ La ruta no es un directorio: %s", carpeta_destino)
+    if not os.path.isdir(carpeta_json):
+        logger.error("❌ La ruta no es un directorio: %s", carpeta_json)
+        return
+
+    # Validar carpeta de adjuntos
+    if not os.path.exists(carpeta_adjuntos):
+        try:
+            os.makedirs(carpeta_adjuntos, exist_ok=True)
+            logger.debug("📁 Carpeta creada para adjuntos: %s", carpeta_adjuntos)
+        except OSError as e:
+            logger.error("❌ Error al crear carpeta de adjuntos %s: %s", carpeta_adjuntos, e)
+            return
+
+    if not os.path.isdir(carpeta_adjuntos):
+        logger.error("❌ La ruta de adjuntos no es un directorio: %s", carpeta_adjuntos)
         return
 
     # Buscar archivos JSON de actuaciones
     try:
-        archivos_json = [f for f in os.listdir(carpeta_destino) if f.startswith("actuaciones-") and f.endswith(".json")]
+        archivos_json = [
+            f
+            for f in os.listdir(carpeta_json)
+            if f.startswith("actuaciones-") and f.endswith(".json")
+        ]
     except OSError as e:
-        logger.error("❌ Error al listar archivos en %s: %s", carpeta_destino, e)
+        logger.error("❌ Error al listar archivos en %s: %s", carpeta_json, e)
         return
 
     if archivos_json:
-        ruta_json = os.path.join(carpeta_destino, archivos_json[0])
+        ruta_json = os.path.join(carpeta_json, archivos_json[0])
 
         # Validar que el archivo existe
         if not os.path.exists(ruta_json):
@@ -1418,7 +1445,7 @@ async def descargar_archivos_de_json(page, carpeta_destino: str):
 
         for act in actuaciones:
             if act.get("TieneArchivo") and act.get("NombreArchivo"):
-                archivo_path = os.path.join(carpeta_destino, act["NombreArchivo"])
+                archivo_path = os.path.join(carpeta_adjuntos, act["NombreArchivo"])
                 if not os.path.exists(archivo_path):
                     actuaciones_filtradas.append(act)
                 else:
@@ -1427,7 +1454,7 @@ async def descargar_archivos_de_json(page, carpeta_destino: str):
 
         if actuaciones_filtradas:
             logger.info("\n🔽 Descargando %d archivo(s)...", len(actuaciones_filtradas))
-            await descargar_archivos_actuaciones(page, actuaciones_filtradas, carpeta_destino)
+            await descargar_archivos_actuaciones(page, actuaciones_filtradas, carpeta_adjuntos)
             for act in actuaciones_filtradas:
                 act["Descargado"] = True
         else:
@@ -1437,8 +1464,8 @@ async def descargar_archivos_de_json(page, carpeta_destino: str):
         actualizar_metricas_descargas_en_json(data)
 
         # Validar permisos de escritura antes de guardar
-        if not os.access(carpeta_destino, os.W_OK):
-            logger.error("❌ Sin permisos de escritura en: %s", carpeta_destino)
+        if not os.access(carpeta_json, os.W_OK):
+            logger.error("❌ Sin permisos de escritura en: %s", carpeta_json)
             return
 
         try:
