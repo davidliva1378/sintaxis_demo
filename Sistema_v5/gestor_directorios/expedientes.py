@@ -217,7 +217,28 @@ class GestorDirectoriosExpedientes:
             return
 
         for nombre, subestructura in estructura.items():
-            ruta = base / nombre
+            componente = Path(nombre)
+
+            if componente.is_absolute():
+                raise ValueError(
+                    f"No se permiten componentes absolutos en la estructura: '{nombre}'"
+                )
+
+            partes = componente.parts
+            if any(parte == ".." for parte in partes):
+                raise ValueError(
+                    f"No se permite el uso de '..' en la estructura: '{nombre}'"
+                )
+
+            if len(partes) != 1:
+                raise ValueError(
+                    "Los componentes de la estructura deben ser simples, "
+                    f"se recibió: '{nombre}'"
+                )
+
+            nombre_normalizado = partes[0]
+
+            ruta = base / nombre_normalizado
             ruta.mkdir(parents=True, exist_ok=True)
             manifest.append(str(ruta.relative_to(raiz_manifest).as_posix()))
 
