@@ -76,6 +76,7 @@ class GestorDirectoriosExpedientes:
     raiz: Path
     estructura: dict[str, object] = field(default_factory=lambda: deepcopy(ESTRUCTURA_POR_DEFECTO))
     manifest_filename: str = "manifest.json"
+    index_filename: str = "expedientes_index.json"
 
     @classmethod
     def desde_config(
@@ -176,11 +177,22 @@ class GestorDirectoriosExpedientes:
         """Actualiza el manifiesto y estructura de un expediente existente."""
 
         numero_normalizado = normalizar_numero_expediente(numero_expediente)
-        destino = self.raiz / numero_normalizado
-        destino.mkdir(parents=True, exist_ok=True)
+        identificador = self._obtener_o_registrar_identificador(numero_normalizado)
+        destino_preferido = self._obtener_ruta_expediente(
+            numero_normalizado, identificador
+        )
+        legado = self.raiz / numero_normalizado
+        if destino_preferido.exists():
+            destino = destino_preferido
+        elif legado.exists() and legado.is_dir():
+            destino = legado
+        else:
+            destino_preferido.mkdir(parents=True, exist_ok=True)
+            destino = destino_preferido
 
         manifest_path = destino / self.manifest_filename
         manifest_existente: dict[str, Any] = {}
+
         if manifest_path.exists():
             try:
                 manifest_existente = json.loads(
@@ -203,6 +215,7 @@ class GestorDirectoriosExpedientes:
 
         metadata_final = deepcopy(metadata_previos)
         metadata_final.update(metadata_nueva)
+        metadata_final["id"] = identificador
 
         manifest_final: dict[str, Any] = {"directories": directories_combinados}
         if metadata_final:
@@ -215,11 +228,13 @@ class GestorDirectoriosExpedientes:
         """Genera el árbol estándar para un expediente específico."""
 
         numero_normalizado = normalizar_numero_expediente(numero_expediente)
-        destino = self.raiz / numero_normalizado
+        identificador = self._obtener_o_registrar_identificador(numero_normalizado)
+        destino = self._obtener_ruta_expediente(numero_normalizado, identificador)
 
         metadata = {
             "numero_expediente": numero_expediente,
             "numero_normalizado": numero_normalizado,
+            "id": identificador,
         }
 
         manifest = self.generar_arbol(destino, metadata=metadata)
@@ -285,13 +300,15 @@ class GestorDirectoriosExpedientes:
                 errores[numero_expediente] = "'fusionar_estructura' debe ser un booleano"
                 continue
 
-            destino = self.raiz / numero_normalizado
+            identificador = self._obtener_o_registrar_identificador(numero_normalizado)
+            destino = self._obtener_ruta_expediente(numero_normalizado, identificador)
             metadata_manifest = {
                 "numero_expediente": numero_expediente,
                 "numero_normalizado": numero_normalizado,
             }
             if metadata_extra:
                 metadata_manifest.update(deepcopy(metadata_extra))
+            metadata_manifest["id"] = identificador
 
             try:
                 manifest = self.generar_arbol(
@@ -395,19 +412,90 @@ class GestorDirectoriosExpedientes:
 
     def _persistir_manifest(self, manifest_path: Path, manifest: dict[str, Any]) -> None:
         """Escribe el manifiesto usando una operación atómica."""
+        self._persistir_json_atomico(manifest_path, manifest)
 
-        contenido_manifest = json.dumps(manifest, indent=2, ensure_ascii=False)
+    def _obtener_ruta_expediente(
+        self, numero_normalizado: str, identificador: int
+    ) -> Path:
+        """Calcula la ruta destino para un expediente dado su identificador."""
+
+        nombre_directorio = f"{identificador:06d}_{numero_normalizado}"
+        return self.raiz / nombre_directorio
+
+    def _indice_path(self) -> Path:
+        """Devuelve la ruta al archivo de índice de expedientes."""
+
+        return self.raiz / self.index_filename
+
+    def _cargar_indice(self) -> tuple[int, dict[str, int]]:
+        """Lee el índice de expedientes desde disco si está disponible."""
+
+        indice_path = self._indice_path()
+        if not indice_path.exists():
+            return 0, {}
+
+        try:
+            contenido = json.loads(indice_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return 0, {}
+
+        expedientes_brutos = contenido.get("expedientes", {})
+        if not isinstance(expedientes_brutos, dict):
+            expedientes_brutos = {}
+
+        expedientes: dict[str, int] = {}
+        max_id = 0
+        for numero, identificador in expedientes_brutos.items():
+            if isinstance(numero, str) and isinstance(identificador, int) and identificador > 0:
+                expedientes[numero] = identificador
+                if identificador > max_id:
+                    max_id = identificador
+
+        last_id = contenido.get("last_id", 0)
+        if not isinstance(last_id, int) or last_id < max_id:
+            last_id = max_id
+
+        return last_id, expedientes
+
+    def _guardar_indice(self, last_id: int, expedientes: dict[str, int]) -> None:
+        """Persiste el índice de expedientes de manera atómica."""
+
+        indice_path = self._indice_path()
+        indice_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "last_id": last_id,
+            "expedientes": expedientes,
+        }
+        self._persistir_json_atomico(indice_path, payload)
+
+    def _obtener_o_registrar_identificador(self, numero_normalizado: str) -> int:
+        """Obtiene el identificador del expediente o registra uno nuevo."""
+
+        last_id, expedientes = self._cargar_indice()
+        if numero_normalizado in expedientes:
+            return expedientes[numero_normalizado]
+
+        nuevo_id = last_id + 1
+        expedientes[numero_normalizado] = nuevo_id
+        self._guardar_indice(nuevo_id, expedientes)
+        return nuevo_id
+
+    def _persistir_json_atomico(self, destino: Path, contenido: dict[str, Any]) -> None:
+        """Escribe un archivo JSON en disco utilizando reemplazo atómico."""
+
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        contenido_serializado = json.dumps(contenido, indent=2, ensure_ascii=False)
         temp_path: Path | None = None
         try:
             with tempfile.NamedTemporaryFile(
                 "w",
                 encoding="utf-8",
-                dir=manifest_path.parent,
+                dir=destino.parent,
                 delete=False,
             ) as tmp_file:
                 temp_path = Path(tmp_file.name)
-                tmp_file.write(contenido_manifest)
-            os.replace(temp_path, manifest_path)
+                tmp_file.write(contenido_serializado)
+            os.replace(temp_path, destino)
         except Exception:
             if temp_path is not None:
                 try:
