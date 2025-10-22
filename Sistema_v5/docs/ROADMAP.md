@@ -511,14 +511,14 @@ TOTAL: 60% (9/15 mejoras)
   ```bash
   # Windows/Linux
   pip install pystray pillow
-  python -m Sistema_v5.ejecutar_monitor_tray
+  python ejecutar_monitor_tray.py
 
   # macOS
   pip install rumps
-  python -m Sistema_v5.ejecutar_monitor_statusbar
+  python ejecutar_monitor_statusbar.py
 
   # Universal (auto-detección)
-  python -m Sistema_v5.ejecutar_monitor_universal
+  python ejecutar_monitor_universal.py
   ```
 - **Características técnicas:**
   - Fallback graceful si dependencias no están instaladas

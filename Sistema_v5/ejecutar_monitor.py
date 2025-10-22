@@ -8,10 +8,13 @@ import asyncio
 import sys
 from pathlib import Path
 
-from Sistema_v5.pjn import SystemConfig
-from Sistema_v5.pjn.monitor.config import MonitorConfig
-from Sistema_v5.pjn.monitor.core import MonitorPJN
-from Sistema_v5.pjn.utils.logging import get_logger, setup_logging
+# Agregar directorio al path si es necesario
+sys.path.insert(0, str(Path(__file__).parent))
+
+from pjn import SystemConfig
+from pjn.monitor.config import MonitorConfig
+from pjn.monitor.core import MonitorPJN
+from pjn.utils.logging import setup_logging, get_logger
 
 # Configurar logging
 setup_logging(level="INFO")

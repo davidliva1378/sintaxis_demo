@@ -23,11 +23,15 @@ import argparse
 import asyncio
 import signal
 import sys
+from pathlib import Path
 
-from Sistema_v5.configuracion.monitor import MonitorConfig
-from Sistema_v5.pjn.monitor.core import MonitorPJN
-from Sistema_v5.pjn.monitor.scheduler import SchedulerMonitor
-from Sistema_v5.pjn.utils.logging import get_logger, setup_logging
+# Agregar directorio raíz al path para imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from configuracion.monitor import MonitorConfig
+from pjn.monitor.core import MonitorPJN
+from pjn.monitor.scheduler import SchedulerMonitor
+from pjn.utils.logging import get_logger, setup_logging
 
 logger = get_logger(__name__)
 
