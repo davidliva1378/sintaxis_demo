@@ -796,21 +796,35 @@ class MonitorForm(tk.Tk):
             self._append_resultado(_ResultadoItem(mensaje=event.mensaje, estado="info"))
         elif event.tipo == "success":
             resumen = event.resumen or {}
-            descargas = "Sí" if resumen.get("descargas_ejecutadas") else "No"
-            mensaje = (
-                f"✓ {event.expediente.expediente.numero} — "
-                f"Act.: {resumen.get('actuaciones_actuales', 0)}/"
-                f"{resumen.get('actuaciones_historicas', 0)} — Descargas: {descargas}"
-            )
-            self._append_resultado(
-                _ResultadoItem(
-                    mensaje=mensaje,
-                    estado="success",
-                    carpeta_expediente=resumen.get("carpeta_expediente"),
-                    carpeta_json=resumen.get("carpeta_json"),
-                    json_path=event.json_path,
+            mensaje_error = resumen.get("error")
+            numero = (event.expediente.expediente.numero if event.expediente else "—")
+            if mensaje_error:
+                mensaje = f"✗ {numero} — Error: {mensaje_error}"
+                event.mensaje = mensaje
+                event.alert = event.alert or "error"
+                self._append_resultado(
+                    _ResultadoItem(
+                        mensaje=mensaje,
+                        estado="error",
+                        json_path=event.json_path,
+                    )
                 )
-            )
+            else:
+                descargas = "Sí" if resumen.get("descargas_ejecutadas") else "No"
+                mensaje = (
+                    f"✓ {numero} — "
+                    f"Act.: {resumen.get('actuaciones_actuales', 0)}/"
+                    f"{resumen.get('actuaciones_historicas', 0)} — Descargas: {descargas}"
+                )
+                self._append_resultado(
+                    _ResultadoItem(
+                        mensaje=mensaje,
+                        estado="success",
+                        carpeta_expediente=resumen.get("carpeta_expediente"),
+                        carpeta_json=resumen.get("carpeta_json"),
+                        json_path=event.json_path,
+                    )
+                )
         elif event.tipo == "error":
             mensaje = f"✗ {event.expediente.expediente.numero} — Error: {event.mensaje}"
             self._append_resultado(_ResultadoItem(mensaje=mensaje, estado="error"))
@@ -831,8 +845,10 @@ class MonitorForm(tk.Tk):
         self._resultados_items.append(item)
         self._resultados_listbox.insert(tk.END, item.mensaje)
         self._resultados_listbox.yview_moveto(1.0)
-        if item.carpeta_expediente:
+        if item.estado == "success" and item.carpeta_expediente:
             self._abrir_carpeta_btn.config(state=tk.NORMAL)
+        else:
+            self._abrir_carpeta_btn.config(state=tk.DISABLED)
 
     def _on_result_selection(self, _event: tk.Event[object]) -> None:  # pragma: no cover - UI
         index = self._get_selected_result_index()
@@ -840,7 +856,7 @@ class MonitorForm(tk.Tk):
             self._abrir_carpeta_btn.config(state=tk.DISABLED)
             return
         item = self._resultados_items[index]
-        if item.carpeta_expediente:
+        if item.estado == "success" and item.carpeta_expediente:
             self._abrir_carpeta_btn.config(state=tk.NORMAL)
         else:
             self._abrir_carpeta_btn.config(state=tk.DISABLED)
