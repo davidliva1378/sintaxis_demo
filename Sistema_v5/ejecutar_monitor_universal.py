@@ -7,7 +7,7 @@ la implementación más adecuada:
 - Windows/Linux: pystray (multiplataforma)
 
 Uso:
-    python ejecutar_monitor_universal.py
+    python -m Sistema_v5.ejecutar_monitor_universal
 """
 
 import sys
@@ -40,7 +40,8 @@ def main():
             return 1
 
         # Importar y ejecutar la versión de macOS
-        import ejecutar_monitor_statusbar
+        from . import ejecutar_monitor_statusbar
+
         return ejecutar_monitor_statusbar.main()
 
     elif os_name in ("Windows", "Linux"):
@@ -60,7 +61,8 @@ def main():
             return 1
 
         # Importar y ejecutar la versión multiplataforma
-        import ejecutar_monitor_tray
+        from . import ejecutar_monitor_tray
+
         # Necesitamos hacer asyncio.run del main
         import asyncio
         return asyncio.run(ejecutar_monitor_tray.main())
