@@ -26,6 +26,8 @@ class ResultadoProcesamiento(TypedDict, total=False):
     error: str | None
     carpeta_expediente: str
     carpeta_json: str | None
+    carpeta_actuaciones: str | None
+    carpeta_adjuntos: str | None
     descargas_ejecutadas: bool
     manifest: dict[str, Any]
 
@@ -87,19 +89,21 @@ async def procesar_actuaciones_expediente(
     gestor = GestorDirectoriosExpedientes.desde_config()
     carpeta_expediente, manifest = gestor.crear_para_expediente(numero_expediente)
 
-    carpeta_json_base = carpeta_expediente / "json"
+    carpeta_json = carpeta_expediente / "json"
+    carpeta_actuaciones = carpeta_expediente / "actuaciones"
+    carpeta_adjuntos = carpeta_actuaciones / "adjuntos"
 
     actuales, historicas, error = await extraer_actuaciones_completas(
         page_expediente=page,
         expediente_datos=expediente_info,
         incluir_historicas=True,
-        directorio_base=str(carpeta_json_base),
+        directorio_base=str(carpeta_json),
     )
 
     json_path: Path | None = None
     if not error:
         json_path = (
-            carpeta_json_base
+            carpeta_json
             / numero_normalizado
             / f"actuaciones-{numero_normalizado}.json"
         )
@@ -108,7 +112,11 @@ async def procesar_actuaciones_expediente(
 
     descargas_ejecutadas = False
     if descargar_adjuntos and not error and json_path is not None:
-        await descargar_archivos_de_json(page, str(json_path.parent))
+        await descargar_archivos_de_json(
+            page,
+            str(json_path.parent),
+            str(carpeta_adjuntos),
+        )
         descargas_ejecutadas = True
 
     resumen: ResultadoProcesamiento = {
@@ -117,6 +125,8 @@ async def procesar_actuaciones_expediente(
         "error": error,
         "carpeta_expediente": str(carpeta_expediente),
         "carpeta_json": str(json_path.parent) if json_path else None,
+        "carpeta_actuaciones": str(carpeta_actuaciones),
+        "carpeta_adjuntos": str(carpeta_adjuntos),
         "descargas_ejecutadas": descargas_ejecutadas,
         "manifest": manifest,
     }

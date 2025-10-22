@@ -65,7 +65,16 @@ def test_procesar_actuaciones_generates_json_and_downloads(monkeypatch, tmp_path
     assert resumen["actuaciones_historicas"] == 1
     assert resumen["descargas_ejecutadas"] is True
     assert resumen["error"] is None
-    descargar_mock.assert_awaited_once_with(datos["page"], str(json_path.parent))
+    expected_adjuntos = resumen["carpeta_adjuntos"]
+    assert expected_adjuntos is not None
+    descargar_mock.assert_awaited_once_with(
+        datos["page"],
+        str(json_path.parent),
+        expected_adjuntos,
+    )
+    assert resumen["carpeta_json"] == str(json_path.parent)
+    assert resumen["carpeta_actuaciones"].endswith("actuaciones")
+    assert resumen["carpeta_adjuntos"].endswith("actuaciones/adjuntos")
 
     # Idempotencia: una segunda ejecución debe reutilizar la estructura sin errores
     descargar_mock.reset_mock()
@@ -79,7 +88,13 @@ def test_procesar_actuaciones_generates_json_and_downloads(monkeypatch, tmp_path
     assert json_path_second == json_path
     assert resumen_second["actuaciones_actuales"] == 1
     assert resumen_second["actuaciones_historicas"] == 1
-    descargar_mock.assert_awaited_once_with(datos["page"], str(json_path.parent))
+    expected_adjuntos_second = resumen_second["carpeta_adjuntos"]
+    assert expected_adjuntos_second == expected_adjuntos
+    descargar_mock.assert_awaited_once_with(
+        datos["page"],
+        str(json_path.parent),
+        expected_adjuntos_second,
+    )
 
 
 def test_procesar_actuaciones_no_descarga_si_hay_error(monkeypatch, tmp_path):
