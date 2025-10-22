@@ -13,7 +13,7 @@ from pathlib import Path
 
 from .shared_config import ModoMonitor, MonitorSharedConfig
 from .validators import validar_directorio
-from ..utils.env import parse_bool, parse_int
+from ..utils.env import parse_bool, parse_int, parse_str_list
 
 
 @dataclass
@@ -80,6 +80,7 @@ class MonitorConfig(MonitorSharedConfig):
         notificar_errores: bool = True,
         verificar_entradas: bool = True,
         verificar_expedientes: bool = True,
+        tipos_entradas: tuple[str, ...] | list[str] | str = ("N",),
         comparacion_automatica: bool = False,
         fecha_corte_expedientes: str | None = None,
         fecha_desde_entradas: str | None = None,
@@ -113,6 +114,7 @@ class MonitorConfig(MonitorSharedConfig):
             notificar_errores=notificar_errores,
             verificar_entradas=verificar_entradas,
             verificar_expedientes=verificar_expedientes,
+            tipos_entradas=tipos_entradas,
             comparacion_automatica=comparacion_automatica,
             fecha_corte_expedientes=fecha_corte_expedientes,
             fecha_desde_entradas=fecha_desde_entradas,
@@ -183,12 +185,16 @@ class MonitorConfig(MonitorSharedConfig):
         path = Path(path)
 
         if not path.exists():
-            # Intentar buscar desde el directorio del proyecto
-            alt_path = Path(__file__).parent.parent.parent / path
-            if alt_path.exists():
-                path = alt_path
+            project_root = Path(__file__).resolve().parents[3]
+
+            # Para rutas relativas, intentar resolverlas desde la raíz del proyecto
+            candidate = path if path.is_absolute() else project_root / path
+
+            if candidate.exists():
+                path = candidate
             else:
-                # Crear configuración por defecto
+                # Crear configuración por defecto en la ubicación resuelta
+                path = candidate
                 config = cls()
                 config.to_file(path)
                 return config
@@ -246,6 +252,10 @@ class MonitorConfig(MonitorSharedConfig):
         if notif is not None:
             data["notificar_cambios_expedientes"] = parse_bool(notif)
 
+        tipos = os.getenv(f"{prefix}TIPOS_ENTRADAS")
+        if tipos is not None:
+            data["tipos_entradas"] = parse_str_list(tipos)
+
         return cls(**data)
 
     def to_file(self, path: str | Path = "config/monitor.json") -> None:
@@ -269,6 +279,7 @@ class MonitorConfig(MonitorSharedConfig):
         data = asdict(self)
         data["modo"] = data.pop("modo_monitor")
         data["directorio_datos"] = data.pop("directorio_monitor_datos")
+        data["tipos_entradas"] = list(self.tipos_entradas)
         return data
 
     @classmethod
@@ -310,6 +321,7 @@ class MonitorConfig(MonitorSharedConfig):
             notificar_errores=system_config.notificar_errores,
             verificar_entradas=system_config.verificar_entradas,
             verificar_expedientes=system_config.verificar_expedientes,
+            tipos_entradas=system_config.tipos_entradas,
             comparacion_automatica=system_config.comparacion_automatica,
             fecha_corte_expedientes=system_config.fecha_corte_expedientes,
             fecha_desde_entradas=system_config.fecha_desde_entradas,

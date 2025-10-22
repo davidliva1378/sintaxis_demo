@@ -26,11 +26,45 @@ setup_logging(level="INFO")
 logger = get_logger(__name__)
 
 
+def _resolver_ruta_config(nombre: str) -> tuple[Path, bool]:
+    """Busca ``config/<nombre>`` en ubicaciones conocidas.
+
+    Devuelve la ruta y un booleano indicando si ya existía.
+    """
+
+    relativo = Path("config") / nombre
+    archivo_actual = Path(__file__).resolve()
+
+    posibles_bases: list[Path] = []
+
+    for base in (Path.cwd(), archivo_actual.parent):
+        if base not in posibles_bases:
+            posibles_bases.append(base)
+
+    for indice in range(1, 3):
+        if len(archivo_actual.parents) > indice:
+            candidato = archivo_actual.parents[indice]
+            if candidato not in posibles_bases:
+                posibles_bases.append(candidato)
+
+    for base in posibles_bases:
+        candidato = base / relativo
+        if candidato.exists():
+            return candidato, True
+
+    destino_base = (
+        archivo_actual.parents[1]
+        if len(archivo_actual.parents) > 1
+        else archivo_actual.parent
+    )
+    return destino_base / relativo, False
+
+
 def cargar_configuracion() -> tuple[MonitorConfig, str]:
     """Obtiene la configuración del monitor y la fuente utilizada."""
 
-    sistema_path = Path("config/sistema.json")
-    monitor_path = Path("config/monitor.json")
+    sistema_path, existe_sistema = _resolver_ruta_config("sistema.json")
+    monitor_path, existe_monitor = _resolver_ruta_config("monitor.json")
     env_prefix = "SISTEMA_"
 
     env_overrides = [
@@ -46,12 +80,12 @@ def cargar_configuracion() -> tuple[MonitorConfig, str]:
         system_config = SystemConfig.from_env(prefix=env_prefix)
         return MonitorConfig.from_system_config(system_config), "variables de entorno"
 
-    if sistema_path.exists():
+    if existe_sistema:
         logger.info("[OK] Configuración unificada desde %s", sistema_path)
         system_config = SystemConfig.from_file(sistema_path)
         return MonitorConfig.from_system_config(system_config), str(sistema_path)
 
-    if monitor_path.exists():
+    if existe_monitor:
         logger.warning(
             "[ADVERTENCIA] No se encontró %s. Usando configuración legacy %s",
             sistema_path,

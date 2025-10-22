@@ -12,31 +12,41 @@ from tkinter import ttk, messagebox, filedialog
 from pathlib import Path
 from typing import Callable, Sequence
 
-if __package__ in (None, ""):
+try:
+    if __package__ not in (None, ""):
+        from ..core.system_config import (
+            SystemConfig,
+            ModoMonitor,
+            ModoComparacion,
+            FormatoReporte,
+            NivelLog,
+        )
+
+        from .config_widgets import (
+            DirectorySelector,
+            DatePicker,
+            TimePicker,
+            IntervalInput,
+            DaysSelector,
+        )
+    else:
+        raise ImportError
+except ImportError:
     _PACKAGE_ROOT = Path(__file__).resolve().parents[2]
     _PROJECT_ROOT = _PACKAGE_ROOT.parent
     _project_root_str = str(_PROJECT_ROOT)
     if _project_root_str not in sys.path:
         sys.path.append(_project_root_str)
 
-from ..core.system_config import (
-    SystemConfig,
-    ModoMonitor,
-    ModoComparacion,
-    FormatoReporte,
-    NivelLog,
-)
-
-try:
-    from .config_widgets import (
-        DirectorySelector,
-        DatePicker,
-        TimePicker,
-        IntervalInput,
-        DaysSelector,
+    from Sistema_v5.configuracion.core.system_config import (  # type: ignore[import-not-found]
+        SystemConfig,
+        ModoMonitor,
+        ModoComparacion,
+        FormatoReporte,
+        NivelLog,
     )
-except ImportError:  # pragma: no cover - ejecución directa fuera del paquete
-    from Sistema_v5.configuracion.gui.config_widgets import (
+
+    from Sistema_v5.configuracion.gui.config_widgets import (  # type: ignore[import-not-found]
         DirectorySelector,
         DatePicker,
         TimePicker,
@@ -63,6 +73,7 @@ class ConfigForm(tk.Tk):
         """
         super().__init__()
 
+        self.project_root = Path(__file__).resolve().parents[2]
         self.config_path = Path(config_path)
         self.config: SystemConfig | None = None
 
@@ -330,6 +341,33 @@ class ConfigForm(tk.Tk):
             text="Verificar expedientes",
             variable=self.mon_widgets["verificar_expedientes"]
         ).pack(anchor=tk.W)
+
+        tipos_frame = ttk.LabelFrame(frame, text="Tipos de entradas a incluir", padding=10)
+        tipos_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
+
+        self.mon_widgets["tipos_entradas"] = {
+            "N": tk.BooleanVar(value=True),
+            "D": tk.BooleanVar(value=False),
+        }
+
+        ttk.Checkbutton(
+            tipos_frame,
+            text="Notificaciones (N)",
+            variable=self.mon_widgets["tipos_entradas"]["N"],
+        ).pack(anchor=tk.W)
+
+        ttk.Checkbutton(
+            tipos_frame,
+            text="Despachos (D)",
+            variable=self.mon_widgets["tipos_entradas"]["D"],
+        ).pack(anchor=tk.W)
+
+        ttk.Label(
+            tipos_frame,
+            text="Seleccione una o ambas opciones según los tipos que desee monitorear.",
+            font=("TkDefaultFont", 8, "italic"),
+            foreground="gray",
+        ).pack(anchor=tk.W, pady=(5, 0))
 
         # Notificaciones
         frame = ttk.LabelFrame(scrollable_frame, text="Notificaciones", padding=10)
@@ -821,14 +859,39 @@ class ConfigForm(tk.Tk):
     # MÉTODOS DE CARGA/GUARDADO
     # =========================================================================
 
+    def _resolve_config_path(self, path: Path | str | None = None) -> Path:
+        """Normaliza una ruta de configuración dentro del proyecto.
+
+        Args:
+            path: Ruta relativa o absoluta a normalizar. Si es ``None`` se
+                utiliza ``self.config_path``.
+
+        Returns:
+            Path: Ruta absoluta dentro del proyecto o la ruta absoluta
+                recibida si ya lo era.
+        """
+
+        candidate = Path(path) if path is not None else self.config_path
+
+        if candidate.is_absolute():
+            return candidate.resolve()
+
+        # Normalizar rutas relativas dentro del directorio de configuraciones
+        config_root = self.project_root / "config"
+
+        if candidate.parts and candidate.parts[0] == "config":
+            candidate = Path(*candidate.parts[1:])
+
+        return (config_root / candidate).resolve()
+
     def _load_config(self) -> None:
         """Carga la configuración desde archivo."""
         try:
-            # Cargar configuración
-            if self.config_path.exists():
-                self.config = SystemConfig.from_file(self.config_path)
-            else:
-                self.config = SystemConfig()
+            # Normalizar ruta de configuración
+            self.config_path = self._resolve_config_path()
+
+            # Cargar configuración aprovechando la lógica interna de fallback
+            self.config = SystemConfig.from_file(self.config_path)
 
             # Actualizar widgets de directorios
             for key, widget in self.dir_widgets.items():
@@ -846,6 +909,9 @@ class ConfigForm(tk.Tk):
             self.mon_widgets["dias_laborales"].set(self.config.dias_laborales)
             self.mon_widgets["verificar_entradas"].set(self.config.verificar_entradas)
             self.mon_widgets["verificar_expedientes"].set(self.config.verificar_expedientes)
+            tipos_vars = self.mon_widgets["tipos_entradas"]
+            tipos_vars["N"].set("N" in self.config.tipos_entradas)
+            tipos_vars["D"].set("D" in self.config.tipos_entradas)
             self.mon_widgets["notificar_nuevas_entradas"].set(self.config.notificar_nuevas_entradas)
             self.mon_widgets["notificar_cambios_expedientes"].set(self.config.notificar_cambios_expedientes)
             self.mon_widgets["notificar_errores"].set(self.config.notificar_errores)
@@ -869,8 +935,9 @@ class ConfigForm(tk.Tk):
             self.mon_widgets["expedientes_orden"].set(orden_texto)
 
             self.mon_widgets["expedientes_detener_duplicados"].set(self.config.expedientes_detener_duplicados)
-            if self.config.expedientes_max_paginas is not None:
-                self.mon_widgets["expedientes_max_paginas"].set(self.config.expedientes_max_paginas)
+            self.mon_widgets["expedientes_max_paginas"].set(
+                self.config.expedientes_max_paginas
+            )
 
             # Actualizar widgets de extracción
             self.ext_widgets["headless"].set(self.config.headless)
@@ -907,6 +974,9 @@ class ConfigForm(tk.Tk):
     def _save_config(self) -> None:
         """Guarda la configuración actual."""
         try:
+            # Asegurar que el archivo de destino esté resuelto antes de guardar
+            self.config_path = self._resolve_config_path()
+
             # Crear nueva configuración con valores de los widgets
             config_data = {}
 
@@ -925,6 +995,15 @@ class ConfigForm(tk.Tk):
             config_data["dias_laborales"] = self.mon_widgets["dias_laborales"].get()
             config_data["verificar_entradas"] = self.mon_widgets["verificar_entradas"].get()
             config_data["verificar_expedientes"] = self.mon_widgets["verificar_expedientes"].get()
+            tipos_vars = self.mon_widgets["tipos_entradas"]
+            tipos_seleccionados = [tipo for tipo, var in tipos_vars.items() if var.get()]
+            if not tipos_seleccionados:
+                messagebox.showerror(
+                    "Error",
+                    "Seleccione al menos un tipo de entrada (Notificaciones y/o Despachos).",
+                )
+                return
+            config_data["tipos_entradas"] = tipos_seleccionados
             config_data["notificar_nuevas_entradas"] = self.mon_widgets["notificar_nuevas_entradas"].get()
             config_data["notificar_cambios_expedientes"] = self.mon_widgets["notificar_cambios_expedientes"].get()
             config_data["notificar_errores"] = self.mon_widgets["notificar_errores"].get()
@@ -948,7 +1027,19 @@ class ConfigForm(tk.Tk):
             config_data["expedientes_orden"] = orden_inverso_map.get(orden_text, None)
 
             config_data["expedientes_detener_duplicados"] = self.mon_widgets["expedientes_detener_duplicados"].get()
-            config_data["expedientes_max_paginas"] = self.mon_widgets["expedientes_max_paginas"].get()
+            exp_max_paginas = self.mon_widgets["expedientes_max_paginas"].get()
+
+            if self.mon_widgets["extraccion_expedientes_completa"].get():
+                exp_max_paginas = None
+            elif (
+                exp_max_paginas is None
+                and self.config
+                and self.config.expedientes_max_paginas is not None
+            ):
+                # Conservar el valor previo si el widget quedó vacío
+                exp_max_paginas = self.config.expedientes_max_paginas
+
+            config_data["expedientes_max_paginas"] = exp_max_paginas
 
             # Extracción
             config_data["headless"] = self.ext_widgets["headless"].get()
@@ -1033,6 +1124,7 @@ class ConfigForm(tk.Tk):
         if file_path:
             try:
                 self.config = SystemConfig.from_file(file_path)
+                self.config_path = self._resolve_config_path(file_path)
                 self._load_config()
                 messagebox.showinfo("Éxito", "Configuración importada correctamente")
             except Exception as e:

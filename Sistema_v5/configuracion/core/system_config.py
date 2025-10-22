@@ -68,6 +68,7 @@ ENV_FIELD_MAP: dict[str, str] = {
     "notificar_errores": "NOTIFICAR_ERRORES",
     "verificar_entradas": "VERIFICAR_ENTRADAS",
     "verificar_expedientes": "VERIFICAR_EXPEDIENTES",
+    "tipos_entradas": "TIPOS_ENTRADAS",
     "comparacion_automatica": "COMPARACION_AUTOMATICA",
     "fecha_corte_expedientes": "FECHA_CORTE_EXPEDIENTES",
     "fecha_desde_entradas": "FECHA_DESDE_ENTRADAS",
@@ -147,7 +148,7 @@ INT_FIELDS = {
 }
 
 
-LIST_FIELDS = {"dias_laborales"}
+LIST_FIELDS = {"dias_laborales", "tipos_entradas"}
 
 
 LOWER_FIELDS = {
@@ -208,6 +209,7 @@ class SystemConfig(MonitorSharedConfig):
         hora_fin: Hora de fin del horario laboral
         verificar_entradas: Si verificar entradas
         verificar_expedientes: Si verificar expedientes
+        tipos_entradas: Tipos de entradas a incluir (combinaciones de "N" y "D")
         notificar_nuevas_entradas: Si notificar nuevas entradas
         notificar_cambios_expedientes: Si notificar cambios en expedientes
         notificar_errores: Si notificar errores del monitor
@@ -484,12 +486,16 @@ class SystemConfig(MonitorSharedConfig):
         path = Path(path)
 
         if not path.exists():
-            # Intentar buscar desde el directorio del proyecto
-            alt_path = Path(__file__).parent.parent / path
-            if alt_path.exists():
-                path = alt_path
+            project_root = Path(__file__).resolve().parents[3]
+
+            # Para rutas relativas, intentar resolverlas desde la raíz del proyecto
+            candidate = path if path.is_absolute() else project_root / path
+
+            if candidate.exists():
+                path = candidate
             else:
-                # Crear configuración por defecto
+                # Crear configuración por defecto en la ubicación resuelta
+                path = candidate
                 config = cls()
                 config.to_file(path)
                 return config
@@ -549,6 +555,7 @@ class SystemConfig(MonitorSharedConfig):
             notificar_errores=monitor_data.get("notificar_errores", True),
             verificar_entradas=monitor_data.get("verificar_entradas", True),
             verificar_expedientes=monitor_data.get("verificar_expedientes", True),
+            tipos_entradas=monitor_data.get("tipos_entradas", ("N",)),
             comparacion_automatica=monitor_data.get("comparacion_automatica", False),
             fecha_corte_expedientes=monitor_data.get("fecha_corte_expedientes"),
             fecha_desde_entradas=monitor_data.get("fecha_desde_entradas"),
@@ -567,7 +574,7 @@ class SystemConfig(MonitorSharedConfig):
         path.parent.mkdir(parents=True, exist_ok=True)
 
         with path.open("w", encoding="utf-8") as f:
-            json.dump(asdict(self), f, indent=2, ensure_ascii=False)
+            json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
 
     def to_dict(self) -> dict:
         """Convierte la configuración a diccionario.
@@ -575,7 +582,9 @@ class SystemConfig(MonitorSharedConfig):
         Returns:
             dict: Configuración como diccionario
         """
-        return asdict(self)
+        data = asdict(self)
+        data["tipos_entradas"] = list(self.tipos_entradas)
+        return data
 
     def crear_directorios(self) -> None:
         """Crea todos los directorios definidos en la configuración.

@@ -413,12 +413,14 @@ from pjn.scraping.entradas import extraer_entradas_datos
 
 entradas = await extraer_entradas_datos(
     page,
-    incluir_tipos=("N",),         # Solo notificaciones
+    incluir_tipos=("N", "D"),     # Monitorea notificaciones y despachos
     historial_existente=historial, # Deduplicar
 )
 
 print(f"📬 Nuevas notificaciones: {len(entradas)}")
 ```
+
+> 💡 Define los tipos por defecto desde la configuración (`tipos_entradas` en `config/monitor.json` o `config/sistema.json`).
 
 **Más ejemplos →** [docs/DOCUMENTACION_GUIAS.md](docs/DOCUMENTACION_GUIAS.md)
 

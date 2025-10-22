@@ -146,7 +146,7 @@ python scripts/monitor_cli.py --verificar-ahora
 {
   "verificar_entradas": true,
   "verificar_expedientes": false,
-  "filtrar_tipo_entrada": ["N"],
+  "tipos_entradas": ["N"],
   "notificar_nuevas_entradas": true
 }
 ```
@@ -161,6 +161,8 @@ notificaciones = await extraer_entradas_datos(
     incluir_tipos=("N",),  # Solo 'N'
 )
 ```
+
+> 📌 Ajusta los valores válidos en `tipos_entradas` (`"N"` para notificaciones, `"D"` para despachos) dentro de `config/monitor.json` o `config/sistema.json` para que el monitor utilice estos filtros por defecto.
 
 ### 4. Modo horario laboral estricto
 

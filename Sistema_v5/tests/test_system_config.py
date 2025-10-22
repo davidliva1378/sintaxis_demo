@@ -198,6 +198,27 @@ class TestSystemConfigFileOperations:
         assert data["modo_monitor"] == "no_laboral"
         assert data["nivel_log"] == "DEBUG"
 
+    def test_from_file_uses_project_root_for_relative_path(self, tmp_path, monkeypatch):
+        """from_file() resuelve rutas relativas desde la raíz del proyecto."""
+        project_root = Path(__file__).resolve().parents[2]
+        project_config = project_root / "config" / "sistema.json"
+        assert project_config.exists(), "La plantilla de sistema debe existir en la raíz del proyecto"
+
+        # Cambiar el directorio de trabajo para simular ejecución desde otra ubicación
+        monkeypatch.chdir(tmp_path)
+
+        config = SystemConfig.from_file("config/sistema.json")
+
+        # Verificar que se cargan valores esperados sin crear archivos alternos
+        assert config.modo_monitor == "automatico"
+
+        tmp_config = tmp_path / "config" / "sistema.json"
+        assert not tmp_config.exists()
+
+        # No debe crearse un archivo dentro de Sistema_v5/config
+        internal_config = Path(__file__).resolve().parents[1] / "config" / "sistema.json"
+        assert not internal_config.exists()
+
 
 class TestSystemConfigFromEnv:
     """Tests para la carga de configuración desde variables de entorno."""

@@ -14,6 +14,7 @@ from .validators import (
     validar_max_reintentos,
     validar_rango_fechas,
     validar_rango_horas,
+    validar_tipos_entradas,
 )
 
 ModoMonitor = Literal["automatico", "laboral", "no_laboral"]
@@ -55,6 +56,7 @@ class MonitorSharedConfig:
 
     verificar_entradas: bool = True
     verificar_expedientes: bool = True
+    tipos_entradas: tuple[str, ...] = ("N",)
 
     comparacion_automatica: bool = False
     fecha_corte_expedientes: str | None = None
@@ -150,6 +152,8 @@ class MonitorSharedConfig:
         validar_formato_fecha(
             self.fecha_corte_expedientes, "fecha_corte_expedientes"
         )
+
+        self.tipos_entradas = validar_tipos_entradas(self.tipos_entradas)
 
         # Validar días hacia atrás
         if self.dias_atras_entradas is not None:
