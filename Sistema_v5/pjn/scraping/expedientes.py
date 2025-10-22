@@ -23,7 +23,7 @@ from ..models.extraccion_config import ExtraccionExpedientesConfig
 from ..parsers.expedientes_parser import parse_expediente_resumen
 from ..selectores import SEL_EXPEDIENTES
 from ..utils.logging import get_logger
-from .base import descomponer_numero_expediente
+from .base import descomponer_numero_expediente, normalizar_texto
 from .pagination import PaginationStrategy, DEFAULT_PAGINATION_STRATEGY
 
 logger = get_logger(__name__)
@@ -1007,13 +1007,42 @@ async def buscar_expedientes(
         return []
 
     if caratula:
+        caratula_normalizada = normalizar_texto(caratula)
+        if not caratula_normalizada:
+            logger.debug(
+                "🔎 La carátula '%s' quedó vacía tras la normalización; se omite el filtro.",
+                caratula,
+            )
+            return filas
+
+        coincidencia_parcial = getattr(
+            _config.scraping, "caratula_coincidencia_parcial", True
+        )
         filas_filtradas: list[ElementHandle] = []
         for fila in filas:
             columnas = await fila.query_selector_all(SEL_EXPEDIENTES.COLUMNAS_FILA)
             if len(columnas) >= 3:
-                caratula_texto = (await columnas[2].inner_text()).strip().lower()
-                if caratula_texto == caratula.lower():
+                caratula_original = (await columnas[2].inner_text()).strip()
+                caratula_normalizada_fila = normalizar_texto(caratula_original)
+
+                coincide = caratula_normalizada_fila == caratula_normalizada
+                if (
+                    not coincide
+                    and coincidencia_parcial
+                    and caratula_normalizada
+                    and caratula_normalizada in caratula_normalizada_fila
+                ):
+                    coincide = True
+
+                if coincide:
                     filas_filtradas.append(fila)
+                else:
+                    logger.debug(
+                        "🔎 Fila descartada tras normalizar carátula (filtro='%s', original='%s', normalizada='%s').",
+                        caratula_normalizada,
+                        caratula_original,
+                        caratula_normalizada_fila,
+                    )
         return filas_filtradas
 
     return filas
