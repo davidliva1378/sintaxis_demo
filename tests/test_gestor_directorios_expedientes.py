@@ -116,3 +116,21 @@ def test_desde_config_resuelve_ruta_relativa(tmp_path: Path) -> None:
     ruta, manifest = gestor.crear_para_expediente("123")
     assert ruta == tmp_path / "data" / "expedientes" / "123"
     assert "documentos_usuario" in manifest["directories"]
+
+
+def test_resolver_ruta_expande_home_y_variables(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("EXPEDIENTES_DIR", str(tmp_path / "desde_env"))
+
+    ruta_env = GestorDirectoriosExpedientes._resolver_ruta(
+        "$EXPEDIENTES_DIR/subcarpeta",
+        base_dir=None,
+        config_path=None,
+    )
+    assert ruta_env == tmp_path / "desde_env" / "subcarpeta"
+
+    ruta_home = GestorDirectoriosExpedientes._resolver_ruta(
+        "~/expedientes_home",
+        base_dir=None,
+        config_path=None,
+    )
+    assert ruta_home == Path.home() / "expedientes_home"
