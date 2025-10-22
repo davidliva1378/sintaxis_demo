@@ -7,10 +7,10 @@ existentes:
 1. **Configuración del sistema**. Se carga :class:`~configuracion.core.SystemConfig`
    desde el archivo indicado, reutilizando la infraestructura unificada de
    configuraciones.
-2. **Formulario de directorios (Tarea 2)**. Se lanza el formulario gráfico
-   :class:`Sistema_v5.configuracion.gui.config_form.ConfigForm` centrado en la
-   pestaña de directorios para que la persona operadora confirme o ajuste las
-   rutas que utilizarán los siguientes pasos.
+2. **Formulario de directorios (Tarea 2)**. Se lanza la ventana
+   :class:`extractor_inicial.ui.directorios_form.DirectoriosForm` para que la
+   persona operadora confirme o ajuste las rutas que utilizarán los siguientes
+   pasos.
 3. **Servicio de extracción inicial (Tarea 3)**. Se ejecuta la extracción de
    expedientes mediante :func:`Sistema_v5.pjn.scraping.expedientes.extraer_expedientes_completos_modelos`
    y se persiste el resultado en ``directorio_extraccion_inicial``.
@@ -39,7 +39,6 @@ from typing import Any, Coroutine
 
 from Sistema_v5.configuracion.core import SystemConfig
 from Sistema_v5.configuracion.core.extraccion_config import ExtraccionExpedientesConfig
-from Sistema_v5.configuracion.gui.config_form import ConfigForm
 from Sistema_v5.configuracion.monitor.config import MonitorConfig
 from Sistema_v5.pjn.monitor.core import MonitorPJN
 from Sistema_v5.pjn.scraping import obtener_pagina_autenticada
@@ -48,6 +47,9 @@ from Sistema_v5.ui.gui_monitor_form import launch_monitor_form
 from Sistema_v5.ui.gui_playwright_bridge import (
     GUIPlaywrightBridge,
     PlaywrightSessionError,
+)
+from .ui.directorios_form import (
+    mostrar_formulario_directorios as _mostrar_formulario_directorios_gui,
 )
 
 logger = logging.getLogger(__name__)
@@ -86,14 +88,11 @@ def run_ciclo_prueba(
     sistema_path = Path(config_sistema_path)
     monitor_path = Path(config_monitor_path)
 
-    logger.info("📥 Cargando configuración del sistema desde %s", sistema_path)
-    system_config = _load_system_config(sistema_path)
-
     if mostrar_formulario_directorios:
         logger.info("🖥️  Abriendo formulario de directorios")
-        _mostrar_formulario_directorios(sistema_path)
-        # Recargar configuración para tomar cambios guardados desde la GUI
-        logger.info("♻️  Recargando configuración del sistema después del formulario")
+        system_config = _mostrar_formulario_directorios_gui(sistema_path)
+    else:
+        logger.info("📥 Cargando configuración del sistema desde %s", sistema_path)
         system_config = _load_system_config(sistema_path)
 
     monitor_config = _prepare_monitor_config(
@@ -137,16 +136,6 @@ def _load_system_config(config_path: Path) -> SystemConfig:
             f"No se encontró el archivo de configuración del sistema: {config_path}"
         )
     return SystemConfig.from_file(config_path)
-
-
-def _mostrar_formulario_directorios(config_path: Path) -> None:
-    app = ConfigForm(config_path=str(config_path))
-    try:
-        # La pestaña de directorios es la primera, aseguramos el enfoque
-        app.notebook.select(0)
-    except Exception:  # pragma: no cover - interfaz defensiva
-        pass
-    app.mainloop()
 
 
 def _prepare_monitor_config(
