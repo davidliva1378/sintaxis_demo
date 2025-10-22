@@ -2,6 +2,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -16,6 +18,8 @@ def test_descomponer_numero_expediente_variantes():
         "FPA 21002641/2010": (None, "21002641", "2010"),
         "3-21002641-23": ("3", "21002641", "2023"),
         "21002641/2010/I": (None, "21002641", "2010"),
+        "FPA1945/2024/1": (None, "1945", "2024"),
+        "FPA 1945/2024/1": (None, "1945", "2024"),
         "Expte: 12345/024": (None, "12345", "2024"),
     }
 
@@ -40,7 +44,14 @@ class DummyPage:
         return DummyTable()
 
 
-def test_buscar_expedientes_normaliza_numero(monkeypatch, caplog):
+@pytest.mark.parametrize(
+    "entrada",
+    [
+        "FPA 21002641/10/I",
+        "FPA 21002641/10/1",
+    ],
+)
+def test_buscar_expedientes_normaliza_numero(monkeypatch, caplog, entrada):
     llamado: dict[str, tuple[str, str, int]] = {}
 
     async def fake_buscar(page, numero, anio, timeout=8000):
@@ -56,9 +67,7 @@ def test_buscar_expedientes_normaliza_numero(monkeypatch, caplog):
     caplog.set_level("ERROR")
 
     filas = asyncio.run(
-        scraping_expedientes.buscar_expedientes(
-            DummyPage(), numero="FPA 21002641/10/I"
-        )
+        scraping_expedientes.buscar_expedientes(DummyPage(), numero=entrada)
     )
 
     assert llamado["args"] == ("21002641", "2010", 8000)

@@ -80,7 +80,7 @@ def _leer_dato(prompt: str) -> str:
 async def _buscar_y_seleccionar_expediente(page: Page) -> dict[str, Any] | None:
     numero = _leer_dato("Número de expediente: ")
     anio = _leer_dato(
-        "Año (dejá vacío si el número incluye formato XXXXX/YYY o prefijos como FPA): "
+        "Año (dejá vacío si el número incluye formato XXXXX/YYY o incidentes como /I o /1): "
     )
     caratula = _leer_dato("Carátula exacta (opcional): ") or None
 

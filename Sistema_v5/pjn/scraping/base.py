@@ -172,8 +172,8 @@ def descomponer_numero_expediente(
 
     Soporta formatos con prefijos alfabéticos y sufijos de incidentes, por
     ejemplo ``"FPA 21002641/2010"``, ``"3-21002641-23"`` o
-    ``"21002641/2010/I"``. Los incidentes (``/I``, ``/CA1``) se ignoran y los
-    años de dos o tres dígitos se expanden a cuatro cuando es posible.
+    ``"21002641/2010/I"``. Los incidentes (``/I``, ``/CA1``, ``/1``) se ignoran y
+    los años de dos o tres dígitos se expanden a cuatro cuando es posible.
     """
 
     if not valor:
@@ -188,7 +188,21 @@ def descomponer_numero_expediente(
         return None, None, None
 
     texto = re.sub(r"\s+", "", texto)
-    texto = re.sub(r"(?:[-/][A-Za-z]+[A-Za-z0-9]*)+$", "", texto)
+
+    def _remover_incidentes(cadena: str) -> str:
+        while True:
+            match = re.search(r"/(?:[A-Za-z]+[A-Za-z0-9]*|\d+)$", cadena)
+            if not match:
+                break
+
+            if cadena[: match.start()].count("/") == 0:
+                break
+
+            cadena = cadena[: match.start()]
+
+        return re.sub(r"(?:[-][A-Za-z]+[A-Za-z0-9]*)+$", "", cadena)
+
+    texto = _remover_incidentes(texto)
 
     bloques = re.findall(r"\d+", texto)
     if not bloques:
