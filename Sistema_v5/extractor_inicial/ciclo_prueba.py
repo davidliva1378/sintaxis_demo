@@ -32,9 +32,18 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Coroutine
+
+if __package__ is None or __package__ == "":  # pragma: no cover - comportamiento CLI
+    project_root = Path(__file__).resolve().parents[2]
+    if str(project_root) not in sys.path:
+        sys.path.append(str(project_root))
+    __package__ = "Sistema_v5.extractor_inicial"
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 from ..configuracion.core import SystemConfig
 from ..configuracion.core.extraccion_config import ExtraccionExpedientesConfig
@@ -80,8 +89,8 @@ def run_ciclo_prueba(
         extracción fue omitida por un error.
     """
 
-    sistema_path = Path(config_sistema_path)
-    monitor_path = Path(config_monitor_path)
+    sistema_path = _resolve_config_path(Path(config_sistema_path))
+    monitor_path = _resolve_config_path(Path(config_monitor_path))
 
     if mostrar_formulario_directorios:
         logger.info("🖥️  Abriendo formulario de directorios")
@@ -131,6 +140,17 @@ def _load_system_config(config_path: Path) -> SystemConfig:
             f"No se encontró el archivo de configuración del sistema: {config_path}"
         )
     return SystemConfig.from_file(config_path)
+
+
+def _resolve_config_path(path: Path) -> Path:
+    if path.is_absolute() or path.exists():
+        return path
+
+    candidate = PROJECT_ROOT / path
+    if candidate.exists() or candidate.parent.exists():
+        return candidate
+
+    return path
 
 
 def _prepare_monitor_config(
@@ -278,3 +298,7 @@ def _run_async_task(coro: Coroutine[Any, Any, Any]) -> Any:
 
 # Exponer helpers adicionales para pruebas o reutilización externa
 __all__ = ["run_ciclo_prueba"]
+
+
+if __name__ == "__main__":  # pragma: no cover - punto de entrada CLI
+    run_ciclo_prueba()
