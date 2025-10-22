@@ -8,6 +8,7 @@ helpers para generar árboles por expediente.
 
 from __future__ import annotations
 
+import os
 import json
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -108,7 +109,8 @@ class GestorDirectoriosExpedientes:
     ) -> Path:
         """Resuelve rutas relativas usando un directorio base apropiado."""
 
-        path = Path(ruta)
+        expanded = os.path.expandvars(str(ruta))
+        path = Path(expanded).expanduser()
         if path.is_absolute():
             return path
 
