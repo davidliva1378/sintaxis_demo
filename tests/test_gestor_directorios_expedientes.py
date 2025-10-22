@@ -96,14 +96,65 @@ def test_crear_para_expediente_normaliza_y_agrega_metadata(tmp_path: Path) -> No
 
     ruta_expediente, manifest = gestor.crear_para_expediente("Exp 123/2024")
 
-    assert ruta_expediente == tmp_path / "expedientes" / "Exp_123_2024"
+    ruta_esperada = tmp_path / "expedientes" / "000001_Exp_123_2024"
+    assert ruta_expediente == ruta_esperada
     assert manifest["metadata"]["numero_expediente"] == "Exp 123/2024"
     assert manifest["metadata"]["numero_normalizado"] == "Exp_123_2024"
+    assert manifest["metadata"]["id"] == 1
 
     manifest_path = ruta_expediente / "manifest.json"
     assert manifest_path.exists()
     contenido_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert contenido_manifest == manifest
+
+    indice_path = tmp_path / "expedientes" / "expedientes_index.json"
+    assert indice_path.exists()
+
+
+def test_creacion_multiple_asigna_ids_consecutivos(tmp_path: Path) -> None:
+    gestor = GestorDirectoriosExpedientes(tmp_path)
+
+    ruta_1, manifest_1 = gestor.crear_para_expediente("Exp 1/2024")
+    ruta_2, manifest_2 = gestor.crear_para_expediente("Exp 2/2024")
+
+    assert ruta_1.name.startswith("000001_")
+    assert ruta_2.name.startswith("000002_")
+    assert manifest_1["metadata"]["id"] == 1
+    assert manifest_2["metadata"]["id"] == 2
+
+    indice = json.loads((tmp_path / "expedientes_index.json").read_text(encoding="utf-8"))
+    assert indice["last_id"] == 2
+    assert indice["expedientes"][manifest_1["metadata"]["numero_normalizado"]] == 1
+    assert indice["expedientes"][manifest_2["metadata"]["numero_normalizado"]] == 2
+
+
+def test_reimportacion_conserva_identificador(tmp_path: Path) -> None:
+    gestor = GestorDirectoriosExpedientes(tmp_path)
+
+    ruta_1, manifest_1 = gestor.crear_para_expediente("Exp 321/2023")
+    ruta_2, manifest_2 = gestor.crear_para_expediente("Exp 321/2023")
+
+    assert ruta_1 == ruta_2
+    assert manifest_1["metadata"]["id"] == manifest_2["metadata"]["id"] == 1
+
+    indice = json.loads((tmp_path / "expedientes_index.json").read_text(encoding="utf-8"))
+    assert indice["last_id"] == 1
+
+
+def test_indice_persistente_tras_reinicio(tmp_path: Path) -> None:
+    gestor_inicial = GestorDirectoriosExpedientes(tmp_path)
+    _, manifest_1 = gestor_inicial.crear_para_expediente("Exp 10/2024")
+
+    gestor_recreado = GestorDirectoriosExpedientes(tmp_path)
+    ruta_2, manifest_2 = gestor_recreado.crear_para_expediente("Exp 11/2024")
+
+    assert manifest_1["metadata"]["id"] == 1
+    assert manifest_2["metadata"]["id"] == 2
+    assert ruta_2.name.startswith("000002_")
+
+    indice = json.loads((tmp_path / "expedientes_index.json").read_text(encoding="utf-8"))
+    assert indice["last_id"] == 2
+    assert set(indice["expedientes"].values()) == {1, 2}
 
 
 def test_actualizar_estructura_permita_reemplazar(tmp_path: Path) -> None:
@@ -132,7 +183,7 @@ def test_desde_config_resuelve_ruta_relativa(tmp_path: Path) -> None:
     assert gestor.raiz == tmp_path / "data" / "expedientes"
 
     ruta, manifest = gestor.crear_para_expediente("123")
-    assert ruta == tmp_path / "data" / "expedientes" / "123"
+    assert ruta == tmp_path / "data" / "expedientes" / "000001_123"
     assert "documentos_usuario" in manifest["directories"]
 
 
@@ -160,7 +211,7 @@ def test_generar_arbol_rechaza_componentes_multisegmento(tmp_path: Path) -> None
 
 
 @pytest.mark.parametrize(
-    "entradas, espera_error, mensaje, ruta_esperada",
+    "entradas, espera_error, mensaje, ruta_esperada, id_esperado",
     [
         pytest.param(
             [
@@ -171,7 +222,8 @@ def test_generar_arbol_rechaza_componentes_multisegmento(tmp_path: Path) -> None
             ],
             False,
             None,
-            "Exp_123_2024",
+            "000001_Exp_123_2024",
+            1,
             id="entrada_valida",
         ),
         pytest.param(
@@ -181,7 +233,8 @@ def test_generar_arbol_rechaza_componentes_multisegmento(tmp_path: Path) -> None
             ],
             True,
             "repetido",
-            "Exp_123_2024",
+            "000001_Exp_123_2024",
+            1,
             id="entrada_repetida",
         ),
         pytest.param(
@@ -191,11 +244,19 @@ def test_generar_arbol_rechaza_componentes_multisegmento(tmp_path: Path) -> None
             True,
             "numero_expediente",
             None,
+            None,
             id="entrada_sin_numero",
         ),
     ],
 )
-def test_crear_desde_json(tmp_path: Path, entradas, espera_error, mensaje, ruta_esperada):
+def test_crear_desde_json(
+    tmp_path: Path,
+    entradas,
+    espera_error,
+    mensaje,
+    ruta_esperada,
+    id_esperado,
+):
     gestor = GestorDirectoriosExpedientes(tmp_path)
 
     if espera_error:
@@ -214,8 +275,9 @@ def test_crear_desde_json(tmp_path: Path, entradas, espera_error, mensaje, ruta_
 
         assert ruta == tmp_path / ruta_esperada
         assert manifest["metadata"]["numero_expediente"] == entradas[0]["numero_expediente"]
-        assert manifest["metadata"]["numero_normalizado"] == ruta_esperada
+        assert ruta_esperada.endswith(manifest["metadata"]["numero_normalizado"])
         assert manifest["metadata"]["actor"] == "PJN"
+        assert manifest["metadata"]["id"] == id_esperado
         manifest_path = ruta / "manifest.json"
         assert manifest_path.exists()
 
