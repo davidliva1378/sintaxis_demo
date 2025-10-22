@@ -327,7 +327,31 @@ class GestorDirectoriosExpedientes:
             raise
 
 
+def inicializar_directorio_base(
+    config: "SystemConfig | None" = None,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Genera la estructura base de expedientes y devuelve su manifiesto.
+
+    Este es el punto de entrada recomendado tras ejecutar el instalador, ya
+    que crea la estructura inicial utilizando la configuración del sistema.
+
+    Args:
+        config: Instancia opcional de :class:`SystemConfig` ya cargada.
+        **kwargs: Parámetros adicionales propagados a
+            :meth:`GestorDirectoriosExpedientes.desde_config`, como
+            ``base_dir`` o ``config_path``.
+
+    Returns:
+        dict[str, Any]: El manifiesto generado por :meth:`generar_arbol`.
+    """
+
+    gestor = GestorDirectoriosExpedientes.desde_config(config, **kwargs)
+    return gestor.generar_arbol()
+
+
 __all__ = [
     "ESTRUCTURA_POR_DEFECTO",
     "GestorDirectoriosExpedientes",
+    "inicializar_directorio_base",
 ]

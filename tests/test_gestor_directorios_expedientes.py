@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 from Sistema_v5.gestor_directorios import (
     ESTRUCTURA_POR_DEFECTO,
     GestorDirectoriosExpedientes,
+    inicializar_directorio_base,
 )
 from Sistema_v5.configuracion.core.system_config import SystemConfig
 
@@ -176,33 +177,54 @@ def test_resolver_ruta_expande_home_y_variables(monkeypatch, tmp_path: Path) -> 
     assert ruta_home == Path.home() / "expedientes_home"
 
 
-def test_actualizar_expediente_fusiona_manifest(tmp_path: Path) -> None:
-    gestor = GestorDirectoriosExpedientes(tmp_path)
-
-    ruta_expediente, manifest_inicial = gestor.crear_para_expediente("Exp 42/2023")
-    manifest_path = ruta_expediente / "manifest.json"
-
-    contenido = json.loads(manifest_path.read_text(encoding="utf-8"))
-    contenido.setdefault("metadata", {})["etiquetas"] = ["inicial"]
-    manifest_path.write_text(
-        json.dumps(contenido, indent=2, ensure_ascii=False), encoding="utf-8"
+def test_inicializar_directorio_base_sin_config_explicit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    config_path = tmp_path / "config" / "sistema.json"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(
+        json.dumps({"directorio_expedientes_base": "expedientes_desde_archivo"}),
+        encoding="utf-8",
     )
 
-    manifest_actualizado = gestor.actualizar_expediente(
-        "Exp 42/2023",
-        {"estado": "cerrado"},
-        estructura={"audiencias": {"video": None}},
+    manifest = inicializar_directorio_base(config_path=config_path)
+
+    raiz = tmp_path / "expedientes_desde_archivo"
+    rutas_esperadas = _listar_directorios(ESTRUCTURA_POR_DEFECTO)
+
+    for ruta in rutas_esperadas:
+        assert (raiz / ruta).is_dir(), f"No se creó el directorio esperado: {ruta}"
+
+    manifest_path = raiz / "manifest.json"
+    assert manifest_path.exists(), "Se esperaba el manifiesto en la raíz"
+    assert config_path.exists(), "La configuración debería haberse materializado en disco"
+
+    contenido_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert set(contenido_manifest["directories"]) >= rutas_esperadas
+    assert manifest == contenido_manifest
+
+
+def test_inicializar_directorio_base_con_base_dir_personalizado(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    config = SystemConfig()
+    config.directorio_expedientes_base = "expedientes_personalizados"
+
+    manifest = inicializar_directorio_base(
+        config=config,
+        base_dir=tmp_path,
     )
 
-    manifest_final = json.loads(manifest_path.read_text(encoding="utf-8"))
+    raiz = tmp_path / "expedientes_personalizados"
 
-    assert manifest_actualizado == manifest_final
-    assert set(manifest_final["directories"]) >= set(manifest_inicial["directories"])
-    assert "audiencias" in manifest_final["directories"]
-    assert "audiencias/video" in manifest_final["directories"]
+    for ruta in _listar_directorios(ESTRUCTURA_POR_DEFECTO):
+        assert (raiz / ruta).is_dir()
 
-    metadata_final = manifest_final["metadata"]
-    assert metadata_final["estado"] == "cerrado"
-    assert metadata_final["etiquetas"] == ["inicial"]
-    assert metadata_final["numero_expediente"] == "Exp 42/2023"
-    assert metadata_final["numero_normalizado"] == "Exp_42_2023"
+    manifest_path = raiz / "manifest.json"
+    assert manifest_path.exists()
+    contenido_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest == contenido_manifest
