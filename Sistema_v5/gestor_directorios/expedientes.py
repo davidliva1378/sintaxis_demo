@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import json
+import tempfile
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -162,9 +163,25 @@ class GestorDirectoriosExpedientes:
             manifest["metadata"] = deepcopy(metadata)
 
         manifest_path = raiz / self.manifest_filename
-        manifest_path.write_text(
-            json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        contenido_manifest = json.dumps(manifest, indent=2, ensure_ascii=False)
+        temp_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                dir=manifest_path.parent,
+                delete=False,
+            ) as tmp_file:
+                temp_path = Path(tmp_file.name)
+                tmp_file.write(contenido_manifest)
+            os.replace(temp_path, manifest_path)
+        except Exception:
+            if temp_path is not None:
+                try:
+                    temp_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+            raise
         return manifest
 
     def crear_para_expediente(self, numero_expediente: str) -> tuple[Path, dict[str, Any]]:
