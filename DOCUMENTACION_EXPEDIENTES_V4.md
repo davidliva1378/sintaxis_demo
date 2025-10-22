@@ -59,8 +59,8 @@ La utilidad de gestión de directorios crea un árbol base para cada expediente 
 ```
 <expediente>/
 ├── actuaciones/
-│   ├── adjuntos/
-│   └── json/
+│   └── adjuntos/
+├── json/
 ├── documentos_usuario/
 └── reportes/
 ```

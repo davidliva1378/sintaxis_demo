@@ -13,8 +13,8 @@ base dentro del directorio configurado como raíz:
 ```
 <raiz>
 ├── actuaciones/
-│   ├── adjuntos/
-│   └── json/
+│   └── adjuntos/
+├── json/
 ├── documentos_usuario/
 └── reportes/
 ```

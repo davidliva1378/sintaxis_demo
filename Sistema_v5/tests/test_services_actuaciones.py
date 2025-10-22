@@ -22,8 +22,8 @@ class DummyGestor:
 
     def crear_para_expediente(self, numero: str) -> tuple[Path, dict]:
         destino = self.raiz / normalizar_numero_expediente(numero)
-        (destino / "actuaciones" / "json").mkdir(parents=True, exist_ok=True)
         (destino / "actuaciones" / "adjuntos").mkdir(parents=True, exist_ok=True)
+        (destino / "json").mkdir(parents=True, exist_ok=True)
         return destino, {"directories": []}
 
 
