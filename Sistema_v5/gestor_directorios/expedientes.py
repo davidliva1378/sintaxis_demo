@@ -158,8 +158,8 @@ class GestorDirectoriosExpedientes:
         self._crear_estructura(raiz, estructura_a_usar, directories, raiz)
 
         manifest: dict[str, Any] = {"directories": sorted(directories)}
-        if metadata:
-            manifest.update(metadata)
+        if metadata is not None:
+            manifest["metadata"] = deepcopy(metadata)
 
         manifest_path = raiz / self.manifest_filename
         manifest_path.write_text(
