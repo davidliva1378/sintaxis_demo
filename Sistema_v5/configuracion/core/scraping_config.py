@@ -16,6 +16,16 @@ from dataclasses import dataclass, field
 from typing import Sequence
 
 
+def _env_bool(nombre: str, default: bool) -> bool:
+    """Obtiene un valor booleano desde el entorno."""
+
+    valor = os.getenv(nombre)
+    if valor is None:
+        return default
+
+    return valor.strip().lower() in {"1", "true", "yes", "y", "t"}
+
+
 # ============================================================================
 # CONFIGURACIÓN DE SCRAPING
 # ============================================================================
@@ -61,6 +71,10 @@ class ScrapingConfig:
 
     timeout_loading_hidden: int = 10_000
     """Timeout para esperar que desaparezca el indicador de carga."""
+
+    # Filtros y normalizaciones
+    caratula_coincidencia_parcial: bool = True
+    """Si ``True``, permite coincidencias parciales al filtrar carátulas."""
 
     # Reintentos
     max_reintentos_descarga: int = 3
@@ -108,6 +122,10 @@ class ScrapingConfig:
             ),
             max_reintentos_descarga=int(
                 os.getenv("PJN_MAX_REINTENTOS_DESCARGA", cls.max_reintentos_descarga)
+            ),
+            caratula_coincidencia_parcial=_env_bool(
+                "PJN_COINCIDENCIA_CARATULA_PARCIAL",
+                cls.caratula_coincidencia_parcial,
             ),
         )
 
