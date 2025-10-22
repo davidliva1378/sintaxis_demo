@@ -16,8 +16,7 @@ existentes:
    y se persiste el resultado en ``directorio_extraccion_inicial``.
 4. **Formulario de filtrado (Tarea 4)**. Se abre la interfaz de filtrado de
    historiales :func:`Sistema_v5.ui.gui_monitor_form.launch_monitor_form`,
-   preparando un :class:`Sistema_v5.ui.gui_playwright_bridge.GUIPlaywrightBridge`
-   para compartir la sesión autenticada entre selecciones y procesamientos.
+   delegando el manejo de la sesión autenticada a la propia GUI.
 5. **Procesamiento automatizado (Tarea 5)**. Finalmente se invoca el motor de
    monitoreo :class:`Sistema_v5.pjn.monitor.core.MonitorPJN` para ejecutar las
    verificaciones automáticas de entradas y expedientes usando la configuración
@@ -44,10 +43,6 @@ from Sistema_v5.pjn.monitor.core import MonitorPJN
 from Sistema_v5.pjn.scraping import obtener_pagina_autenticada
 from Sistema_v5.pjn.scraping.expedientes import extraer_expedientes_completos_modelos
 from Sistema_v5.ui.gui_monitor_form import launch_monitor_form
-from Sistema_v5.ui.gui_playwright_bridge import (
-    GUIPlaywrightBridge,
-    PlaywrightSessionError,
-)
 from .ui.directorios_form import (
     mostrar_formulario_directorios as _mostrar_formulario_directorios_gui,
 )
@@ -252,26 +247,10 @@ def _abrir_formulario_filtrado(
     datos_dir = Path(directorio_datos_monitor or monitor_config.directorio_datos)
     datos_dir.mkdir(parents=True, exist_ok=True)
 
-    bridge: GUIPlaywrightBridge | None = GUIPlaywrightBridge(
-        headless=monitor_config.headless
+    launch_monitor_form(
+        monitor_path,
+        datos_dir=datos_dir,
     )
-    try:
-        bridge.start()
-    except PlaywrightSessionError as exc:  # pragma: no cover - depende de Playwright real
-        logger.warning(
-            "No se pudo iniciar la sesión de Playwright para la GUI: %s", exc
-        )
-        bridge = None
-
-    try:
-        launch_monitor_form(
-            monitor_path,
-            datos_dir=datos_dir,
-            playwright_bridge=bridge,
-        )
-    finally:
-        if bridge is not None:
-            bridge.close()
 
 
 def _ejecutar_procesamiento_automatizado(monitor_config: MonitorConfig) -> None:
