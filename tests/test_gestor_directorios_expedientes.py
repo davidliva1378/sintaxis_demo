@@ -5,6 +5,8 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -116,6 +118,29 @@ def test_desde_config_resuelve_ruta_relativa(tmp_path: Path) -> None:
     ruta, manifest = gestor.crear_para_expediente("123")
     assert ruta == tmp_path / "data" / "expedientes" / "123"
     assert "documentos_usuario" in manifest["directories"]
+
+
+def test_generar_arbol_rechaza_componentes_maliciosos(tmp_path: Path) -> None:
+    gestor = GestorDirectoriosExpedientes(tmp_path)
+
+    estructura_maliciosa = {"../malicioso": None}
+
+    with pytest.raises(ValueError, match="malicioso"):
+        gestor.generar_arbol(estructura=estructura_maliciosa, fusionar_estructura=False)
+
+    objetivo = tmp_path.parent / "malicioso"
+    assert not objetivo.exists()
+
+
+def test_generar_arbol_rechaza_componentes_multisegmento(tmp_path: Path) -> None:
+    gestor = GestorDirectoriosExpedientes(tmp_path)
+
+    estructura_invalida = {"sub/carpeta": None}
+
+    with pytest.raises(ValueError, match="sub/carpeta"):
+        gestor.generar_arbol(estructura=estructura_invalida, fusionar_estructura=False)
+
+    assert not (tmp_path / "sub").exists()
 
 
 def test_resolver_ruta_expande_home_y_variables(monkeypatch, tmp_path: Path) -> None:
