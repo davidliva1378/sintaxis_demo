@@ -46,6 +46,7 @@ class ResumenProcesamientoExpedientes(TypedDict, total=False):
     con_error: int
     resultados: list[ResultadoExpedienteProcesado]
     errores: list[str]
+    no_encontrados: list[dict[str, str | None]]
     carpetas_expedientes: list[str]
     carpetas_json: list[str]
     carpetas_actuaciones: list[str]
@@ -83,6 +84,7 @@ def procesar_expedientes_iniciales(
 
     resultados: list[ResultadoExpedienteProcesado] = []
     errores: list[str] = []
+    no_encontrados: list[dict[str, str | None]] = []
     carpetas_expedientes: set[str] = set()
     carpetas_json: set[str] = set()
     carpetas_actuaciones: set[str] = set()
@@ -134,6 +136,7 @@ def procesar_expedientes_iniciales(
                 mensaje = str(exc) or "Expediente no encontrado"
                 errores.append(mensaje)
                 resultados.append(_build_resultado_error(expediente, mensaje))
+                no_encontrados.append(expediente.to_dict())
                 _emit(
                     ProcessingEvent(
                         tipo="error",
@@ -278,6 +281,7 @@ def procesar_expedientes_iniciales(
             con_error=sum(1 for r in resultados if r.get("estado") == "error"),
             resultados=resultados,
             errores=errores,
+            no_encontrados=no_encontrados,
             carpetas_expedientes=sorted(carpetas_expedientes),
             carpetas_json=sorted(carpetas_json),
             carpetas_actuaciones=sorted(carpetas_actuaciones),

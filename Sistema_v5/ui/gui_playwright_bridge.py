@@ -23,6 +23,7 @@ from Sistema_v5.pjn.scraping.expedientes import (
     buscar_expedientes,
     mostrar_y_elegir_expediente,
 )
+from Sistema_v5.pjn.scraping.base import normalizar_texto
 from Sistema_v5.pjn.utils.logging import get_logger
 from urls_pjn import URL_CONSULTAS
 
@@ -191,12 +192,14 @@ class GUIPlaywrightBridge:
                 numero = expediente.numero.strip() or None
             caratula = expediente.caratula if expediente.caratula else None
 
+            caratula_normalizada = normalizar_texto(caratula) if caratula else ""
+
             try:
                 filas = await buscar_expedientes(
                     page,
                     numero=numero,
                     anio=anio,
-                    caratula=None if numero and anio else caratula,
+                    caratula=caratula,
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.exception("Error buscando expediente %s", expediente.numero)
@@ -209,8 +212,44 @@ class GUIPlaywrightBridge:
                     f"El expediente {expediente.numero} no fue encontrado en el portal."
                 )
 
+            estrategia_seleccion = None
+            descripcion_estrategia = None
+            if caratula_normalizada:
+                if len(filas) > 1:
+                    logger.warning(
+                        "Se encontraron múltiples filas para el expediente %s con la carátula '%s'.",
+                        expediente.numero,
+                        expediente.caratula,
+                    )
+
+                def _seleccionar_por_caratula(opciones: list[dict[str, str]]) -> int | None:
+                    coincidencias = [
+                        indice
+                        for indice, opcion in enumerate(opciones)
+                        if normalizar_texto(opcion.get("caratula")) == caratula_normalizada
+                    ]
+
+                    if not coincidencias:
+                        return None
+
+                    if len(coincidencias) > 1:
+                        logger.warning(
+                            "Persisten múltiples filas con la misma carátula normalizada para el expediente %s; se seleccionará la primera coincidencia.",
+                            expediente.numero,
+                        )
+
+                    return coincidencias[0]
+
+                estrategia_seleccion = _seleccionar_por_caratula
+                descripcion_estrategia = "coincidencia exacta por carátula"
+
             try:
-                datos = await mostrar_y_elegir_expediente(page, filas)
+                datos = await mostrar_y_elegir_expediente(
+                    page,
+                    filas,
+                    estrategia_seleccion=estrategia_seleccion,
+                    descripcion_estrategia=descripcion_estrategia,
+                )
             except Exception as exc:  # noqa: BLE001
                 logger.exception("Error abriendo expediente %s", expediente.numero)
                 raise ExpedienteNavigationError(
@@ -218,6 +257,12 @@ class GUIPlaywrightBridge:
                 ) from exc
 
             if not datos:
+                if caratula_normalizada:
+                    raise ExpedienteNotFoundError(
+                        "No se pudo seleccionar un expediente que coincida con la carátula "
+                        f"'{expediente.caratula}' para el número {expediente.numero}."
+                    )
+
                 raise ExpedienteNavigationError(
                     f"No se pudieron obtener los datos del expediente {expediente.numero}."
                 )
