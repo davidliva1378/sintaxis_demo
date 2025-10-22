@@ -23,6 +23,7 @@ from ..models.extraccion_config import ExtraccionExpedientesConfig
 from ..parsers.expedientes_parser import parse_expediente_resumen
 from ..selectores import SEL_EXPEDIENTES
 from ..utils.logging import get_logger
+from .base import descomponer_numero_expediente
 from .pagination import PaginationStrategy, DEFAULT_PAGINATION_STRATEGY
 
 logger = get_logger(__name__)
@@ -912,18 +913,66 @@ async def buscar_expedientes(
     anio: str | None = None,
     caratula: str | None = None,
 ) -> list[ElementHandle]:
-    """Busca expedientes en el portal PJN según los filtros indicados."""
+    """Busca expedientes en el portal PJN según los filtros indicados.
+
+    El ``numero`` puede incluir prefijos o sufijos como ``"FPA XXXXX/YYY"`` o
+    ``"XXXXX/YYY/I"``; en esos casos se normaliza automáticamente al formato
+    requerido por el buscador (``numero`` + ``anio``).
+    """
+
+    formatos_validos = '"FPA XXXXX/YYY", "XXXXX/YYY", "XXXXX/YYY/I"'
 
     numero = numero.strip() if numero and numero.strip() else None
     anio = anio.strip() if anio and anio.strip() else None
     caratula = caratula.strip() if caratula and caratula.strip() else None
 
+    numero_original = numero
+    anio_original = anio
+
     if numero and not anio:
-        logger.error("❌ Para buscar por número debe indicar también el año del expediente.")
-        return []
+        _, numero, anio = descomponer_numero_expediente(numero)
+        if numero and anio:
+            logger.debug(
+                "Normalizado número de expediente sin año explícito: %s/%s",
+                numero,
+                anio,
+            )
+        else:
+            logger.error(
+                "❌ No se pudo interpretar el número de expediente '%s'. "
+                "Formatos soportados: %s.",
+                numero_original,
+                formatos_validos,
+            )
+            return []
+
+    if anio and numero:
+        _, numero, anio = descomponer_numero_expediente(f"{numero}/{anio}")
 
     if anio and not numero:
         logger.error("❌ Para buscar por año debe indicar también el número del expediente.")
+        return []
+
+    if numero and (not numero.isdigit()):
+        logger.error(
+            "❌ El número del expediente debe contener sólo dígitos tras normalizar (recibido: %s).",
+            numero_original or numero,
+        )
+        return []
+
+    if anio and (not anio.isdigit() or len(anio) != 4):
+        logger.error(
+            "❌ El año del expediente debe ser de cuatro dígitos tras normalizar (recibido: %s).",
+            anio_original or anio,
+        )
+        return []
+
+    if numero and not anio:
+        logger.error(
+            "❌ No se pudo determinar un año válido para el expediente '%s'. Formatos soportados: %s.",
+            f"{numero_original}/{anio_original}" if anio_original else (numero_original or numero),
+            formatos_validos,
+        )
         return []
 
     if not numero and not caratula:

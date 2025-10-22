@@ -8,7 +8,6 @@ reutilizar la misma pestaña autenticada entre múltiples expedientes.
 from __future__ import annotations
 
 import asyncio
-import re
 import threading
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Coroutine
@@ -16,7 +15,10 @@ from typing import Any, Awaitable, Coroutine
 from playwright.async_api import Page
 
 from Sistema_v5.pjn.models import ExpedienteResumen
-from Sistema_v5.pjn.scraping import obtener_pagina_autenticada
+from Sistema_v5.pjn.scraping import (
+    descomponer_numero_expediente,
+    obtener_pagina_autenticada,
+)
 from Sistema_v5.pjn.scraping.expedientes import (
     buscar_expedientes,
     mostrar_y_elegir_expediente,
@@ -181,7 +183,12 @@ class GUIPlaywrightBridge:
             page = await self._get_page()
             await self._ensure_consultas_page()
 
-            numero, anio = _split_numero_anio(expediente.numero)
+            _, numero_normalizado, anio = descomponer_numero_expediente(
+                expediente.numero
+            )
+            numero = numero_normalizado
+            if numero is None and expediente.numero:
+                numero = expediente.numero.strip() or None
             caratula = expediente.caratula if expediente.caratula else None
 
             try:
@@ -221,24 +228,6 @@ class GUIPlaywrightBridge:
             datos.setdefault("dependencia", expediente.dependencia)
             datos["page"] = page
             return datos
-
-
-def _split_numero_anio(valor: str | None) -> tuple[str | None, str | None]:
-    if not valor:
-        return None, None
-    texto = valor.strip()
-    if not texto:
-        return None, None
-
-    match = re.search(r"(\d+)[^\d]{0,5}(\d{2,4})$", texto)
-    if match:
-        return match.group(1), match.group(2)
-
-    numeros = re.findall(r"\d+", texto)
-    if len(numeros) >= 2:
-        return numeros[-2], numeros[-1]
-
-    return None, None
 
 
 __all__ = [
