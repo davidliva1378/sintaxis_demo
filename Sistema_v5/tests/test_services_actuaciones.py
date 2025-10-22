@@ -22,7 +22,7 @@ class DummyGestor:
 
     def crear_para_expediente(self, numero: str) -> tuple[Path, dict]:
         destino = self.raiz / normalizar_numero_expediente(numero)
-        (destino / "actuaciones" / "adjuntos").mkdir(parents=True, exist_ok=True)
+        (destino / "actuaciones").mkdir(parents=True, exist_ok=True)
         (destino / "json").mkdir(parents=True, exist_ok=True)
         return destino, {"directories": []}
 
@@ -74,7 +74,7 @@ def test_procesar_actuaciones_generates_json_and_downloads(monkeypatch, tmp_path
     )
     assert resumen["carpeta_json"] == str(json_path.parent)
     assert resumen["carpeta_actuaciones"].endswith("actuaciones")
-    assert resumen["carpeta_adjuntos"].endswith("actuaciones/adjuntos")
+    assert resumen["carpeta_adjuntos"] == resumen["carpeta_actuaciones"]
 
     # Idempotencia: una segunda ejecución debe reutilizar la estructura sin errores
     descargar_mock.reset_mock()

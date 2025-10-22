@@ -167,7 +167,7 @@ class TestValidacionesDescargarArchivos:
         """Debe crear la carpeta si no existe."""
         page_mock = MagicMock()
         carpeta_json = tmp_path / "json"
-        carpeta_adjuntos = tmp_path / "adjuntos"
+        carpeta_adjuntos = tmp_path / "actuaciones"
 
         # Carpeta no existe aún
         assert not carpeta_json.exists()
