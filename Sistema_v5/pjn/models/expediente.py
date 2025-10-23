@@ -39,6 +39,36 @@ class ExpedienteResumen:
             "ultima_actuacion": self.ultima_actuacion,
         }
 
+    def esta_activo(self, dias: int) -> bool:
+        """Verifica si el expediente tuvo movimientos en los últimos N días.
+
+        Args:
+            dias: Número de días hacia atrás desde hoy
+
+        Returns:
+            True si ultima_actuacion está dentro del rango, False en caso contrario
+
+        Example:
+            >>> exp = ExpedienteResumen(..., ultima_actuacion="15/01/2025")
+            >>> exp.esta_activo(30)  # True si hoy es antes del 14/02/2025
+        """
+        if not self.ultima_actuacion:
+            return False
+
+        from datetime import datetime, timedelta
+
+        try:
+            # Soporta formatos: YYYY-MM-DD, DD/MM/YYYY
+            if "/" in self.ultima_actuacion:
+                fecha = datetime.strptime(self.ultima_actuacion, "%d/%m/%Y").date()
+            else:
+                fecha = datetime.fromisoformat(self.ultima_actuacion).date()
+
+            fecha_corte = datetime.now().date() - timedelta(days=dias)
+            return fecha >= fecha_corte
+        except (ValueError, AttributeError):
+            return False
+
 
 @dataclass(slots=True)
 class ExpedienteIdentificacion:

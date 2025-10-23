@@ -7,6 +7,133 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [5.6.0] - 2025-10-23
+
+### ⭐ Agregado - Sistema de Extracción Inicial v2.0
+
+- **FiltradorExpedientes** (`extractor_inicial/filtrador.py`)
+  - Clase de filtrado avanzado con interfaz fluida (método chaining)
+  - 4 tipos de filtros combinables:
+    - `filtrar_por_dias_atras()` - Actividad reciente
+    - `filtrar_por_situacion()` - Estado procesal
+    - `filtrar_por_dependencia()` - Juzgado/fuero (con soporte regex)
+    - `filtrar_por_rango_fechas()` - Período de inicio
+  - Método `filtrar_personalizado()` para predicados custom
+  - Sistema de estadísticas y trazabilidad de filtros
+  - 292 líneas de código
+
+- **Exportadores Multi-formato** (`extractor_inicial/exporters.py`)
+  - `exportar_json()` - Exportación JSON con metadata v2.0
+  - `exportar_csv()` - Exportación CSV con delimitadores configurables
+  - `exportar_excel()` - Exportación Excel con formato (requiere openpyxl)
+  - `cargar_json()` - Importación desde JSON con validación
+  - `cargar_csv()` - Importación desde CSV
+  - Soporte para caracteres especiales y metadata anidada
+  - 278 líneas de código
+
+- **ExtractorCompletoBatch** (`extractor_inicial/batch_processor.py`)
+  - Procesamiento por lotes con manejo inteligente de errores
+  - Umbral configurable de errores consecutivos (default: 5)
+  - Estrategia de pausa-y-preguntar al alcanzar umbral
+  - Callbacks para progreso y consulta al usuario
+  - Dataclasses: `ResultadoExpediente`, `ResumenBatch`
+  - Manejo de excepciones específicas del bridge Playwright
+  - 357 líneas de código
+
+- **GUI de Filtros Avanzados** (`extractor_inicial/ui/filtros_avanzados_form.py`)
+  - Interfaz Tkinter con 4 paneles de filtros activables
+  - Previsualización en tiempo real con Treeview
+  - Estadísticas dinámicas (total, filtrado, porcentaje)
+  - Botones de exportación directa (JSON/CSV/Excel)
+  - Validación de regex con mensajes de error claros
+  - 517 líneas de código
+
+- **MonitorPJN.extraer_listado_inicial()** (`pjn/monitor/core.py`)
+  - Nuevo método para extracción inicial de expedientes
+  - Genera JSON con formato v2.0 (metadata anidada)
+  - Exportación opcional a CSV paralela
+  - Reutiliza `_verificar_expedientes_internal()` existente
+
+- **ExpedienteResumen.esta_activo()** (`pjn/models/expediente.py`)
+  - Método auxiliar para verificar actividad reciente
+  - Soporta formatos DD/MM/YYYY y YYYY-MM-DD
+
+- **Script Principal** (`ejecutar_extraccion_inicial_v2.py`)
+  - Flujo de 4 fases completamente integrado:
+    1. Extracción del listado con MonitorPJN
+    2. Filtrado avanzado mediante GUI
+    3. Generación de directorios por expediente
+    4. Extracción completa batch con manejo de errores
+  - CLI con argumentos: `--headless`, `--no-filtros`, `--no-adjuntos`, `--umbral-errores`
+  - Generación automática de reportes JSON
+  - Logging detallado con separadores visuales
+  - 342 líneas de código
+
+### 🧪 Testing
+
+- **test_filtrador_expedientes.py** (13 tests)
+  - Tests para FiltradorExpedientes
+  - Tests para ExpedienteResumen.esta_activo()
+  - Cobertura de filtros encadenados, reset, estadísticas
+  - Tests de manejo de errores (regex inválido)
+
+- **test_exporters.py** (23 tests)
+  - Tests de exportación JSON/CSV
+  - Tests de importación con validación
+  - Tests de roundtrip (exportar → importar)
+  - Tests de casos extremos (listas vacías, caracteres especiales)
+
+- **test_batch_processor.py** (19 tests)
+  - Tests de ExtractorCompletoBatch
+  - Tests de manejo de errores y umbral
+  - Tests de callbacks y acciones de usuario
+  - Tests de dataclasses (ResultadoExpediente, ResumenBatch)
+
+**Total:** 55 tests pasando (100% de éxito)
+
+### 📖 Documentación
+
+- **GUIA_EXTRACCION_INICIAL_V2.md**
+  - Guía completa de usuario (377 líneas)
+  - Descripción general y ventajas sobre v1.0
+  - Diagramas de flujo ASCII
+  - Ejemplos de uso para cada componente
+  - Casos de uso avanzados
+  - Roadmap futuro (migración a SQLite)
+  - FAQ y troubleshooting
+
+- **README.txt** (actualizado)
+  - Sección dedicada a extracción inicial v2.0
+  - Instrucciones de uso básico y avanzado
+  - Referencia a documentación completa
+
+### 🔧 Corregido
+
+- Corregido campo de fecha en `filtrador.py` (`ultima_actuacion` vs `fecha_ultima_actuacion`)
+- Corregido lambda mal formado en `filtrar_por_dependencia()`
+- Corregido formato JSON para metadata anidada correctamente
+- Ajustados tests para reflejar comportamiento real
+
+### 📊 Métricas
+
+- **Módulos nuevos:** 4
+- **Módulos modificados:** 4
+- **Código nuevo:** ~1,800 líneas
+- **Tests:** ~650 líneas
+- **Documentación:** ~450 líneas
+- **Total agregado:** ~2,900 líneas
+
+### 🎯 Beneficios
+
+- ✅ Reutilización de MonitorPJN (sin duplicar lógica de scraping)
+- ✅ Filtros potentes y combinables con GUI intuitiva
+- ✅ Manejo robusto de errores con opciones al usuario
+- ✅ Formato dual JSON+CSV para transición a SQLite
+- ✅ Extensible y testeable (componentes independientes)
+- ✅ Documentación exhaustiva con ejemplos
+
+---
+
 ## [5.5.1] - 2025-10-16
 
 ### 🔧 Modificado

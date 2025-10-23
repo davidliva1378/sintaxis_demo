@@ -459,5 +459,133 @@ class MonitorPJN:
         logger.info("Deteniendo monitor...")
         self.running = False
 
+    async def extraer_listado_inicial(
+        self,
+        destino: Path | None = None,
+        *,
+        exportar_csv: bool = False,
+        nombre_archivo: str | None = None,
+    ) -> tuple[list[ExpedienteResumen], Path]:
+        """Extrae el listado completo de expedientes para inicialización.
+
+        Este método reutiliza la infraestructura del monitor para obtener
+        el listado completo de expedientes del portal PJN, ideal para la
+        fase inicial de configuración del sistema.
+
+        Args:
+            destino: Directorio donde guardar el JSON. Si es None, usa
+                directorio_extraccion_inicial de la configuración
+            exportar_csv: Si True, genera también un archivo CSV paralelo
+                para facilitar filtrado en herramientas externas
+            nombre_archivo: Nombre personalizado del archivo (sin extensión).
+                Por defecto: expedientes_YYYYMMDD_HHMMSS
+
+        Returns:
+            Tupla con: (lista de expedientes, ruta del JSON generado)
+
+        Raises:
+            VerificationError: Si falla la extracción
+            AuthenticationError: Si falla la autenticación
+
+        Example:
+            >>> monitor = MonitorPJN(config)
+            >>> expedientes, json_path = await monitor.extraer_listado_inicial()
+            >>> print(f"Extraídos {len(expedientes)} expedientes en {json_path}")
+        """
+        import json
+        from datetime import datetime
+
+        logger.info("🚀 Iniciando extracción del listado completo de expedientes")
+
+        # Determinar directorio destino
+        if destino is None:
+            # Intentar usar directorio de extracción inicial de la config
+            destino_str = getattr(self.config, "directorio_extraccion_inicial", None)
+            if destino_str:
+                destino = Path(destino_str)
+            else:
+                # Fallback: subdirectorio en directorio de datos
+                destino = Path(self.config.directorio_datos).parent / "extraccion_inicial"
+
+        destino.mkdir(parents=True, exist_ok=True)
+
+        # Generar nombre de archivo
+        if nombre_archivo is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            nombre_archivo = f"expedientes_{timestamp}"
+
+        json_path = destino / f"{nombre_archivo}.json"
+
+        # Extraer expedientes usando el método interno
+        try:
+            expedientes = await self._verificar_expedientes_internal()
+        except Exception as exc:
+            logger.error(f"❌ Error durante la extracción del listado: {exc}")
+            raise VerificationError(f"Fallo en extracción del listado inicial: {exc}") from exc
+
+        # Preparar metadata
+        metadata = {
+            "version": "2.0",
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "total_expedientes": len(expedientes),
+            "config_utilizada": {
+                "fecha_desde": self.config.fecha_desde_expedientes,
+                "fecha_hasta": self.config.fecha_hasta_expedientes,
+                "dias_atras": self.config.dias_atras_expedientes,
+                "extraccion_completa": getattr(
+                    self.config, "extraccion_expedientes_completa", True
+                ),
+                "orden": self.config.expedientes_orden,
+            },
+        }
+
+        # Guardar JSON
+        payload = {
+            "metadata": metadata,
+            "expedientes": [exp.to_dict() for exp in expedientes],
+        }
+
+        json_path.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        logger.info(f"✅ Listado guardado en: {json_path}")
+        logger.info(f"📊 Total expedientes extraídos: {len(expedientes)}")
+
+        # Exportar CSV si se solicita
+        if exportar_csv:
+            csv_path = destino / f"{nombre_archivo}.csv"
+            try:
+                self._exportar_csv(expedientes, csv_path)
+                logger.info(f"📄 CSV exportado en: {csv_path}")
+            except Exception as exc:
+                logger.warning(f"⚠️  No se pudo exportar CSV: {exc}")
+
+        return expedientes, json_path
+
+    def _exportar_csv(self, expedientes: list[ExpedienteResumen], csv_path: Path) -> None:
+        """Exporta expedientes a formato CSV para filtrado externo.
+
+        Args:
+            expedientes: Lista de expedientes a exportar
+            csv_path: Ruta donde guardar el CSV
+        """
+        import csv
+
+        with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
+            fieldnames = ["numero", "dependencia", "caratula", "situacion", "ultima_actuacion"]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            writer.writeheader()
+            for exp in expedientes:
+                writer.writerow({
+                    "numero": exp.numero,
+                    "dependencia": exp.dependencia,
+                    "caratula": exp.caratula,
+                    "situacion": exp.situacion or "",
+                    "ultima_actuacion": exp.ultima_actuacion or "",
+                })
+
 
 __all__ = ["MonitorPJN"]

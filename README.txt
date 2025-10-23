@@ -58,6 +58,35 @@
 
 3. Después de personalizar los archivos de configuración podés volver a ejecutar el script cuando cambies rutas o agregues nuevos directorios.
 
+🚀 EXTRACCIÓN INICIAL DE EXPEDIENTES V2.0
+
+El Sistema V5 incluye un nuevo flujo mejorado para la incorporación inicial de expedientes al sistema:
+
+**Características principales:**
+- Reutiliza el MonitorPJN existente (sin duplicar código)
+- Sistema de filtros avanzados con GUI interactiva (4 tipos de filtros combinables)
+- Procesamiento por lotes con manejo inteligente de errores
+- Exportación dual: JSON + CSV automáticamente
+- Umbral configurable de errores consecutivos
+
+**Uso básico:**
+
+   python ejecutar_extraccion_inicial_v2.py
+
+**Opciones avanzadas:**
+
+   # Modo headless (sin navegador visible)
+   python ejecutar_extraccion_inicial_v2.py --headless
+
+   # Sin filtros (procesar todos los expedientes)
+   python ejecutar_extraccion_inicial_v2.py --no-filtros
+
+   # Umbral de errores personalizado
+   python ejecutar_extraccion_inicial_v2.py --umbral-errores 10
+
+📖 Para más información, consultá la guía completa en:
+   Sistema_v5/docs/GUIA_EXTRACCION_INICIAL_V2.md
+
 🔒 RECOMENDACIONES DE SEGURIDAD Y DESPLIEGUE
 
 - Nunca hardcodees `PJN_USER` ni `PJN_PASSWORD` en scripts, notebooks o archivos de configuración versionados.
