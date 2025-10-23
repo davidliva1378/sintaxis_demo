@@ -144,9 +144,67 @@ def test_extraer_expedientes_iniciales_realiza_navegacion_previa(monkeypatch, tm
     )
 
     output_path = asyncio.run(
-        ciclo_prueba._extraer_expedientes_iniciales(system_config, tmp_path)
+        ciclo_prueba._extraer_expedientes_iniciales(
+            system_config,
+            tmp_path,
+            headless=True,
+        )
     )
 
     assert output_path.exists()
     assert page.calls[0] == ("goto", URL_CONSULTAS)
     assert page.calls[1] == ("wait_for_load_state", "domcontentloaded")
+
+
+def test_run_ciclo_prueba_sincroniza_headless(monkeypatch, tmp_path) -> None:
+    dummy_system_config = SimpleNamespace(
+        headless=True,
+        directorio_extraccion_inicial=str(tmp_path / "inicial"),
+    )
+
+    ejecuciones_extraccion: list[tuple[bool, bool]] = []
+    ejecuciones_monitor: list[bool] = []
+    prepare_calls: list[tuple[bool, bool]] = []
+
+    def fake_load_system_config(path):
+        return dummy_system_config
+
+    def fake_prepare_monitor_config(
+        monitor_path,
+        system_config,
+        directorio_datos_monitor,
+        *,
+        headless_override,
+    ):
+        prepare_calls.append((system_config.headless, headless_override))
+        return SimpleNamespace(headless=headless_override)
+
+    def fake_ejecutar_extraccion_inicial(system_config, directorio_extraccion, headless):
+        ejecuciones_extraccion.append((system_config.headless, headless))
+        return tmp_path / "dummy.json"
+
+    def fake_ejecutar_procesamiento_automatizado(monitor_config):
+        ejecuciones_monitor.append(monitor_config.headless)
+
+    monkeypatch.setattr(ciclo_prueba, "_load_system_config", fake_load_system_config)
+    monkeypatch.setattr(ciclo_prueba, "_prepare_monitor_config", fake_prepare_monitor_config)
+    monkeypatch.setattr(ciclo_prueba, "_ejecutar_extraccion_inicial", fake_ejecutar_extraccion_inicial)
+    monkeypatch.setattr(
+        ciclo_prueba,
+        "_ejecutar_procesamiento_automatizado",
+        fake_ejecutar_procesamiento_automatizado,
+    )
+
+    resultado = ciclo_prueba.run_ciclo_prueba(
+        tmp_path / "sistema.json",
+        tmp_path / "monitor.json",
+        mostrar_formulario_directorios=False,
+        mostrar_formulario_filtrado=False,
+        headless=False,
+    )
+
+    assert resultado == tmp_path / "dummy.json"
+    assert dummy_system_config.headless is False
+    assert ejecuciones_extraccion == [(False, False)]
+    assert prepare_calls == [(False, False)]
+    assert ejecuciones_monitor == [False]
