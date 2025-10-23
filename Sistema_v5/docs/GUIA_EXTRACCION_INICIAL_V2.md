@@ -54,7 +54,10 @@ El **sistema de extracción inicial v2.0** replantea el flujo de incorporación 
 
 ### Comando Básico
 
+**IMPORTANTE:** El script debe ejecutarse desde el directorio `Sistema_v5`
+
 ```bash
+cd Sistema_v5
 python ejecutar_extraccion_inicial_v2.py
 ```
 
@@ -64,8 +67,8 @@ python ejecutar_extraccion_inicial_v2.py
 # Modo headless (sin navegador visible)
 python ejecutar_extraccion_inicial_v2.py --headless
 
-# Configuración personalizada
-python ejecutar_extraccion_inicial_v2.py --config config/desarrollo.json
+# Configuración personalizada (ruta relativa a Sistema_v5)
+python ejecutar_extraccion_inicial_v2.py --config ../config/desarrollo.json
 
 # Sin filtros (procesar todos)
 python ejecutar_extraccion_inicial_v2.py --no-filtros
@@ -363,14 +366,42 @@ Asegúrate de activar el checkbox "Activar" para cada filtro antes de aplicarlo.
 
 ---
 
+## 🔄 ¿Qué sigue después de la Extracción Inicial?
+
+Una vez completada la extracción inicial exitosamente:
+
+1. **Verificar resultados:**
+   ```bash
+   cd Sistema_v5
+   python verificar_extraccion.py
+   ```
+
+2. **Configurar monitoreo continuo:**
+   - Consultar: `docs/FLUJO_COMPLETO_SISTEMA.md`
+   - Ejecutar monitor: `python ejecutar_monitor.py`
+
+3. **Próximos pasos:**
+   - El monitor verificará periódicamente nuevas actuaciones
+   - No es necesario repetir la extracción inicial
+   - Solo agregar nuevos expedientes cuando sea necesario
+
+📖 **Guía completa del flujo:** `Sistema_v5/docs/FLUJO_COMPLETO_SISTEMA.md`
+
+---
+
 ## 📞 Soporte
 
 Para reportar problemas o sugerencias:
 - GitHub Issues: https://github.com/tu-repo/issues
 - Documentación completa: `Sistema_v5/docs/`
 
+**Documentación relacionada:**
+- `FLUJO_COMPLETO_SISTEMA.md` - Flujo de extracción inicial a monitoreo
+- `RESUMEN_V2.0.md` - Resumen ejecutivo del sistema
+- `ENTREGA_V2.0.md` - Documentación de entrega
+
 ---
 
 **Versión:** 2.0.0
-**Fecha:** Enero 2025
+**Fecha:** Octubre 2025
 **Autor:** Sistema_v5 Team

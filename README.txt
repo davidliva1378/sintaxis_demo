@@ -69,8 +69,9 @@ El Sistema V5 incluye un nuevo flujo mejorado para la incorporación inicial de 
 - Exportación dual: JSON + CSV automáticamente
 - Umbral configurable de errores consecutivos
 
-**Uso básico:**
+**Uso básico (desde directorio Sistema_v5):**
 
+   cd Sistema_v5
    python ejecutar_extraccion_inicial_v2.py
 
 **Opciones avanzadas:**

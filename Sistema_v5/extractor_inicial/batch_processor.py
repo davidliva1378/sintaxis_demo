@@ -100,6 +100,8 @@ class ExtractorCompletoBatch:
         self._resultados: list[ResultadoExpediente] = []
         self._callback_progreso: Callable[[int, int, ExpedienteResumen], None] | None = None
         self._callback_error_umbral: Callable[[int, list[str]], str] | None = None
+        self._callback_expediente_inicio: Callable[[ExpedienteResumen, int, int], None] | None = None
+        self._callback_expediente_fin: Callable[[ResultadoExpediente, float], None] | None = None
 
     def set_callback_progreso(
         self,
@@ -123,6 +125,28 @@ class ExtractorCompletoBatch:
                       y retorna "continuar", "saltar" o "cancelar"
         """
         self._callback_error_umbral = callback
+
+    def set_callback_expediente_inicio(
+        self,
+        callback: Callable[[ExpedienteResumen, int, int], None],
+    ) -> None:
+        """Configura callback cuando comienza el procesamiento de un expediente.
+
+        Args:
+            callback: Función que recibe (expediente, indice, total)
+        """
+        self._callback_expediente_inicio = callback
+
+    def set_callback_expediente_fin(
+        self,
+        callback: Callable[[ResultadoExpediente, float], None],
+    ) -> None:
+        """Configura callback cuando termina el procesamiento de un expediente.
+
+        Args:
+            callback: Función que recibe (resultado, tiempo_segundos)
+        """
+        self._callback_expediente_fin = callback
 
     async def procesar_lote(
         self,
@@ -167,6 +191,11 @@ class ExtractorCompletoBatch:
                 if self._callback_progreso:
                     self._callback_progreso(indice, total, expediente)
 
+                # Callback inicio de expediente
+                tiempo_inicio_exp = datetime.now()
+                if self._callback_expediente_inicio:
+                    self._callback_expediente_inicio(expediente, indice, total)
+
                 # Procesar expediente
                 try:
                     resultado = await self._procesar_expediente_individual(
@@ -176,6 +205,12 @@ class ExtractorCompletoBatch:
                         total,
                     )
                     self._resultados.append(resultado)
+
+                    # Callback fin de expediente
+                    tiempo_fin_exp = datetime.now()
+                    duracion_exp = (tiempo_fin_exp - tiempo_inicio_exp).total_seconds()
+                    if self._callback_expediente_fin:
+                        self._callback_expediente_fin(resultado, duracion_exp)
 
                     if resultado.estado == "success":
                         self._errores_consecutivos = 0

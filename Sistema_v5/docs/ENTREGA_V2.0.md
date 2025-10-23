@@ -61,7 +61,8 @@ Sistema_v5/extractor_inicial/
 #### Script de Ejecución
 
 ```
-ejecutar_extraccion_inicial_v2.py (342 líneas) .... Orquestador principal del flujo
+Sistema_v5/
+└── ejecutar_extraccion_inicial_v2.py (342 líneas) .... Orquestador principal del flujo
 ```
 
 #### Modificaciones a Módulos Existentes
@@ -116,7 +117,12 @@ No se requiere instalación adicional. El sistema v2.0 reutiliza las dependencia
 
 ### Uso Básico
 
+**IMPORTANTE:** El script debe ejecutarse desde el directorio `Sistema_v5`
+
 ```bash
+# Navegar al directorio Sistema_v5
+cd Sistema_v5
+
 # Ejecutar con configuración por defecto
 python ejecutar_extraccion_inicial_v2.py
 

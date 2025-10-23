@@ -45,8 +45,8 @@ class FiltrosAvanzadosForm(tk.Toplevel):
         """
         super().__init__(master=master)
         self.title(titulo)
-        self.geometry("1000x700")
-        self.minsize(900, 600)
+        self.geometry("1100x750")
+        self.minsize(1000, 650)
 
         if master is not None:
             self.transient(master)
@@ -311,18 +311,31 @@ class FiltrosAvanzadosForm(tk.Toplevel):
             width=8,
         ).pack(side=tk.LEFT, padx=2)
 
-        # Botones principales
+        # Botones principales (MÁS GRANDES Y VISIBLES)
         ttk.Button(
             botones_frame,
-            text="Cancelar",
+            text="❌ Cancelar",
             command=self._on_cancel,
+            width=20,
         ).pack(side=tk.RIGHT, padx=(5, 0))
 
-        ttk.Button(
+        # Botón de confirmación en VERDE/destacado
+        btn_confirmar = ttk.Button(
             botones_frame,
-            text="Confirmar Selección",
+            text="✅ Confirmar y Continuar",
             command=self._on_confirmar,
-        ).pack(side=tk.RIGHT)
+            width=25,
+        )
+        btn_confirmar.pack(side=tk.RIGHT, padx=5)
+
+        # Hacer el botón más visible (estilo)
+        try:
+            # Intentar resaltar el botón
+            style = ttk.Style()
+            style.configure('Accent.TButton', font=('TkDefaultFont', 12, 'bold'))
+            btn_confirmar.configure(style='Accent.TButton')
+        except Exception:
+            pass  # Si falla, usar estilo por defecto
 
     def _aplicar_filtros(self) -> None:
         """Aplica todos los filtros activos y actualiza la UI."""
@@ -546,9 +559,33 @@ def mostrar_filtros_avanzados(
         ...     print(f"Usuario seleccionó {len(seleccion)} expedientes")
     """
     root = tk.Tk()
-    root.withdraw()
+
+    # NO ocultar la ventana root en macOS
+    # root.withdraw()  # Comentado para macOS
+
+    # Configurar para macOS: forzar ventana al frente
+    try:
+        root.lift()
+        root.attributes('-topmost', True)
+        # Aplicar también a todas las ventanas toplevel
+        root.after(100, lambda: root.attributes('-topmost', False))
+    except Exception:
+        pass  # Ignorar errores en otras plataformas
 
     form = FiltrosAvanzadosForm(root, expedientes, titulo=titulo)
+
+    # En macOS, asegurar que la ventana se muestre
+    try:
+        form.lift()
+        form.focus_force()
+        form.attributes('-topmost', True)
+        form.after(100, lambda: form.attributes('-topmost', False))
+        # Forzar actualización
+        form.update()
+        form.deiconify()
+    except Exception:
+        pass
+
     root.wait_window(form)
     root.destroy()
 

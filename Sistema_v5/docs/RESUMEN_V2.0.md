@@ -104,6 +104,7 @@ ejecutar_extraccion_inicial_v2.py
 
 ### Paso 1: Ejecución Inicial
 ```bash
+cd Sistema_v5
 python ejecutar_extraccion_inicial_v2.py --headless
 ```
 
@@ -190,6 +191,7 @@ python ejecutar_extraccion_inicial_v2.py --headless
 ### 1. Incorporación Inicial de Cliente Nuevo
 ```bash
 # Cliente con 500 expedientes, solo queremos activos de últimos 60 días
+cd Sistema_v5
 python ejecutar_extraccion_inicial_v2.py --headless
 
 # En GUI:

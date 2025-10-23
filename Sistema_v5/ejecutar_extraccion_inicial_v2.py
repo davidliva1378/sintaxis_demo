@@ -7,10 +7,10 @@ Este script implementa el nuevo flujo de extracción inicial:
 3. Generación de directorios por expediente
 4. Extracción completa con manejo inteligente de errores
 
-Uso:
+Uso (desde directorio Sistema_v5):
     python ejecutar_extraccion_inicial_v2.py
     python ejecutar_extraccion_inicial_v2.py --headless
-    python ejecutar_extraccion_inicial_v2.py --config config/sistema.json
+    python ejecutar_extraccion_inicial_v2.py --config ../config/sistema.json
 """
 
 from __future__ import annotations
@@ -18,11 +18,15 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
+import tkinter as tk
 from tkinter import messagebox
 import logging
 
-# Agregar directorio raíz al path
-PROJECT_ROOT = Path(__file__).resolve().parent
+# Configurar paths relativos a Sistema_v5
+SISTEMA_V5_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SISTEMA_V5_DIR.parent
+
+# Agregar raíz del proyecto al path para que Sistema_v5 sea un paquete
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -31,6 +35,7 @@ from Sistema_v5.pjn.monitor import MonitorPJN, MonitorConfig
 from Sistema_v5.pjn.utils.logging import setup_logging, get_logger
 from Sistema_v5.extractor_inicial import mostrar_filtros_avanzados
 from Sistema_v5.extractor_inicial.batch_processor import ExtractorCompletoBatch
+from Sistema_v5.extractor_inicial.ui.progress_window import ProgressWindow
 from Sistema_v5.gestor_directorios import GestorDirectoriosExpedientes
 
 
@@ -47,8 +52,8 @@ def parse_args() -> dict[str, object]:
     parser.add_argument(
         "--config",
         type=str,
-        default="config/sistema.json",
-        help="Ruta al archivo de configuración del sistema",
+        default="../config/sistema.json",
+        help="Ruta al archivo de configuración del sistema (relativa a Sistema_v5)",
     )
     parser.add_argument(
         "--headless",
@@ -70,6 +75,12 @@ def parse_args() -> dict[str, object]:
         type=int,
         default=5,
         help="Número de errores consecutivos antes de pausar (default: 5)",
+    )
+    parser.add_argument(
+        "--desde-json",
+        type=str,
+        default=None,
+        help="Usar un JSON ya extraído (salta Fase 1). Ruta relativa a Sistema_v5",
     )
 
     args = parser.parse_args()
@@ -138,7 +149,7 @@ def fase_3_crear_directorios(
 
     gestor = GestorDirectoriosExpedientes.desde_config(
         config,
-        base_dir=PROJECT_ROOT,
+        base_dir=SISTEMA_V5_DIR,
     )
 
     logger.info(f"📁 Creando estructura para {len(seleccion)} expedientes...")
@@ -234,7 +245,7 @@ async def fase_4_extraer_completo(
         # Guardar reporte
         from Sistema_v5.extractor_inicial.exporters import exportar_json
 
-        reporte_path = PROJECT_ROOT / "data" / "reportes" / f"extraccion_{resumen.tiempo_inicio.replace(':', '-').split('.')[0]}.json"
+        reporte_path = SISTEMA_V5_DIR / "data" / "reportes" / f"extraccion_{resumen.tiempo_inicio.replace(':', '-').split('.')[0]}.json"
         reporte_path.parent.mkdir(parents=True, exist_ok=True)
 
         reporte_data = {
@@ -276,9 +287,11 @@ async def main() -> int:
     args = parse_args()
 
     # Configurar logging
+    log_dir = SISTEMA_V5_DIR / "logs"
+    log_dir.mkdir(exist_ok=True)
     setup_logging(
         level="INFO",
-        log_file=PROJECT_ROOT / "logs" / "extraccion_inicial_v2.log",
+        log_file=log_dir / "extraccion_inicial_v2.log",
     )
 
     logger.info("🚀 Iniciando Extracción Inicial v2.0")
@@ -286,7 +299,7 @@ async def main() -> int:
 
     try:
         # Cargar configuración
-        config_path = PROJECT_ROOT / args["config"]
+        config_path = SISTEMA_V5_DIR / args["config"]
         if not config_path.exists():
             logger.error(f"❌ No se encontró el archivo de configuración: {config_path}")
             return 1
@@ -294,8 +307,18 @@ async def main() -> int:
         config = SystemConfig.from_file(config_path)
         headless = args["headless"] or config.headless
 
-        # Fase 1: Extraer listado
-        expedientes, json_path = await fase_1_extraer_listado(config, headless)
+        # Fase 1: Extraer listado (o cargar desde JSON existente)
+        if args["desde_json"]:
+            logger.info(f"📄 Cargando expedientes desde JSON: {args['desde_json']}")
+            from Sistema_v5.extractor_inicial import cargar_json
+            json_path = SISTEMA_V5_DIR / args["desde_json"]
+            if not json_path.exists():
+                logger.error(f"❌ Archivo JSON no encontrado: {json_path}")
+                return 1
+            expedientes, metadata = cargar_json(json_path)
+            logger.info(f"✅ Cargados {len(expedientes)} expedientes desde {json_path.name}")
+        else:
+            expedientes, json_path = await fase_1_extraer_listado(config, headless)
 
         if not expedientes:
             logger.warning("⚠️  No se extrajeron expedientes. Finalizando.")

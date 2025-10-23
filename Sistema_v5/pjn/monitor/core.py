@@ -267,7 +267,7 @@ class MonitorPJN:
                 self.backoff_entradas.reset()
             return resultado
 
-    async def _verificar_expedientes_internal(self) -> list[ExpedienteResumen]:
+    async def _verificar_expedientes_internal(self, retornar_todos: bool = False) -> list[ExpedienteResumen]:
         """Método interno de verificación de expedientes (sin circuit breaker).
 
         Returns:
@@ -341,6 +341,17 @@ class MonitorPJN:
                 expedientes_conocidos
             )
 
+            # Si retornar_todos=True, retornar TODOS los expedientes sin filtrar
+            if retornar_todos:
+                logger.info(f"📊 Extracción inicial: retornando todos los {len(expedientes)} expedientes")
+                # Actualizar historial para que futuras verificaciones funcionen
+                self.storage.guardar_expedientes(expedientes)
+                self.estado.ultima_verificacion_expedientes = datetime.now().isoformat()
+                self.estado.errores_consecutivos_expedientes = 0
+                self.storage.guardar_estado(self.estado)
+                return expedientes
+
+            # Modo normal: solo retornar cambios detectados
             if cambios:
                 logger.info(f"📊 Detectados {len(cambios)} expedientes con cambios")
 
@@ -516,9 +527,9 @@ class MonitorPJN:
 
         json_path = destino / f"{nombre_archivo}.json"
 
-        # Extraer expedientes usando el método interno
+        # Extraer expedientes usando el método interno (SIN filtrar por cambios)
         try:
-            expedientes = await self._verificar_expedientes_internal()
+            expedientes = await self._verificar_expedientes_internal(retornar_todos=True)
         except Exception as exc:
             logger.error(f"❌ Error durante la extracción del listado: {exc}")
             raise VerificationError(f"Fallo en extracción del listado inicial: {exc}") from exc
