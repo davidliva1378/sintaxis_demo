@@ -36,6 +36,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--datos-monitor",
         help="Directorio de historiales del monitor a usar durante el ciclo.",
     )
+    headless_group = parser.add_mutually_exclusive_group()
+    headless_group.add_argument(
+        "--headless",
+        dest="headless",
+        action="store_const",
+        const=True,
+        help="Fuerza la ejecución del navegador sin interfaz gráfica.",
+    )
+    headless_group.add_argument(
+        "--mostrar-navegador",
+        dest="headless",
+        action="store_const",
+        const=False,
+        help="Abre el navegador en modo visible (headless desactivado).",
+    )
     parser.add_argument(
         "--sin-formularios",
         action="store_true",
@@ -54,6 +69,7 @@ def main(argv: list[str] | None = None) -> int:
         directorio_datos_monitor=args.datos_monitor,
         mostrar_formulario_directorios=not args.sin_formularios,
         mostrar_formulario_filtrado=not args.sin_formularios,
+        headless=args.headless,
     )
 
     if resultado is None:

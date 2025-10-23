@@ -24,7 +24,9 @@ existentes:
 
 Las funciones auxiliares expuestas permiten reutilizar cada etapa por
 separado, mientras que :func:`run_ciclo_prueba` orquesta el recorrido completo
-para scripts o herramientas de línea de comandos.
+para scripts o herramientas de línea de comandos. El ciclo acepta un parámetro
+``headless`` opcional que fuerza el modo de ejecución del navegador (visible o
+sin interfaz) tanto para la extracción inicial como para el monitor.
 """
 
 from __future__ import annotations
@@ -70,6 +72,7 @@ def run_ciclo_prueba(
     directorio_datos_monitor: str | Path | None = None,
     mostrar_formulario_directorios: bool = True,
     mostrar_formulario_filtrado: bool = True,
+    headless: bool | None = None,
 ) -> Path | None:
     """Ejecuta el ciclo completo del extractor inicial.
 
@@ -85,6 +88,10 @@ def run_ciclo_prueba(
             directorios antes de continuar.
         mostrar_formulario_filtrado: Si ``True`` se abre la interfaz de
             filtrado antes del procesamiento automatizado.
+        headless: Forzar el modo de Playwright. Si se indica ``True`` se
+            ejecuta sin interfaz gráfica; con ``False`` se abre el navegador en
+            modo visible. Cuando es ``None`` se respeta lo definido en los
+            archivos de configuración.
 
     Returns:
         Ruta del archivo JSON generado durante la extracción inicial (si se
@@ -110,10 +117,15 @@ def run_ciclo_prueba(
         )
         return None
 
+    resolved_headless = system_config.headless if headless is None else headless
+    if headless is not None:
+        system_config.headless = headless
+
     monitor_config = _prepare_monitor_config(
         monitor_path,
         system_config,
         directorio_datos_monitor,
+        headless_override=resolved_headless,
     )
 
     logger.info("🚀 Ejecutando extracción inicial de expedientes")
@@ -122,6 +134,7 @@ def run_ciclo_prueba(
         json_path = _ejecutar_extraccion_inicial(
             system_config,
             directorio_extraccion,
+            resolved_headless,
         )
     except Exception as exc:  # pragma: no cover - defensivo frente a I/O real
         logger.exception("No se pudo completar la extracción inicial: %s", exc)
@@ -135,6 +148,8 @@ def run_ciclo_prueba(
         )
         # El formulario puede haber ajustado directorios; reflejar cambios
         monitor_config = MonitorConfig.from_file(monitor_path)
+        if headless is not None:
+            monitor_config.headless = resolved_headless
 
     logger.info("🤖 Ejecutando procesamiento automatizado del monitor")
     try:
@@ -168,11 +183,15 @@ def _prepare_monitor_config(
     monitor_path: Path,
     system_config: SystemConfig,
     directorio_datos_monitor: str | Path | None,
+    *,
+    headless_override: bool,
 ) -> MonitorConfig:
     monitor_config = MonitorConfig.from_system_config(system_config)
 
     if directorio_datos_monitor is not None:
         monitor_config.directorio_datos = str(Path(directorio_datos_monitor))
+
+    monitor_config.headless = headless_override
 
     monitor_path.parent.mkdir(parents=True, exist_ok=True)
     monitor_config.to_file(monitor_path)
@@ -182,6 +201,7 @@ def _prepare_monitor_config(
 def _ejecutar_extraccion_inicial(
     system_config: SystemConfig,
     directorio_extraccion: str | Path | None,
+    headless: bool,
 ) -> Path:
     destino_base = Path(
         directorio_extraccion or system_config.directorio_extraccion_inicial
@@ -189,7 +209,7 @@ def _ejecutar_extraccion_inicial(
     destino_base.mkdir(parents=True, exist_ok=True)
 
     output_path = _run_async_task(
-        _extraer_expedientes_iniciales(system_config, destino_base)
+        _extraer_expedientes_iniciales(system_config, destino_base, headless=headless)
     )
     logger.info("📁 Extracción inicial guardada en %s", output_path)
     return output_path
@@ -198,12 +218,14 @@ def _ejecutar_extraccion_inicial(
 async def _extraer_expedientes_iniciales(
     system_config: SystemConfig,
     destino_base: Path,
+    *,
+    headless: bool,
 ) -> Path:
     extraccion_config = _build_extraccion_config(system_config)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     output_path = destino_base / f"expedientes-inicial-{timestamp}.json"
 
-    async with obtener_pagina_autenticada(headless=system_config.headless) as (
+    async with obtener_pagina_autenticada(headless=headless) as (
         page,
         _context,
         _browser,
