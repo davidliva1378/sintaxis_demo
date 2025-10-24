@@ -115,6 +115,59 @@ async def procesar_actuaciones_expediente(
         )
         descargas_ejecutadas = True
 
+    # Actualizar metadatos de procesamiento en manifest.json
+    if not error and json_path is not None:
+        from datetime import datetime
+        import json
+
+        total_actuaciones = len(actuales) + len(historicas)
+
+        # Contar adjuntos descargados
+        total_adjuntos = 0
+        if descargas_ejecutadas and carpeta_adjuntos:
+            try:
+                from pathlib import Path
+                adjuntos_path = Path(carpeta_adjuntos) / "adjuntos"
+                if adjuntos_path.exists():
+                    total_adjuntos = len(list(adjuntos_path.glob("*.*")))
+            except Exception:
+                pass
+
+        # Actualizar manifest
+        try:
+            manifest_path = carpeta_expediente / "manifest.json"
+            if manifest_path.exists():
+                manifest_actual = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+                # Asegurar estructura de procesamiento existe
+                if "metadata" not in manifest_actual:
+                    manifest_actual["metadata"] = {}
+                if "procesamiento" not in manifest_actual["metadata"]:
+                    manifest_actual["metadata"]["procesamiento"] = {
+                        "creado_en": datetime.now().isoformat(timespec="seconds"),
+                        "total_extracciones": 0,
+                    }
+
+                # Actualizar contadores
+                proc = manifest_actual["metadata"]["procesamiento"]
+                proc["ultima_extraccion"] = datetime.now().isoformat(timespec="seconds")
+                proc["total_extracciones"] = proc.get("total_extracciones", 0) + 1
+                proc["total_actuaciones"] = total_actuaciones
+                proc["total_adjuntos_descargados"] = total_adjuntos
+                proc["estado_sincronizacion"] = "actualizado"
+
+                # Guardar manifest actualizado
+                manifest_path.write_text(
+                    json.dumps(manifest_actual, indent=2, ensure_ascii=False),
+                    encoding="utf-8"
+                )
+                manifest = manifest_actual
+        except Exception as e:
+            # No fallar si no se puede actualizar manifest
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"No se pudo actualizar manifest para {numero_expediente}: {e}")
+
     resumen: ResultadoProcesamiento = {
         "actuaciones_actuales": len(actuales),
         "actuaciones_historicas": len(historicas),

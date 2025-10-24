@@ -5,10 +5,24 @@ Este módulo compara estados actuales vs anteriores para detectar novedades.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from ..models import Entrada, ExpedienteResumen
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class CambioExpediente:
+    """Representa un cambio detectado en un expediente.
+
+    Wrapper que contiene el expediente y metadata sobre el cambio.
+    """
+    expediente: ExpedienteResumen
+    tipo_cambio: str
+    campos_cambiados: list[str]
+    valores_anteriores: dict[str, str | None]
 
 
 class DetectorCambios:
@@ -50,19 +64,27 @@ class DetectorCambios:
         self,
         actuales: list[ExpedienteResumen],
         anteriores: list[ExpedienteResumen]
-    ) -> list[ExpedienteResumen]:
-        """Detecta expedientes con ultima_actuacion diferente.
+    ) -> list[CambioExpediente]:
+        """Detecta expedientes con cambios en cualquier campo relevante.
+
+        Detecta cambios en: ultima_actuacion, situacion, dependencia, caratula
 
         Args:
             actuales: Expedientes actuales extraídos
             anteriores: Expedientes del estado anterior
 
         Returns:
-            list[ExpedienteResumen]: Expedientes con cambios en ultima_actuacion
+            list[CambioExpediente]: Lista de cambios detectados, cada uno con el
+                expediente y metadata sobre el tipo de cambio.
         """
-        # Mapear anteriores por número de expediente
+        # Mapear anteriores por número de expediente con todos los campos relevantes
         mapa_anterior = {
-            exp.numero: exp.ultima_actuacion
+            exp.numero: {
+                "ultima_actuacion": exp.ultima_actuacion,
+                "situacion": exp.situacion,
+                "dependencia": exp.dependencia,
+                "caratula": exp.caratula,
+            }
             for exp in anteriores
         }
 
@@ -70,9 +92,32 @@ class DetectorCambios:
         cambios = []
         for exp in actuales:
             if exp.numero in mapa_anterior:
-                # Expediente ya conocido - verificar si cambió
-                if mapa_anterior[exp.numero] != exp.ultima_actuacion:
-                    cambios.append(exp)
+                # Expediente ya conocido - verificar si cambió algún campo
+                anterior = mapa_anterior[exp.numero]
+
+                campos_cambiados = []
+                if exp.ultima_actuacion != anterior["ultima_actuacion"]:
+                    campos_cambiados.append("ultima_actuacion")
+                if exp.situacion != anterior["situacion"]:
+                    campos_cambiados.append("situacion")
+                if exp.dependencia != anterior["dependencia"]:
+                    campos_cambiados.append("dependencia")
+                if exp.caratula != anterior["caratula"]:
+                    campos_cambiados.append("caratula")
+
+                if campos_cambiados:
+                    # Clasificar tipo de cambio
+                    tipo_cambio = self._clasificar_cambio(campos_cambiados)
+
+                    # Crear objeto CambioExpediente con toda la información
+                    cambio = CambioExpediente(
+                        expediente=exp,
+                        tipo_cambio=tipo_cambio,
+                        campos_cambiados=campos_cambiados,
+                        valores_anteriores=anterior,
+                    )
+
+                    cambios.append(cambio)
             # Si no está en mapa_anterior, es nuevo (no cuenta como cambio)
 
         logger.debug(
@@ -82,5 +127,27 @@ class DetectorCambios:
 
         return cambios
 
+    def _clasificar_cambio(self, campos_cambiados: list[str]) -> str:
+        """Clasifica el tipo de cambio según los campos modificados.
 
-__all__ = ["DetectorCambios"]
+        Args:
+            campos_cambiados: Lista de nombres de campos que cambiaron
+
+        Returns:
+            str: Tipo de cambio clasificado
+        """
+        if len(campos_cambiados) > 1:
+            return "multiples_cambios"
+        elif "ultima_actuacion" in campos_cambiados:
+            return "nueva_actuacion"
+        elif "situacion" in campos_cambiados:
+            return "cambio_situacion"
+        elif "dependencia" in campos_cambiados:
+            return "cambio_dependencia"
+        elif "caratula" in campos_cambiados:
+            return "cambio_caratula"
+        else:
+            return "cambio_desconocido"
+
+
+__all__ = ["DetectorCambios", "CambioExpediente"]

@@ -24,6 +24,8 @@
   "notificar_nuevas_entradas": true,
   "notificar_cambios_expedientes": true,
   "notificar_errores": true,
+  "actualizar_actuaciones_automaticamente": true,
+  "max_reintentos_actualizacion_actuaciones": 3,
   "verificar_entradas": true,
   "verificar_expedientes": false,
   "comparacion_automatica": false,

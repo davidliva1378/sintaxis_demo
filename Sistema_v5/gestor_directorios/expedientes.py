@@ -224,8 +224,122 @@ class GestorDirectoriosExpedientes:
         self._persistir_manifest(manifest_path, manifest_final)
         return manifest_final
 
+    def actualizar_desde_monitor(
+        self,
+        numero_expediente: str,
+        estado_portal: dict[str, Any],
+        tipo_cambio: str | None = None,
+        campos_cambiados: list[str] | None = None,
+        valores_anteriores: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Actualiza manifest.json con datos frescos del monitor PJN.
+
+        Este método sincroniza el estado local con el estado actual del portal,
+        actualizando `estado_portal` en los metadatos y opcionalmente registrando
+        el cambio en el historial.
+
+        Args:
+            numero_expediente: Número del expediente a actualizar
+            estado_portal: Diccionario con los campos actuales del portal
+                (dependencia, caratula, situacion, ultima_actuacion)
+            tipo_cambio: Tipo de cambio detectado (nueva_actuacion, cambio_situacion, etc.)
+            campos_cambiados: Lista de campos que cambiaron
+            valores_anteriores: Valores anteriores de los campos cambiados
+
+        Returns:
+            dict[str, Any]: Manifest actualizado
+
+        Example:
+            >>> gestor = GestorDirectoriosExpedientes.desde_config()
+            >>> gestor.actualizar_desde_monitor(
+            ...     "FPA 001382/2019",
+            ...     estado_portal={
+            ...         "situacion": "EN LETRA",
+            ...         "ultima_actuacion": "2025-10-23",
+            ...         "dependencia": "JUZGADO...",
+            ...         "caratula": "ESTRADA..."
+            ...     },
+            ...     tipo_cambio="cambio_situacion",
+            ...     campos_cambiados=["situacion"],
+            ...     valores_anteriores={"situacion": "En trámite"}
+            ... )
+        """
+        from datetime import datetime
+
+        numero_normalizado = normalizar_numero_expediente(numero_expediente)
+        identificador = self._obtener_o_registrar_identificador(numero_normalizado)
+        destino = self._obtener_ruta_expediente(numero_normalizado, identificador)
+
+        # Verificar si existe el directorio
+        if not destino.exists():
+            # Si no existe, crear estructura básica primero
+            self.crear_para_expediente(numero_expediente)
+
+        manifest_path = destino / self.manifest_filename
+
+        # Cargar manifest existente
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError):
+            # Si no existe o está corrupto, crear estructura básica
+            manifest = {
+                "directories": [],
+                "metadata": {
+                    "numero_expediente": numero_expediente,
+                    "numero_normalizado": numero_normalizado,
+                    "id": identificador,
+                },
+            }
+
+        # Asegurar estructura metadata existe
+        if "metadata" not in manifest:
+            manifest["metadata"] = {}
+
+        # Actualizar estado_portal
+        manifest["metadata"]["estado_portal"] = estado_portal
+
+        # Actualizar timestamp de sincronización si existe sección procesamiento
+        if "procesamiento" in manifest["metadata"]:
+            manifest["metadata"]["procesamiento"]["ultima_sincronizacion"] = (
+                datetime.now().isoformat(timespec="seconds")
+            )
+            manifest["metadata"]["procesamiento"]["estado_sincronizacion"] = "actualizado"
+
+        # Registrar cambio en historial si hay cambios detectados
+        if tipo_cambio and campos_cambiados:
+            if "historial_cambios" not in manifest:
+                manifest["historial_cambios"] = []
+
+            entrada_historial: dict[str, Any] = {
+                "timestamp": datetime.now().isoformat(timespec="seconds"),
+                "tipo": tipo_cambio,
+                "campos_cambiados": campos_cambiados,
+            }
+
+            # Añadir valores anteriores y nuevos para cada campo cambiado
+            if valores_anteriores:
+                entrada_historial["cambios"] = {}
+                for campo in campos_cambiados:
+                    entrada_historial["cambios"][campo] = {
+                        "anterior": valores_anteriores.get(campo),
+                        "nuevo": estado_portal.get(campo),
+                    }
+
+            manifest["historial_cambios"].append(entrada_historial)
+
+            # Limitar historial a últimos 50 cambios (configurable)
+            max_historial = 50
+            if len(manifest["historial_cambios"]) > max_historial:
+                manifest["historial_cambios"] = manifest["historial_cambios"][-max_historial:]
+
+        # Guardar manifest actualizado
+        self._persistir_manifest(manifest_path, manifest)
+
+        return manifest
+
     def crear_para_expediente(self, numero_expediente: str) -> tuple[Path, dict[str, Any]]:
         """Genera el árbol estándar para un expediente específico."""
+        from datetime import datetime
 
         numero_normalizado = normalizar_numero_expediente(numero_expediente)
         identificador = self._obtener_o_registrar_identificador(numero_normalizado)
@@ -235,6 +349,14 @@ class GestorDirectoriosExpedientes:
             "numero_expediente": numero_expediente,
             "numero_normalizado": numero_normalizado,
             "id": identificador,
+            "procesamiento": {
+                "creado_en": datetime.now().isoformat(timespec="seconds"),
+                "ultima_extraccion": None,
+                "total_extracciones": 0,
+                "total_actuaciones": 0,
+                "total_adjuntos_descargados": 0,
+                "estado_sincronizacion": "pendiente",
+            },
         }
 
         manifest = self.generar_arbol(destino, metadata=metadata)
@@ -300,15 +422,40 @@ class GestorDirectoriosExpedientes:
                 errores[numero_expediente] = "'fusionar_estructura' debe ser un booleano"
                 continue
 
+            from datetime import datetime
+
             identificador = self._obtener_o_registrar_identificador(numero_normalizado)
             destino = self._obtener_ruta_expediente(numero_normalizado, identificador)
+
+            # Metadatos base (inmutables)
             metadata_manifest = {
                 "numero_expediente": numero_expediente,
                 "numero_normalizado": numero_normalizado,
+                "id": identificador,
+                "procesamiento": {
+                    "creado_en": datetime.now().isoformat(timespec="seconds"),
+                    "ultima_extraccion": None,
+                    "total_extracciones": 0,
+                    "total_actuaciones": 0,
+                    "total_adjuntos_descargados": 0,
+                    "estado_sincronizacion": "pendiente",
+                },
             }
+
+            # Estado del portal (mutable) - separado
             if metadata_extra:
-                metadata_manifest.update(deepcopy(metadata_extra))
-            metadata_manifest["id"] = identificador
+                # Extraer campos del portal si vienen en metadata_extra
+                campos_portal = {}
+                for campo in ["dependencia", "caratula", "situacion", "ultima_actuacion"]:
+                    if campo in metadata_extra:
+                        campos_portal[campo] = metadata_extra.pop(campo)
+
+                if campos_portal:
+                    metadata_manifest["estado_portal"] = campos_portal
+
+                # Resto de metadata extra se añade al nivel raíz
+                if metadata_extra:
+                    metadata_manifest.update(deepcopy(metadata_extra))
 
             try:
                 manifest = self.generar_arbol(

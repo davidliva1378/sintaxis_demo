@@ -66,6 +66,8 @@ ENV_FIELD_MAP: dict[str, str] = {
     "notificar_nuevas_entradas": "NOTIFICAR_NUEVAS_ENTRADAS",
     "notificar_cambios_expedientes": "NOTIFICAR_CAMBIOS_EXPEDIENTES",
     "notificar_errores": "NOTIFICAR_ERRORES",
+    "actualizar_actuaciones_automaticamente": "ACTUALIZAR_ACTUACIONES_AUTOMATICAMENTE",
+    "max_reintentos_actualizacion_actuaciones": "MAX_REINTENTOS_ACTUALIZACION_ACTUACIONES",
     "verificar_entradas": "VERIFICAR_ENTRADAS",
     "verificar_expedientes": "VERIFICAR_EXPEDIENTES",
     "tipos_entradas": "TIPOS_ENTRADAS",
@@ -111,6 +113,7 @@ BOOL_FIELDS = {
     "notificar_nuevas_entradas",
     "notificar_cambios_expedientes",
     "notificar_errores",
+    "actualizar_actuaciones_automaticamente",
     "verificar_entradas",
     "verificar_expedientes",
     "comparacion_automatica",
@@ -213,6 +216,8 @@ class SystemConfig(MonitorSharedConfig):
         notificar_nuevas_entradas: Si notificar nuevas entradas
         notificar_cambios_expedientes: Si notificar cambios en expedientes
         notificar_errores: Si notificar errores del monitor
+        actualizar_actuaciones_automaticamente: Si actualizar actuaciones al detectar cambios
+        max_reintentos_actualizacion_actuaciones: Número de reintentos al actualizar actuaciones
         fecha_desde_entradas: Filtro de fecha desde para entradas
         fecha_hasta_entradas: Filtro de fecha hasta para entradas
         fecha_desde_expedientes: Filtro de fecha desde para expedientes
@@ -553,6 +558,8 @@ class SystemConfig(MonitorSharedConfig):
             notificar_nuevas_entradas=monitor_data.get("notificar_nuevas_entradas", True),
             notificar_cambios_expedientes=monitor_data.get("notificar_cambios_expedientes", True),
             notificar_errores=monitor_data.get("notificar_errores", True),
+            actualizar_actuaciones_automaticamente=monitor_data.get("actualizar_actuaciones_automaticamente", True),
+            max_reintentos_actualizacion_actuaciones=monitor_data.get("max_reintentos_actualizacion_actuaciones", 3),
             verificar_entradas=monitor_data.get("verificar_entradas", True),
             verificar_expedientes=monitor_data.get("verificar_expedientes", True),
             tipos_entradas=monitor_data.get("tipos_entradas", ("N",)),

@@ -54,6 +54,9 @@ class MonitorSharedConfig:
     notificar_cambios_expedientes: bool = True
     notificar_errores: bool = True
 
+    actualizar_actuaciones_automaticamente: bool = True
+    max_reintentos_actualizacion_actuaciones: int = 3
+
     verificar_entradas: bool = True
     verificar_expedientes: bool = True
     tipos_entradas: tuple[str, ...] = ("N",)

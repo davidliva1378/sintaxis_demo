@@ -193,9 +193,69 @@ async def fase_4_extraer_completo(
         descargar_adjuntos=descargar_adjuntos,
     )
 
-    # Callback de progreso
+    # Crear ventana de progreso
+    root = tk.Tk()
+    root.withdraw()  # Ocultar ventana root
+
+    cancelado = False
+
+    def on_cancel() -> None:
+        nonlocal cancelado
+        cancelado = True
+
+    progress_window = ProgressWindow(
+        root,
+        total_expedientes=len(seleccion),
+        on_cancel=on_cancel,
+    )
+
+    progress_window.agregar_log("Iniciando extracción batch de expedientes", "info")
+
+    # Callback de progreso (ahora actualiza ventana)
     def on_progreso(indice: int, total: int, expediente) -> None:
         logger.info(f"[{indice}/{total}] Procesando: {expediente.numero}")
+
+    # Callback inicio de expediente
+    def on_expediente_inicio(expediente, indice: int, total: int) -> None:
+        progress_window.actualizar_progreso(
+            indice,
+            expediente.numero,
+            f"Extrayendo actuaciones de {expediente.numero}..."
+        )
+        progress_window.agregar_log(f"Iniciando {expediente.numero}", "info")
+        root.update()
+
+    # Callback fin de expediente
+    def on_expediente_fin(resultado, tiempo_segundos: float) -> None:
+        # Actualizar estadísticas
+        exitosos = sum(1 for r in batch._resultados if r.estado == "success")
+        errores = sum(1 for r in batch._resultados if r.estado == "error")
+        omitidos = sum(1 for r in batch._resultados if r.estado == "skipped")
+
+        progress_window.actualizar_estadisticas(exitosos, errores, omitidos)
+
+        # Agregar log según resultado
+        if resultado.estado == "success":
+            progress_window.agregar_log(
+                f"✓ {resultado.expediente.numero} completado ({tiempo_segundos:.1f}s)",
+                "success"
+            )
+        elif resultado.estado == "error":
+            progress_window.agregar_log(
+                f"✗ {resultado.expediente.numero}: {resultado.error}",
+                "error"
+            )
+        else:  # skipped
+            progress_window.agregar_log(
+                f"⊘ {resultado.expediente.numero} omitido",
+                "warning"
+            )
+
+        # Registrar tiempo para ETA
+        if resultado.estado in ("success", "error"):
+            progress_window.registrar_tiempo_procesamiento(tiempo_segundos)
+
+        root.update()
 
     # Callback de umbral de errores
     def on_umbral_errores(num_errores: int, mensajes: list[str]) -> str:
@@ -203,6 +263,11 @@ async def fase_4_extraer_completo(
         logger.warning("Últimos errores:")
         for msg in mensajes[-5:]:  # Mostrar últimos 5
             logger.warning(f"  - {msg}")
+
+        progress_window.agregar_log(
+            f"⚠️ Umbral alcanzado: {num_errores} errores consecutivos",
+            "warning"
+        )
 
         # Preguntar al usuario
         respuesta = messagebox.askyesnocancel(
@@ -223,6 +288,8 @@ async def fase_4_extraer_completo(
             return "cancelar"
 
     batch.set_callback_progreso(on_progreso)
+    batch.set_callback_expediente_inicio(on_expediente_inicio)
+    batch.set_callback_expediente_fin(on_expediente_fin)
     batch.set_callback_error_umbral(on_umbral_errores)
 
     logger.info(f"🤖 Procesando {len(seleccion)} expedientes...")
@@ -232,6 +299,9 @@ async def fase_4_extraer_completo(
 
     try:
         resumen = await batch.procesar_lote(seleccion)
+
+        # Marcar ventana como completada
+        progress_window.marcar_completado()
 
         logger.info("")
         logger.info("=" * 60)
@@ -277,8 +347,17 @@ async def fase_4_extraer_completo(
         )
         logger.info(f"📊 Reporte guardado en: {reporte_path}")
 
+        progress_window.agregar_log(f"Reporte guardado: {reporte_path.name}", "success")
+
+        # Mantener ventana abierta hasta que el usuario la cierre
+        logger.info("Ventana de progreso permanecerá abierta. Ciérrela cuando termine de revisar.")
+        root.mainloop()
+
     except Exception as exc:
         logger.exception(f"❌ Error durante procesamiento batch: {exc}")
+        progress_window.marcar_error_fatal(str(exc))
+        # Mantener ventana abierta para mostrar el error
+        root.mainloop()
         raise
 
 
