@@ -1,0 +1,236 @@
+# codex.agents.yaml
+# Archivo de orquestación para trabajar con “Codex/AI” sobre el proyecto Sistema Jurídico.
+# Describe agentes, contexto, rutas, convenciones y playbooks operativos.
+# Fuente del flujo y tareas: README_inicializacion.md y Tareas_Sistema_Juridico.md
+
+project:
+  name: "Sistema Jurídico - Sistema_v3"
+  description: >
+    Suite de automatización para estudios jurídicos: extracción de expedientes,
+    actuaciones y notificaciones del PJN; almacenamiento (JSON/DB), descargas,
+    agenda y alertas. Código Python con Playwright; estructura modular en
+    Sistema_v3/operaciones/*.
+  tech_stack:
+    language: "Python 3.11+"
+    automation: "Playwright (async)"
+    packaging: "venv/poetry/pip (a elección)"
+    gui: "pendiente (PySide/Qt sugerido)"
+  repos_layout:
+    root: "Sistema_v3/"
+    packages:
+      - "Sistema_v3/operaciones"
+      - "Sistema_v3/operaciones/expedientes"
+      - "Sistema_v3/operaciones/entradas"
+      - "Sistema_v3/operaciones/actuaciones"
+    docs: "Sistema_v3/docs (opcional)"
+  environment:
+    env_vars:
+      - "PJN_USER"
+      - "PJN_PASSWORD"
+      - "PLAYWRIGHT_BROWSERS_PATH (opcional)"
+      - "APP_ENV=dev|prod"
+    secrets_notes: "Nunca commitear credenciales; usar .env/gestor de secretos."
+  commands:
+    setup:
+      - "python -m venv .venv && . .venv/bin/activate && pip install -U pip"
+      - "pip install playwright pytest"
+      - "playwright install chromium"
+    test:
+      - "pytest -q"
+    lint_format:
+      - "pip install ruff black"
+      - "ruff check Sistema_v3 --fix"
+      - "black Sistema_v3"
+    run_examples:
+      - "python - <<'PY'
+print('Punto de entrada TBD (main.py)')
+PY"
+
+context:
+  high_level_flow:
+    - "Extracción completa inicial de expedientes y notificaciones (respaldos JSON)."
+    - "Selección/filtrado de expedientes a procesar."
+    - "Extracción de actuaciones (sin descarga) para poblar BD/JSON."
+    - "Descarga de documentos (cuando aplique)."
+    - "Alertas/agenda (vencimientos y eventos)."
+  docs_refs:
+    - "README_inicializacion.md  → flujo y metadatos esperados."
+    - "Tareas_Sistema_Juridico.md → backlog y dependencias."
+  data_dirs:
+    - "datos_extraidos/monitoreo/ (histórico y respaldos)"
+    - "base_datos_simulada/ (JSON por expediente)"
+    - "logs/ (actividad y errores)"
+  outputs_expected:
+    expedientes_json: "expedientes_YYYYMMDD_HHMMSS.json"
+    notificaciones_json: "historial_notificaciones.json"
+    actuaciones_json: "actuaciones_{EXPEDIENTE}.json"
+    csv_notif: "historial_notificaciones.csv"
+
+conventions:
+  imports: "usar imports relativos dentro de Sistema_v3/operaciones"
+  typing: "usar typing en nuevas funciones; preferir list[dict] en 3.11+"
+  errors: "propagar info con códigos/estados; evitar silencios; logs en logs/"
+  io:
+    encoding: "utf-8"
+    newline: "LF"
+  style:
+    - "black (formato)"
+    - "ruff (lint)"
+  logging:
+    - "usar print() hasta integrar logging.stdlib"
+    - "unificar prefijos: ✅, ⚠️, ❌, ⏳, 🔎, 📦"
+  filenames:
+    - "snake_case"
+    - "sufijos _doc.md para documentación"
+  json_format:
+    ensure_ascii: false
+    indent: 2
+
+ownership:
+  # Mapa informal de responsabilidad de archivos por agente lógico
+  expedientes:
+    owns:
+      - "Sistema_v3/operaciones/expedientes/lista.py"
+      - "Sistema_v3/operaciones/expedientes/detalle.py"
+  entradas:
+    owns:
+      - "Sistema_v3/operaciones/entradas/notificaciones.py"
+  actuaciones:
+    owns:
+      - "Sistema_v3/operaciones/actuaciones/extraccion_descarga.py"
+  utils:
+    owns:
+      - "Sistema_v3/operaciones/utils.py"
+
+agents:
+  - id: "architect"
+    goal: "Mantener la arquitectura limpia, modular y testeable."
+    context:
+      sees:
+        - "conventions"
+        - "context.high_level_flow"
+        - "ownership"
+      modify:
+        - "directorio Sistema_v3/"
+        - "imports relativos y __init__.py reexportando APIs públicas"
+    playbooks:
+      - "Reubicar funciones dispersas en subpaquetes por dominio."
+      - "Definir __all__ y reexports en operaciones/__init__.py."
+      - "Agregar tests mínimos por módulo."
+  - id: "expedientes-agent"
+    goal: "Extraer listados de expedientes y buscar/abrir detalle."
+    files:
+      - "Sistema_v3/operaciones/expedientes/lista.py"
+      - "Sistema_v3/operaciones/expedientes/detalle.py"
+    apis:
+      - "extraer_expedientes(page, ...) -> (list, ruta_json|None, estado)"
+      - "buscar_expediente_por_numero(page, numero) -> bool"
+      - "buscar_expedientes(page, numero|anio|caratula) -> list[ElementHandle]"
+      - "abrir_expediente_desde_fila(page, indice) -> bool"
+      - "extraer_datos_expediente(page) -> dict"
+    notes:
+      - "documentar selectores sensibles; estado_final puede ser: completo|corte_fecha|repetido_detectado|tiempo_maximo|tabla_no_disponible"
+  - id: "entradas-agent"
+    goal: "Gestionar notificaciones electrónicas (DEO/cédulas)."
+    files:
+      - "Sistema_v3/operaciones/entradas/notificaciones.py"
+    apis:
+      - "extraer_entradas(page, destino=None) -> int"
+      - "notificaciones_proximas_a_vencer(destino=None, horas=48) -> list[dict]"
+    outputs:
+      - "historial_notificaciones.json"
+      - "historial_notificaciones.csv"
+  - id: "actuaciones-agent"
+    goal: "Extraer actuaciones (con paginación), históricas y descargar adjuntos."
+    files:
+      - "Sistema_v3/operaciones/actuaciones/extraccion_descarga.py"
+    apis_example:
+      - "extraer_actuaciones(page_expediente) -> list[dict]"
+      - "extraer_actuaciones_completas(page, expedientes, ruta_salida) -> None"
+      - "descargar_adjuntos(page, actuaciones, carpeta_destino) -> None"
+      - "extraer_actuaciones_historicas(page_expediente, expediente_datos, indice_inicial=1) -> list[dict]"
+  - id: "persistence-agent"
+    goal: "Persistir y migrar datos (JSON ⇄ DB real)."
+    tasks:
+      - "definir esquema relacional mínimo (expedientes, actuaciones, notificaciones, archivos)"
+      - "script migración JSON→DB"
+      - "DAO/Repos para lectura/escritura"
+  - id: "alerts-agenda-agent"
+    goal: "Alertas de notificaciones y agenda de vencimientos/eventos."
+    tasks:
+      - "generar eventos a partir de notificaciones y actuaciones clave"
+      - "persistir/mostrar en GUI (pendiente)"
+  - id: "docs-agent"
+    goal: "Mantener documentación técnica y de usuario."
+    files:
+      - "Sistema_v3/docs/*.md"
+    tasks:
+      - "actualizar docs cuando cambie una API pública"
+      - "añadir ejemplos mínimos y formatos de salida"
+  - id: "qa-agent"
+    goal: "Asegurar calidad (tests, lint, tipo)."
+    tasks:
+      - "añadir pytest por módulo"
+      - "añadir casos de errores típicos (timeouts, tabla ausente, duplicados)"
+      - "mocks para Playwright"
+
+routines:
+  # Playbooks accionables que los agentes pueden seguir paso a paso
+  - name: "extraccion-completa-inicial"
+    steps:
+      - "Leer README_inicializacion.md para metadatos esperados."
+      - "Lanzar navegador/Playwright y navegar a listados."
+      - "Llamar extraer_expedientes(page, guardar_json=True)."
+      - "Llamar extraer_entradas(page)."
+      - "Para cada expediente seleccionado: extraer_actuaciones(page)."
+      - "Guardar respaldos en datos_extraidos/monitoreo/historico/."
+  - name: "descargas-por-expediente"
+    steps:
+      - "Abrir expediente → extraer_actuaciones(page)."
+      - "Filtrar actuaciones con TieneArchivo==True."
+      - "descargar_adjuntos(page, actuaciones_filtradas, carpeta_destino)."
+  - name: "migracion-json-a-db"
+    steps:
+      - "Leer JSONs en base_datos_simulada/."
+      - "Mapear a tablas relacionales (expediente, actuacion, archivo, notificacion)."
+      - "Insertar usando DAO con manejo de duplicados por Hash/Indice."
+
+backlog:
+  # Derivado de Tareas_Sistema_Juridico.md
+  - "[ ] Alertas automáticas por notificaciones judiciales."
+  - "[ ] Agenda con vista calendario y vínculo a expedientes."
+  - "[ ] Formato expedientes_descartados.json y respeto en monitores."
+  - "[ ] Base de datos real (MySQL) y migración."
+  - "[ ] Backups automáticos y resumen diario."
+  - "[ ] GUI de selección de expedientes y panel de notificaciones."
+  - "[ ] Restauración desde backups previos."
+
+prompts:
+  # Plantillas para usar con agentes tipo “system”/“developer”
+  - agent: "expedientes-agent"
+    system: |
+      Actuá como un módulo Playwright para listar y abrir expedientes.
+      No hardcodees selectores sin documentarlos. Siempre devolvé estados claros.
+    user_template: |
+      Usá `extraer_expedientes(page, fecha_corte='{fecha_corte}', orden='{orden}')` y
+      devolveme el JSON y el estado final.
+  - agent: "entradas-agent"
+    system: |
+      Dedicado a notificaciones electrónicas. Evitá duplicados (normalizar texto).
+      Generá historial JSON y CSV consistentes.
+    user_template: |
+      Ejecutá `extraer_entradas(page, destino='{dest}')` y listá novedades (+ total).
+  - agent: "actuaciones-agent"
+    system: |
+      Recorre todas las páginas y captura metadatos mínimos. Identificá archivos a descargar.
+    user_template: |
+      Para el expediente {numero}, corré extracción completa y guardá resultados en {ruta}.
+
+notes:
+  safe_defaults:
+    - "Nunca sobrescribir archivos existentes sin backup."
+    - "Respetar encoding utf-8 y normalización de texto."
+    - "Manejar timeouts y estados de error devolviendo mensajes claros."
+  future:
+    - "Integrar logging estructurado y configuración vía config/."
+    - "Agregar main.py con CLI simple para orquestar rutinas."

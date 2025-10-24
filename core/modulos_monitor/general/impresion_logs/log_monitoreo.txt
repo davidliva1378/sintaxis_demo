@@ -1,0 +1,1520 @@
+[2025-04-23 22:19:21] ✅ Verificación de notificaciones: sin novedades.\n[2025-04-23 22:29:10] 📦 Estado: repetido_detectado\n[2025-04-23 22:29:10] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.\n[2025-04-23 22:29:10] 📊 Total extraídos: 1305\n[2025-04-23 22:32:29] 🔔 Nuevas notificaciones detectadas: 481\n[2025-04-23 23:36:53] 📦 Estado: repetido_detectado
+[2025-04-23 23:36:53] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-23 23:36:53] 📊 Total extraídos: 1290
+[2025-04-23 23:51:06] 📦 Estado: completo
+[2025-04-23 23:51:06] ✅ Extracción finalizada exitosamente.
+[2025-04-23 23:51:06] 📊 Total extraídos: 2011
+[2025-04-23 23:51:06] 📁 Guardado en: C:\Users\aleja\Documents\Sistema\modulos_monitor\general\descargas_monitoreo\expedientes\expedientes_monitor.json
+[2025-04-23 23:59:25] 📦 Estado: completo
+[2025-04-23 23:59:25] ✅ Extracción finalizada exitosamente.
+[2025-04-23 23:59:25] 📊 Total extraídos: 2011
+[2025-04-23 23:59:25] 📁 Guardado en: C:\Users\aleja\Documents\Sistema\modulos_monitor\general\descargas_monitoreo\expedientes\expedientes_monitor.json
+[2025-04-24 00:08:36] 📦 Estado: completo
+[2025-04-24 00:08:36] ✅ Extracción finalizada exitosamente.
+[2025-04-24 00:08:36] 📊 Total extraídos: 2011
+[2025-04-24 00:08:36] 📁 Guardado en: C:\Users\aleja\Documents\Sistema\modulos_monitor\general\descargas_monitoreo\expedientes\expedientes_monitor.json
+[2025-04-24 00:11:45] 📦 Estado: repetido_detectado
+[2025-04-24 00:11:45] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 00:11:45] 📊 Total extraídos: 375
+[2025-04-24 00:11:45] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 00:11:45] 📦 Estado: repetido_detectado
+[2025-04-24 00:11:45] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 00:11:45] 📊 Total extraídos: 1305
+[2025-04-24 00:11:45] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-04-24 00:24:46] 📦 Estado: repetido_detectado
+[2025-04-24 00:24:46] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 00:24:46] 📊 Total extraídos: 735
+[2025-04-24 00:24:46] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 00:24:46] 📦 Estado: repetido_detectado
+[2025-04-24 00:24:46] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 00:24:46] 📊 Total extraídos: 285
+[2025-04-24 00:24:46] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-04-24 00:28:48] 📦 Estado: repetido_detectado
+[2025-04-24 00:28:48] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 00:28:48] 📊 Total extraídos: 255
+[2025-04-24 00:28:48] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 00:39:26] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 00:39:34] 🌐 Navegación a consultas realizada.
+[2025-04-24 00:39:44] 📦 Estado: repetido_detectado
+[2025-04-24 00:39:44] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 00:39:44] 📊 Total extraídos: 45
+[2025-04-24 00:39:44] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 00:39:49] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 00:39:49] ❌ Error en verificación: Page.goto: net::ERR_INTERNET_DISCONNECTED at https://portalpjn.pjn.gov.ar/inicio
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-04-24 00:39:49] 📦 Estado: fallo
+[2025-04-24 00:39:49] ❌ Fallo en la verificación.
+[2025-04-24 00:39:49] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-04-24 00:39:54] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 00:39:55] ❌ Error en verificación: Page.goto: net::ERR_INTERNET_DISCONNECTED at https://portalpjn.pjn.gov.ar/inicio
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-04-24 00:39:55] 📦 Estado: fallo
+[2025-04-24 00:39:55] ❌ Fallo en la verificación.
+[2025-04-24 00:39:55] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-04-24 00:40:00] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 00:40:12] 🌐 Navegación a consultas realizada.
+[2025-04-24 00:43:24] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 00:43:28] 🌐 Navegación a consultas realizada.
+[2025-04-24 00:45:04] 📦 Estado: repetido_detectado
+[2025-04-24 00:45:04] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 00:45:04] 📊 Total extraídos: 435
+[2025-04-24 00:45:04] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 00:45:09] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 00:45:09] ❌ Error en verificación: Page.goto: net::ERR_INTERNET_DISCONNECTED at https://portalpjn.pjn.gov.ar/inicio
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-04-24 00:45:09] 📦 Estado: fallo
+[2025-04-24 00:45:09] ❌ Fallo en la verificación.
+[2025-04-24 00:45:09] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-04-24 00:45:14] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 00:45:15] ❌ Error en verificación: Page.goto: net::ERR_INTERNET_DISCONNECTED at https://portalpjn.pjn.gov.ar/inicio
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-04-24 00:45:15] 📦 Estado: fallo
+[2025-04-24 00:45:15] ❌ Fallo en la verificación.
+[2025-04-24 00:45:15] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-04-24 00:45:20] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 00:45:30] 🌐 Navegación a consultas realizada.
+[2025-04-24 19:00:51] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 19:01:12] 🌐 Navegación a consultas realizada.
+[2025-04-24 19:08:50] 📦 Estado: completo
+[2025-04-24 19:08:50] ✅ Extracción finalizada exitosamente.
+[2025-04-24 19:08:50] 📊 Total extraídos: 2011
+[2025-04-24 19:08:50] 📁 Guardado en: datos_iniciales/expedientes_monitor.json
+[2025-04-24 19:13:54] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 19:13:58] 🌐 Navegación a consultas realizada.
+[2025-04-24 19:18:59] 📦 Estado: repetido_detectado
+[2025-04-24 19:18:59] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 19:18:59] 📊 Total extraídos: 1365
+[2025-04-24 19:18:59] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 19:19:04] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 19:19:09] 🌐 Navegación a consultas realizada.
+[2025-04-24 19:24:42] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 19:24:47] 🌐 Navegación a consultas realizada.
+[2025-04-24 19:33:39] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 19:33:43] 🌐 Navegación a consultas realizada.
+[2025-04-24 19:35:53] ❌ Error en verificación: ElementHandle.query_selector_all: Target page, context or browser has been closed
+[2025-04-24 19:35:56] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 19:36:00] 🌐 Navegación a consultas realizada.
+[2025-04-24 19:38:33] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 19:38:38] 🌐 Navegación a consultas realizada.
+[2025-04-24 19:39:24] 📦 Estado: repetido_detectado
+[2025-04-24 19:39:24] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 19:39:24] 📊 Total extraídos: 210
+[2025-04-24 19:39:24] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 19:39:29] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 19:39:33] 🌐 Navegación a consultas realizada.
+[2025-04-24 19:44:35] 📦 Estado: repetido_detectado
+[2025-04-24 19:44:35] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 19:44:35] 📊 Total extraídos: 1365
+[2025-04-24 19:44:35] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-04-24 19:44:40] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 19:44:46] 🌐 Navegación a consultas realizada.
+[2025-04-24 19:51:54] 📦 Estado: repetido_detectado
+[2025-04-24 19:51:54] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 19:51:54] 📊 Total extraídos: 1935
+[2025-04-24 19:51:54] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-04-24 19:51:59] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 19:52:03] 🌐 Navegación a consultas realizada.
+[2025-04-24 19:59:32] 📦 Estado: completo
+[2025-04-24 19:59:32] ✅ Extracción finalizada exitosamente.
+[2025-04-24 19:59:32] 📊 Total extraídos: 2011
+[2025-04-24 19:59:32] 📁 Guardado en: datos_iniciales/expedientes_monitor.json
+[2025-04-24 19:59:41] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 19:59:45] 🌐 Navegación a consultas realizada.
+[2025-04-24 20:03:48] 📦 Estado: repetido_detectado
+[2025-04-24 20:03:48] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 20:03:48] 📊 Total extraídos: 1050
+[2025-04-24 20:03:48] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 20:03:53] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 20:03:58] 🌐 Navegación a consultas realizada.
+[2025-04-24 20:06:25] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 20:06:29] 🌐 Navegación a consultas realizada.
+[2025-04-24 20:08:11] 📦 Estado: repetido_detectado
+[2025-04-24 20:08:11] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 20:08:11] 📊 Total extraídos: 435
+[2025-04-24 20:08:11] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 20:08:16] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 20:08:21] 🌐 Navegación a consultas realizada.
+[2025-04-24 20:16:05] 📦 Estado: completo
+[2025-04-24 20:16:05] ✅ Extracción finalizada exitosamente.
+[2025-04-24 20:16:05] 📊 Total extraídos: 2011
+[2025-04-24 20:16:05] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-04-24 20:21:50] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 20:21:54] 🌐 Navegación a consultas realizada.
+[2025-04-24 20:50:21] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 20:50:28] 🌐 Navegación a consultas realizada.
+[2025-04-24 20:52:53] 📦 Estado: repetido_detectado
+[2025-04-24 20:52:53] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 20:52:53] 📊 Total extraídos: 660
+[2025-04-24 20:52:53] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 20:52:58] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 20:52:58] ❌ Error en verificación: Page.goto: net::ERR_INTERNET_DISCONNECTED at https://portalpjn.pjn.gov.ar/inicio
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-04-24 20:52:58] 📦 Estado: fallo
+[2025-04-24 20:52:58] ❌ Fallo en la verificación.
+[2025-04-24 20:52:58] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-04-24 20:53:03] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 20:53:16] 🌐 Navegación a consultas realizada.
+[2025-04-24 20:53:40] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 20:53:44] 🌐 Navegación a consultas realizada.
+[2025-04-24 20:54:01] 📦 Estado: repetido_detectado
+[2025-04-24 20:54:01] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 20:54:01] 📊 Total extraídos: 75
+[2025-04-24 20:54:01] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 20:54:06] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 20:54:06] ❌ Error en verificación: Page.goto: net::ERR_INTERNET_DISCONNECTED at https://portalpjn.pjn.gov.ar/inicio
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-04-24 20:54:06] 📦 Estado: fallo
+[2025-04-24 20:54:06] ❌ Fallo en la verificación.
+[2025-04-24 20:54:06] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-04-24 20:54:11] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 20:54:25] 🌐 Navegación a consultas realizada.
+[2025-04-24 20:54:46] 📦 Estado: repetido_detectado
+[2025-04-24 20:54:46] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 20:54:46] 📊 Total extraídos: 90
+[2025-04-24 20:54:46] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-04-24 20:54:51] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 20:55:13] 🌐 Navegación a consultas realizada.
+[2025-04-24 20:59:43] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 20:59:49] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:00:08] ⏳ Verificación de expedientes ya en curso.
+[2025-04-24 21:00:22] ❌ Error en verificación: ElementHandle.inner_text: Target page, context or browser has been closed
+Call log:
+  - waiting for locator(":scope")
+
+[2025-04-24 21:00:50] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:00:55] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:01:00] ⏳ Verificación de expedientes ya en curso.
+[2025-04-24 21:01:06] ⏳ Verificación de notificaciones ya en curso.
+[2025-04-24 21:01:12] 📦 Estado: repetido_detectado
+[2025-04-24 21:01:12] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 21:01:12] 📊 Total extraídos: 75
+[2025-04-24 21:01:12] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 21:01:17] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:01:33] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:11:58] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:12:05] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:12:14] ⏳ Verificación de notificaciones ya en curso.
+[2025-04-24 21:12:25] ⏳ Verificación de expedientes ya en curso.
+[2025-04-24 21:12:32] ⏳ Verificación de notificaciones ya en curso.
+[2025-04-24 21:13:09] ❌ Error en verificación: ElementHandle.inner_text: Target page, context or browser has been closed
+Call log:
+  - waiting for locator(":scope")
+
+[2025-04-24 21:14:46] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:14:51] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:19:29] 📦 Estado: repetido_detectado
+[2025-04-24 21:19:29] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 21:19:29] 📊 Total extraídos: 1260
+[2025-04-24 21:19:29] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 21:19:34] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:19:39] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:22:08] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:22:19] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-04-24 21:22:28] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:22:37] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:23:17] ❌ Error en verificación: ElementHandle.inner_text: Target page, context or browser has been closed
+Call log:
+  - waiting for locator(":scope")
+
+[2025-04-24 21:26:19] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:26:25] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:26:39] 📦 Estado: repetido_detectado
+[2025-04-24 21:26:39] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 21:26:39] 📊 Total extraídos: 60
+[2025-04-24 21:26:39] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 21:26:44] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:26:54] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:29:32] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:29:37] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:33:46] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:33:51] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:34:04] 📦 Estado: repetido_detectado
+[2025-04-24 21:34:04] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 21:34:04] 📊 Total extraídos: 60
+[2025-04-24 21:34:04] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 21:34:09] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:34:14] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:37:20] 📦 Estado: repetido_detectado
+[2025-04-24 21:37:20] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 21:37:20] 📊 Total extraídos: 840
+[2025-04-24 21:37:20] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-04-24 21:37:25] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:37:29] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:37:31] ⏳ Verificación de expedientes ya en curso.
+[2025-04-24 21:38:08] ⏳ Verificación de expedientes ya en curso.
+[2025-04-24 21:38:46] 📦 Estado: repetido_detectado
+[2025-04-24 21:38:46] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 21:38:46] 📊 Total extraídos: 345
+[2025-04-24 21:38:46] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-04-24 21:38:51] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:39:09] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:39:13] 📦 Estado: repetido_detectado
+[2025-04-24 21:39:13] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 21:39:13] 📊 Total extraídos: 15
+[2025-04-24 21:39:13] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-04-24 21:39:18] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:39:36] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:41:51] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:41:56] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:42:46] ⏳ Verificación de expedientes ya en curso.
+[2025-04-24 21:43:10] ⏳ Verificación de expedientes ya en curso.
+[2025-04-24 21:45:56] ⏳ Verificación de expedientes ya en curso.
+[2025-04-24 21:46:57] 📦 Estado: repetido_detectado
+[2025-04-24 21:46:57] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 21:46:57] 📊 Total extraídos: 1365
+[2025-04-24 21:46:57] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 21:47:02] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:47:07] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:50:58] 📦 Estado: repetido_detectado
+[2025-04-24 21:50:58] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 21:50:58] 📊 Total extraídos: 1050
+[2025-04-24 21:50:58] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-04-24 21:51:03] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:51:09] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:53:29] 📦 Estado: repetido_detectado
+[2025-04-24 21:53:29] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 21:53:29] 📊 Total extraídos: 600
+[2025-04-24 21:53:29] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-04-24 21:53:34] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:53:40] 🌐 Navegación a consultas realizada.
+[2025-04-24 21:58:40] 📦 Estado: repetido_detectado
+[2025-04-24 21:58:40] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 21:58:40] 📊 Total extraídos: 1260
+[2025-04-24 21:58:40] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-04-24 21:58:45] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 21:58:49] 🌐 Navegación a consultas realizada.
+[2025-04-24 22:03:29] 📦 Estado: repetido_detectado
+[2025-04-24 22:03:29] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 22:03:29] 📊 Total extraídos: 1275
+[2025-04-24 22:03:29] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-04-24 22:06:23] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 22:06:27] 🌐 Navegación a consultas realizada.
+[2025-04-24 22:14:00] 📦 Estado: completo
+[2025-04-24 22:14:00] ✅ Extracción finalizada exitosamente.
+[2025-04-24 22:14:00] 📊 Total extraídos: 2011
+[2025-04-24 22:14:00] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-04-24 22:36:23] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 22:36:30] 🌐 Navegación a consultas realizada.
+[2025-04-24 22:38:04] 📦 Estado: repetido_detectado
+[2025-04-24 22:38:04] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 22:38:04] 📊 Total extraídos: 390
+[2025-04-24 22:38:04] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 22:38:09] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 22:38:13] 🌐 Navegación a consultas realizada.
+[2025-04-24 22:46:13] 📦 Estado: completo
+[2025-04-24 22:46:13] ✅ Extracción finalizada exitosamente.
+[2025-04-24 22:46:13] 📊 Total extraídos: 2011
+[2025-04-24 22:46:13] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-04-24 23:06:23] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 23:06:30] 🌐 Navegación a consultas realizada.
+[2025-04-24 23:14:17] 📦 Estado: completo
+[2025-04-24 23:14:17] ✅ Extracción finalizada exitosamente.
+[2025-04-24 23:14:17] 📊 Total extraídos: 2011
+[2025-04-24 23:14:17] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-04-24 23:33:13] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 23:33:21] 🌐 Navegación a consultas realizada.
+[2025-04-24 23:40:48] 📦 Estado: completo
+[2025-04-24 23:40:48] ✅ Extracción finalizada exitosamente.
+[2025-04-24 23:40:48] 📊 Total extraídos: 2011
+[2025-04-24 23:40:48] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-04-24 23:46:22] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 23:46:37] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-04-24 23:46:37] 📦 Estado: fallo
+[2025-04-24 23:46:37] ❌ Fallo en la verificación.
+[2025-04-24 23:46:37] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-24 23:46:42] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 23:46:46] 🌐 Navegación a consultas realizada.
+[2025-04-24 23:51:47] 📦 Estado: repetido_detectado
+[2025-04-24 23:51:47] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 23:51:47] 📊 Total extraídos: 1365
+[2025-04-24 23:51:47] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-04-24 23:51:52] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 23:51:57] 🌐 Navegación a consultas realizada.
+[2025-04-24 23:56:58] 📦 Estado: repetido_detectado
+[2025-04-24 23:56:58] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-24 23:56:58] 📊 Total extraídos: 1365
+[2025-04-24 23:56:58] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-04-24 23:57:03] 🔍 Iniciando verificación de expedientes...
+[2025-04-24 23:57:07] 🌐 Navegación a consultas realizada.
+[2025-04-25 00:02:08] 📦 Estado: repetido_detectado
+[2025-04-25 00:02:08] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-25 00:02:08] 📊 Total extraídos: 1365
+[2025-04-25 00:02:08] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-04-25 00:02:13] 🔍 Iniciando verificación de expedientes...
+[2025-04-25 00:02:18] 🌐 Navegación a consultas realizada.
+[2025-04-25 00:03:17] 📦 Estado: repetido_detectado
+[2025-04-25 00:03:17] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-25 00:03:17] 📊 Total extraídos: 270
+[2025-04-25 00:03:17] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-04-25 00:03:30] 🔍 Iniciando verificación de expedientes...
+[2025-04-25 00:03:35] 🌐 Navegación a consultas realizada.
+[2025-04-25 00:10:56] 📦 Estado: completo
+[2025-04-25 00:10:56] ✅ Extracción finalizada exitosamente.
+[2025-04-25 00:10:56] 📊 Total extraídos: 2011
+[2025-04-25 00:10:56] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-04-25 00:10:56] 🧪 Comparación automática detectó 2 cambios.
+[2025-04-25 00:26:01] 🔍 Iniciando verificación de expedientes...
+[2025-04-25 00:26:08] 🌐 Navegación a consultas realizada.
+[2025-04-25 00:33:36] 📦 Estado: completo
+[2025-04-25 00:33:36] ✅ Extracción finalizada exitosamente.
+[2025-04-25 00:33:36] 📊 Total extraídos: 2011
+[2025-04-25 00:33:36] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-04-25 00:33:36] 🧪 Comparación automática detectó 2 cambios.
+[2025-04-25 09:33:53] 🔍 Iniciando verificación de expedientes...
+[2025-04-25 09:34:07] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-04-25 09:34:07] 📦 Estado: fallo
+[2025-04-25 09:34:07] ❌ Fallo en la verificación.
+[2025-04-25 09:34:07] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-25 09:34:12] 🔍 Iniciando verificación de expedientes...
+[2025-04-25 09:34:17] 🌐 Navegación a consultas realizada.
+[2025-04-25 20:46:36] 🔍 Iniciando verificación de expedientes...
+[2025-04-25 20:46:52] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-04-25 20:46:52] 📦 Estado: fallo
+[2025-04-25 20:46:52] ❌ Fallo en la verificación.
+[2025-04-25 20:46:52] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-25 20:46:57] 🔍 Iniciando verificación de expedientes...
+[2025-04-25 20:47:01] 🌐 Navegación a consultas realizada.
+[2025-04-25 20:52:02] 📦 Estado: repetido_detectado
+[2025-04-25 20:52:02] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-25 20:52:02] 📊 Total extraídos: 1320
+[2025-04-25 20:52:02] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-04-25 20:52:07] 🔍 Iniciando verificación de expedientes...
+[2025-04-25 20:52:11] 🌐 Navegación a consultas realizada.
+[2025-04-25 20:59:52] 📦 Estado: completo
+[2025-04-25 20:59:52] ✅ Extracción finalizada exitosamente.
+[2025-04-25 20:59:52] 📊 Total extraídos: 2012
+[2025-04-25 20:59:52] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-04-25 20:59:52] 🧪 Comparación automática detectó 70 cambios.
+[2025-04-27 13:48:44] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 13:49:01] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-04-27 13:49:01] 📦 Estado: fallo
+[2025-04-27 13:49:01] ❌ Fallo en la verificación.
+[2025-04-27 13:49:01] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-27 13:49:06] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 13:49:12] 🌐 Navegación a consultas realizada.
+[2025-04-27 13:50:09] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 13:50:15] 🌐 Navegación a consultas realizada.
+[2025-04-27 13:51:26] 📦 Estado: repetido_detectado
+[2025-04-27 13:51:26] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-27 13:51:26] 📊 Total extraídos: 315
+[2025-04-27 13:51:26] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-27 13:51:31] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 13:51:40] 🌐 Navegación a consultas realizada.
+[2025-04-27 13:56:40] 📦 Estado: repetido_detectado
+[2025-04-27 13:56:40] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-27 13:56:40] 📊 Total extraídos: 1320
+[2025-04-27 13:56:40] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-04-27 13:56:45] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 13:56:52] 🌐 Navegación a consultas realizada.
+[2025-04-27 13:57:16] 📦 Estado: repetido_detectado
+[2025-04-27 13:57:16] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-27 13:57:16] 📊 Total extraídos: 105
+[2025-04-27 13:57:16] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-04-27 13:57:21] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 13:57:25] 🌐 Navegación a consultas realizada.
+[2025-04-27 13:57:36] 📦 Estado: tabla_no_disponible
+[2025-04-27 13:57:36] ❌ No se encontró la tabla de expedientes en la página.
+[2025-04-27 13:57:36] 📊 Total extraídos: 0
+[2025-04-27 13:57:36] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-04-27 13:57:41] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 13:57:47] 🌐 Navegación a consultas realizada.
+[2025-04-27 13:59:31] 📦 Estado: repetido_detectado
+[2025-04-27 13:59:31] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-27 13:59:31] 📊 Total extraídos: 450
+[2025-04-27 13:59:31] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-04-27 13:59:46] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 13:59:52] 🌐 Navegación a consultas realizada.
+[2025-04-27 14:06:46] 📦 Estado: repetido_detectado
+[2025-04-27 14:06:46] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-27 14:06:46] 📊 Total extraídos: 1890
+[2025-04-27 14:06:46] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-04-27 14:06:59] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 14:07:41] ❌ Error en verificación: Page.goto: Timeout 30000ms exceeded.
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-04-27 14:07:41] 📦 Estado: fallo
+[2025-04-27 14:07:41] ❌ Fallo en la verificación.
+[2025-04-27 14:07:41] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-04-27 14:07:58] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 14:08:29] ❌ Error en verificación: Page.goto: Timeout 30000ms exceeded.
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-04-27 14:08:29] 📦 Estado: fallo
+[2025-04-27 14:08:29] ❌ Fallo en la verificación.
+[2025-04-27 14:08:29] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-04-27 14:09:21] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 14:09:51] 📦 Estado: fallo
+[2025-04-27 14:09:51] ❌ Fallo en la verificación.
+[2025-04-27 14:09:51] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-04-27 14:10:03] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 14:10:07] 🌐 Navegación a consultas realizada.
+[2025-04-27 14:17:34] 📦 Estado: completo
+[2025-04-27 14:17:34] ✅ Extracción finalizada exitosamente.
+[2025-04-27 14:17:34] 📊 Total extraídos: 2012
+[2025-04-27 14:17:34] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-04-27 14:17:34] 🧪 Comparación automática detectó 70 cambios.
+[2025-04-27 14:20:09] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 14:20:14] 🌐 Navegación a consultas realizada.
+[2025-04-27 14:27:48] 📦 Estado: completo
+[2025-04-27 14:27:48] ✅ Extracción finalizada exitosamente.
+[2025-04-27 14:27:48] 📊 Total extraídos: 2012
+[2025-04-27 14:27:48] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-04-27 14:27:48] 🧪 Comparación automática detectó 70 cambios.
+[2025-04-27 23:08:15] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 23:08:32] 🌐 Navegación a consultas realizada.
+[2025-04-27 23:08:42] 📦 Estado: tabla_no_disponible
+[2025-04-27 23:08:42] ❌ No se encontró la tabla de expedientes en la página.
+[2025-04-27 23:08:42] 📊 Total extraídos: 0
+[2025-04-27 23:08:42] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-27 23:08:47] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 23:08:51] 🌐 Navegación a consultas realizada.
+[2025-04-27 23:13:03] 📦 Estado: repetido_detectado
+[2025-04-27 23:13:03] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-27 23:13:03] 📊 Total extraídos: 1140
+[2025-04-27 23:13:03] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-04-27 23:13:08] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 23:13:10] 🌐 Navegación a consultas realizada.
+[2025-04-27 23:13:20] 📦 Estado: tabla_no_disponible
+[2025-04-27 23:13:20] ❌ No se encontró la tabla de expedientes en la página.
+[2025-04-27 23:13:20] 📊 Total extraídos: 0
+[2025-04-27 23:13:20] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-04-27 23:13:25] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 23:13:29] 🌐 Navegación a consultas realizada.
+[2025-04-27 23:18:47] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 23:18:51] 🌐 Navegación a consultas realizada.
+[2025-04-27 23:19:04] 📦 Estado: repetido_detectado
+[2025-04-27 23:19:04] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-27 23:19:04] 📊 Total extraídos: 60
+[2025-04-27 23:19:04] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-27 23:19:09] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 23:19:13] 🌐 Navegación a consultas realizada.
+[2025-04-27 23:19:14] 📦 Estado: completo
+[2025-04-27 23:19:14] ✅ Extracción finalizada exitosamente.
+[2025-04-27 23:19:14] 📊 Total extraídos: 15
+[2025-04-27 23:19:14] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-04-27 23:19:14] 🧪 Comparación automática detectó 1999 cambios.
+[2025-04-27 23:21:01] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 23:21:05] 🌐 Navegación a consultas realizada.
+[2025-04-27 23:24:23] 📦 Estado: repetido_detectado
+[2025-04-27 23:24:23] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-27 23:24:23] 📊 Total extraídos: 870
+[2025-04-27 23:24:23] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-04-27 23:24:28] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 23:24:35] 🌐 Navegación a consultas realizada.
+[2025-04-27 23:25:54] 📦 Estado: repetido_detectado
+[2025-04-27 23:25:54] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-04-27 23:25:54] 📊 Total extraídos: 345
+[2025-04-27 23:25:54] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-04-27 23:25:59] 🔍 Iniciando verificación de expedientes...
+[2025-04-27 23:26:04] 🌐 Navegación a consultas realizada.
+[2025-04-27 23:33:51] 📦 Estado: completo
+[2025-04-27 23:33:51] ✅ Extracción finalizada exitosamente.
+[2025-04-27 23:33:51] 📊 Total extraídos: 2012
+[2025-04-27 23:33:51] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-04-27 23:33:51] 🧪 Comparación automática detectó 72 cambios.
+[2025-05-10 23:00:08] 🔍 Iniciando verificación de expedientes...
+[2025-05-10 23:00:26] 🌐 Navegación a consultas realizada.
+[2025-05-10 23:00:32] 📦 Estado: completo
+[2025-05-10 23:00:32] ✅ Extracción finalizada exitosamente.
+[2025-05-10 23:00:32] 📊 Total extraídos: 30
+[2025-05-10 23:00:32] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-05-10 23:00:32] 📊 Comparación automática: sin cambios detectados.
+[2025-05-10 23:09:13] 🔍 Iniciando verificación de expedientes...
+[2025-05-10 23:09:17] 🌐 Navegación a consultas realizada.
+[2025-05-10 23:14:17] 📦 Estado: repetido_detectado
+[2025-05-10 23:14:17] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-10 23:14:17] 📊 Total extraídos: 1950
+[2025-05-10 23:14:17] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-05-10 23:14:22] 🔍 Iniciando verificación de expedientes...
+[2025-05-10 23:14:29] 🌐 Navegación a consultas realizada.
+[2025-05-10 23:19:30] 📦 Estado: repetido_detectado
+[2025-05-10 23:19:30] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-10 23:19:30] 📊 Total extraídos: 1965
+[2025-05-10 23:19:30] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-05-10 23:19:35] 🔍 Iniciando verificación de expedientes...
+[2025-05-10 23:19:39] 🌐 Navegación a consultas realizada.
+[2025-05-10 23:24:38] 📦 Estado: repetido_detectado
+[2025-05-10 23:24:38] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-10 23:24:38] 📊 Total extraídos: 1935
+[2025-05-10 23:24:38] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-05-10 23:24:43] 🔍 Iniciando verificación de expedientes...
+[2025-05-10 23:24:48] 🌐 Navegación a consultas realizada.
+[2025-05-10 23:27:30] 📦 Estado: repetido_detectado
+[2025-05-10 23:27:30] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-10 23:27:30] 📊 Total extraídos: 1065
+[2025-05-10 23:27:30] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-05-10 23:27:35] 🔍 Iniciando verificación de expedientes...
+[2025-05-10 23:27:39] 🌐 Navegación a consultas realizada.
+[2025-05-10 23:32:46] 📦 Estado: completo
+[2025-05-10 23:32:46] ✅ Extracción finalizada exitosamente.
+[2025-05-10 23:32:46] 📊 Total extraídos: 2015
+[2025-05-10 23:32:46] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-05-10 23:32:46] 📊 Comparación automática: sin cambios detectados.
+[2025-05-11 00:25:45] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 00:25:58] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-05-11 00:25:58] 📦 Estado: fallo
+[2025-05-11 00:25:58] ❌ Fallo en la verificación.
+[2025-05-11 00:25:58] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-05-11 00:26:03] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 00:26:07] 🌐 Navegación a consultas realizada.
+[2025-05-11 00:31:08] 📦 Estado: repetido_detectado
+[2025-05-11 00:31:08] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-11 00:31:08] 📊 Total extraídos: 1965
+[2025-05-11 00:31:08] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-05-11 00:31:13] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 00:31:19] 🌐 Navegación a consultas realizada.
+[2025-05-11 00:38:45] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 00:38:51] 🌐 Navegación a consultas realizada.
+[2025-05-11 00:43:58] 📦 Estado: completo
+[2025-05-11 00:43:58] ✅ Extracción finalizada exitosamente.
+[2025-05-11 00:43:58] 📊 Total extraídos: 2015
+[2025-05-11 00:43:58] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-05-11 00:43:58] 📊 Comparación automática: sin cambios detectados.
+[2025-05-11 00:53:03] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 00:53:10] 🌐 Navegación a consultas realizada.
+[2025-05-11 00:53:37] 📦 Estado: completo
+[2025-05-11 00:53:37] ✅ Extracción finalizada exitosamente.
+[2025-05-11 00:53:37] 📊 Total extraídos: 180
+[2025-05-11 00:53:37] 📁 Guardado en: C:/Users/aleja/Documents/Sistema/modulos_monitor/general/descargas_monitoreo/expedientes\expedientes_monitor.json
+[2025-05-11 00:53:37] 📊 Comparación automática: sin cambios detectados.
+[2025-05-11 01:26:09] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 01:26:21] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-05-11 01:26:21] 📦 Estado: fallo
+[2025-05-11 01:26:21] ❌ Fallo en la verificación.
+[2025-05-11 01:26:21] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-05-11 01:26:26] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 01:26:30] 🌐 Navegación a consultas realizada.
+[2025-05-11 01:31:31] 📦 Estado: repetido_detectado
+[2025-05-11 01:31:31] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-11 01:31:31] 📊 Total extraídos: 1965
+[2025-05-11 01:31:31] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-05-11 01:31:36] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 01:31:40] 🌐 Navegación a consultas realizada.
+[2025-05-11 01:36:41] 📦 Estado: repetido_detectado
+[2025-05-11 01:36:41] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-11 01:36:41] 📊 Total extraídos: 1965
+[2025-05-11 01:36:41] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-05-11 01:36:46] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 01:36:50] 🌐 Navegación a consultas realizada.
+[2025-05-11 01:41:51] 📦 Estado: repetido_detectado
+[2025-05-11 01:41:51] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-11 01:41:51] 📊 Total extraídos: 1965
+[2025-05-11 01:41:51] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-05-11 01:41:56] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 01:42:01] 🌐 Navegación a consultas realizada.
+[2025-05-11 01:47:01] 📦 Estado: repetido_detectado
+[2025-05-11 01:47:01] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-11 01:47:01] 📊 Total extraídos: 1125
+[2025-05-11 01:47:01] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-05-11 02:03:55] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 02:04:00] 🌐 Navegación a consultas realizada.
+[2025-05-11 02:08:59] 📦 Estado: repetido_detectado
+[2025-05-11 02:08:59] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-11 02:08:59] 📊 Total extraídos: 1170
+[2025-05-11 02:08:59] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-05-11 02:09:04] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 02:09:09] 🌐 Navegación a consultas realizada.
+[2025-05-11 02:14:14] 📦 Estado: completo
+[2025-05-11 02:14:14] ✅ Extracción finalizada exitosamente.
+[2025-05-11 02:14:14] 📊 Total extraídos: 2015
+[2025-05-11 02:14:14] 📁 Guardado en: datos_iniciales/expedientes_monitor.json
+[2025-05-11 02:14:14] 📊 Comparación automática: sin cambios detectados.
+[2025-05-11 02:33:55] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 02:34:04] 🌐 Navegación a consultas realizada.
+[2025-05-11 13:13:03] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 13:13:19] 🌐 Navegación a consultas realizada.
+[2025-05-11 13:14:06] 📦 Estado: repetido_detectado
+[2025-05-11 13:14:06] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-11 13:14:06] 📊 Total extraídos: 180
+[2025-05-11 13:14:06] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-05-11 13:14:11] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 13:14:16] 🌐 Navegación a consultas realizada.
+[2025-05-11 13:19:16] 📦 Estado: repetido_detectado
+[2025-05-11 13:19:16] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-11 13:19:16] 📊 Total extraídos: 1125
+[2025-05-11 13:19:16] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-05-11 13:19:21] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 13:19:26] 🌐 Navegación a consultas realizada.
+[2025-05-11 13:22:00] 📦 Estado: repetido_detectado
+[2025-05-11 13:22:00] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-11 13:22:00] 📊 Total extraídos: 1005
+[2025-05-11 13:22:00] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-05-11 13:22:06] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 13:22:10] 🌐 Navegación a consultas realizada.
+[2025-05-11 13:31:07] 📦 Estado: completo
+[2025-05-11 13:31:07] ✅ Extracción finalizada exitosamente.
+[2025-05-11 13:31:07] 📊 Total extraídos: 2015
+[2025-05-11 13:31:07] 📁 Guardado en: datos_iniciales/expedientes_monitor.json
+[2025-05-11 13:31:07] 📊 Comparación automática: sin cambios detectados.
+[2025-05-11 13:34:00] 🔍 Iniciando verificación de expedientes...
+[2025-05-11 13:34:09] 🌐 Navegación a consultas realizada.
+[2025-05-11 13:34:13] ⏳ Verificación de expedientes ya en curso.
+[2025-05-11 13:34:13] ⏳ Verificación de notificaciones ya en curso.
+[2025-05-11 13:34:38] ⏳ Verificación de expedientes ya en curso.
+[2025-05-11 13:37:04] ❌ Error en verificación: Page.query_selector_all: Target page, context or browser has been closed
+[2025-05-18 20:41:57] 🔍 Iniciando verificación de expedientes...
+[2025-05-18 20:42:10] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-05-18 20:42:10] 📦 Estado: fallo
+[2025-05-18 20:42:10] ❌ Fallo en la verificación.
+[2025-05-18 20:42:10] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-05-18 20:42:15] 🔍 Iniciando verificación de expedientes...
+[2025-05-18 20:42:19] 🌐 Navegación a consultas realizada.
+[2025-05-18 20:47:20] 📦 Estado: repetido_detectado
+[2025-05-18 20:47:20] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-18 20:47:20] 📊 Total extraídos: 1920
+[2025-05-18 20:47:20] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-05-18 20:47:25] 🔍 Iniciando verificación de expedientes...
+[2025-05-18 20:47:29] 🌐 Navegación a consultas realizada.
+[2025-05-18 20:52:28] 📦 Estado: repetido_detectado
+[2025-05-18 20:52:28] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-18 20:52:28] 📊 Total extraídos: 1950
+[2025-05-18 20:52:28] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-05-18 20:52:33] 🔍 Iniciando verificación de expedientes...
+[2025-05-18 20:52:38] 🌐 Navegación a consultas realizada.
+[2025-05-18 23:32:32] 🔍 Iniciando verificación de expedientes...
+[2025-05-18 23:32:50] 🌐 Navegación a consultas realizada.
+[2025-05-18 23:37:58] 📦 Estado: completo
+[2025-05-18 23:37:58] ✅ Extracción finalizada exitosamente.
+[2025-05-18 23:37:58] 📊 Total extraídos: 2015
+[2025-05-18 23:37:58] 📁 Guardado en: datos_iniciales/expedientes_monitor.json
+[2025-05-18 23:37:58] 📊 Comparación automática: sin cambios detectados.
+[2025-05-19 00:02:34] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 00:02:40] 🌐 Navegación a consultas realizada.
+[2025-05-19 00:04:14] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 00:04:19] 🌐 Navegación a consultas realizada.
+[2025-05-19 00:09:34] 📦 Estado: completo
+[2025-05-19 00:09:34] ✅ Extracción finalizada exitosamente.
+[2025-05-19 00:09:34] 📊 Total extraídos: 2015
+[2025-05-19 00:09:34] 📁 Guardado en: datos_iniciales/expedientes_monitor.json
+[2025-05-19 00:09:34] 📊 Comparación automática: sin cambios detectados.
+[2025-05-19 00:35:29] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 00:35:37] 🌐 Navegación a consultas realizada.
+[2025-05-19 00:40:44] 📦 Estado: completo
+[2025-05-19 00:40:44] ✅ Extracción finalizada exitosamente.
+[2025-05-19 00:40:44] 📊 Total extraídos: 2015
+[2025-05-19 00:40:44] 📁 Guardado en: datos_iniciales/expedientes_monitor.json
+[2025-05-19 00:40:44] 📊 Comparación automática: sin cambios detectados.
+[2025-05-19 00:51:25] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 00:51:31] 🌐 Navegación a consultas realizada.
+[2025-05-19 00:56:30] 📦 Estado: repetido_detectado
+[2025-05-19 00:56:30] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-19 00:56:30] 📊 Total extraídos: 1650
+[2025-05-19 00:56:30] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-05-19 00:56:35] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 00:56:42] 🌐 Navegación a consultas realizada.
+[2025-05-19 01:01:40] ❌ Error en verificación: Page.query_selector_all: Execution context was destroyed, most likely because of a navigation
+[2025-05-19 01:01:40] 📦 Estado: fallo
+[2025-05-19 01:01:40] ❌ Fallo en la verificación.
+[2025-05-19 01:01:40] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-05-19 01:01:45] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 01:01:50] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-05-19 01:01:52] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 01:01:58] 🌐 Navegación a consultas realizada.
+[2025-05-19 01:06:58] 📦 Estado: repetido_detectado
+[2025-05-19 01:06:58] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-19 01:06:58] 📊 Total extraídos: 1890
+[2025-05-19 01:06:58] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-05-19 01:07:03] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 01:07:09] 🌐 Navegación a consultas realizada.
+[2025-05-19 01:12:08] 📦 Estado: repetido_detectado
+[2025-05-19 01:12:08] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-19 01:12:08] 📊 Total extraídos: 1905
+[2025-05-19 01:12:08] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-05-19 01:12:13] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 01:12:18] 🌐 Navegación a consultas realizada.
+[2025-05-19 01:17:18] 📦 Estado: repetido_detectado
+[2025-05-19 01:17:18] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-19 01:17:18] 📊 Total extraídos: 1125
+[2025-05-19 01:17:18] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-05-19 01:17:23] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 01:17:23] ❌ Error en verificación: Page.goto: net::ERR_ABORTED; maybe frame was detached?
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-05-19 01:17:26] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 01:17:31] 🌐 Navegación a consultas realizada.
+[2025-05-19 01:25:19] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 01:25:24] 🌐 Navegación a consultas realizada.
+[2025-05-19 01:25:39] ❌ Error en verificación: Page.query_selector_all: Connection closed while reading from the driver
+[2025-05-19 01:26:17] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 01:26:22] 🌐 Navegación a consultas realizada.
+[2025-05-19 01:29:47] 📦 Estado: repetido_detectado
+[2025-05-19 01:29:47] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-19 01:29:47] 📊 Total extraídos: 1290
+[2025-05-19 01:29:47] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-05-19 01:29:52] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 01:29:58] 🌐 Navegación a consultas realizada.
+[2025-05-19 01:32:52] 📦 Estado: repetido_detectado
+[2025-05-19 01:32:52] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-19 01:32:52] 📊 Total extraídos: 660
+[2025-05-19 01:32:52] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-05-19 01:32:57] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 01:33:09] ❌ Error en verificación: Page.goto: net::ERR_ABORTED; maybe frame was detached?
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-05-19 01:35:43] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 01:35:49] 🌐 Navegación a consultas realizada.
+[2025-05-19 01:40:48] 📦 Estado: repetido_detectado
+[2025-05-19 01:40:48] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-19 01:40:48] 📊 Total extraídos: 1965
+[2025-05-19 01:40:48] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-05-19 01:40:53] 🔍 Iniciando verificación de expedientes...
+[2025-05-19 01:40:57] 🌐 Navegación a consultas realizada.
+[2025-05-19 01:41:11] ❌ Error en verificación: Page.query_selector_all: Connection closed while reading from the driver
+[2025-05-25 13:51:08] 🔍 Iniciando verificación de expedientes...
+[2025-05-25 13:51:25] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-05-25 13:51:25] 📦 Estado: fallo
+[2025-05-25 13:51:25] ❌ Fallo en la verificación.
+[2025-05-25 13:51:25] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-05-25 13:51:30] 🔍 Iniciando verificación de expedientes...
+[2025-05-25 13:51:35] 🌐 Navegación a consultas realizada.
+[2025-05-25 13:55:54] 📦 Estado: repetido_detectado
+[2025-05-25 13:55:54] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-25 13:55:54] 📊 Total extraídos: 1591
+[2025-05-25 13:55:54] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-05-25 13:55:59] 🔍 Iniciando verificación de expedientes...
+[2025-05-25 13:56:04] 🌐 Navegación a consultas realizada.
+[2025-05-25 14:00:27] 📦 Estado: repetido_detectado
+[2025-05-25 14:00:27] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-05-25 14:00:27] 📊 Total extraídos: 1591
+[2025-05-25 14:00:27] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-05-25 14:00:32] 🔍 Iniciando verificación de expedientes...
+[2025-05-25 14:00:38] 🌐 Navegación a consultas realizada.
+[2025-05-25 14:00:59] ❌ Error en verificación: ElementHandle.inner_text: Target page, context or browser has been closed
+Call log:
+  - waiting for locator(":scope")
+
+[2025-06-05 15:31:13] 🔍 Iniciando verificación de expedientes...
+[2025-06-05 15:31:29] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-06-05 15:31:29] 📦 Estado: fallo
+[2025-06-05 15:31:29] ❌ Fallo en la verificación.
+[2025-06-05 15:31:29] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-06-05 15:31:34] 🔍 Iniciando verificación de expedientes...
+[2025-06-05 15:31:39] 🌐 Navegación a consultas realizada.
+[2025-06-05 15:38:39] 📦 Estado: repetido_detectado
+[2025-06-05 15:38:39] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-06-05 15:38:39] 📊 Total extraídos: 1591
+[2025-06-05 15:38:39] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-06-05 15:38:44] 🔍 Iniciando verificación de expedientes...
+[2025-06-05 15:38:49] 🌐 Navegación a consultas realizada.
+[2025-06-05 15:43:51] 📦 Estado: repetido_detectado
+[2025-06-05 15:43:51] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-06-05 15:43:51] 📊 Total extraídos: 765
+[2025-06-05 15:43:51] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-06-05 15:43:56] 🔍 Iniciando verificación de expedientes...
+[2025-06-05 15:44:01] 🌐 Navegación a consultas realizada.
+[2025-06-05 15:47:52] 📦 Estado: repetido_detectado
+[2025-06-05 15:47:52] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-06-05 15:47:52] 📊 Total extraídos: 870
+[2025-06-05 15:47:52] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-06-05 15:47:57] 🔍 Iniciando verificación de expedientes...
+[2025-06-05 15:48:02] 🌐 Navegación a consultas realizada.
+[2025-06-05 15:49:56] 📦 Estado: repetido_detectado
+[2025-06-05 15:49:56] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-06-05 15:49:56] 📊 Total extraídos: 360
+[2025-06-05 15:49:56] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-16 16:23:57] 🔍 Iniciando verificación de expedientes...
+[2025-07-16 16:24:14] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-07-16 16:24:14] 📦 Estado: fallo
+[2025-07-16 16:24:14] ❌ Fallo en la verificación.
+[2025-07-16 16:24:14] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-16 16:24:19] 🔍 Iniciando verificación de expedientes...
+[2025-07-16 16:24:30] 🌐 Navegación a consultas realizada.
+[2025-07-16 16:25:19] 📦 Estado: repetido_detectado
+[2025-07-16 16:25:19] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-16 16:25:19] 📊 Total extraídos: 300
+[2025-07-16 16:25:19] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-07-16 16:25:24] 🔍 Iniciando verificación de expedientes...
+[2025-07-16 16:25:29] 🌐 Navegación a consultas realizada.
+[2025-07-16 16:26:21] 📦 Estado: repetido_detectado
+[2025-07-16 16:26:21] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-16 16:26:21] 📊 Total extraídos: 315
+[2025-07-16 16:26:21] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-07-16 16:26:26] 🔍 Iniciando verificación de expedientes...
+[2025-07-16 16:26:35] 🌐 Navegación a consultas realizada.
+[2025-07-16 16:26:57] 📦 Estado: repetido_detectado
+[2025-07-16 16:26:57] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-16 16:26:57] 📊 Total extraídos: 120
+[2025-07-16 16:26:57] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-07-16 16:27:02] 🔍 Iniciando verificación de expedientes...
+[2025-07-16 16:27:09] 🌐 Navegación a consultas realizada.
+[2025-07-16 16:29:06] 📦 Estado: repetido_detectado
+[2025-07-16 16:29:06] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-16 16:29:06] 📊 Total extraídos: 720
+[2025-07-16 16:29:06] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-16 16:29:26] 🔍 Iniciando verificación de expedientes...
+[2025-07-16 16:29:37] 🌐 Navegación a consultas realizada.
+[2025-07-16 16:31:01] 📦 Estado: repetido_detectado
+[2025-07-16 16:31:01] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-16 16:31:01] 📊 Total extraídos: 510
+[2025-07-16 16:31:01] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-24 14:06:46] 🔍 Iniciando verificación de expedientes...
+[2025-07-24 14:07:10] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-07-24 14:07:10] 📦 Estado: fallo
+[2025-07-24 14:07:10] ❌ Fallo en la verificación.
+[2025-07-24 14:07:10] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-24 14:07:15] 🔍 Iniciando verificación de expedientes...
+[2025-07-24 14:07:20] 🌐 Navegación a consultas realizada.
+[2025-07-24 14:15:24] 📦 Estado: completo
+[2025-07-24 14:15:24] ✅ Extracción finalizada exitosamente.
+[2025-07-24 14:15:24] 📊 Total extraídos: 2046
+[2025-07-24 14:15:24] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-07-24 14:15:24] 📊 Comparación automática: sin cambios detectados.
+[2025-07-31 00:01:18] 🔍 Iniciando verificación de expedientes...
+[2025-07-31 00:01:19] ❌ Error en verificación: BrowserType.launch: Executable doesn't exist at /Users/davidalejandroliva/Library/Caches/ms-playwright/chromium-1155/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+[2025-07-31 00:01:19] 📦 Estado: fallo
+[2025-07-31 00:01:19] ❌ Fallo en la verificación.
+[2025-07-31 00:01:19] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-31 00:01:23] 🔍 Iniciando verificación de expedientes...
+[2025-07-31 00:01:24] ❌ Error en verificación: BrowserType.launch: Executable doesn't exist at /Users/davidalejandroliva/Library/Caches/ms-playwright/chromium-1155/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+[2025-07-31 00:01:24] 📦 Estado: fallo
+[2025-07-31 00:01:24] ❌ Fallo en la verificación.
+[2025-07-31 00:01:24] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-07-31 00:01:28] 🔍 Iniciando verificación de expedientes...
+[2025-07-31 00:01:28] ❌ Error en verificación: BrowserType.launch: Executable doesn't exist at /Users/davidalejandroliva/Library/Caches/ms-playwright/chromium-1155/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+[2025-07-31 00:01:28] 📦 Estado: fallo
+[2025-07-31 00:01:28] ❌ Fallo en la verificación.
+[2025-07-31 00:01:28] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-07-31 00:01:33] 🔍 Iniciando verificación de expedientes...
+[2025-07-31 00:01:33] ❌ Error en verificación: BrowserType.launch: Executable doesn't exist at /Users/davidalejandroliva/Library/Caches/ms-playwright/chromium-1155/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+[2025-07-31 00:01:33] 📦 Estado: fallo
+[2025-07-31 00:01:33] ❌ Fallo en la verificación.
+[2025-07-31 00:01:33] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-07-31 00:01:38] 🔍 Iniciando verificación de expedientes...
+[2025-07-31 00:01:38] ❌ Error en verificación: BrowserType.launch: Executable doesn't exist at /Users/davidalejandroliva/Library/Caches/ms-playwright/chromium-1155/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+[2025-07-31 00:01:38] 📦 Estado: fallo
+[2025-07-31 00:01:38] ❌ Fallo en la verificación.
+[2025-07-31 00:01:38] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-31 00:04:48] 🔍 Iniciando verificación de expedientes...
+[2025-07-31 00:04:57] 🌐 Navegación a consultas realizada.
+[2025-07-31 00:09:57] 📦 Estado: repetido_detectado
+[2025-07-31 00:09:57] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-31 00:09:57] 📊 Total extraídos: 1980
+[2025-07-31 00:09:57] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-31 00:10:02] 🔍 Iniciando verificación de expedientes...
+[2025-07-31 00:10:07] 🌐 Navegación a consultas realizada.
+[2025-07-31 00:15:07] 📦 Estado: repetido_detectado
+[2025-07-31 00:15:07] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-31 00:15:07] 📊 Total extraídos: 1920
+[2025-07-31 00:15:07] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-07-31 00:15:12] 🔍 Iniciando verificación de expedientes...
+[2025-07-31 00:15:17] 🌐 Navegación a consultas realizada.
+[2025-07-31 00:20:30] 📦 Estado: completo
+[2025-07-31 00:20:30] ✅ Extracción finalizada exitosamente.
+[2025-07-31 00:20:30] 📊 Total extraídos: 2046
+[2025-07-31 00:20:30] 📁 Guardado en: /Users/davidalejandroliva/PycharmProjects/sintaXis/core/modulos_monitor/general/datos_extraidos/monitoreo/expedientes_monitor.json
+[2025-07-31 00:20:30] 📊 Comparación automática: sin cambios detectados.
+[2025-07-24 21:26:32] 🔍 Iniciando verificación de expedientes...
+[2025-07-24 21:26:53] 🌐 Navegación a consultas realizada.
+[2025-07-24 21:31:53] 📦 Estado: repetido_detectado
+[2025-07-24 21:31:53] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-24 21:31:53] 📊 Total extraídos: 1410
+[2025-07-24 21:31:53] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-24 21:31:58] 🔍 Iniciando verificación de expedientes...
+[2025-07-24 21:32:04] 🌐 Navegación a consultas realizada.
+[2025-07-24 21:37:03] 📦 Estado: repetido_detectado
+[2025-07-24 21:37:03] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-24 21:37:03] 📊 Total extraídos: 1590
+[2025-07-24 21:37:03] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-07-24 21:37:08] 🔍 Iniciando verificación de expedientes...
+[2025-07-24 21:37:12] 🌐 Navegación a consultas realizada.
+[2025-07-24 22:48:46] 🔍 Iniciando verificación de expedientes...
+[2025-07-24 22:49:03] 🌐 Navegación a consultas realizada.
+[2025-07-24 22:50:54] 📦 Estado: repetido_detectado
+[2025-07-24 22:50:54] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-24 22:50:54] 📊 Total extraídos: 420
+[2025-07-24 22:50:54] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-24 22:50:59] 🔍 Iniciando verificación de expedientes...
+[2025-07-24 22:51:04] 🌐 Navegación a consultas realizada.
+[2025-07-24 22:59:35] 📦 Estado: completo
+[2025-07-24 22:59:35] ✅ Extracción finalizada exitosamente.
+[2025-07-24 22:59:35] 📊 Total extraídos: 2046
+[2025-07-24 22:59:35] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-07-24 22:59:35] 📊 Comparación automática: sin cambios detectados.
+[2025-07-28 12:54:43] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 12:55:08] 🌐 Navegación a consultas realizada.
+[2025-07-28 12:55:54] 📦 Estado: repetido_detectado
+[2025-07-28 12:55:54] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 12:55:54] 📊 Total extraídos: 300
+[2025-07-28 12:55:54] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-28 12:55:59] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 12:56:06] 🌐 Navegación a consultas realizada.
+[2025-07-28 12:56:16] 📦 Estado: repetido_detectado
+[2025-07-28 12:56:16] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 12:56:16] 📊 Total extraídos: 60
+[2025-07-28 12:56:16] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-07-28 12:56:21] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 12:56:36] 🌐 Navegación a consultas realizada.
+[2025-07-28 12:58:11] 📦 Estado: repetido_detectado
+[2025-07-28 12:58:11] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 12:58:11] 📊 Total extraídos: 615
+[2025-07-28 12:58:11] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-07-28 12:58:16] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 12:58:34] 🌐 Navegación a consultas realizada.
+[2025-07-28 12:59:14] 📦 Estado: repetido_detectado
+[2025-07-28 12:59:14] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 12:59:14] 📊 Total extraídos: 255
+[2025-07-28 12:59:14] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-07-28 12:59:19] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 12:59:28] 🌐 Navegación a consultas realizada.
+[2025-07-28 12:59:54] 📦 Estado: repetido_detectado
+[2025-07-28 12:59:54] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 12:59:54] 📊 Total extraídos: 165
+[2025-07-28 12:59:55] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-28 13:02:45] ⏳ Verificación de notificaciones ya en curso.
+[2025-07-28 13:02:45] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 13:02:51] 🌐 Navegación a consultas realizada.
+[2025-07-28 13:04:54] 📦 Estado: repetido_detectado
+[2025-07-28 13:04:54] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 13:04:54] 📊 Total extraídos: 795
+[2025-07-28 13:04:54] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-28 13:30:37] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 13:30:43] 🌐 Navegación a consultas realizada.
+[2025-07-28 13:31:10] 📦 Estado: repetido_detectado
+[2025-07-28 13:31:10] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 13:31:10] 📊 Total extraídos: 180
+[2025-07-28 13:31:10] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-28 13:31:32] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 13:31:40] 🌐 Navegación a consultas realizada.
+[2025-07-28 13:32:06] 📦 Estado: repetido_detectado
+[2025-07-28 13:32:06] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 13:32:06] 📊 Total extraídos: 165
+[2025-07-28 13:32:06] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-07-28 13:32:45] ⏳ Verificación de notificaciones ya en curso.
+[2025-07-28 13:32:45] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 13:32:51] 🌐 Navegación a consultas realizada.
+[2025-07-28 13:40:01] 📦 Estado: completo
+[2025-07-28 13:40:01] ✅ Extracción finalizada exitosamente.
+[2025-07-28 13:40:01] 📊 Total extraídos: 2046
+[2025-07-28 13:40:01] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-07-28 13:40:01] 📊 Comparación automática: sin cambios detectados.
+[2025-07-28 14:10:10] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 14:10:34] 🌐 Navegación a consultas realizada.
+[2025-07-28 14:12:18] 📦 Estado: repetido_detectado
+[2025-07-28 14:12:18] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 14:12:18] 📊 Total extraídos: 390
+[2025-07-28 14:12:18] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-28 14:12:23] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 14:12:28] 🌐 Navegación a consultas realizada.
+[2025-07-28 14:16:22] 📦 Estado: repetido_detectado
+[2025-07-28 14:16:22] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 14:16:22] 📊 Total extraídos: 1335
+[2025-07-28 14:16:22] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-07-28 14:16:27] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 14:16:31] 🌐 Navegación a consultas realizada.
+[2025-07-28 14:54:03] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 14:54:21] 🌐 Navegación a consultas realizada.
+[2025-07-28 15:32:37] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 15:32:54] 🌐 Navegación a consultas realizada.
+[2025-07-28 15:37:54] 📦 Estado: repetido_detectado
+[2025-07-28 15:37:54] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 15:37:54] 📊 Total extraídos: 1980
+[2025-07-28 15:37:54] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-28 15:37:59] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 15:38:03] 🌐 Navegación a consultas realizada.
+[2025-07-28 15:38:12] ⏳ Verificación de notificaciones ya en curso.
+[2025-07-28 15:38:20] ❌ Error en verificación: Browser.close: Connection closed while reading from the driver
+[2025-07-28 15:38:26] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 15:38:32] 🌐 Navegación a consultas realizada.
+[2025-07-28 15:42:36] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 15:42:41] 🌐 Navegación a consultas realizada.
+[2025-07-28 16:29:57] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 16:30:14] 🌐 Navegación a consultas realizada.
+[2025-07-28 16:35:24] 📦 Estado: completo
+[2025-07-28 16:35:24] ✅ Extracción finalizada exitosamente.
+[2025-07-28 16:35:24] 📊 Total extraídos: 2046
+[2025-07-28 16:35:24] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-07-28 16:35:24] 📊 Comparación automática: sin cambios detectados.
+[2025-07-28 16:37:18] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 16:37:23] 🌐 Navegación a consultas realizada.
+[2025-07-28 16:42:23] 📦 Estado: repetido_detectado
+[2025-07-28 16:42:23] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-07-28 16:42:23] 📊 Total extraídos: 1770
+[2025-07-28 16:42:23] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-07-28 16:42:28] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 16:42:33] 🌐 Navegación a consultas realizada.
+[2025-07-28 16:51:00] 📦 Estado: completo
+[2025-07-28 16:51:00] ✅ Extracción finalizada exitosamente.
+[2025-07-28 16:51:00] 📊 Total extraídos: 2046
+[2025-07-28 16:51:00] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-07-28 16:51:00] 📊 Comparación automática: sin cambios detectados.
+[2025-07-28 17:07:18] 🔍 Iniciando verificación de expedientes...
+[2025-07-28 17:07:22] 🌐 Navegación a consultas realizada.
+[2025-07-28 17:12:33] 📦 Estado: completo
+[2025-07-28 17:12:33] ✅ Extracción finalizada exitosamente.
+[2025-07-28 17:12:33] 📊 Total extraídos: 2046
+[2025-07-28 17:12:33] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-07-28 17:12:33] 📊 Comparación automática: sin cambios detectados.
+[2025-08-02 15:39:38] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 15:39:55] 🌐 Navegación a consultas realizada.
+[2025-08-02 15:40:14] ❌ Error en verificación: Page.query_selector_all: Connection closed while reading from the driver
+[2025-08-02 15:40:18] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 15:40:23] 🌐 Navegación a consultas realizada.
+[2025-08-02 15:40:36] ❌ Error en verificación: Page.query_selector_all: Connection closed while reading from the driver
+[2025-08-02 15:40:36] 📦 Estado: fallo
+[2025-08-02 15:40:36] ❌ Fallo en la verificación.
+[2025-08-02 15:40:36] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 15:40:41] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 15:40:46] 🌐 Navegación a consultas realizada.
+[2025-08-02 15:44:30] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 15:44:42] 🌐 Navegación a consultas realizada.
+[2025-08-02 15:53:34] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 15:53:39] 🌐 Navegación a consultas realizada.
+[2025-08-02 15:58:50] 📦 Estado: completo
+[2025-08-02 15:58:50] ✅ Extracción finalizada exitosamente.
+[2025-08-02 15:58:50] 📊 Total extraídos: 2046
+[2025-08-02 15:58:50] 📁 Guardado en: C:\Users\aleja\Documents\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-08-02 15:58:50] 📊 Comparación automática: sin cambios detectados.
+[2025-08-02 16:34:26] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:34:38] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-08-02 16:34:38] 📦 Estado: fallo
+[2025-08-02 16:34:38] ❌ Fallo en la verificación.
+[2025-08-02 16:34:38] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 16:34:43] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:34:48] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:34:48] ❌ Error en verificación: [Errno 2] No such file or directory: 'config/config_monitor.json'
+[2025-08-02 16:34:48] 📦 Estado: fallo
+[2025-08-02 16:34:48] ❌ Fallo en la verificación.
+[2025-08-02 16:34:48] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-02 16:34:53] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:34:57] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:34:57] ❌ Error en verificación: [Errno 2] No such file or directory: 'config/config_monitor.json'
+[2025-08-02 16:34:57] 📦 Estado: fallo
+[2025-08-02 16:34:57] ❌ Fallo en la verificación.
+[2025-08-02 16:34:57] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-08-02 16:35:02] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:35:06] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:35:06] ❌ Error en verificación: [Errno 2] No such file or directory: 'config/config_monitor.json'
+[2025-08-02 16:35:06] 📦 Estado: fallo
+[2025-08-02 16:35:06] ❌ Fallo en la verificación.
+[2025-08-02 16:35:06] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-08-02 16:35:11] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:35:16] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-08-02 16:35:30] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:35:34] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:35:34] ❌ Error en verificación: [Errno 2] No such file or directory: 'config/config_monitor.json'
+[2025-08-02 16:35:34] 📦 Estado: fallo
+[2025-08-02 16:35:34] ❌ Fallo en la verificación.
+[2025-08-02 16:35:35] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 16:35:40] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:35:44] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-08-02 16:40:11] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:40:16] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:40:16] ❌ Error en verificación: [Errno 2] No such file or directory: 'config/config_monitor.json'
+[2025-08-02 16:40:16] 📦 Estado: fallo
+[2025-08-02 16:40:16] ❌ Fallo en la verificación.
+[2025-08-02 16:40:16] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 16:40:21] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:40:24] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-08-02 16:40:24] 📦 Estado: fallo
+[2025-08-02 16:40:24] ❌ Fallo en la verificación.
+[2025-08-02 16:40:24] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-02 16:41:31] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:41:35] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:41:35] ❌ Error en verificación: [Errno 2] No such file or directory: 'config/config_monitor.json'
+[2025-08-02 16:41:35] 📦 Estado: fallo
+[2025-08-02 16:41:35] ❌ Fallo en la verificación.
+[2025-08-02 16:41:35] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 16:41:40] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:41:42] ❌ Error en verificación: Page.is_visible: Target page, context or browser has been closed
+[2025-08-02 16:41:56] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:42:01] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:42:01] ❌ Error en verificación: [Errno 2] No such file or directory: 'config/config_monitor.json'
+[2025-08-02 16:42:01] 📦 Estado: fallo
+[2025-08-02 16:42:01] ❌ Fallo en la verificación.
+[2025-08-02 16:42:01] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 16:45:58] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:46:03] 🌐 Navegación a consultas realizada.
+[2025-08-02 16:46:03] 📦 Estado: fecha_invalida
+[2025-08-02 16:46:03] ❓ Estado no reconocido.
+[2025-08-02 16:46:03] 📊 Total extraídos: 0
+[2025-08-02 16:46:03] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 16:46:08] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 16:46:11] ❌ Error en verificación: Page.goto: net::ERR_ABORTED at https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-08-02 21:05:17] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:05:30] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-08-02 21:05:30] 📦 Estado: fallo
+[2025-08-02 21:05:30] ❌ Fallo en la verificación.
+[2025-08-02 21:05:30] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:05:35] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:05:37] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-08-02 21:06:11] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:06:48] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-08-02 21:06:52] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:07:23] ❌ Error en verificación: Page.goto: Timeout 30000ms exceeded.
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-08-02 21:07:23] 📦 Estado: fallo
+[2025-08-02 21:07:23] ❌ Fallo en la verificación.
+[2025-08-02 21:07:23] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:07:28] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:07:44] ❌ Error en verificación: Page.goto: net::ERR_ABORTED; maybe frame was detached?
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-08-02 21:08:28] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:08:35] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:08:35] 📦 Estado: corte_fecha
+[2025-08-02 21:08:35] ❓ Estado no reconocido.
+[2025-08-02 21:08:35] 📊 Total extraídos: 0
+[2025-08-02 21:08:36] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:08:41] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:08:46] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:08:46] 📦 Estado: corte_fecha
+[2025-08-02 21:08:46] ❓ Estado no reconocido.
+[2025-08-02 21:08:46] 📊 Total extraídos: 0
+[2025-08-02 21:08:46] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-02 21:08:51] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:08:55] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:08:56] 📦 Estado: corte_fecha
+[2025-08-02 21:08:56] ❓ Estado no reconocido.
+[2025-08-02 21:08:56] 📊 Total extraídos: 0
+[2025-08-02 21:08:56] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-08-02 21:09:01] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:09:02] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://portalpjn.pjn.gov.ar/inicio", waiting until "load"
+
+[2025-08-02 21:09:15] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:09:19] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:09:20] 📦 Estado: corte_fecha
+[2025-08-02 21:09:20] ❓ Estado no reconocido.
+[2025-08-02 21:09:20] 📊 Total extraídos: 0
+[2025-08-02 21:09:20] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:09:25] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:09:27] ❌ Error en verificación: Page.is_visible: Target page, context or browser has been closed
+[2025-08-02 21:25:48] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:25:52] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:25:52] 📦 Estado: corte_fecha
+[2025-08-02 21:25:52] ❓ Estado no reconocido.
+[2025-08-02 21:25:52] 📊 Total extraídos: 0
+[2025-08-02 21:25:52] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:25:57] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:26:02] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:26:02] 📦 Estado: corte_fecha
+[2025-08-02 21:26:02] ❓ Estado no reconocido.
+[2025-08-02 21:26:02] 📊 Total extraídos: 0
+[2025-08-02 21:26:02] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-02 21:33:37] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:33:42] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:33:52] 📦 Estado: corte_fecha
+[2025-08-02 21:33:52] ❓ Estado no reconocido.
+[2025-08-02 21:33:52] 📊 Total extraídos: 72
+[2025-08-02 21:33:52] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:33:57] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:34:01] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:34:11] 📦 Estado: corte_fecha
+[2025-08-02 21:34:11] ❓ Estado no reconocido.
+[2025-08-02 21:34:11] 📊 Total extraídos: 72
+[2025-08-02 21:34:11] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-02 21:34:16] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:34:21] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:34:31] 📦 Estado: corte_fecha
+[2025-08-02 21:34:31] ❓ Estado no reconocido.
+[2025-08-02 21:34:31] 📊 Total extraídos: 72
+[2025-08-02 21:34:31] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-08-02 21:34:36] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:34:41] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:34:51] 📦 Estado: corte_fecha
+[2025-08-02 21:34:51] ❓ Estado no reconocido.
+[2025-08-02 21:34:51] 📊 Total extraídos: 72
+[2025-08-02 21:34:51] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-08-02 21:34:56] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:35:01] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:35:11] 📦 Estado: corte_fecha
+[2025-08-02 21:35:11] ❓ Estado no reconocido.
+[2025-08-02 21:35:11] 📊 Total extraídos: 72
+[2025-08-02 21:35:11] ❌ Se alcanzó el límite de reintentos. No se pudo completar la verificación.
+[2025-08-02 21:37:36] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:37:40] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:37:48] 📦 Estado: repetido_detectado
+[2025-08-02 21:37:48] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-08-02 21:37:48] 📊 Total extraídos: 45
+[2025-08-02 21:37:48] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:37:53] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:38:16] ❌ Error en verificación: Page.goto: Target page, context or browser has been closed
+Call log:
+  - navigating to "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam", waiting until "load"
+
+[2025-08-02 21:38:20] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:38:26] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:38:36] 📦 Estado: corte_fecha
+[2025-08-02 21:38:36] ❓ Estado no reconocido.
+[2025-08-02 21:38:36] 📊 Total extraídos: 72
+[2025-08-02 21:38:36] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 21:38:41] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:38:46] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:38:56] 📦 Estado: corte_fecha
+[2025-08-02 21:38:56] ❓ Estado no reconocido.
+[2025-08-02 21:38:56] 📊 Total extraídos: 72
+[2025-08-02 21:38:56] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-02 21:39:01] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:39:06] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:39:17] 📦 Estado: corte_fecha
+[2025-08-02 21:39:17] ❓ Estado no reconocido.
+[2025-08-02 21:39:17] 📊 Total extraídos: 72
+[2025-08-02 21:39:17] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-08-02 21:39:22] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:39:27] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:39:35] ❌ Error en verificación: ElementHandle.inner_text: Target page, context or browser has been closed
+Call log:
+  - waiting for locator(":scope")
+
+[2025-08-02 21:43:06] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 21:43:11] 🌐 Navegación a consultas realizada.
+[2025-08-02 21:43:21] 📦 Estado: corte_fecha
+[2025-08-02 21:43:21] 📆 Se aplicó la fecha de corte. Extracción finalizada.
+[2025-08-02 21:43:21] 📊 Total extraídos: 72
+[2025-08-02 21:43:21] 📊 Comparación automática: sin cambios detectados.
+[2025-08-02 22:36:07] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 22:36:19] ❌ Error en verificación: [WinError 2] El sistema no puede encontrar el archivo especificado: 'estado_sesion.json'
+[2025-08-02 22:36:19] 📦 Estado: fallo
+[2025-08-02 22:36:19] ❌ Fallo en la verificación.
+[2025-08-02 22:36:19] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-02 22:36:24] 🔍 Iniciando verificación de expedientes...
+[2025-08-02 22:36:29] 🌐 Navegación a consultas realizada.
+[2025-08-02 22:36:39] 📦 Estado: corte_fecha
+[2025-08-02 22:36:39] 📆 Se aplicó la fecha de corte. Extracción finalizada.
+[2025-08-02 22:36:39] 📊 Total extraídos: 72
+[2025-08-02 22:36:39] 📊 Comparación automática: sin cambios detectados.
+[2025-08-20 11:59:38] 🔍 Iniciando verificación de expedientes...
+[2025-08-20 11:59:58] 🌐 Navegación a consultas realizada.
+[2025-08-20 12:00:07] 📦 Estado: corte_fecha
+[2025-08-20 12:00:07] 📆 Se aplicó la fecha de corte. Extracción finalizada.
+[2025-08-20 12:00:07] 📊 Total extraídos: 47
+[2025-08-20 12:00:07] 📊 Comparación automática: sin cambios detectados.
+[2025-08-24 12:15:12] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 12:15:30] 🌐 Navegación a consultas realizada.
+[2025-08-24 12:15:38] 📦 Estado: corte_fecha
+[2025-08-24 12:15:38] 📆 Se aplicó la fecha de corte. Extracción finalizada.
+[2025-08-24 12:15:38] 📊 Total extraídos: 54
+[2025-08-24 12:15:38] 📊 Comparación automática: sin cambios detectados.
+[2025-08-24 12:16:00] ⏳ Verificación de notificaciones ya en curso.
+[2025-08-24 12:16:33] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 12:16:38] 🌐 Navegación a consultas realizada.
+[2025-08-24 12:16:46] 📦 Estado: corte_fecha
+[2025-08-24 12:16:46] 📆 Se aplicó la fecha de corte. Extracción finalizada.
+[2025-08-24 12:16:46] 📊 Total extraídos: 54
+[2025-08-24 12:16:46] 📊 Comparación automática: sin cambios detectados.
+[2025-08-24 13:11:24] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 13:11:41] 🌐 Navegación a consultas realizada.
+[2025-08-24 13:11:49] 📦 Estado: corte_fecha
+[2025-08-24 13:11:49] 📆 Se aplicó la fecha de corte. Extracción finalizada.
+[2025-08-24 13:11:49] 📊 Total extraídos: 54
+[2025-08-24 13:11:49] 📊 Comparación automática: sin cambios detectados.
+[2025-08-24 13:12:26] ⏳ Verificación de notificaciones ya en curso.
+[2025-08-24 13:58:11] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 13:58:28] 🌐 Navegación a consultas realizada.
+[2025-08-24 13:58:37] 📦 Estado: corte_fecha
+[2025-08-24 13:58:37] 📆 Se aplicó la fecha de corte. Extracción finalizada.
+[2025-08-24 13:58:37] 📊 Total extraídos: 54
+[2025-08-24 13:58:37] 📊 Comparación automática: sin cambios detectados.
+[2025-08-24 13:59:36] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 13:59:41] 🌐 Navegación a consultas realizada.
+[2025-08-24 13:59:41] ❌ Error en verificación: Illegal trailing comma before end of object: line 19 column 23 (char 341)
+[2025-08-24 13:59:41] 📦 Estado: fallo
+[2025-08-24 13:59:41] ❌ Fallo en la verificación.
+[2025-08-24 13:59:41] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-24 13:59:46] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 13:59:51] 🌐 Navegación a consultas realizada.
+[2025-08-24 13:59:51] ❌ Error en verificación: Illegal trailing comma before end of object: line 19 column 23 (char 341)
+[2025-08-24 13:59:51] 📦 Estado: fallo
+[2025-08-24 13:59:51] ❌ Fallo en la verificación.
+[2025-08-24 13:59:51] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-24 13:59:56] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:00:00] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:00:00] ❌ Error en verificación: Illegal trailing comma before end of object: line 19 column 23 (char 341)
+[2025-08-24 14:00:00] 📦 Estado: fallo
+[2025-08-24 14:00:00] ❌ Fallo en la verificación.
+[2025-08-24 14:00:00] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-08-24 14:00:05] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:00:10] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:00:10] ❌ Error en verificación: Illegal trailing comma before end of object: line 19 column 23 (char 341)
+[2025-08-24 14:00:10] 📦 Estado: fallo
+[2025-08-24 14:00:10] ❌ Fallo en la verificación.
+[2025-08-24 14:00:10] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-08-24 14:00:32] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:00:37] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:00:37] ❌ Error en verificación: Illegal trailing comma before end of object: line 19 column 23 (char 341)
+[2025-08-24 14:00:37] 📦 Estado: fallo
+[2025-08-24 14:00:37] ❌ Fallo en la verificación.
+[2025-08-24 14:00:37] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-24 14:00:42] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:00:44] ❌ Error en verificación: Page.is_visible: Target page, context or browser has been closed
+[2025-08-24 14:00:44] 📦 Estado: fallo
+[2025-08-24 14:00:44] ❌ Fallo en la verificación.
+[2025-08-24 14:00:44] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-24 14:00:49] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:00:54] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:00:54] ❌ Error en verificación: Illegal trailing comma before end of object: line 19 column 23 (char 341)
+[2025-08-24 14:00:54] 📦 Estado: fallo
+[2025-08-24 14:00:54] ❌ Fallo en la verificación.
+[2025-08-24 14:00:54] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-08-24 14:01:57] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:02:02] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:03:09] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:03:13] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:08:14] 📦 Estado: repetido_detectado
+[2025-08-24 14:08:14] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-08-24 14:08:14] 📊 Total extraídos: 1755
+[2025-08-24 14:08:14] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-08-24 14:08:19] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:08:24] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:13:24] 📦 Estado: repetido_detectado
+[2025-08-24 14:13:24] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-08-24 14:13:24] 📊 Total extraídos: 1785
+[2025-08-24 14:13:25] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-08-24 14:13:30] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:13:34] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:18:34] 📦 Estado: repetido_detectado
+[2025-08-24 14:18:34] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-08-24 14:18:34] 📊 Total extraídos: 1830
+[2025-08-24 14:18:34] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-08-24 14:18:39] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:18:44] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:20:36] 📦 Estado: repetido_detectado
+[2025-08-24 14:20:36] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-08-24 14:20:36] 📊 Total extraídos: 690
+[2025-08-24 14:20:37] 🔁 Reintentando verificación (4/5) en 5 segundos...
+[2025-08-24 14:20:42] 🔍 Iniciando verificación de expedientes...
+[2025-08-24 14:20:46] 🌐 Navegación a consultas realizada.
+[2025-08-24 14:26:20] 📦 Estado: completo
+[2025-08-24 14:26:20] ✅ Extracción finalizada exitosamente.
+[2025-08-24 14:26:20] 📊 Total extraídos: 2063
+[2025-08-24 14:26:20] 📁 Guardado en: F:\RESPALDO DAVID\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-08-24 14:26:20] 📊 Comparación automática: sin cambios detectados.
+[2025-08-27 21:04:14] 🔍 Iniciando verificación de expedientes...
+[2025-08-27 21:04:32] 🌐 Navegación a consultas realizada.
+[2025-09-03 13:57:36] 🔍 Iniciando verificación de expedientes...
+[2025-09-03 13:57:53] 🌐 Navegación a consultas realizada.
+[2025-09-03 13:58:30] ⏳ Verificación de notificaciones ya en curso.
+[2025-09-03 13:58:47] 📦 Estado: repetido_detectado
+[2025-09-03 13:58:47] ⚠️ Se detectó repetición de expedientes. La extracción se interrumpió.
+[2025-09-03 13:58:47] 📊 Total extraídos: 336
+[2025-09-03 13:58:47] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-09-03 13:58:52] 🔍 Iniciando verificación de expedientes...
+[2025-09-03 13:58:57] 🌐 Navegación a consultas realizada.
+[2025-09-03 14:08:00] 📦 Estado: completo
+[2025-09-03 14:08:00] ✅ Extracción finalizada exitosamente.
+[2025-09-03 14:08:00] 📊 Total extraídos: 2062
+[2025-09-03 14:08:00] 📁 Guardado en: F:\RESPALDO DAVID\Sistema_v2\core\modulos_monitor\general\datos_extraidos\monitoreo\expedientes_monitor.json
+[2025-09-03 14:08:00] 📊 Comparación automática: sin cambios detectados.
+[2025-09-03 14:11:12] 🔍 Iniciando verificación de expedientes...
+[2025-09-03 14:11:16] 🌐 Navegación a consultas realizada.
+[2025-09-03 14:11:25] ⏳ Verificación de notificaciones ya en curso.
+[2025-09-03 14:11:29] ❌ Error en verificación: Page.query_selector_all: Target page, context or browser has been closed
+[2025-09-03 14:11:29] 📦 Estado: fallo
+[2025-09-03 14:11:29] ❌ Fallo en la verificación.
+[2025-09-03 14:11:29] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-09-05 12:39:10] 🔍 Iniciando verificación de expedientes...
+[2025-09-05 12:39:28] 🌐 Navegación a consultas realizada.
+[2025-09-28 15:18:08] 🔍 Iniciando verificación de expedientes...
+[2025-09-28 15:18:08] ❌ Error en verificación: Faltan variables de entorno requeridas: PJN_USER, PJN_PASSWORD
+[2025-09-28 15:18:08] 📦 Estado: fallo
+[2025-09-28 15:18:08] ❌ Fallo en la verificación.
+[2025-09-28 15:18:08] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-09-28 15:18:14] 🔍 Iniciando verificación de expedientes...
+[2025-09-28 15:18:14] ❌ Error en verificación: Faltan variables de entorno requeridas: PJN_USER, PJN_PASSWORD
+[2025-09-28 15:18:14] 📦 Estado: fallo
+[2025-09-28 15:18:14] ❌ Fallo en la verificación.
+[2025-09-28 15:18:14] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-09-28 15:18:19] 🔍 Iniciando verificación de expedientes...
+[2025-09-28 15:18:19] ❌ Error en verificación: Faltan variables de entorno requeridas: PJN_USER, PJN_PASSWORD
+[2025-09-28 15:18:19] 📦 Estado: fallo
+[2025-09-28 15:18:19] ❌ Fallo en la verificación.
+[2025-09-28 15:18:19] 🔁 Reintentando verificación (3/5) en 5 segundos...
+[2025-10-05 20:32:06] 🔍 Iniciando verificación de expedientes...
+[2025-10-05 20:32:06] ❌ Error en verificación: Faltan variables de entorno requeridas: PJN_USER, PJN_PASSWORD
+[2025-10-05 20:32:06] 📦 Estado: fallo
+[2025-10-05 20:32:06] ❌ Fallo en la verificación.
+[2025-10-05 20:32:06] 🔁 Reintentando verificación (1/5) en 5 segundos...
+[2025-10-05 20:32:11] 🔍 Iniciando verificación de expedientes...
+[2025-10-05 20:32:11] ❌ Error en verificación: Faltan variables de entorno requeridas: PJN_USER, PJN_PASSWORD
+[2025-10-05 20:32:11] 📦 Estado: fallo
+[2025-10-05 20:32:11] ❌ Fallo en la verificación.
+[2025-10-05 20:32:11] 🔁 Reintentando verificación (2/5) en 5 segundos...
+[2025-10-05 20:32:16] 🔍 Iniciando verificación de expedientes...
+[2025-10-05 20:32:16] ❌ Error en verificación: Faltan variables de entorno requeridas: PJN_USER, PJN_PASSWORD
+[2025-10-05 20:32:16] 📦 Estado: fallo
+[2025-10-05 20:32:16] ❌ Fallo en la verificación.
+[2025-10-05 20:32:16] 🔁 Reintentando verificación (3/5) en 5 segundos...
