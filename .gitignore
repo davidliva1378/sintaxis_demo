@@ -17,18 +17,39 @@ __pycache__/
 # Archivos temporales
 *.log
 *.bak
+*.backup
 *.tmp
 *.swp
+*~
+
+# Coverage files
+.coverage
+.coverage.*
+htmlcov/
+*.cover
 
 # Configuraciones sensibles
-config/credenciales.env
 *.env
+!.env.example
+Sistema_v5/config/credenciales.env
 
 # Datos generados por el sistema
 base_datos_simulada/
 datos_extraidos/
 backup_*/
+data/
+*/data/extraccion_inicial/
+Sistema_v5/configuracion/gui/data/
+
+# JSON files (allow config and test fixtures)
 *.json
+!Sistema_v5/config/sistema.json
+!Sistema_v5/config/monitor.json
+!Sistema_v5/tests/fixtures/**/*.json
+
+# CSV data files
+*.csv
+!**/fixtures/**/*.csv
 
 # Archivos comprimidos y exportaciones
 *.zip
@@ -46,3 +67,15 @@ backup_*/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Playwright browser cache
+.playwright/
+
+# Logs de ejecución
+Sistema_v5/logs/
+logs/
+*.log
+
+# Datos de prueba
+test_data/
+temp/

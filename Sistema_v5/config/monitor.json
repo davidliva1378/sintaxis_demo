@@ -1,0 +1,42 @@
+{
+  "headless": true,
+  "intervalos_laboral_expedientes": 15,
+  "intervalos_laboral_entradas": 10,
+  "intervalos_no_laboral_expedientes": 55,
+  "intervalos_no_laboral_entradas": 30,
+  "dias_laborales": [
+    "lunes",
+    "martes",
+    "miércoles",
+    "jueves",
+    "viernes"
+  ],
+  "hora_inicio": "08:00",
+  "hora_fin": "18:00",
+  "max_reintentos_expedientes": 3,
+  "espera_reintentos_expedientes": 30,
+  "max_reintentos_entradas": 3,
+  "espera_reintentos_entradas": 30,
+  "notificar_nuevas_entradas": true,
+  "notificar_cambios_expedientes": true,
+  "notificar_errores": true,
+  "verificar_entradas": true,
+  "verificar_expedientes": false,
+  "tipos_entradas": [
+    "N"
+  ],
+  "comparacion_automatica": false,
+  "fecha_corte_expedientes": null,
+  "fecha_desde_entradas": null,
+  "fecha_hasta_entradas": null,
+  "fecha_desde_expedientes": null,
+  "fecha_hasta_expedientes": null,
+  "dias_atras_entradas": 14,
+  "dias_atras_expedientes": null,
+  "extraccion_expedientes_completa": true,
+  "expedientes_orden": "fecha",
+  "expedientes_detener_duplicados": true,
+  "expedientes_max_paginas": null,
+  "modo": "automatico",
+  "directorio_datos": "/Users/davidalejandroliva/PycharmProjects/sintaXis/Sistema_v5/configuracion/gui/data/monitor"
+}
