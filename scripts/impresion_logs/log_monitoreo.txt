@@ -1,4 +1,0 @@
-[2025-10-08 01:45:12] 🚀 Iniciando extracción total de expedientes
-[2025-10-08 01:46:19] 🚀 Iniciando extracción total de expedientes
-[2025-10-08 01:48:15] ✅ Expedientes guardados en /Users/davidalejandroliva/PycharmProjects/sintaXis/scripts/datos_extraidos/extraccion_total/expedientes/expedientes_20251008-014619.json
-[2025-10-08 01:48:15] 🚀 Iniciando extracción de entradas

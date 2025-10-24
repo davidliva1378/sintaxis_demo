@@ -1,2 +1,0 @@
-"""Utilidades comunes para core."""
-
