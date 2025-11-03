@@ -3,14 +3,37 @@ import asyncio
 from datetime import datetime
 import os
 import json
+import logging
 
 from web.auto_login import reutilizar_sesion_async
 from core.modulos_monitor.expedientes_modular.extraer_expedientes import extraer_expedientes
 from panel_pjn.acciones_pjn.urls_pjn import URL_CONSULTAS
 
+# Importar procesamiento de expedientes (opcional)
+try:
+    from core.flujo_inicial.procesamiento_expedientes import (
+        ProcesadorExpedientesInicial,
+        clasificar_actuaciones_desde_json,
+        PROCESADOR_DISPONIBLE
+    )
+except ImportError:
+    PROCESADOR_DISPONIBLE = False
+    logging.warning("Módulo de procesamiento no disponible")
+
 MAX_INTENTOS = 5
 
-async def extraccion_incremental_async():
+async def extraccion_incremental_async(procesar_expedientes: bool = False):
+    """
+    Extrae expedientes de forma incremental del PJN.
+
+    Args:
+        procesar_expedientes: Si True, procesa expedientes con procesador_pdf
+                             (requiere módulo de procesamiento disponible)
+
+    Returns:
+        Tuple[list, dict | None]: Lista de expedientes extraídos y resultado
+                                   del procesamiento (si se habilitó)
+    """
     fecha_hoy = datetime.now().strftime("%Y-%m-%d")
     carpeta_destino = os.path.join("datos_extraidos", "monitoreo", "historico")
     os.makedirs(carpeta_destino, exist_ok=True)
@@ -73,7 +96,53 @@ async def extraccion_incremental_async():
             json.dump(expedientes_totales, f, indent=2, ensure_ascii=False)
         print(f"📁 Expedientes guardados en {ruta_final}")
 
+        # NUEVO: Procesamiento de expedientes con procesador_pdf
+        resultado_procesamiento = None
+        if procesar_expedientes and PROCESADOR_DISPONIBLE and expedientes_totales:
+            print("\n" + "=" * 70)
+            print("🔄 INICIANDO PROCESAMIENTO DE EXPEDIENTES")
+            print("=" * 70)
+
+            try:
+                procesador = ProcesadorExpedientesInicial(config={
+                    "clasificar": True,
+                    "analizar_vencimientos": True,
+                    "detectar_duplicados": False,
+                    "dias_urgentes": 7,
+                    "extraer_actuaciones": False,  # No extraer actuaciones por ahora
+                    "guardar_reportes": True,
+                })
+
+                resultado_procesamiento = await procesador.procesar_expedientes_extraidos(
+                    expedientes_totales,
+                    page=None,  # Sin página porque no extraemos actuaciones
+                    carpeta_base=carpeta_destino
+                )
+
+                # Mostrar resumen
+                print("\n📊 RESUMEN DE PROCESAMIENTO:")
+                print(f"  Total expedientes: {resultado_procesamiento['total_expedientes']}")
+                print(f"  Procesados: {resultado_procesamiento['expedientes_procesados']}")
+
+                if resultado_procesamiento.get("vencimientos_urgentes"):
+                    venc_urgentes = len(resultado_procesamiento["vencimientos_urgentes"])
+                    print(f"\n⚠️  VENCIMIENTOS URGENTES DETECTADOS: {venc_urgentes}")
+
+                if resultado_procesamiento.get("errores"):
+                    errores = len(resultado_procesamiento["errores"])
+                    print(f"\n❌ Errores durante procesamiento: {errores}")
+
+                print("\n" + "=" * 70)
+
+            except Exception as e:
+                print(f"\n❌ Error durante el procesamiento: {e}")
+                logging.error(f"Error procesando expedientes: {e}", exc_info=True)
+
+        elif procesar_expedientes and not PROCESADOR_DISPONIBLE:
+            print("\n⚠️ Procesamiento solicitado pero procesador_pdf no está disponible")
+
     print("🏁 Extracción finalizada.")
+    return expedientes_totales, resultado_procesamiento
 
 
 if __name__ == "__main__":
