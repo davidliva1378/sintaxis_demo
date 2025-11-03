@@ -1,0 +1,324 @@
+#!/usr/bin/env python3
+"""
+SintaXis - Sistema Jurídico Automatizado
+Script de línea de comandos unificado
+
+Este script proporciona acceso a las principales funcionalidades del sistema
+sintaXis desde la línea de comandos.
+
+Uso:
+    python sintaxis <comando> [opciones]
+
+Comandos disponibles:
+    extraer         Extrae expedientes del PJN
+    procesar        Procesa archivos JSON de actuaciones
+    monitorear      Inicia el monitoreo de expedientes
+    clasificar      Clasifica una actuación específica
+    help            Muestra ayuda detallada
+
+Ejemplos:
+    python sintaxis extraer --procesar
+    python sintaxis procesar datos.json --recursivo
+    python sintaxis clasificar --tipo CEDULA --detalle "Notificación de sentencia"
+    python sintaxis help extraer
+
+Para ayuda específica de un comando:
+    python sintaxis <comando> --help
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+# Agregar raíz del proyecto al path
+proyecto_raiz = Path(__file__).parent
+sys.path.insert(0, str(proyecto_raiz))
+
+
+def comando_extraer(args):
+    """Ejecuta extracción de expedientes."""
+    import asyncio
+    from core.flujo_inicial import extraccion_incremental_async, PROCESADOR_DISPONIBLE
+
+    procesar = args.procesar and not args.no_procesar
+
+    if procesar and not PROCESADOR_DISPONIBLE:
+        print("⚠️ procesador_pdf no disponible, se ejecutará solo extracción")
+        procesar = False
+
+    print("\n" + "=" * 70)
+    print("EXTRACCIÓN INCREMENTAL DE EXPEDIENTES")
+    print("=" * 70)
+    print(f"\nConfiguración:")
+    print(f"  Procesar: {'SÍ' if procesar else 'NO'}")
+    if procesar:
+        print(f"  Días urgentes: {args.dias_urgentes}")
+    print()
+
+    try:
+        asyncio.run(extraccion_incremental_async(procesar_expedientes=procesar))
+    except KeyboardInterrupt:
+        print("\n⚠️ Cancelado por el usuario")
+        sys.exit(0)
+
+
+def comando_procesar(args):
+    """Procesa archivos JSON de actuaciones."""
+    from core.flujo_inicial.procesar_actuaciones_json import (
+        procesar_archivo,
+        procesar_carpeta,
+        PROCESADOR_DISPONIBLE
+    )
+
+    if not PROCESADOR_DISPONIBLE:
+        print("❌ procesador_pdf no está disponible")
+        sys.exit(1)
+
+    ruta = Path(args.ruta)
+
+    if not ruta.exists():
+        print(f"❌ La ruta no existe: {ruta}")
+        sys.exit(1)
+
+    config = {
+        "clasificar": True,
+        "analizar_vencimientos": not args.no_vencimientos,
+        "dias_urgentes": args.dias_urgentes,
+    }
+
+    print("\n" + "=" * 70)
+    print("PROCESAMIENTO DE ACTUACIONES")
+    print("=" * 70)
+    print(f"\nConfiguración:")
+    print(f"  Clasificar: {config['clasificar']}")
+    print(f"  Vencimientos: {config['analizar_vencimientos']}")
+    print(f"  Días urgentes: {config['dias_urgentes']}")
+    print()
+
+    if ruta.is_file():
+        resultado = procesar_archivo(ruta, config)
+        if not resultado:
+            sys.exit(1)
+    elif ruta.is_dir():
+        resultados = procesar_carpeta(ruta, config, args.recursivo)
+        if not resultados:
+            print("⚠️ No se procesaron archivos")
+            sys.exit(1)
+        print(f"\n✅ {len(resultados)} archivos procesados")
+    else:
+        print("❌ La ruta no es válida")
+        sys.exit(1)
+
+
+def comando_clasificar(args):
+    """Clasifica una actuación específica."""
+    try:
+        from Sistema_v5.procesador_pdf import ClasificadorActuaciones
+    except ImportError:
+        print("❌ procesador_pdf no está disponible")
+        sys.exit(1)
+
+    clasificador = ClasificadorActuaciones()
+
+    clasificacion = clasificador.clasificar(
+        tipo=args.tipo or "",
+        detalle=args.detalle or "",
+        tiene_archivo=args.con_archivo,
+        texto_completo=""
+    )
+
+    print("\n" + "=" * 70)
+    print("CLASIFICACIÓN DE ACTUACIÓN")
+    print("=" * 70)
+    print(f"\nActuación:")
+    print(f"  Tipo: {args.tipo or '(vacío)'}")
+    print(f"  Detalle: {args.detalle or '(vacío)'}")
+    print(f"  Con archivo: {'SÍ' if args.con_archivo else 'NO'}")
+    print(f"\nResultado:")
+    print(f"  Utilidad: {clasificacion.utilidad.value}")
+    print(f"  Confianza: {clasificacion.score_confianza:.1f}%")
+    print(f"  Motivo: {clasificacion.motivo_clasificacion}")
+    print(f"  Tiene plazo probable: {'SÍ' if clasificacion.tiene_plazo_probable else 'NO'}")
+
+    if clasificacion.keywords:
+        print(f"  Keywords: {', '.join(clasificacion.keywords)}")
+
+
+def comando_help(args):
+    """Muestra ayuda detallada."""
+    if args.comando:
+        # Ayuda específica de comando
+        ayuda_comandos = {
+            "extraer": """
+COMANDO: extraer
+Extrae expedientes del PJN de forma incremental.
+
+Opciones:
+  --procesar              Procesar con procesador_pdf
+  --no-procesar           NO procesar (solo extracción)
+  --dias-urgentes N       Días para vencimiento urgente (default: 7)
+
+Ejemplos:
+  python sintaxis extraer
+  python sintaxis extraer --procesar
+  python sintaxis extraer --procesar --dias-urgentes 3
+            """,
+            "procesar": """
+COMANDO: procesar
+Procesa archivos JSON de actuaciones ya extraídas.
+
+Argumentos:
+  ruta                    Archivo JSON o carpeta
+
+Opciones:
+  --recursivo, -r         Buscar en subcarpetas
+  --dias-urgentes N       Días para vencimiento urgente (default: 7)
+  --no-vencimientos       No analizar vencimientos
+
+Ejemplos:
+  python sintaxis procesar datos.json
+  python sintaxis procesar carpeta/ --recursivo
+  python sintaxis procesar datos.json --dias-urgentes 3
+            """,
+            "clasificar": """
+COMANDO: clasificar
+Clasifica una actuación individual.
+
+Opciones:
+  --tipo TIPO             Tipo de actuación
+  --detalle DETALLE       Detalle de actuación
+  --con-archivo           La actuación tiene archivo adjunto
+
+Ejemplos:
+  python sintaxis clasificar --tipo CEDULA --detalle "Notificación"
+  python sintaxis clasificar --detalle "Auto de mero trámite" --con-archivo
+            """,
+        }
+
+        ayuda = ayuda_comandos.get(args.comando)
+        if ayuda:
+            print(ayuda)
+        else:
+            print(f"❌ Comando desconocido: {args.comando}")
+            print("\nComandos disponibles: extraer, procesar, clasificar")
+    else:
+        # Ayuda general
+        print(__doc__)
+
+
+def main():
+    """Función principal del CLI."""
+    parser = argparse.ArgumentParser(
+        description="SintaXis - Sistema Jurídico Automatizado",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Para ayuda de un comando específico: python sintaxis <comando> --help"
+    )
+
+    subparsers = parser.add_subparsers(dest="comando", help="Comando a ejecutar")
+
+    # Subcomando: extraer
+    parser_extraer = subparsers.add_parser(
+        "extraer",
+        help="Extrae expedientes del PJN"
+    )
+    parser_extraer.add_argument(
+        "--procesar",
+        action="store_true",
+        help="Procesar con procesador_pdf"
+    )
+    parser_extraer.add_argument(
+        "--no-procesar",
+        action="store_true",
+        help="NO procesar (solo extracción)"
+    )
+    parser_extraer.add_argument(
+        "--dias-urgentes",
+        type=int,
+        default=7,
+        help="Días para vencimiento urgente (default: 7)"
+    )
+    parser_extraer.set_defaults(func=comando_extraer)
+
+    # Subcomando: procesar
+    parser_procesar = subparsers.add_parser(
+        "procesar",
+        help="Procesa archivos JSON de actuaciones"
+    )
+    parser_procesar.add_argument(
+        "ruta",
+        type=str,
+        help="Archivo JSON o carpeta"
+    )
+    parser_procesar.add_argument(
+        "--recursivo",
+        "-r",
+        action="store_true",
+        help="Buscar en subcarpetas"
+    )
+    parser_procesar.add_argument(
+        "--dias-urgentes",
+        type=int,
+        default=7,
+        help="Días para vencimiento urgente (default: 7)"
+    )
+    parser_procesar.add_argument(
+        "--no-vencimientos",
+        action="store_true",
+        help="No analizar vencimientos"
+    )
+    parser_procesar.set_defaults(func=comando_procesar)
+
+    # Subcomando: clasificar
+    parser_clasificar = subparsers.add_parser(
+        "clasificar",
+        help="Clasifica una actuación"
+    )
+    parser_clasificar.add_argument(
+        "--tipo",
+        type=str,
+        help="Tipo de actuación"
+    )
+    parser_clasificar.add_argument(
+        "--detalle",
+        type=str,
+        help="Detalle de actuación"
+    )
+    parser_clasificar.add_argument(
+        "--con-archivo",
+        action="store_true",
+        help="La actuación tiene archivo adjunto"
+    )
+    parser_clasificar.set_defaults(func=comando_clasificar)
+
+    # Subcomando: help
+    parser_help = subparsers.add_parser(
+        "help",
+        help="Muestra ayuda detallada"
+    )
+    parser_help.add_argument(
+        "comando",
+        nargs="?",
+        help="Comando del que mostrar ayuda"
+    )
+    parser_help.set_defaults(func=comando_help)
+
+    # Parsear argumentos
+    args = parser.parse_args()
+
+    # Si no se especificó comando, mostrar ayuda
+    if not args.comando:
+        parser.print_help()
+        sys.exit(0)
+
+    # Ejecutar comando
+    try:
+        args.func(args)
+    except Exception as e:
+        print(f"\n❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
