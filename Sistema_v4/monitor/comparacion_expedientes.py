@@ -29,6 +29,16 @@ except ImportError:  # pragma: no cover - ejecución directa
         obtener_fecha_corte = None  # type: ignore[assignment]
         cargar_config_monitor = None  # type: ignore[assignment]
 
+# Importar integración con procesador_pdf (opcional)
+try:
+    from .integracion_procesador_pdf import (
+        detectar_vencimientos_urgentes,
+        PROCESADOR_DISPONIBLE
+    )
+except ImportError:  # pragma: no cover - procesador_pdf no disponible
+    detectar_vencimientos_urgentes = None  # type: ignore[assignment]
+    PROCESADOR_DISPONIBLE = False
+
 
 MODO_COMPARACION_PARCIAL = "parcial"
 MODO_COMPARACION_TOTAL = "total"
@@ -185,6 +195,31 @@ def comparar_expedientes(
             avisos.append(f"No se pudo guardar el informe de comparación: {exc}")
         else:
             informe = Path(informe_path)
+
+        # ANÁLISIS DE VENCIMIENTOS URGENTES (si procesador_pdf disponible)
+        if PROCESADOR_DISPONIBLE and detectar_vencimientos_urgentes and config_resuelta:
+            try:
+                config_pdf = config_resuelta.get("procesador_pdf", {})
+                if config_pdf.get("vencimientos_automaticos", True):
+                    dias_urgentes = config_pdf.get("dias_urgentes", 7)
+
+                    # Detectar vencimientos en expedientes nuevos/modificados
+                    resultado_venc = detectar_vencimientos_urgentes(
+                        rutas.archivo_actual,
+                        rutas.carpeta_reportes.parent / "alertas",
+                        dias_urgentes=dias_urgentes
+                    )
+
+                    if resultado_venc:
+                        vencimientos_urgentes, total_venc = resultado_venc
+                        if vencimientos_urgentes:
+                            avisos.append(
+                                f"⚠️ {len(vencimientos_urgentes)} vencimientos urgentes "
+                                f"detectados (≤{dias_urgentes} días)"
+                            )
+            except Exception as exc:  # pragma: no cover - no crítico
+                # No fallar si el análisis de vencimientos falla
+                pass
 
     return ResultadoComparacion(
         nuevos,

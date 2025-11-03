@@ -54,6 +54,17 @@ DEFAULT_CONFIG = {
         "comparacion_sin_cambios": False,
         "comparacion_faltantes": True,
     },
+    "procesador_pdf": {
+        "habilitado": True,
+        "clasificacion_automatica": True,
+        "confianza_minima": 0.75,
+        "vencimientos_automaticos": True,
+        "dias_urgentes": 7,
+        "duplicados_analisis": True,
+        "timeout_clasificacion": 300,
+        "guardar_reportes": True,
+        "carpeta_reportes": "datos_extraidos/monitoreo/reportes_pdf",
+    },
 }
 
 MODOS_VALIDOS: tuple[str, ...] = ("automatico", "laboral", "no_laboral")
