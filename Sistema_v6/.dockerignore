@@ -1,0 +1,87 @@
+# .dockerignore for Sistema PJN v6
+# Prevents unnecessary files from being copied to Docker images
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+*.log
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.venv1/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Frontend (será copiado por su propio Dockerfile)
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/coverage/
+
+# Documentation
+*.md
+docs/
+README.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Database (será creado en runtime o montado como volumen)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Temp files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Docker files (no necesarios dentro de la imagen)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Tests
+tests/
+test/
+*_test.py
+test_*.py
+
+# Logs
+logs/
+*.log
+
+# OS
+Thumbs.db
+.DS_Store

@@ -239,7 +239,12 @@ class APISettings(BaseSettings):
     reload: bool = False
     workers: int = 1
     cors_origins: list[str] = Field(
-        default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"]
+        default_factory=lambda: [
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://localhost:8080"
+        ]
     )
     api_prefix: str = "/api/v1"
 
