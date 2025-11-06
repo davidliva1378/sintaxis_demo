@@ -26,6 +26,16 @@ from .workspace_schemas import (
     CrearWorkspacesRequest,
     CrearWorkspacesResponse,
 )
+from .config_schemas import (
+    BrowserConfigSchema,
+    MonitoreoConfigSchema,
+    ScrapingConfigSchema,
+    MCPConfigSchema,
+    StorageConfigSchema,
+    SystemConfigResponse,
+    SystemConfigUpdateRequest,
+    ConfigUpdateResponse,
+)
 
 __all__ = [
     # Auth
@@ -50,4 +60,13 @@ __all__ = [
     # Workspaces
     "CrearWorkspacesRequest",
     "CrearWorkspacesResponse",
+    # Config
+    "BrowserConfigSchema",
+    "MonitoreoConfigSchema",
+    "ScrapingConfigSchema",
+    "MCPConfigSchema",
+    "StorageConfigSchema",
+    "SystemConfigResponse",
+    "SystemConfigUpdateRequest",
+    "ConfigUpdateResponse",
 ]

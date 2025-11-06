@@ -51,7 +51,7 @@ from infrastructure.config import get_settings
 from infrastructure.di_container import get_container
 from infrastructure.exceptions import PJNError
 
-from .routers import auth, expedientes, health, monitoreo, workspaces
+from .routers import auth, config, expedientes, health, monitoreo, workspaces
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +169,7 @@ app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(expedientes.router, prefix="/api/v1/expedientes", tags=["expedientes"])
 app.include_router(workspaces.router, prefix="/api/v1/workspaces", tags=["workspaces"])
 app.include_router(monitoreo.router, prefix="/api/v1/monitoreo", tags=["monitoreo"])
+app.include_router(config.router, prefix="/api/v1", tags=["configuracion"])
 
 
 # === Root Endpoint ===

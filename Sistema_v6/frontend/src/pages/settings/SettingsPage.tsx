@@ -3,13 +3,18 @@
  */
 
 import { useState } from 'react'
-import { Settings, User, Key, Lock, Sliders } from 'lucide-react'
+import { Settings, User, Key, Lock, Sliders, Activity, Globe, Download, Cog, Code } from 'lucide-react'
 import PerfilUsuario from '@/components/settings/PerfilUsuario'
 import CredencialesPJN from '@/components/settings/CredencialesPJN'
 import CambiarPassword from '@/components/settings/CambiarPassword'
 import PreferenciasUsuario from '@/components/settings/PreferenciasUsuario'
+import ConfiguracionMonitoreo from '@/components/settings/ConfiguracionMonitoreo'
+import ConfiguracionBrowser from '@/components/settings/ConfiguracionBrowser'
+import ConfiguracionScraping from '@/components/settings/ConfiguracionScraping'
+import ConfiguracionAvanzada from '@/components/settings/ConfiguracionAvanzada'
+import ConfiguracionEnDesarrollo from '@/components/settings/ConfiguracionEnDesarrollo'
 
-type TabId = 'perfil' | 'credenciales' | 'password' | 'preferencias'
+type TabId = 'perfil' | 'credenciales' | 'password' | 'preferencias' | 'monitoreo' | 'browser' | 'scraping' | 'avanzado' | 'desarrollo'
 
 interface Tab {
   id: TabId
@@ -42,6 +47,36 @@ const tabs: Tab[] = [
     label: 'Preferencias',
     icon: Sliders,
     description: 'Configuración general',
+  },
+  {
+    id: 'monitoreo',
+    label: 'Monitoreo',
+    icon: Activity,
+    description: 'Monitoreo automático',
+  },
+  {
+    id: 'browser',
+    label: 'Navegador',
+    icon: Globe,
+    description: 'Config. del navegador',
+  },
+  {
+    id: 'scraping',
+    label: 'Extracción',
+    icon: Download,
+    description: 'Timeouts y límites',
+  },
+  {
+    id: 'avanzado',
+    label: 'Avanzado',
+    icon: Cog,
+    description: 'MCP, Storage y más',
+  },
+  {
+    id: 'desarrollo',
+    label: 'En Desarrollo',
+    icon: Code,
+    description: 'Features experimentales',
   },
 ]
 
@@ -105,6 +140,11 @@ export default function SettingsPage() {
         {tabActiva === 'credenciales' && <CredencialesPJN />}
         {tabActiva === 'password' && <CambiarPassword />}
         {tabActiva === 'preferencias' && <PreferenciasUsuario />}
+        {tabActiva === 'monitoreo' && <ConfiguracionMonitoreo />}
+        {tabActiva === 'browser' && <ConfiguracionBrowser />}
+        {tabActiva === 'scraping' && <ConfiguracionScraping />}
+        {tabActiva === 'avanzado' && <ConfiguracionAvanzada />}
+        {tabActiva === 'desarrollo' && <ConfiguracionEnDesarrollo />}
       </div>
     </div>
   )
