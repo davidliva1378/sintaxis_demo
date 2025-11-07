@@ -21,6 +21,7 @@ from application.ports import (
 from application.use_cases import (
     CrearWorkspacesUseCase,
     ExtraerExpedientesUseCase,
+    ExtraccionMasivaUseCase,
     FiltrarExpedientesUseCase,
     MonitorearExpedientesUseCase,
 )
@@ -35,6 +36,7 @@ from .adapters.scraping import PlaywrightScraperAdapter
 from .adapters.storage import FileStorageAdapter
 from .adapters.workspace import WorkspaceAdapter
 from .config import Settings, get_settings
+from .services.gestor_sesiones_service import get_gestor_sesiones
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +192,14 @@ class DIContainer:
             storage=self.storage,
             workspace_port=self.workspace,
             notificacion_port=self.notificacion,
+        )
+
+    def extraccion_masiva_use_case(self) -> ExtraccionMasivaUseCase:
+        """Crea el use case de extracción masiva."""
+        return ExtraccionMasivaUseCase(
+            storage=self.storage,
+            repository=self.expediente_repo,
+            gestor_sesiones=get_gestor_sesiones(),
         )
 
     def cleanup(self) -> None:

@@ -22,6 +22,10 @@ from .commands import (
     MarcarEntradaLeidaCommand,
     MonitorearExpedientesCommand,
 )
+from .extraccion_masiva_commands import (
+    ControlExtraccionCommand,
+    IniciarExtraccionMasivaCommand,
+)
 from .queries import (
     BuscarExpedientesQuery,
     ListarExpedientesQuery,
@@ -45,6 +49,11 @@ from .responses import (
     MonitorearExpedientesResponse,
     Result,
 )
+from .extraccion_masiva_responses import (
+    IniciarExtraccionMasivaResponse,
+    ProgresoExtraccionResponse,
+    ResumenExtraccionResponse,
+)
 
 __all__ = [
     # Commands
@@ -57,6 +66,9 @@ __all__ = [
     "MonitorearExpedientesCommand",
     "DescargarArchivoCommand",
     "MarcarEntradaLeidaCommand",
+    # Extracción Masiva Commands
+    "IniciarExtraccionMasivaCommand",
+    "ControlExtraccionCommand",
     # Queries
     "ObtenerExpedienteQuery",
     "ListarExpedientesQuery",
@@ -78,4 +90,8 @@ __all__ = [
     "DescargarArchivoResponse",
     "CambioDetectado",
     "EstadisticasSistema",
+    # Extracción Masiva Responses
+    "IniciarExtraccionMasivaResponse",
+    "ProgresoExtraccionResponse",
+    "ResumenExtraccionResponse",
 ]

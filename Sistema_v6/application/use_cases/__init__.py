@@ -15,6 +15,7 @@ Use cases principales (workflow):
 
 from .crear_workspaces_use_case import CrearWorkspacesUseCase
 from .extraer_expedientes_use_case import ExtraerExpedientesUseCase
+from .extraccion_masiva_use_case import ExtraccionMasivaUseCase
 from .filtrar_expedientes_use_case import FiltrarExpedientesUseCase
 from .monitorear_expedientes_use_case import MonitorearExpedientesUseCase
 
@@ -23,4 +24,5 @@ __all__ = [
     "FiltrarExpedientesUseCase",
     "CrearWorkspacesUseCase",
     "MonitorearExpedientesUseCase",
+    "ExtraccionMasivaUseCase",
 ]
