@@ -1,0 +1,63 @@
+# .dockerignore for Frontend - Sistema PJN v6
+# Optimizes Docker build by excluding unnecessary files
+
+# Dependencies (will be installed fresh)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build output (will be generated)
+dist/
+build/
+.vite/
+
+# Testing
+coverage/
+.nyc_output/
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+vitest.config.ts
+src/test/
+
+# Git
+.git
+.gitignore
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env.local
+.env.development
+.env.test
+.env.production.local
+
+# Documentation
+README.md
+*.md
+!package.json
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Logs
+logs/
+*.log
+
+# Misc
+.eslintcache
+.prettierignore
