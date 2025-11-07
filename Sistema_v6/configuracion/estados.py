@@ -115,7 +115,13 @@ class GestorEstados:
         Returns:
             Lista filtrada de expedientes
         """
-        estados_str = [e.value for e in estados_permitidos]
+        # Manejar estados que pueden ser strings o enums
+        estados_str = []
+        for e in estados_permitidos:
+            if isinstance(e, str):
+                estados_str.append(e)
+            else:
+                estados_str.append(e.value)
 
         return [
             exp for exp in expedientes
