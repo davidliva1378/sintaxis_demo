@@ -29,6 +29,9 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# Excepción: permitir el código fuente de frontend/src/lib/
+!frontend/src/lib/
+
 # PyInstaller
 *.manifest
 *.spec
