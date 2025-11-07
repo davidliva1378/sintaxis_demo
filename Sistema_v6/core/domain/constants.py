@@ -16,6 +16,29 @@ Nota: Adaptado de Sistema_v5.1.1/pjn/constants.py para compatibilidad.
 URL_CONSULTAS_DEFAULT = "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam"
 """URL por defecto para consultas del PJN (puede ser sobreescrita por configuración)."""
 
+# Alias para compatibilidad con scripts externos
+URL_CONSULTAS = URL_CONSULTAS_DEFAULT
+"""URL de consultas del PJN (alias de URL_CONSULTAS_DEFAULT)."""
+
+# URLs adicionales del portal PJN
+URL_LOGIN = "https://portalpjn.pjn.gov.ar/inicio"
+"""URL de inicio de sesión del portal PJN."""
+
+URL_NOTIFICACIONES = "https://notif.pjn.gov.ar/recibidas"
+"""URL del sistema de notificaciones electrónicas."""
+
+URL_ESCRITOS = "https://escritos.pjn.gov.ar/enviados/dependencia"
+"""URL del sistema de escritos electrónicos."""
+
+URL_DEOX = "https://deox.pjn.gov.ar/deox/inicio.do"
+"""URL del sistema DEOX (Demandas Electrónicas)."""
+
+URL_IWECS = "https://iwecs.csjn.gov.ar/iwecs/solicitudes/"
+"""URL del sistema IWECS (Información Web de Expedientes CSJN)."""
+
+URL_AUTORIZADOS = "https://autorizados.pjn.gov.ar/autorizados"
+"""URL del sistema de usuarios autorizados."""
+
 
 # ============================================================================
 # CÓDIGOS DE FINALIZACIÓN / MOTIVOS

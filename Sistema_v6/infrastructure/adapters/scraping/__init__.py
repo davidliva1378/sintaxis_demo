@@ -8,6 +8,7 @@ from .pagination import (
 )
 from .playwright_scraper_adapter import PlaywrightScraperAdapter
 from .session_manager import SessionManager, obtener_sesion_autenticada
+from .expedientes_batch_extractor import extraer_expedientes
 
 __all__ = [
     "PlaywrightScraperAdapter",
@@ -17,4 +18,5 @@ __all__ = [
     "PrimeFacesPaginationStrategy",
     "DEFAULT_PAGINATION_STRATEGY",
     "parsers",
+    "extraer_expedientes",
 ]
