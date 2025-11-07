@@ -27,6 +27,16 @@ Endpoints:
     - GET /api/v1/expedientes/{numero} - Obtiene un expediente
     - GET /api/v1/actuaciones/{numero} - Obtiene actuaciones
 
+    Extracción Masiva:
+    - POST /api/v1/expedientes/extraer/masivo - Inicia extracción masiva
+    - GET /api/v1/expedientes/extraer/{session_id}/progreso - Obtiene progreso
+    - POST /api/v1/expedientes/extraer/{session_id}/pausar - Pausa extracción
+    - POST /api/v1/expedientes/extraer/{session_id}/reanudar - Reanuda extracción
+    - POST /api/v1/expedientes/extraer/{session_id}/cancelar - Cancela extracción
+    - GET /api/v1/expedientes/extraer/{session_id}/resumen - Obtiene resumen
+    - GET /api/v1/expedientes/extraer/{session_id}/descargar/{formato} - Descarga reporte
+    - WS /api/v1/expedientes/extraer/{session_id}/ws - WebSocket para progreso
+
     Workspaces:
     - POST /api/v1/workspaces/crear - Crea workspaces
 
@@ -51,7 +61,15 @@ from infrastructure.config import get_settings
 from infrastructure.di_container import get_container
 from infrastructure.exceptions import PJNError
 
-from .routers import auth, config, expedientes, health, monitoreo, workspaces
+from .routers import (
+    auth,
+    config,
+    expedientes,
+    extraccion_masiva,
+    health,
+    monitoreo,
+    workspaces,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +185,11 @@ async def log_requests(request: Request, call_next):
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(expedientes.router, prefix="/api/v1/expedientes", tags=["expedientes"])
+app.include_router(
+    extraccion_masiva.router,
+    prefix="/api/v1/expedientes/extraer",
+    tags=["extraccion_masiva"],
+)
 app.include_router(workspaces.router, prefix="/api/v1/workspaces", tags=["workspaces"])
 app.include_router(monitoreo.router, prefix="/api/v1/monitoreo", tags=["monitoreo"])
 app.include_router(config.router, prefix="/api/v1", tags=["configuracion"])
