@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Plus, Loader2, ChevronLeft, ChevronRight, Download } from 'lucide-react'
+import { Plus, Loader2, ChevronLeft, ChevronRight, Download, LayoutDashboard } from 'lucide-react'
 import { useExpedientesStore } from '@/stores/expedientesStore'
 import { useMonitoreoStore } from '@/stores/monitoreoStore'
 import ExpedienteCard from '@/components/expedientes/ExpedienteCard'
@@ -100,6 +100,13 @@ export default function ExpedientesPage() {
           >
             <Download className="h-4 w-4 mr-2" />
             Extracción Masiva
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => window.open('/extraccion-masiva', '_blank')}
+          >
+            <LayoutDashboard className="h-4 w-4 mr-2" />
+            Dashboard Extracción
           </Button>
         </div>
       </div>
