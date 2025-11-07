@@ -16,7 +16,8 @@ from Sistema_v6.configuracion.config import Config
 from Sistema_v6.configuracion.estados import GestorEstados, EstadoExpediente
 from Sistema_v6.configuracion.urls import URL_CONSULTAS
 from Sistema_v6.pjn.auto_login import reutilizar_sesion_async
-from Sistema_v6.pjn.monitor.extraer_expedientes import extraer_expedientes
+from Sistema_v6.pjn.scraping.expedientes import extraer_expedientes_completos
+from Sistema_v6.pjn.models.extraccion_config import ExtraccionExpedientesConfig
 
 logger = logging.getLogger(__name__)
 
@@ -211,7 +212,7 @@ class ExtractorMasivo:
         })
 
         expedientes = []
-        pagina_actual = 1
+        paginas_procesadas = 0
 
         try:
             async with reutilizar_sesion_async() as (page, context, browser):
@@ -219,50 +220,45 @@ class ExtractorMasivo:
                 await page.goto(URL_CONSULTAS)
                 await page.wait_for_load_state("domcontentloaded")
 
-                while not self.cancelado:
-                    logger.info(f"Procesando página {pagina_actual}")
+                # Callback de progreso para la extracción
+                def callback_progreso(mensaje: str, total_acumulado: int):
+                    nonlocal paginas_procesadas
+                    # Detectar cuándo se procesa una nueva página
+                    if "Página" in mensaje and "procesada" in mensaje:
+                        paginas_procesadas += 1
+
                     self._emit("progreso_listado", {
-                        "pagina": pagina_actual,
-                        "total_paginas": 0,  # No se conoce el total por adelantado
-                        "total_expedientes": len(expedientes),
+                        "pagina": paginas_procesadas,
+                        "total_expedientes": total_acumulado,
+                        "mensaje": mensaje,
                     })
 
-                    # Usar función existente de extracción
-                    nuevos, _, motivo = await extraer_expedientes(
-                        page=page,
-                        guardar_json=False,
-                        detener_en_duplicado=False,  # Queremos TODOS
-                        fecha_corte=self.config.fecha_desde,
-                    )
+                # Configurar extracción optimizada
+                config = ExtraccionExpedientesConfig(
+                    omitir_duplicados=False,  # Queremos TODOS los expedientes
+                    detener_en_duplicado=False,
+                    fecha_corte=self.config.fecha_desde,
+                    max_paginas=None,  # Sin límite
+                )
 
-                    if nuevos:
-                        expedientes.extend(nuevos)
-                        logger.info(f"Página {pagina_actual}: {len(nuevos)} expedientes extraídos")
+                # Usar función optimizada que extrae todo automáticamente
+                logger.info("Iniciando extracción masiva optimizada...")
+                resultados, motivo, metadata = await extraer_expedientes_completos(
+                    page=page,
+                    config=config,
+                    callback_progreso=callback_progreso,
+                )
 
-                    # Verificar si hay más páginas
-                    if motivo == "fin_tabla":
-                        logger.info("Fin de la tabla alcanzado")
-                        break
+                # Convertir ExpedienteResumen a dict si es necesario
+                expedientes = [
+                    exp.to_dict() if hasattr(exp, 'to_dict') else exp
+                    for exp in resultados
+                ]
 
-                    # Intentar ir a la siguiente página
-                    try:
-                        siguiente = await page.query_selector("a.ui-paginator-next")
-                        if siguiente:
-                            is_disabled = await siguiente.get_attribute("class")
-                            if is_disabled and "ui-state-disabled" in is_disabled:
-                                logger.info("Botón 'siguiente' deshabilitado - última página")
-                                break
-
-                            await siguiente.click()
-                            await page.wait_for_load_state("domcontentloaded")
-                            await asyncio.sleep(1)  # Esperar a que cargue la página
-                            pagina_actual += 1
-                        else:
-                            logger.info("No se encontró botón 'siguiente'")
-                            break
-                    except Exception as e:
-                        logger.warning(f"Error al cambiar de página: {e}")
-                        break
+                logger.info(
+                    f"Extracción completada: {len(expedientes)} expedientes, "
+                    f"motivo: {motivo}, metadata: {metadata}"
+                )
 
         except Exception as e:
             logger.error(f"Error durante extracción del listado: {e}")
@@ -282,10 +278,10 @@ class ExtractorMasivo:
         self._emit("fin_listado", {
             "total": len(expedientes),
             "archivo": str(listado_path),
-            "paginas_procesadas": pagina_actual,
+            "paginas_procesadas": paginas_procesadas,
         })
 
-        logger.info(f"Extracción completa: {len(expedientes)} expedientes en {pagina_actual} páginas")
+        logger.info(f"Extracción completa: {len(expedientes)} expedientes en {paginas_procesadas} páginas")
         return expedientes
 
     async def procesar_lote_expedientes(
