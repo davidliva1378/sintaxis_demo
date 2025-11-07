@@ -1,7 +1,7 @@
 """
-M骴ulo de extracci髇 inicial de expedientes.
+M贸dulo de extracci贸n inicial de expedientes.
 
-Este m骴ulo proporciona funcionalidades para la extracci髇
+Este m贸dulo proporciona funcionalidades para la extracci贸n
 incremental de expedientes del portal PJN.
 """
 
