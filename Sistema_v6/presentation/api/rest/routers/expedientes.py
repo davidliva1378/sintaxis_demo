@@ -1,0 +1,264 @@
+"""Expedientes Router - Endpoints para gestión de expedientes."""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, status
+
+from application.dtos import (
+    ExtraerExpedientesCommand,
+    FiltrarExpedientesCommand,
+    ListarExpedientesQuery,
+    ObtenerExpedienteQuery,
+)
+from infrastructure.di_container import get_container
+from infrastructure.exceptions import PJNError
+
+from ..schemas.expediente_schemas import (
+    ExpedienteResponse,
+    ExtraerExpedientesRequest,
+    ExtraerExpedientesResponse,
+    FiltrarExpedientesRequest,
+    FiltrarExpedientesResponse,
+    ListarExpedientesResponse,
+)
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+
+@router.post("/extraer", response_model=ExtraerExpedientesResponse, status_code=status.HTTP_200_OK)
+async def extraer_expedientes(request: ExtraerExpedientesRequest):
+    """Extrae la lista completa de expedientes del PJN.
+
+    Args:
+        request: Datos de la petición
+
+    Returns:
+        ExtraerExpedientesResponse con resultado
+
+    Raises:
+        HTTPException: Si hay error en la extracción
+    """
+    logger.info("POST /expedientes/extraer")
+
+    try:
+        # Preparar comando
+        guardar_en = Path(request.guardar_en) if request.guardar_en else None
+        command = ExtraerExpedientesCommand(
+            usuario=request.usuario,
+            contrasena=request.contrasena,
+            headless=request.headless,
+            guardar_en=guardar_en,
+        )
+
+        # Ejecutar use case
+        container = get_container()
+        use_case = container.extraer_expedientes_use_case()
+        result = await use_case.execute(command)
+
+        if result.success:
+            response_data = result.value
+            return ExtraerExpedientesResponse(
+                success=True,
+                total=response_data.total,
+                archivo_guardado=str(response_data.archivo_guardado) if response_data.archivo_guardado else None,
+            )
+        else:
+            return ExtraerExpedientesResponse(
+                success=False,
+                total=0,
+                error=result.error,
+            )
+
+    except NotImplementedError as e:
+        logger.warning(f"Funcionalidad no implementada: {e}")
+        return ExtraerExpedientesResponse(
+            success=False,
+            total=0,
+            error="Scraping no implementado aún. Migración pendiente desde Sistema_v5.",
+        )
+
+    except PJNError as e:
+        logger.error(f"Error PJN en extracción: {e}")
+        return ExtraerExpedientesResponse(
+            success=False,
+            total=0,
+            error=str(e),
+        )
+
+    except Exception as e:
+        logger.exception("Error inesperado en extracción")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno: {str(e)}",
+        )
+
+
+@router.post("/filtrar", response_model=FiltrarExpedientesResponse, status_code=status.HTTP_200_OK)
+async def filtrar_expedientes(request: FiltrarExpedientesRequest):
+    """Filtra expedientes según selección del usuario.
+
+    Args:
+        request: Datos de la petición
+
+    Returns:
+        FiltrarExpedientesResponse con resultado
+
+    Raises:
+        HTTPException: Si hay error en el filtrado
+    """
+    logger.info("POST /expedientes/filtrar")
+
+    try:
+        # Preparar comando
+        command = FiltrarExpedientesCommand(
+            numeros_seleccionados=request.numeros_seleccionados,
+            origen=Path(request.origen),
+            destino=Path(request.destino) if request.destino else None,
+            incluir_activos=request.incluir_activos,
+            dias_actividad=request.dias_actividad,
+        )
+
+        # Ejecutar use case
+        container = get_container()
+        use_case = container.filtrar_expedientes_use_case()
+        result = await use_case.execute(command)
+
+        if result.success:
+            response_data = result.value
+            return FiltrarExpedientesResponse(
+                success=True,
+                total_origen=response_data.total_origen,
+                total_filtrados=response_data.total_filtrados,
+                archivo_guardado=str(response_data.archivo_guardado) if response_data.archivo_guardado else None,
+            )
+        else:
+            return FiltrarExpedientesResponse(
+                success=False,
+                total_origen=0,
+                total_filtrados=0,
+                error=result.error,
+            )
+
+    except PJNError as e:
+        logger.error(f"Error PJN en filtrado: {e}")
+        return FiltrarExpedientesResponse(
+            success=False,
+            total_origen=0,
+            total_filtrados=0,
+            error=str(e),
+        )
+
+    except Exception as e:
+        logger.exception("Error inesperado en filtrado")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno: {str(e)}",
+        )
+
+
+@router.get("", response_model=ListarExpedientesResponse, status_code=status.HTTP_200_OK)
+async def listar_expedientes(activos_solo: bool = False, dias: int = 30):
+    """Lista expedientes almacenados.
+
+    Args:
+        activos_solo: Si True, solo expedientes activos
+        dias: Días para considerar activo
+
+    Returns:
+        ListarExpedientesResponse con lista de expedientes
+
+    Raises:
+        HTTPException: Si hay error al listar
+    """
+    logger.info(f"GET /expedientes (activos_solo={activos_solo}, dias={dias})")
+
+    try:
+        # Obtener repositorio
+        container = get_container()
+        repo = container.expediente_repo
+
+        # Obtener expedientes
+        if activos_solo:
+            expedientes = await repo.obtener_activos(dias=dias)
+        else:
+            expedientes = await repo.obtener_todos()
+
+        # Convertir a response
+        expedientes_response = [
+            ExpedienteResponse(
+                numero=exp.numero,
+                dependencia=exp.dependencia,
+                caratula=exp.caratula,
+                situacion=exp.situacion,
+                ultima_actuacion=exp.ultima_actuacion,
+            )
+            for exp in expedientes
+        ]
+
+        return ListarExpedientesResponse(
+            success=True,
+            total=len(expedientes_response),
+            expedientes=expedientes_response,
+        )
+
+    except Exception as e:
+        logger.exception("Error al listar expedientes")
+        return ListarExpedientesResponse(
+            success=False,
+            total=0,
+            expedientes=[],
+            error=str(e),
+        )
+
+
+@router.get("/{numero}", response_model=ExpedienteResponse, status_code=status.HTTP_200_OK)
+async def obtener_expediente(numero: str):
+    """Obtiene un expediente por número.
+
+    Args:
+        numero: Número del expediente
+
+    Returns:
+        ExpedienteResponse con datos del expediente
+
+    Raises:
+        HTTPException: Si el expediente no existe
+    """
+    logger.info(f"GET /expedientes/{numero}")
+
+    try:
+        # Obtener repositorio
+        container = get_container()
+        repo = container.expediente_repo
+
+        # Buscar expediente
+        expediente = await repo.obtener_por_numero(numero)
+
+        if expediente is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Expediente {numero} no encontrado",
+            )
+
+        return ExpedienteResponse(
+            numero=expediente.numero,
+            dependencia=expediente.dependencia,
+            caratula=expediente.caratula,
+            situacion=expediente.situacion,
+            ultima_actuacion=expediente.ultima_actuacion,
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.exception(f"Error al obtener expediente {numero}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno: {str(e)}",
+        )
