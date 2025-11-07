@@ -1,54 +1,12 @@
-# Sistema PJN v6 - Production Dependencies
-# Python >= 3.10
+fastapi~=0.115.12
+uvicorn~=0.34.0
+jinja2
+pywebview~=5.4
+playwright~=1.50.0
+python-multipart
+mysql-connector-python~=9.2.0
+pandas~=2.2.3
+openpyxl~=3.1.5
 
-# Web scraping
-playwright==1.50.0
-
-# Web framework and API
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6
-
-# Data validation
-pydantic==2.5.3
-pydantic-settings==2.1.0
-
-# Database and Auth
-sqlalchemy==2.0.25
-alembic==1.13.1
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-cryptography==41.0.7
-
-# Scheduling and background tasks
-apscheduler==3.11.0
-
-# System notifications
-plyer==2.1.0
-
-# Environment variables
-python-dotenv==1.0.0
-
-# HTTP client
-httpx==0.26.0
-
-# PDF processing (for MCP server and plugins)
-pdfplumber==0.11.0
-pytesseract==0.3.10
-
-# Date utilities
-python-dateutil==2.8.2
-
-# CLI interface
-click==8.1.7
-rich==13.7.0
-
-# Model Context Protocol
-mcp==1.0.0
-
-# Cache (optional, for production)
-redis==5.0.1
-hiredis==2.3.2
-
-# Excel export (for extractor inicial)
-openpyxl==3.1.2
+requests~=2.32.3
+PySide6~=6.8.2.1

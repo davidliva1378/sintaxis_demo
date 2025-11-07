@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ titulo }}</title>
+    <link rel="stylesheet" href="/static/css/extraccion_masiva.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📥 Extracción Masiva de Expedientes</h1>
+            <p class="subtitle">Extraer grandes volúmenes de expedientes del PJN con filtros personalizados</p>
+            <a href="/" class="btn-volver">← Volver al listado</a>
+        </header>
+
+        <!-- Panel de Configuración -->
+        <div class="panel panel-config" id="panelConfig">
+            <h2>⚙️ Configuración de Extracción</h2>
+
+            <form id="formConfig">
+                <div class="form-grid">
+                    <!-- Filtros de Fecha -->
+                    <div class="form-group">
+                        <label for="fechaDesde">📅 Fecha Desde:</label>
+                        <input type="date" id="fechaDesde" name="fecha_desde">
+                        <small>Opcional: Filtrar por fecha de inicio</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="fechaHasta">📅 Fecha Hasta:</label>
+                        <input type="date" id="fechaHasta" name="fecha_hasta">
+                        <small>Opcional: Filtrar por fecha final</small>
+                    </div>
+
+                    <!-- Estados -->
+                    <div class="form-group full-width">
+                        <label>📊 Estados a Incluir:</label>
+                        <div class="checkbox-group">
+                            <label><input type="checkbox" name="estados" value="nuevo" checked> Nuevo</label>
+                            <label><input type="checkbox" name="estados" value="monitoreado"> Monitoreado</label>
+                            <label><input type="checkbox" name="estados" value="priorizado"> Priorizado</label>
+                            <label><input type="checkbox" name="estados" value="archivado"> Archivado</label>
+                        </div>
+                        <small>Selecciona los estados de expedientes a incluir</small>
+                    </div>
+
+                    <!-- Formatos de Exportación -->
+                    <div class="form-group full-width">
+                        <label>💾 Formatos de Exportación:</label>
+                        <div class="checkbox-group">
+                            <label><input type="checkbox" name="formatos" value="json" checked> JSON</label>
+                            <label><input type="checkbox" name="formatos" value="excel"> Excel (.xlsx)</label>
+                            <label><input type="checkbox" name="formatos" value="csv"> CSV</label>
+                        </div>
+                    </div>
+
+                    <!-- Opciones Avanzadas -->
+                    <div class="form-group">
+                        <label for="umbralErrores">⚠️ Umbral de Errores:</label>
+                        <input type="number" id="umbralErrores" name="umbral_errores" value="10" min="1" max="100">
+                        <small>Número máximo de errores consecutivos antes de abortar</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="headless" name="headless" checked>
+                            🖥️ Modo Headless (sin interfaz gráfica)
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Botón de Inicio -->
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-lg" id="btnIniciar">
+                        🚀 Iniciar Extracción
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Panel de Progreso -->
+        <div class="panel panel-progreso hidden" id="panelProgreso">
+            <h2>📊 Progreso de Extracción</h2>
+
+            <div class="status-badge" id="statusBadge">
+                <span class="status-dot"></span>
+                <span id="statusText">Iniciando...</span>
+            </div>
+
+            <!-- Barra de Progreso -->
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                    <span class="progress-text" id="progressText">0%</span>
+                </div>
+                <p class="progress-message" id="progressMessage">Preparando extracción...</p>
+            </div>
+
+            <!-- Estadísticas en Tiempo Real -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📄</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Total Procesados</div>
+                        <div class="stat-value" id="statTotal">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card stat-success">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Exitosos</div>
+                        <div class="stat-value" id="statExitosos">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card stat-error">
+                    <div class="stat-icon">❌</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Errores</div>
+                        <div class="stat-value" id="statErrores">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card stat-info">
+                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Tiempo</div>
+                        <div class="stat-value" id="statTiempo">0s</div>
+                    </div>
+                </div>
+
+                <div class="stat-card stat-info">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Velocidad</div>
+                        <div class="stat-value" id="statVelocidad">0/min</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">⏳</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Restante</div>
+                        <div class="stat-value" id="statRestante">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información de Fase -->
+            <div class="phase-info">
+                <div class="phase-label">Fase Actual:</div>
+                <div class="phase-value" id="phaseValue">Configuración</div>
+            </div>
+
+            <!-- Botones de Control -->
+            <div class="control-buttons">
+                <button class="btn btn-warning" id="btnPausar" disabled>
+                    ⏸️ Pausar
+                </button>
+                <button class="btn btn-success hidden" id="btnReanudar">
+                    ▶️ Reanudar
+                </button>
+                <button class="btn btn-danger" id="btnCancelar" disabled>
+                    🛑 Cancelar
+                </button>
+            </div>
+        </div>
+
+        <!-- Panel de Resultados -->
+        <div class="panel panel-resultados hidden" id="panelResultados">
+            <h2>✅ Extracción Completada</h2>
+
+            <div class="results-summary">
+                <div class="summary-item">
+                    <span class="summary-label">Session ID:</span>
+                    <span class="summary-value" id="resultSessionId">-</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Total Procesados:</span>
+                    <span class="summary-value" id="resultTotal">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Exitosos:</span>
+                    <span class="summary-value success" id="resultExitosos">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Errores:</span>
+                    <span class="summary-value error" id="resultErrores">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Duración:</span>
+                    <span class="summary-value" id="resultDuracion">0s</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Velocidad Promedio:</span>
+                    <span class="summary-value" id="resultVelocidad">0 exp/min</span>
+                </div>
+            </div>
+
+            <!-- Botones de Descarga -->
+            <div class="download-buttons">
+                <h3>📥 Descargar Reportes</h3>
+                <div class="download-grid" id="downloadGrid">
+                    <!-- Se llenarán dinámicamente -->
+                </div>
+            </div>
+
+            <!-- Botón para Nueva Extracción -->
+            <div class="form-actions">
+                <button class="btn btn-primary" id="btnNuevaExtraccion">
+                    🔄 Nueva Extracción
+                </button>
+            </div>
+        </div>
+
+        <!-- Panel de Error -->
+        <div class="panel panel-error hidden" id="panelError">
+            <h2>❌ Error en la Extracción</h2>
+            <div class="error-message" id="errorMessage"></div>
+            <div class="form-actions">
+                <button class="btn btn-primary" id="btnReintentar">
+                    🔄 Reintentar
+                </button>
+            </div>
+        </div>
+
+        <!-- Log de Actividad (Opcional) -->
+        <div class="panel panel-log">
+            <details>
+                <summary>📝 Registro de Actividad</summary>
+                <div class="log-container" id="logContainer">
+                    <p class="log-entry">Sistema listo para iniciar extracción...</p>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/extraccion_masiva.js"></script>
+</body>
+</html>
