@@ -62,10 +62,22 @@ class ConfigExtraccionMasiva:
 
     def to_dict(self) -> Dict:
         """Convertir configuración a diccionario."""
+        # Manejar estados que pueden ser strings o enums
+        if self.estados:
+            estados_list = []
+            for e in self.estados:
+                if isinstance(e, str):
+                    estados_list.append(e)
+                else:
+                    # Es un enum EstadoExpediente
+                    estados_list.append(e.value)
+        else:
+            estados_list = []
+
         return {
             "fecha_desde": self.fecha_desde,
             "fecha_hasta": self.fecha_hasta,
-            "estados": [e.value for e in self.estados] if self.estados else [],
+            "estados": estados_list,
             "dependencias": self.dependencias,
             "descargar_adjuntos": self.descargar_adjuntos,
             "headless": self.headless,
@@ -86,27 +98,30 @@ class ExtractorMasivo:
     5. Genera reportes finales
     """
 
-    def __init__(self, config: ConfigExtraccionMasiva):
+    def __init__(self, config: ConfigExtraccionMasiva, callbacks: Optional[Dict[str, Callable]] = None):
         """
         Inicializar extractor masivo.
 
         Args:
             config: Configuración de extracción
+            callbacks: Diccionario de funciones callback para eventos (opcional)
         """
         self.config = config
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.callbacks: Dict[str, Callable] = {}
+        self.callbacks: Dict[str, Callable] = callbacks or {}
         self.cancelado = False
 
         # Paths de guardado
         self.listados_dir = Config.DATA_DIR / "extraccion_masiva" / "listados"
         self.reportes_dir = Config.DATA_DIR / "extraccion_masiva" / "reportes"
         self.logs_dir = Config.DATA_DIR / "extraccion_masiva" / "logs"
+        self.session_dir = Config.DATA_DIR / "extraccion_masiva" / "sesiones" / self.session_id
 
         # Crear directorios si no existen
         self.listados_dir.mkdir(parents=True, exist_ok=True)
         self.reportes_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
+        self.session_dir.mkdir(parents=True, exist_ok=True)
 
     def set_callback(self, evento: str, func: Callable):
         """
@@ -129,7 +144,47 @@ class ExtractorMasivo:
         """
         if evento in self.callbacks:
             try:
-                self.callbacks[evento](data)
+                import asyncio
+                import inspect
+
+                callback = self.callbacks[evento]
+
+                # Determinar qué parámetros pasar según el evento
+                if evento == "inicio_listado":
+                    args = ()
+                elif evento == "progreso_listado":
+                    args = (data.get("pagina", 0), data.get("total_paginas", 0))
+                elif evento == "fin_listado":
+                    args = (data.get("expedientes", []),)
+                elif evento == "inicio_batch":
+                    args = (data.get("total", 0),)
+                elif evento == "progreso_batch":
+                    args = (data.get("idx", 0), data.get("total", 0), data.get("resultado", {}))
+                elif evento == "fin_batch":
+                    args = (data.get("resumen", {}),)
+                elif evento == "error":
+                    args = (data.get("mensaje", "Error desconocido"),)
+                else:
+                    args = (data,)
+
+                # Llamar al callback (sync o async)
+                if inspect.iscoroutinefunction(callback):
+                    # Es async, ejecutar en el event loop
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            # Si ya hay un loop corriendo, crear una tarea
+                            asyncio.create_task(callback(*args))
+                        else:
+                            # Si no hay loop, ejecutar con run_until_complete
+                            loop.run_until_complete(callback(*args))
+                    except RuntimeError:
+                        # Si no hay event loop, crear uno nuevo
+                        asyncio.run(callback(*args))
+                else:
+                    # Es sync, llamar directamente
+                    callback(*args)
+
             except Exception as e:
                 logger.error(f"Error en callback {evento}: {e}")
         else:
@@ -168,6 +223,7 @@ class ExtractorMasivo:
                     logger.info(f"Procesando página {pagina_actual}")
                     self._emit("progreso_listado", {
                         "pagina": pagina_actual,
+                        "total_paginas": 0,  # No se conoce el total por adelantado
                         "total_expedientes": len(expedientes),
                     })
 
@@ -318,7 +374,14 @@ class ExtractorMasivo:
 
             # Filtrar por estados si es necesario
             if self.config.estados:
-                logger.info(f"Filtrando por estados: {[e.value for e in self.config.estados]}")
+                # Manejar estados que pueden ser strings o enums
+                estados_str = []
+                for e in self.config.estados:
+                    if isinstance(e, str):
+                        estados_str.append(e)
+                    else:
+                        estados_str.append(e.value)
+                logger.info(f"Filtrando por estados: {estados_str}")
                 gestor_estados = GestorEstados()
                 gestor_estados.cargar_estados()
 
