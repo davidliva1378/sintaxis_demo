@@ -2,14 +2,25 @@ from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from .db import obtener_expedientes
+from .api import extraccion
 import json
 import os
 from datetime import datetime
 
 
-app = FastAPI()
+app = FastAPI(title="Sistema de Expedientes PJN", version="1.0.0")
 templates = Jinja2Templates(directory="backend/templates")
+
+# Incluir router de API de extracción masiva
+app.include_router(extraccion.router)
+
+# Montar directorio static si existe
+static_dir = Path("backend/static")
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -25,6 +36,15 @@ async def panel_admin(request: Request):
     return templates.TemplateResponse("admin_dashboard.html", {
         "request": request,
         "titulo": "Panel del Administrador"
+    })
+
+
+@app.get("/extraccion-masiva", response_class=HTMLResponse)
+async def vista_extraccion_masiva(request: Request):
+    """Vista del dashboard de extracción masiva."""
+    return templates.TemplateResponse("extraccion_masiva.html", {
+        "request": request,
+        "titulo": "Extracción Masiva de Expedientes"
     })
 
 
