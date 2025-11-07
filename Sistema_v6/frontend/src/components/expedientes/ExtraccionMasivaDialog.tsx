@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { X, Download, Loader2, Filter, CheckSquare, Square } from 'lucide-react'
+import { Progress } from '@/components/ui/progress'
+import { X, Download, Loader2, Filter, CheckSquare, Square, Pause, Play, XCircle, FileDown } from 'lucide-react'
 import { useExpedientesStore } from '@/stores/expedientesStore'
 import type { ExpedienteResumen } from '@/types/expediente'
 
@@ -25,15 +26,28 @@ interface Filtros {
 }
 
 export default function ExtraccionMasivaDialog({ onClose, onSuccess }: ExtraccionMasivaDialogProps) {
-  const { extraerExpedientesMasivamente, isExtractingMasivo } = useExpedientesStore()
+  const {
+    extraerExpedientesMasivamente,
+    isExtractingMasivo,
+    extraccionMasiva,
+    iniciarExtraccionMasivaAvanzada,
+    pausarExtraccion,
+    reanudarExtraccion,
+    cancelarExtraccion,
+    obtenerResumen,
+    descargarReporte,
+    desconectarWebSocket,
+    expedientes,
+  } = useExpedientesStore()
 
   // Estados
-  const [etapa, setEtapa] = useState<'extraccion' | 'filtrado'>('extraccion')
+  const [etapa, setEtapa] = useState<'config' | 'extrayendo' | 'filtrado'>('config')
   const [expedientesExtraidos, setExpedientesExtraidos] = useState<ExpedienteResumen[]>([])
   const [expedientesFiltrados, setExpedientesFiltrados] = useState<ExpedienteResumen[]>([])
   const [expedientesSeleccionados, setExpedientesSeleccionados] = useState<Set<string>>(new Set())
   const [procesarConPDF, setProcesarConPDF] = useState(false)
   const [logMensajes, setLogMensajes] = useState<string[]>([])
+  const [mostrarOpcionesAvanzadas, setMostrarOpcionesAvanzadas] = useState(false)
 
   // Filtros
   const [filtros, setFiltros] = useState<Filtros>({
@@ -53,6 +67,31 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
       aplicarFiltros()
     }
   }, [filtros, expedientesExtraidos])
+
+  // Monitorear progreso de extracción y cambiar a filtrado cuando termine
+  useEffect(() => {
+    if (extraccionMasiva.estado === 'completed' && etapa === 'extrayendo') {
+      // Obtener expedientes del store
+      setExpedientesExtraidos(expedientes)
+      setExpedientesFiltrados(expedientes)
+
+      // Seleccionar todos por defecto
+      const seleccionados = new Set(expedientes.map(exp => exp.numero))
+      setExpedientesSeleccionados(seleccionados)
+
+      // Avanzar a etapa de filtrado
+      setEtapa('filtrado')
+    }
+  }, [extraccionMasiva.estado, etapa, expedientes])
+
+  // Cleanup: desconectar WebSocket al cerrar
+  useEffect(() => {
+    return () => {
+      if (extraccionMasiva.websocket) {
+        desconectarWebSocket()
+      }
+    }
+  }, [])
 
   const aplicarFiltros = () => {
     let filtered = [...expedientesExtraidos]
@@ -94,28 +133,55 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
     setLogMensajes([])
 
     try {
-      // Llamar a la función del store para extracción masiva
-      const expedientes = await extraerExpedientesMasivamente(
-        undefined, // usuario (opcional, se obtiene de sesión)
-        undefined, // contraseña (opcional, se obtiene de sesión)
-        procesarConPDF, // procesarConPDF
-        agregarLog // callback de progreso
-      )
+      // Configuración de extracción avanzada
+      const config = {
+        headless: true,
+        umbralErrores: 10,
+        exportarFormatos: ['json'],
+      }
 
-      // Guardar expedientes extraídos
-      setExpedientesExtraidos(expedientes)
-      setExpedientesFiltrados(expedientes)
+      // Iniciar extracción masiva avanzada con WebSocket
+      await iniciarExtraccionMasivaAvanzada(config)
 
-      // Seleccionar todos por defecto
-      const seleccionados = new Set(expedientes.map(exp => exp.numero))
-      setExpedientesSeleccionados(seleccionados)
-
-      // Avanzar a etapa de filtrado
-      setEtapa('filtrado')
+      // Cambiar a etapa de extrayendo (el progreso se mostrará en tiempo real)
+      setEtapa('extrayendo')
 
     } catch (error) {
       agregarLog(`❌ Error durante la extracción: ${error}`)
       // El error ya se muestra en el toast por el store
+    }
+  }
+
+  const handlePausar = async () => {
+    try {
+      await pausarExtraccion()
+    } catch (error) {
+      console.error('Error al pausar:', error)
+    }
+  }
+
+  const handleReanudar = async () => {
+    try {
+      await reanudarExtraccion()
+    } catch (error) {
+      console.error('Error al reanudar:', error)
+    }
+  }
+
+  const handleCancelar = async () => {
+    try {
+      await cancelarExtraccion()
+      setEtapa('config')
+    } catch (error) {
+      console.error('Error al cancelar:', error)
+    }
+  }
+
+  const handleDescargarReporte = async (formato: 'json' | 'excel' | 'csv' | 'html') => {
+    try {
+      await descargarReporte(formato)
+    } catch (error) {
+      console.error('Error al descargar reporte:', error)
     }
   }
 
@@ -215,8 +281,8 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
         </CardHeader>
 
         <CardContent className="flex-1 overflow-auto">
-          {/* Tab de Extracción */}
-          {etapa === 'extraccion' && (
+          {/* Tab de Configuración */}
+          {etapa === 'config' && (
             <div className="space-y-6">
               {/* Opciones */}
               <div className="space-y-4">
@@ -248,35 +314,106 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
               <div>
                 <Button
                   onClick={handleIniciarExtraccion}
-                  disabled={isExtractingMasivo}
+                  disabled={extraccionMasiva.estado === 'running'}
                   className="w-full"
                   size="lg"
                 >
-                  {isExtractingMasivo ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Extrayendo...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4 mr-2" />
-                      Iniciar Extracción
-                    </>
-                  )}
+                  <Download className="h-4 w-4 mr-2" />
+                  Iniciar Extracción Masiva Avanzada
                 </Button>
               </div>
+            </div>
+          )}
 
-              {/* Log */}
-              {logMensajes.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="font-semibold">Registro de Actividad</h3>
-                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 h-64 overflow-auto font-mono text-xs">
-                    {logMensajes.map((msg, idx) => (
-                      <div key={idx} className="mb-1">{msg}</div>
-                    ))}
+          {/* Tab de Extrayendo con progreso en tiempo real */}
+          {etapa === 'extrayendo' && (
+            <div className="space-y-6">
+              {/* Barra de progreso */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-lg">Extracción en Progreso</h3>
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <span className="font-mono">{extraccionMasiva.progreso.actual}/{extraccionMasiva.progreso.total}</span>
+                    <span>•</span>
+                    <span>{extraccionMasiva.progreso.porcentaje.toFixed(1)}%</span>
                   </div>
                 </div>
-              )}
+
+                <Progress value={extraccionMasiva.progreso.porcentaje} className="h-3" />
+
+                {/* Información de progreso */}
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-1">
+                    <div className="text-gray-600 dark:text-gray-400">Fase Actual</div>
+                    <div className="font-semibold">{extraccionMasiva.progreso.fase || 'Iniciando...'}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-gray-600 dark:text-gray-400">Estado</div>
+                    <div className="font-semibold capitalize">{extraccionMasiva.estado}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-gray-600 dark:text-gray-400">Errores</div>
+                    <div className="font-semibold text-red-600">{extraccionMasiva.progreso.errores}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-gray-600 dark:text-gray-400">Tiempo Transcurrido</div>
+                    <div className="font-semibold font-mono">
+                      {Math.floor(extraccionMasiva.progreso.tiempoTranscurrido / 60)}:{String(Math.floor(extraccionMasiva.progreso.tiempoTranscurrido % 60)).padStart(2, '0')}
+                    </div>
+                  </div>
+                  {extraccionMasiva.progreso.velocidad && (
+                    <div className="space-y-1">
+                      <div className="text-gray-600 dark:text-gray-400">Velocidad</div>
+                      <div className="font-semibold">{extraccionMasiva.progreso.velocidad.toFixed(2)} exp/s</div>
+                    </div>
+                  )}
+                  {extraccionMasiva.progreso.tiempoEstimado && (
+                    <div className="space-y-1">
+                      <div className="text-gray-600 dark:text-gray-400">Tiempo Estimado</div>
+                      <div className="font-semibold font-mono">
+                        {Math.floor(extraccionMasiva.progreso.tiempoEstimado / 60)}:{String(Math.floor(extraccionMasiva.progreso.tiempoEstimado % 60)).padStart(2, '0')}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Mensaje actual */}
+                <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                  <p className="text-sm font-mono">{extraccionMasiva.progreso.mensaje || 'Esperando actualizaciones...'}</p>
+                </div>
+
+                {/* Controles de extracción */}
+                <div className="flex gap-2">
+                  {extraccionMasiva.estado === 'running' && (
+                    <Button
+                      onClick={handlePausar}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      <Pause className="h-4 w-4 mr-2" />
+                      Pausar
+                    </Button>
+                  )}
+                  {extraccionMasiva.estado === 'paused' && (
+                    <Button
+                      onClick={handleReanudar}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      Reanudar
+                    </Button>
+                  )}
+                  <Button
+                    onClick={handleCancelar}
+                    variant="destructive"
+                    className="flex-1"
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -451,22 +588,62 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
         </CardContent>
 
         {/* Footer con botones */}
-        <div className="border-t p-4 flex justify-end gap-2">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            disabled={isExtractingMasivo}
-          >
-            Cancelar
-          </Button>
-          {etapa === 'filtrado' && (
+        <div className="border-t p-4 flex justify-between gap-2">
+          <div className="flex gap-2">
+            {etapa === 'filtrado' && extraccionMasiva.sessionId && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDescargarReporte('json')}
+                >
+                  <FileDown className="h-4 w-4 mr-2" />
+                  JSON
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDescargarReporte('excel')}
+                >
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDescargarReporte('csv')}
+                >
+                  <FileDown className="h-4 w-4 mr-2" />
+                  CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDescargarReporte('html')}
+                >
+                  <FileDown className="h-4 w-4 mr-2" />
+                  HTML
+                </Button>
+              </>
+            )}
+          </div>
+          <div className="flex gap-2">
             <Button
-              onClick={handleConfirmar}
-              disabled={expedientesSeleccionados.size === 0}
+              variant="outline"
+              onClick={onClose}
+              disabled={extraccionMasiva.estado === 'running'}
             >
-              Confirmar y Guardar Selección ({expedientesSeleccionados.size})
+              {etapa === 'filtrado' ? 'Cerrar' : 'Cancelar'}
             </Button>
-          )}
+            {etapa === 'filtrado' && (
+              <Button
+                onClick={handleConfirmar}
+                disabled={expedientesSeleccionados.size === 0}
+              >
+                Confirmar y Guardar Selección ({expedientesSeleccionados.size})
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
     </div>

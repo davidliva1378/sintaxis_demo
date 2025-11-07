@@ -9,6 +9,50 @@ import type {
   PaginacionResult,
 } from '@/types/expediente'
 
+// Tipos para extracción masiva avanzada
+interface ConfigExtraccionMasiva {
+  usuario?: string
+  contrasena?: string
+  fechaDesde?: string
+  fechaHasta?: string
+  estados?: string[]
+  dependencias?: string[]
+  umbralErrores?: number
+  headless?: boolean
+  exportarFormatos?: string[]
+}
+
+interface ProgresoExtraccion {
+  actual: number
+  total: number
+  porcentaje: number
+  fase: string
+  mensaje: string
+  errores: number
+  tiempoTranscurrido: number
+  tiempoEstimado: number | null
+  velocidad: number | null
+}
+
+interface ResumenExtraccion {
+  sessionId: string
+  estado: string
+  total: number
+  exitosos: number
+  errores: number
+  omitidos: number
+  duracionSegundos: number
+  velocidadPromedio: number
+  archivosGenerados: string[]
+}
+
+interface ExtraccionMasivaState {
+  sessionId: string | null
+  estado: 'idle' | 'running' | 'paused' | 'completed' | 'error' | 'cancelled'
+  progreso: ProgresoExtraccion
+  websocket: WebSocket | null
+}
+
 interface ExpedientesState {
   // Estado
   expedientes: ExpedienteResumen[]
@@ -23,6 +67,7 @@ interface ExpedientesState {
   isLoading: boolean
   isExtracting: boolean
   isExtractingMasivo: boolean
+  extraccionMasiva: ExtraccionMasivaState
 
   // Acciones
   listarExpedientes: (filtros?: ExpedienteFiltros, pagina?: number) => Promise<void>
@@ -38,6 +83,17 @@ interface ExpedientesState {
   limpiarFiltros: () => void
   setPagina: (pagina: number) => void
   limpiarExpedienteActual: () => void
+
+  // Acciones de extracción masiva avanzada
+  iniciarExtraccionMasivaAvanzada: (config: ConfigExtraccionMasiva) => Promise<string>
+  conectarWebSocket: (sessionId: string) => void
+  desconectarWebSocket: () => void
+  pausarExtraccion: () => Promise<void>
+  reanudarExtraccion: () => Promise<void>
+  cancelarExtraccion: () => Promise<void>
+  obtenerProgreso: () => Promise<void>
+  obtenerResumen: () => Promise<ResumenExtraccion>
+  descargarReporte: (formato: 'json' | 'excel' | 'csv' | 'html') => Promise<void>
 }
 
 export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
@@ -54,6 +110,22 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
   isLoading: false,
   isExtracting: false,
   isExtractingMasivo: false,
+  extraccionMasiva: {
+    sessionId: null,
+    estado: 'idle',
+    progreso: {
+      actual: 0,
+      total: 0,
+      porcentaje: 0,
+      fase: '',
+      mensaje: '',
+      errores: 0,
+      tiempoTranscurrido: 0,
+      tiempoEstimado: null,
+      velocidad: null,
+    },
+    websocket: null,
+  },
 
   // Listar expedientes con filtros y paginación
   listarExpedientes: async (filtros?: ExpedienteFiltros, pagina?: number) => {
@@ -322,6 +394,333 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
       throw error
     } finally {
       set({ isExtractingMasivo: false })
+    }
+  },
+
+  // Iniciar extracción masiva avanzada con WebSocket
+  iniciarExtraccionMasivaAvanzada: async (config: ConfigExtraccionMasiva): Promise<string> => {
+    try {
+      toast.info('Iniciando extracción masiva avanzada...', {
+        description: 'Configurando sesión de extracción',
+      })
+
+      // Iniciar extracción en el backend
+      const response = await apiClient.post('/api/v1/expedientes/extraer/masivo', config)
+      const sessionId = response.data.session_id
+
+      // Actualizar estado
+      set({
+        extraccionMasiva: {
+          ...get().extraccionMasiva,
+          sessionId,
+          estado: 'running',
+        },
+      })
+
+      // Conectar WebSocket automáticamente
+      get().conectarWebSocket(sessionId)
+
+      toast.success('Extracción iniciada', {
+        description: `Sesión: ${sessionId}`,
+      })
+
+      return sessionId
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.detail || 'Error al iniciar extracción masiva'
+      toast.error('Error al iniciar extracción', {
+        description: errorMsg,
+      })
+      throw error
+    }
+  },
+
+  // Conectar WebSocket para recibir actualizaciones en tiempo real
+  conectarWebSocket: (sessionId: string) => {
+    const state = get()
+
+    // Cerrar conexión existente si hay
+    if (state.extraccionMasiva.websocket) {
+      state.extraccionMasiva.websocket.close()
+    }
+
+    // Construir URL del WebSocket
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const host = window.location.host
+    const wsUrl = `${protocol}//${host}/api/v1/expedientes/extraer/${sessionId}/ws`
+
+    // Crear conexión WebSocket
+    const ws = new WebSocket(wsUrl)
+
+    ws.onopen = () => {
+      console.log(`WebSocket conectado para sesión ${sessionId}`)
+
+      // Enviar ping cada 25 segundos para mantener conexión
+      const pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send('ping')
+        } else {
+          clearInterval(pingInterval)
+        }
+      }, 25000)
+    }
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data)
+
+      // Actualizar progreso en el estado
+      set({
+        extraccionMasiva: {
+          ...get().extraccionMasiva,
+          estado: data.estado,
+          progreso: {
+            actual: data.progreso_actual,
+            total: data.progreso_total,
+            porcentaje: data.porcentaje,
+            fase: data.fase,
+            mensaje: data.mensaje,
+            errores: data.errores,
+            tiempoTranscurrido: data.tiempo_transcurrido || 0,
+            tiempoEstimado: data.tiempo_estimado || null,
+            velocidad: data.velocidad || null,
+          },
+        },
+      })
+
+      // Si la extracción terminó, cerrar WebSocket
+      if (['completado', 'error', 'cancelado'].includes(data.estado)) {
+        ws.close()
+
+        if (data.estado === 'completado') {
+          toast.success('Extracción completada', {
+            description: data.mensaje,
+          })
+          // Actualizar lista de expedientes
+          get().listarExpedientes()
+        } else if (data.estado === 'error') {
+          toast.error('Error en extracción', {
+            description: data.mensaje,
+          })
+        } else if (data.estado === 'cancelado') {
+          toast.warning('Extracción cancelada', {
+            description: data.mensaje,
+          })
+        }
+      }
+    }
+
+    ws.onerror = (error) => {
+      console.error('Error en WebSocket:', error)
+      toast.error('Error de conexión', {
+        description: 'No se pudo conectar con el servidor',
+      })
+    }
+
+    ws.onclose = () => {
+      console.log(`WebSocket cerrado para sesión ${sessionId}`)
+      set({
+        extraccionMasiva: {
+          ...get().extraccionMasiva,
+          websocket: null,
+        },
+      })
+    }
+
+    // Guardar WebSocket en el estado
+    set({
+      extraccionMasiva: {
+        ...get().extraccionMasiva,
+        websocket: ws,
+      },
+    })
+  },
+
+  // Desconectar WebSocket
+  desconectarWebSocket: () => {
+    const ws = get().extraccionMasiva.websocket
+    if (ws) {
+      ws.close()
+      set({
+        extraccionMasiva: {
+          ...get().extraccionMasiva,
+          websocket: null,
+        },
+      })
+    }
+  },
+
+  // Pausar extracción
+  pausarExtraccion: async () => {
+    const sessionId = get().extraccionMasiva.sessionId
+    if (!sessionId) {
+      toast.error('No hay sesión activa')
+      return
+    }
+
+    try {
+      await apiClient.post(`/api/v1/expedientes/extraer/${sessionId}/pausar`)
+
+      set({
+        extraccionMasiva: {
+          ...get().extraccionMasiva,
+          estado: 'paused',
+        },
+      })
+
+      toast.info('Extracción pausada')
+    } catch (error: any) {
+      toast.error('Error al pausar extracción', {
+        description: error.response?.data?.detail || 'Error desconocido',
+      })
+      throw error
+    }
+  },
+
+  // Reanudar extracción
+  reanudarExtraccion: async () => {
+    const sessionId = get().extraccionMasiva.sessionId
+    if (!sessionId) {
+      toast.error('No hay sesión activa')
+      return
+    }
+
+    try {
+      await apiClient.post(`/api/v1/expedientes/extraer/${sessionId}/reanudar`)
+
+      set({
+        extraccionMasiva: {
+          ...get().extraccionMasiva,
+          estado: 'running',
+        },
+      })
+
+      toast.success('Extracción reanudada')
+    } catch (error: any) {
+      toast.error('Error al reanudar extracción', {
+        description: error.response?.data?.detail || 'Error desconocido',
+      })
+      throw error
+    }
+  },
+
+  // Cancelar extracción
+  cancelarExtraccion: async () => {
+    const sessionId = get().extraccionMasiva.sessionId
+    if (!sessionId) {
+      toast.error('No hay sesión activa')
+      return
+    }
+
+    try {
+      await apiClient.post(`/api/v1/expedientes/extraer/${sessionId}/cancelar`)
+
+      // Desconectar WebSocket
+      get().desconectarWebSocket()
+
+      set({
+        extraccionMasiva: {
+          ...get().extraccionMasiva,
+          estado: 'cancelled',
+        },
+      })
+
+      toast.warning('Extracción cancelada')
+    } catch (error: any) {
+      toast.error('Error al cancelar extracción', {
+        description: error.response?.data?.detail || 'Error desconocido',
+      })
+      throw error
+    }
+  },
+
+  // Obtener progreso actual
+  obtenerProgreso: async () => {
+    const sessionId = get().extraccionMasiva.sessionId
+    if (!sessionId) {
+      return
+    }
+
+    try {
+      const response = await apiClient.get(`/api/v1/expedientes/extraer/${sessionId}/progreso`)
+      const data = response.data
+
+      set({
+        extraccionMasiva: {
+          ...get().extraccionMasiva,
+          estado: data.estado,
+          progreso: {
+            actual: data.progreso_actual,
+            total: data.progreso_total,
+            porcentaje: data.porcentaje,
+            fase: data.fase,
+            mensaje: data.mensaje,
+            errores: data.errores,
+            tiempoTranscurrido: data.tiempo_transcurrido || 0,
+            tiempoEstimado: data.tiempo_estimado || null,
+            velocidad: data.velocidad || null,
+          },
+        },
+      })
+    } catch (error: any) {
+      console.error('Error al obtener progreso:', error)
+    }
+  },
+
+  // Obtener resumen de la extracción
+  obtenerResumen: async (): Promise<ResumenExtraccion> => {
+    const sessionId = get().extraccionMasiva.sessionId
+    if (!sessionId) {
+      throw new Error('No hay sesión activa')
+    }
+
+    try {
+      const response = await apiClient.get(`/api/v1/expedientes/extraer/${sessionId}/resumen`)
+      return response.data
+    } catch (error: any) {
+      toast.error('Error al obtener resumen', {
+        description: error.response?.data?.detail || 'Error desconocido',
+      })
+      throw error
+    }
+  },
+
+  // Descargar reporte en formato específico
+  descargarReporte: async (formato: 'json' | 'excel' | 'csv' | 'html') => {
+    const sessionId = get().extraccionMasiva.sessionId
+    if (!sessionId) {
+      toast.error('No hay sesión activa')
+      return
+    }
+
+    try {
+      const response = await apiClient.get(
+        `/api/v1/expedientes/extraer/${sessionId}/descargar/${formato}`,
+        {
+          responseType: 'blob',
+        }
+      )
+
+      // Crear link de descarga
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+
+      // Determinar extensión del archivo
+      const extension = formato === 'excel' ? 'xlsx' : formato
+      link.setAttribute('download', `extraccion_${sessionId}.${extension}`)
+
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+
+      toast.success('Reporte descargado', {
+        description: `Formato: ${formato.toUpperCase()}`,
+      })
+    } catch (error: any) {
+      toast.error('Error al descargar reporte', {
+        description: error.response?.data?.detail || 'Error desconocido',
+      })
+      throw error
     }
   },
 }))
