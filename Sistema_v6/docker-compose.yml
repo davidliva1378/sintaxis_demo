@@ -1,0 +1,71 @@
+# Docker Compose for Sistema PJN v6
+# Orchestrates backend and frontend services
+
+version: '3.8'
+
+services:
+  # Backend service (FastAPI + Python)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: sistema-pjn-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Application settings
+      - ENVIRONMENT=production
+      - LOG_LEVEL=info
+
+      # Security (CHANGE THESE IN PRODUCTION!)
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-this-in-production}
+      - ENCRYPTION_FERNET_KEY=${ENCRYPTION_FERNET_KEY:-gZxdkgEN2wyl4L3A77Xkrwjzk_uRq6Orz8txZmbdXG4=}
+
+      # Database
+      - DATABASE_URL=sqlite:///./data/sistema.db
+
+      # CORS
+      - CORS_ORIGINS=http://localhost,http://localhost:80,http://frontend
+    volumes:
+      # Persist database
+      - ./data:/app/data
+      # Optional: Mount code for development
+      # - ./:/app
+    networks:
+      - sistema-pjn-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend service (React + Nginx)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: sistema-pjn-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - sistema-pjn-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  sistema-pjn-network:
+    driver: bridge
+
+volumes:
+  # Named volume for database (optional, using bind mount above)
+  # db-data:

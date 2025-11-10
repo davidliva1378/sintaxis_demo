@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block contenido %}
+
+<h1>Expedientes capturados desde el PJN</h1>
+
+{% if expedientes_por_fecha %}
+    {% for fecha, lista in expedientes_por_fecha.items() %}
+        <h2>{{ fecha }}</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Número</th>
+                    <th>Carátula</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for exp in lista %}
+                <tr>
+                    <td>{{ exp.numero }}</td>
+                    <td>{{ exp.caratula }}</td>
+                    <td>
+                        {% if exp.leido %}
+                            ✅
+                        {% else %}
+                            <form method="post" action="/monitoreo/leido" style="margin:0;">
+                                <input type="hidden" name="fecha" value="{{ fecha }}">
+                                <input type="hidden" name="numero" value="{{ exp.numero }}">
+                                <button type="submit" style="
+                                    background-color: #00b4d8;
+                                    color: white;
+                                    border: none;
+                                    border-radius: 4px;
+                                    padding: 4px 10px;
+                                    font-size: 14px;
+                                    cursor: pointer;
+                                ">📌 Marcar</button>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <br>
+    {% endfor %}
+{% else %}
+    <p>No se encontraron expedientes monitoreados aún.</p>
+{% endif %}
+
+{% endblock %}
