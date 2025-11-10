@@ -1,354 +1,260 @@
 """
-Gestor de procesamiento por lotes de expedientes.
+Gestor Batch - Procesa lotes de expedientes seleccionados.
 
-Este módulo maneja el procesamiento de grandes volúmenes de expedientes
-en lotes, con control de errores, estadísticas y capacidad de pausar/reanudar.
+Permite procesar SOLO los expedientes elegidos por el usuario
+después del filtrado y selección.
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Dict, List, Callable, Optional
 import asyncio
-import time
-import logging
+from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Optional, Callable
+from uuid import uuid4
 
-logger = logging.getLogger(__name__)
+from playwright.async_api import Page, async_playwright, Browser, BrowserContext
 
-
-@dataclass
-class ResultadoProcesamiento:
-    """Resultado del procesamiento de un expediente individual."""
-
-    expediente: Dict
-    estado: str  # "success", "error", "skipped"
-    mensaje: str
-    error: Optional[str] = None
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-    duracion_segundos: float = 0.0
-
-    def to_dict(self) -> Dict:
-        """Convertir a diccionario."""
-        return {
-            "numero": self.expediente.get("numero"),
-            "estado": self.estado,
-            "mensaje": self.mensaje,
-            "error": self.error,
-            "timestamp": self.timestamp,
-            "duracion_segundos": self.duracion_segundos,
-        }
-
-
-@dataclass
-class ResumenBatch:
-    """Resumen del procesamiento batch."""
-
-    total: int
-    exitosos: int
-    errores: int
-    omitidos: int
-    duracion_segundos: float
-    resultados: List[ResultadoProcesamiento]
-    tiempo_inicio: str = field(default_factory=lambda: datetime.now().isoformat())
-    tiempo_fin: str = field(default_factory=lambda: datetime.now().isoformat())
-    velocidad_promedio: float = 0.0  # expedientes por minuto
-
-    def to_dict(self) -> Dict:
-        """Convertir a diccionario."""
-        return {
-            "total": self.total,
-            "exitosos": self.exitosos,
-            "errores": self.errores,
-            "omitidos": self.omitidos,
-            "duracion_segundos": self.duracion_segundos,
-            "tiempo_inicio": self.tiempo_inicio,
-            "tiempo_fin": self.tiempo_fin,
-            "velocidad_promedio": self.velocidad_promedio,
-            "resultados": [r.to_dict() for r in self.resultados],
-        }
+from .models import (
+    EstadoExpediente,
+    ConfigExtraccionMasiva,
+    ResumenExtraccion,
+    SesionExtraccion,
+)
 
 
 class GestorBatch:
     """
-    Gestor de procesamiento por lotes de expedientes.
+    Gestor de procesamiento por lotes de expedientes seleccionados.
 
-    Características:
-    - Procesamiento secuencial de expedientes
-    - Control de errores consecutivos con umbral
-    - Estadísticas en tiempo real
-    - Capacidad de pausar/reanudar/cancelar
-    - Callbacks para reportar progreso
+    Flujo:
+    1. Recibe lista de números de expediente a procesar
+    2. Navega al PJN y procesa SOLO esos expedientes
+    3. Actualiza estados en tiempo real
+    4. Guarda solo los procesados exitosamente
     """
 
     def __init__(
         self,
-        umbral_errores: int = 5,
-        callback_progreso: Optional[Callable] = None,
-        timeout_por_expediente: int = 120,
+        config: Optional[ConfigExtraccionMasiva] = None,
+        on_progress: Optional[Callable[[int, int, str], None]] = None,
     ):
         """
-        Inicializar gestor de batch.
-
         Args:
-            umbral_errores: Número de errores consecutivos antes de alertar
-            callback_progreso: Función callback para reportar progreso
-            timeout_por_expediente: Timeout en segundos por expediente
+            config: Configuración de extracción
+            on_progress: Callback para reportar progreso (actual, total, mensaje)
         """
-        self.umbral_errores = umbral_errores
-        self.callback_progreso = callback_progreso
-        self.timeout_por_expediente = timeout_por_expediente
+        self.config = config or ConfigExtraccionMasiva()
+        self.on_progress = on_progress
+        self._estados: Dict[str, EstadoExpediente] = {}
+        self._errores: List[Dict] = []
 
-        self.resultados: List[ResultadoProcesamiento] = []
-        self.errores_consecutivos = 0
-        self.pausado = False
-        self.cancelado = False
-
-    async def procesar_lote(
+    async def procesar_seleccionados(
         self,
-        expedientes: List[Dict],
-        descargar_adjuntos: bool = True,
-        headless: bool = True
-    ) -> ResumenBatch:
+        numeros_expedientes: List[str],
+        username: str,
+        password: str,
+    ) -> ResumenExtraccion:
         """
-        Procesar lote de expedientes.
+        Procesa solo los expedientes seleccionados.
 
         Args:
-            expedientes: Lista de expedientes a procesar
-            descargar_adjuntos: Si descargar archivos adjuntos
-            headless: Modo headless de Playwright
+            numeros_expedientes: Lista de números de expediente a procesar
+            username: Usuario PJN
+            password: Contraseña PJN
 
         Returns:
-            ResumenBatch con resultados del procesamiento
+            ResumenExtraccion con estadísticas del procesamiento
         """
-        logger.info(f"Iniciando procesamiento de lote: {len(expedientes)} expedientes")
-        tiempo_inicio = time.time()
-        tiempo_inicio_str = datetime.now().isoformat()
-
-        total = len(expedientes)
+        inicio = datetime.now()
+        total = len(numeros_expedientes)
         exitosos = 0
         errores = 0
         omitidos = 0
 
-        for i, expediente in enumerate(expedientes):
-            # Verificar cancelación
-            if self.cancelado:
-                logger.warning("Procesamiento cancelado por el usuario")
-                break
+        # Inicializar estados
+        for numero in numeros_expedientes:
+            self._estados[numero] = EstadoExpediente.PENDIENTE
 
-            # Manejar pausa
-            while self.pausado and not self.cancelado:
-                await asyncio.sleep(0.5)
+        self._reportar_progreso(0, total, "Iniciando navegador...")
 
-            try:
-                logger.debug(f"Procesando expediente {i+1}/{total}: {expediente.get('numero')}")
-
-                # Emitir progreso
-                if self.callback_progreso:
-                    velocidad = self._calcular_velocidad(i + 1, tiempo_inicio)
-                    tiempo_estimado = self._estimar_tiempo_restante(i + 1, total, tiempo_inicio)
-
-                    self.callback_progreso({
-                        "expediente_actual": expediente.get("numero"),
-                        "procesados": i + 1,
-                        "total": total,
-                        "exitosos": exitosos,
-                        "errores": errores,
-                        "omitidos": omitidos,
-                        "velocidad": velocidad,
-                        "tiempo_estimado": tiempo_estimado,
-                        "porcentaje": ((i + 1) / total) * 100,
-                    })
-
-                # Procesar expediente individual
-                inicio_proc = time.time()
-                resultado = await self._procesar_expediente(
-                    expediente,
-                    descargar_adjuntos,
-                    headless
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(
+                    headless=self.config.headless
                 )
-                duracion_proc = time.time() - inicio_proc
-                resultado.duracion_segundos = duracion_proc
+                context = await browser.new_context()
+                page = await context.new_page()
+                page.set_default_timeout(self.config.timeout_pagina)
 
-                self.resultados.append(resultado)
+                # Login en PJN
+                self._reportar_progreso(0, total, "Autenticando en PJN...")
+                await self._login_pjn(page, username, password)
 
-                # Actualizar contadores
-                if resultado.estado == "success":
-                    exitosos += 1
-                    self.errores_consecutivos = 0
-                    logger.debug(f"✅ Expediente procesado: {expediente.get('numero')}")
-                elif resultado.estado == "error":
-                    errores += 1
-                    self.errores_consecutivos += 1
-                    logger.warning(f"❌ Error procesando {expediente.get('numero')}: {resultado.error}")
+                # Procesar cada expediente
+                for idx, numero in enumerate(numeros_expedientes, 1):
+                    self._reportar_progreso(
+                        idx - 1, total, f"Procesando {numero}..."
+                    )
+
+                    try:
+                        self._estados[numero] = EstadoExpediente.PROCESANDO
+
+                        # TODO: Implementar procesamiento real del expediente
+                        # Por ahora, placeholder que simula procesamiento
+                        resultado = await self._procesar_expediente(
+                            page, numero, context, browser
+                        )
+
+                        if resultado["success"]:
+                            self._estados[numero] = EstadoExpediente.PROCESADO
+                            exitosos += 1
+                        else:
+                            self._estados[numero] = EstadoExpediente.ERROR
+                            errores += 1
+                            self._errores.append({
+                                "numero": numero,
+                                "error": resultado.get("error", "Error desconocido"),
+                            })
+
+                    except Exception as e:
+                        self._estados[numero] = EstadoExpediente.ERROR
+                        errores += 1
+                        self._errores.append({
+                            "numero": numero,
+                            "error": str(e),
+                        })
 
                     # Verificar umbral de errores
-                    if self.errores_consecutivos >= self.umbral_errores:
-                        logger.error(f"Umbral de errores alcanzado: {self.errores_consecutivos}")
-                        # Por ahora solo logueamos, pero se podría pausar o pedir confirmación
-                        self.errores_consecutivos = 0
-                else:
+                    if errores >= self.config.umbral_errores:
+                        self._reportar_progreso(
+                            idx, total,
+                            f"Detenido: umbral de errores alcanzado ({errores})"
+                        )
+                        # Marcar pendientes como omitidos
+                        for num in numeros_expedientes[idx:]:
+                            if self._estados.get(num) == EstadoExpediente.PENDIENTE:
+                                self._estados[num] = EstadoExpediente.OMITIDO
+                                omitidos += 1
+                        break
+
+                await browser.close()
+
+        except Exception as e:
+            # Error global - marcar todos los pendientes como omitidos
+            for numero, estado in self._estados.items():
+                if estado == EstadoExpediente.PENDIENTE:
+                    self._estados[numero] = EstadoExpediente.OMITIDO
                     omitidos += 1
-                    logger.info(f"⊘ Expediente omitido: {expediente.get('numero')}")
 
-            except asyncio.TimeoutError:
-                logger.error(f"Timeout procesando {expediente.get('numero')}")
-                errores += 1
-                self.resultados.append(ResultadoProcesamiento(
-                    expediente=expediente,
-                    estado="error",
-                    mensaje="Timeout al procesar expediente",
-                    error="TimeoutError"
-                ))
-            except Exception as e:
-                logger.exception(f"Error inesperado procesando {expediente.get('numero')}: {e}")
-                errores += 1
-                self.resultados.append(ResultadoProcesamiento(
-                    expediente=expediente,
-                    estado="error",
-                    mensaje="Error inesperado",
-                    error=str(e)
-                ))
+            self._errores.append({
+                "numero": "GLOBAL",
+                "error": f"Error crítico: {str(e)}",
+            })
+            raise
 
-            # Pequeño delay entre expedientes para no sobrecargar
-            await asyncio.sleep(0.2)
+        finally:
+            fin = datetime.now()
+            tiempo_total = (fin - inicio).total_seconds()
 
-        # Calcular tiempos y velocidades finales
-        tiempo_fin = time.time()
-        duracion = tiempo_fin - tiempo_inicio
-        velocidad_promedio = (len(self.resultados) / duracion * 60) if duracion > 0 else 0
+            self._reportar_progreso(
+                total, total,
+                f"Completado: {exitosos} exitosos, {errores} errores"
+            )
 
-        logger.info(f"Procesamiento completado: {exitosos}/{total} exitosos, {errores} errores, {omitidos} omitidos")
-        logger.info(f"Duración: {duracion:.2f}s, Velocidad: {velocidad_promedio:.2f} exp/min")
-
-        return ResumenBatch(
-            total=total,
-            exitosos=exitosos,
-            errores=errores,
-            omitidos=omitidos,
-            duracion_segundos=duracion,
-            resultados=self.resultados,
-            tiempo_inicio=tiempo_inicio_str,
-            tiempo_fin=datetime.now().isoformat(),
-            velocidad_promedio=velocidad_promedio,
-        )
+            return ResumenExtraccion(
+                total=total,
+                exitosos=exitosos,
+                errores=errores,
+                omitidos=omitidos,
+                tiempo_total=tiempo_total,
+                errores_detalles=self._errores.copy(),
+            )
 
     async def _procesar_expediente(
         self,
-        expediente: Dict,
-        descargar_adjuntos: bool,
-        headless: bool
-    ) -> ResultadoProcesamiento:
+        page: Page,
+        numero_expediente: str,
+        context: BrowserContext,
+        browser: Browser,
+    ) -> Dict:
         """
-        Procesar un expediente individual.
+        Procesa un expediente individual.
+
+        TODO: IMPLEMENTAR LÓGICA REAL
+        Esta es la función clave que debe:
+        1. Navegar al expediente específico
+        2. Extraer datos completos (carátula, partes, actuaciones, etc.)
+        3. Descargar documentos si es necesario
+        4. Retornar datos estructurados
 
         Args:
-            expediente: Datos del expediente
-            descargar_adjuntos: Si descargar adjuntos
-            headless: Modo headless
+            page: Página de Playwright
+            numero_expediente: Número del expediente a procesar
+            context: Contexto del navegador (para múltiples páginas si es necesario)
+            browser: Instancia del navegador
 
         Returns:
-            ResultadoProcesamiento
+            Dict con success y datos del expediente o error
         """
+        # PLACEHOLDER: Implementación temporal
+        # En la Tarea 8 se implementará la lógica real
+
         try:
-            # TODO: Aquí iría la lógica real de procesamiento del expediente
-            # Por ahora, simulamos el procesamiento exitoso
-            await asyncio.sleep(0.1)  # Simular tiempo de procesamiento
-
-            return ResultadoProcesamiento(
-                expediente=expediente,
-                estado="success",
-                mensaje="Expediente procesado correctamente"
+            # Simular búsqueda del expediente
+            await page.goto(
+                "https://jnqn.jusneuquen.gov.ar/portalCiudadanoNeuquen/private/listaExpedientes.seam"
             )
 
-        except asyncio.TimeoutError:
-            return ResultadoProcesamiento(
-                expediente=expediente,
-                estado="error",
-                mensaje="Timeout al procesar expediente",
-                error="TimeoutError"
-            )
+            # TODO: Implementar búsqueda por número de expediente
+            # TODO: Navegar a la página del expediente
+            # TODO: Extraer datos completos
+            # TODO: Descargar documentos si es necesario
+            # TODO: Guardar en repositorio
+
+            # Por ahora, retornar éxito simulado
+            await asyncio.sleep(0.5)  # Simular procesamiento
+
+            return {
+                "success": True,
+                "numero": numero_expediente,
+                "data": {
+                    "numero": numero_expediente,
+                    # Más datos se agregarán en Tarea 8
+                }
+            }
+
         except Exception as e:
-            return ResultadoProcesamiento(
-                expediente=expediente,
-                estado="error",
-                mensaje="Error al procesar expediente",
-                error=str(e)
-            )
+            return {
+                "success": False,
+                "numero": numero_expediente,
+                "error": str(e),
+            }
 
-    def _calcular_velocidad(self, procesados: int, tiempo_inicio: float) -> float:
-        """
-        Calcular velocidad de procesamiento (expedientes/minuto).
+    async def _login_pjn(self, page: Page, username: str, password: str):
+        """Realiza login en el portal PJN."""
+        url_login = "https://jnqn.jusneuquen.gov.ar/portalCiudadanoNeuquen/login.seam"
 
-        Args:
-            procesados: Número de expedientes procesados
-            tiempo_inicio: Timestamp de inicio
+        await page.goto(url_login)
+        await page.wait_for_load_state("networkidle")
 
-        Returns:
-            Velocidad en expedientes por minuto
-        """
-        tiempo_transcurrido = time.time() - tiempo_inicio
-        if tiempo_transcurrido > 0:
-            return (procesados / tiempo_transcurrido) * 60
-        return 0.0
+        await page.fill("input[name*='username'], input[id*='username']", username)
+        await page.fill("input[name*='password'], input[id*='password']", password)
 
-    def _estimar_tiempo_restante(
-        self,
-        procesados: int,
-        total: int,
-        tiempo_inicio: float
-    ) -> int:
-        """
-        Estimar tiempo restante en segundos.
+        await page.click("button[type='submit'], input[type='submit']")
+        await page.wait_for_load_state("networkidle")
 
-        Args:
-            procesados: Número de expedientes procesados
-            total: Total de expedientes
-            tiempo_inicio: Timestamp de inicio
+    def _reportar_progreso(self, actual: int, total: int, mensaje: str):
+        """Reporta progreso a través del callback si está configurado."""
+        if self.on_progress:
+            self.on_progress(actual, total, mensaje)
 
-        Returns:
-            Tiempo estimado restante en segundos
-        """
-        if procesados == 0:
-            return 0
+    def obtener_estado(self, numero_expediente: str) -> Optional[EstadoExpediente]:
+        """Obtiene el estado actual de un expediente."""
+        return self._estados.get(numero_expediente)
 
-        tiempo_transcurrido = time.time() - tiempo_inicio
-        tiempo_por_expediente = tiempo_transcurrido / procesados
-        restantes = total - procesados
+    def obtener_todos_estados(self) -> Dict[str, EstadoExpediente]:
+        """Obtiene todos los estados de expedientes procesados."""
+        return self._estados.copy()
 
-        return int(restantes * tiempo_por_expediente)
-
-    def pausar(self):
-        """Pausar procesamiento."""
-        logger.info("Pausando procesamiento")
-        self.pausado = True
-
-    def reanudar(self):
-        """Reanudar procesamiento."""
-        logger.info("Reanudando procesamiento")
-        self.pausado = False
-
-    def cancelar(self):
-        """Cancelar procesamiento."""
-        logger.warning("Cancelando procesamiento")
-        self.cancelado = True
-        self.pausado = False
-
-    def obtener_estadisticas(self) -> Dict:
-        """
-        Obtener estadísticas actuales del procesamiento.
-
-        Returns:
-            Diccionario con estadísticas
-        """
-        exitosos = sum(1 for r in self.resultados if r.estado == "success")
-        errores = sum(1 for r in self.resultados if r.estado == "error")
-        omitidos = sum(1 for r in self.resultados if r.estado == "skipped")
-
-        return {
-            "procesados": len(self.resultados),
-            "exitosos": exitosos,
-            "errores": errores,
-            "omitidos": omitidos,
-            "errores_consecutivos": self.errores_consecutivos,
-            "pausado": self.pausado,
-            "cancelado": self.cancelado,
-        }
+    def obtener_errores(self) -> List[Dict]:
+        """Obtiene la lista de errores ocurridos."""
+        return self._errores.copy()

@@ -1,21 +1,7 @@
-"""API Routers - FastAPI routers for different resources."""
+"""
+Routers REST API para Sistema v6.
+"""
 
-from . import (
-    auth,
-    config,
-    expedientes,
-    # extraccion_masiva,  # Temporalmente deshabilitado
-    health,
-    monitoreo,
-    workspaces,
-)
+from .extraccion_masiva import router as extraccion_masiva_router
 
-__all__ = [
-    "auth",
-    "config",
-    "expedientes",
-    # "extraccion_masiva",  # Temporalmente deshabilitado
-    "health",
-    "monitoreo",
-    "workspaces",
-]
+__all__ = ["extraccion_masiva_router"]

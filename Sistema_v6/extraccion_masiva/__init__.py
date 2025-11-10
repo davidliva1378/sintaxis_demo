@@ -1,53 +1,29 @@
 """
-Módulo de extracción masiva de expedientes del PJN.
+Módulo de Extracción Masiva
 
-Este módulo proporciona funcionalidad completa para extraer grandes
-volúmenes de expedientes del portal PJN con:
-
-- Extracción completa del listado (todas las páginas)
-- Procesamiento por lotes con manejo de errores
-- Filtrado por estados, fechas, dependencias
-- Progreso en tiempo real vía callbacks
-- Exportación a múltiples formatos (JSON, Excel, CSV)
+Componentes:
+- ExtractorMasivo: Extrae listado completo de expedientes del PJN
+- GestorBatch: Procesa lotes de expedientes seleccionados
 """
 
-# Importar siempre los exportadores (no dependen de playwright)
-from .exportadores import (
-    exportar_json,
-    exportar_excel,
-    exportar_csv,
-    generar_estadisticas,
+from .extractor_masivo import ExtractorMasivo
+from .gestor_batch import GestorBatch
+from .models import (
+    ExpedienteListado,
+    ConfigExtraccionMasiva,
+    ResumenExtraccion,
+    SesionExtraccion,
+    EstadoExpediente,
+    TipoExtraccion,
 )
 
-# Importar módulos que requieren playwright solo si está disponible
 __all__ = [
-    "exportar_json",
-    "exportar_excel",
-    "exportar_csv",
-    "generar_estadisticas",
+    "ExtractorMasivo",
+    "GestorBatch",
+    "ExpedienteListado",
+    "ConfigExtraccionMasiva",
+    "ResumenExtraccion",
+    "SesionExtraccion",
+    "EstadoExpediente",
+    "TipoExtraccion",
 ]
-
-try:
-    from .extractor_masivo import (
-        ExtractorMasivo,
-        ConfigExtraccionMasiva,
-    )
-    from .gestor_batch import (
-        GestorBatch,
-        ResumenBatch,
-        ResultadoProcesamiento,
-    )
-
-    __all__.extend([
-        "ExtractorMasivo",
-        "ConfigExtraccionMasiva",
-        "GestorBatch",
-        "ResumenBatch",
-        "ResultadoProcesamiento",
-    ])
-except ImportError as e:
-    # Playwright u otras dependencias no disponibles
-    # Los exportadores siguen funcionando
-    pass
-
-__version__ = "1.0.0"
