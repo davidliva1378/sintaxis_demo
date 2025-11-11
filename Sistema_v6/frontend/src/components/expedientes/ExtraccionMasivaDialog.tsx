@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -18,11 +18,12 @@ interface ExtraccionMasivaDialogProps {
 
 interface Filtros {
   texto: string
-  fuero: string
+  dependencias: string[]  // Cambio de 'fuero' a array
   situacion: string[]
-  filtrarPorFecha: boolean
-  fechaDesde: string
-  fechaHasta: string
+  ordenFecha: 'desc' | 'asc' | 'ninguno'
+  fechaActuacionDesde: string  // YYYY-MM-DD
+  fechaActuacionHasta: string  // YYYY-MM-DD
+  usarFiltroFechaActuacion: boolean
   minActuaciones: number
   usarMinActuaciones: boolean
 }
@@ -61,14 +62,59 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
   // Filtros
   const [filtros, setFiltros] = useState<Filtros>({
     texto: '',
-    fuero: 'todos',
-    situacion: ['en_tramite'],
-    filtrarPorFecha: false,
-    fechaDesde: '',
-    fechaHasta: '',
+    dependencias: [],
+    situacion: [],
+    ordenFecha: 'ninguno',
+    fechaActuacionDesde: '',
+    fechaActuacionHasta: '',
+    usarFiltroFechaActuacion: false,
     minActuaciones: 5,
     usarMinActuaciones: false
   })
+
+  // Estados de paginación
+  const [paginaActual, setPaginaActual] = useState(1)
+  const ITEMS_POR_PAGINA = 50
+
+  // Funciones auxiliares para fechas
+  const parsearFecha = (fechaStr: string): Date | null => {
+    if (!fechaStr || fechaStr === '') return null
+    const [year, month, day] = fechaStr.split('-').map(Number)
+    if (!year || !month || !day) return null
+    return new Date(year, month - 1, day)
+  }
+
+  const formatearFecha = (fechaStr: string): string => {
+    const fecha = parsearFecha(fechaStr)
+    if (!fecha) return ''
+    const dia = fecha.getDate().toString().padStart(2, '0')
+    const mes = (fecha.getMonth() + 1).toString().padStart(2, '0')
+    return `${dia}/${mes}/${fecha.getFullYear()}`
+  }
+
+  // Calcular opciones de Dependencia con conteo
+  const opcionesDependencia = useMemo(() => {
+    const counts = new Map<string, number>()
+    expedientesExtraidos.forEach(exp => {
+      const dep = exp.dependencia || 'Sin dependencia'
+      counts.set(dep, (counts.get(dep) || 0) + 1)
+    })
+    return Array.from(counts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([valor, count]) => ({ valor, count }))
+  }, [expedientesExtraidos])
+
+  // Calcular opciones de Situación con conteo
+  const opcionesSituacion = useMemo(() => {
+    const counts = new Map<string, number>()
+    expedientesExtraidos.forEach(exp => {
+      const sit = exp.situacion || 'Sin situación'
+      counts.set(sit, (counts.get(sit) || 0) + 1)
+    })
+    return Array.from(counts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([valor, count]) => ({ valor, count }))
+  }, [expedientesExtraidos])
 
   // Aplicar filtros cuando cambien
   useEffect(() => {
@@ -142,37 +188,80 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
   const aplicarFiltros = () => {
     let filtered = [...expedientesExtraidos]
 
+    // Función auxiliar para normalizar texto (quitar tildes, minúsculas)
+    const normalizar = (texto: string) => {
+      return texto
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+    }
+
     // Filtro por texto
     if (filtros.texto) {
-      const textoLower = filtros.texto.toLowerCase()
+      const textoNormalizado = normalizar(filtros.texto)
       filtered = filtered.filter(exp =>
-        exp.numero.toLowerCase().includes(textoLower) ||
-        exp.caratula.toLowerCase().includes(textoLower)
+        normalizar(exp.numero).includes(textoNormalizado) ||
+        normalizar(exp.caratula).includes(textoNormalizado)
       )
     }
 
-    // Filtro por fuero
-    if (filtros.fuero !== 'todos') {
-      filtered = filtered.filter(exp => exp.dependencia?.toLowerCase().includes(filtros.fuero.toLowerCase()))
+    // Filtro por Dependencias (múltiple)
+    if (filtros.dependencias.length > 0) {
+      filtered = filtered.filter(exp =>
+        filtros.dependencias.includes(exp.dependencia)
+      )
     }
 
-    // Filtro por situación
+    // Filtro por Situación (múltiple)
     if (filtros.situacion.length > 0) {
+      filtered = filtered.filter(exp =>
+        filtros.situacion.includes(exp.situacion)
+      )
+    }
+
+    // Filtro por Rango de Fechas
+    if (filtros.usarFiltroFechaActuacion) {
       filtered = filtered.filter(exp => {
-        const situacionExp = exp.situacion?.toLowerCase() || ''
-        return filtros.situacion.some(sit => situacionExp.includes(sit.replace('_', ' ')))
+        const fecha = parsearFecha(exp.ultima_actuacion)
+        if (!fecha) return false
+
+        const desde = filtros.fechaActuacionDesde
+          ? parsearFecha(filtros.fechaActuacionDesde)
+          : null
+        const hasta = filtros.fechaActuacionHasta
+          ? parsearFecha(filtros.fechaActuacionHasta)
+          : null
+
+        if (desde && fecha < desde) return false
+        if (hasta && fecha > hasta) return false
+
+        return true
       })
     }
 
-    // TODO: Implementar filtros adicionales cuando el backend los soporte
-    // - Filtro por fecha
-    // - Filtro por número mínimo de actuaciones
+    // Ordenamiento por fecha
+    if (filtros.ordenFecha !== 'ninguno') {
+      filtered.sort((a, b) => {
+        const fechaA = parsearFecha(a.ultima_actuacion)
+        const fechaB = parsearFecha(b.ultima_actuacion)
+
+        if (!fechaA && !fechaB) return 0
+        if (!fechaA) return 1
+        if (!fechaB) return -1
+
+        const diff = fechaA.getTime() - fechaB.getTime()
+        return filtros.ordenFecha === 'asc' ? diff : -diff
+      })
+    }
 
     setExpedientesFiltrados(filtered)
 
-    // Seleccionar todos por defecto
+    // Seleccionar todos los filtrados por defecto
     const nuevosSeleccionados = new Set(filtered.map(exp => exp.numero))
     setExpedientesSeleccionados(nuevosSeleccionados)
+
+    // Resetear a página 1 cuando cambian filtros
+    setPaginaActual(1)
   }
 
   const handleIniciarExtraccion = async () => {
@@ -260,14 +349,16 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
   const handleLimpiarFiltros = () => {
     setFiltros({
       texto: '',
-      fuero: 'todos',
-      situacion: ['en_tramite'],
-      filtrarPorFecha: false,
-      fechaDesde: '',
-      fechaHasta: '',
+      dependencias: [],
+      situacion: [],
+      ordenFecha: 'ninguno',
+      fechaActuacionDesde: '',
+      fechaActuacionHasta: '',
+      usarFiltroFechaActuacion: false,
       minActuaciones: 5,
       usarMinActuaciones: false
     })
+    setPaginaActual(1)
   }
 
   const handleConfirmar = async () => {
@@ -827,56 +918,185 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                   />
                 </div>
 
-                {/* Fuero */}
+                {/* Dependencia (múltiple con checkboxes) */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Fuero</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Dependencia</label>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs"
+                        onClick={() => setFiltros({
+                          ...filtros,
+                          dependencias: opcionesDependencia.map(o => o.valor)
+                        })}
+                      >
+                        Todas
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs"
+                        onClick={() => setFiltros({ ...filtros, dependencias: [] })}
+                      >
+                        Ninguna
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-1 max-h-48 overflow-y-auto border rounded p-2">
+                    {opcionesDependencia.map(({ valor, count }) => (
+                      <div key={valor} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`dep-${valor}`}
+                          checked={filtros.dependencias.includes(valor)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setFiltros({
+                                ...filtros,
+                                dependencias: [...filtros.dependencias, valor]
+                              })
+                            } else {
+                              setFiltros({
+                                ...filtros,
+                                dependencias: filtros.dependencias.filter(d => d !== valor)
+                              })
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`dep-${valor}`}
+                          className="text-xs flex-1 cursor-pointer"
+                        >
+                          {valor} ({count})
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Situación Procesal (dinámico con checkboxes) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Situación Procesal</label>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs"
+                        onClick={() => setFiltros({
+                          ...filtros,
+                          situacion: opcionesSituacion.map(o => o.valor)
+                        })}
+                      >
+                        Todas
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs"
+                        onClick={() => setFiltros({ ...filtros, situacion: [] })}
+                      >
+                        Ninguna
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    {opcionesSituacion.map(({ valor, count }) => (
+                      <div key={valor} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`sit-${valor}`}
+                          checked={filtros.situacion.includes(valor)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setFiltros({
+                                ...filtros,
+                                situacion: [...filtros.situacion, valor]
+                              })
+                            } else {
+                              setFiltros({
+                                ...filtros,
+                                situacion: filtros.situacion.filter(s => s !== valor)
+                              })
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`sit-${valor}`}
+                          className="text-sm cursor-pointer"
+                        >
+                          {valor} ({count})
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Separador */}
+                <div className="border-t my-4" />
+
+                {/* Ordenamiento por Fecha */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Ordenar por Última Actuación</label>
                   <Select
-                    value={filtros.fuero}
-                    onValueChange={(value) => setFiltros({ ...filtros, fuero: value })}
+                    value={filtros.ordenFecha}
+                    onValueChange={(value) => setFiltros({
+                      ...filtros,
+                      ordenFecha: value as 'desc' | 'asc' | 'ninguno'
+                    })}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="todos">Todos</SelectItem>
-                      <SelectItem value="federal">Federal</SelectItem>
-                      <SelectItem value="civil">Civil</SelectItem>
-                      <SelectItem value="penal">Penal</SelectItem>
-                      <SelectItem value="laboral">Laboral</SelectItem>
-                      <SelectItem value="contencioso">Contencioso Administrativo</SelectItem>
+                      <SelectItem value="ninguno">Sin ordenar</SelectItem>
+                      <SelectItem value="desc">Más recientes primero</SelectItem>
+                      <SelectItem value="asc">Más antiguos primero</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Situación */}
+                {/* Filtro por Rango de Fechas */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Situación Procesal</label>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="en-tramite"
-                        checked={filtros.situacion.includes('en_tramite')}
-                        onCheckedChange={() => handleToggleSituacion('en_tramite')}
-                      />
-                      <label htmlFor="en-tramite" className="text-sm">En trámite</label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="archivado"
-                        checked={filtros.situacion.includes('archivado')}
-                        onCheckedChange={() => handleToggleSituacion('archivado')}
-                      />
-                      <label htmlFor="archivado" className="text-sm">Archivado</label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="finalizado"
-                        checked={filtros.situacion.includes('finalizado')}
-                        onCheckedChange={() => handleToggleSituacion('finalizado')}
-                      />
-                      <label htmlFor="finalizado" className="text-sm">Finalizado</label>
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="usar-filtro-fecha"
+                      checked={filtros.usarFiltroFechaActuacion}
+                      onCheckedChange={(checked) => setFiltros({
+                        ...filtros,
+                        usarFiltroFechaActuacion: checked as boolean
+                      })}
+                    />
+                    <label
+                      htmlFor="usar-filtro-fecha"
+                      className="text-sm font-medium cursor-pointer"
+                    >
+                      Filtrar por rango de fechas
+                    </label>
                   </div>
+
+                  {filtros.usarFiltroFechaActuacion && (
+                    <div className="space-y-3 pl-6">
+                      <DateInputArgentino
+                        label="Desde"
+                        value={filtros.fechaActuacionDesde}
+                        onChange={(value) => setFiltros({
+                          ...filtros,
+                          fechaActuacionDesde: value || ''
+                        })}
+                        placeholder="dd/mm/aaaa"
+                      />
+                      <DateInputArgentino
+                        label="Hasta"
+                        value={filtros.fechaActuacionHasta}
+                        onChange={(value) => setFiltros({
+                          ...filtros,
+                          fechaActuacionHasta: value || ''
+                        })}
+                        placeholder="dd/mm/aaaa"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -895,7 +1115,24 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                       onClick={handleSeleccionarTodos}
                     >
                       <CheckSquare className="h-4 w-4 mr-1" />
-                      Todos
+                      Todos los filtrados ({expedientesFiltrados.length})
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        // Seleccionar solo los expedientes de la página actual
+                        const indiceInicio = (paginaActual - 1) * ITEMS_POR_PAGINA
+                        const indiceFin = Math.min(indiceInicio + ITEMS_POR_PAGINA, expedientesFiltrados.length)
+                        const expedientesPaginados = expedientesFiltrados.slice(indiceInicio, indiceFin)
+
+                        const nuevosSeleccionados = new Set(expedientesSeleccionados)
+                        expedientesPaginados.forEach(exp => nuevosSeleccionados.add(exp.numero))
+                        setExpedientesSeleccionados(nuevosSeleccionados)
+                      }}
+                    >
+                      <CheckSquare className="h-4 w-4 mr-1" />
+                      Página actual ({Math.min(ITEMS_POR_PAGINA, expedientesFiltrados.length - (paginaActual - 1) * ITEMS_POR_PAGINA)})
                     </Button>
                     <Button
                       variant="outline"
@@ -930,10 +1167,18 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                         <th className="p-3 text-left text-sm font-medium">Carátula</th>
                         <th className="p-3 text-left text-sm font-medium">Dependencia</th>
                         <th className="p-3 text-left text-sm font-medium">Situación</th>
+                        <th className="p-3 text-left text-sm font-medium">Última Actuación</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {expedientesFiltrados.map((expediente) => (
+                      {(() => {
+                        // Calcular paginación
+                        const totalPaginas = Math.ceil(expedientesFiltrados.length / ITEMS_POR_PAGINA)
+                        const indiceInicio = (paginaActual - 1) * ITEMS_POR_PAGINA
+                        const indiceFin = Math.min(indiceInicio + ITEMS_POR_PAGINA, expedientesFiltrados.length)
+                        const expedientesPaginados = expedientesFiltrados.slice(indiceInicio, indiceFin)
+
+                        return expedientesPaginados.map((expediente) => (
                         <tr
                           key={expediente.numero}
                           className="border-t hover:bg-gray-50 dark:hover:bg-gray-900/50 cursor-pointer"
@@ -958,10 +1203,66 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                               {expediente.situacion}
                             </span>
                           </td>
+                          <td className="p-3 text-sm text-gray-600 dark:text-gray-400">
+                            {formatearFecha(expediente.ultima_actuacion)}
+                          </td>
                         </tr>
-                      ))}
+                        ))
+                      })()}
                     </tbody>
                   </table>
+
+                  {/* Controles de Paginación */}
+                  {expedientesFiltrados.length > ITEMS_POR_PAGINA && (() => {
+                    const totalPaginas = Math.ceil(expedientesFiltrados.length / ITEMS_POR_PAGINA)
+                    const indiceInicio = (paginaActual - 1) * ITEMS_POR_PAGINA
+                    const indiceFin = Math.min(indiceInicio + ITEMS_POR_PAGINA, expedientesFiltrados.length)
+
+                    return (
+                      <div className="flex items-center justify-between px-4 py-3 border-t">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          Mostrando {indiceInicio + 1}-{indiceFin} de {expedientesFiltrados.length} expedientes
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={paginaActual === 1}
+                            onClick={() => setPaginaActual(1)}
+                          >
+                            Primera
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={paginaActual === 1}
+                            onClick={() => setPaginaActual(paginaActual - 1)}
+                          >
+                            Anterior
+                          </Button>
+                          <span className="px-3 py-1 text-sm">
+                            Página {paginaActual} de {totalPaginas}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={paginaActual >= totalPaginas}
+                            onClick={() => setPaginaActual(paginaActual + 1)}
+                          >
+                            Siguiente
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={paginaActual >= totalPaginas}
+                            onClick={() => setPaginaActual(totalPaginas)}
+                          >
+                            Última
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
             </div>
