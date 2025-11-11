@@ -100,6 +100,7 @@ class SesionExtraccion:
     mensaje: str = ""
     listado_path: Optional[str] = None
     comparacion: Optional[Dict] = None
+    paginas_procesadas: int = 0  # Total de páginas procesadas en la extracción
 
     def to_dict(self) -> Dict:
         return {
@@ -113,5 +114,6 @@ class SesionExtraccion:
             "progreso_total": self.progreso_total,
             "mensaje": self.mensaje,
             "listado_path": self.listado_path,
-            "comparacion": self.comparacion
+            "comparacion": self.comparacion,
+            "paginas_procesadas": self.paginas_procesadas
         }

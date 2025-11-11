@@ -11,11 +11,69 @@ export interface ExpedienteListado {
   ultima_actuacion: string;
 }
 
+// Alias para compatibilidad con el store
+export type ExpedienteResumen = ExpedienteListado;
+
+export interface Actuacion {
+  indice: number;
+  oficina: string;
+  oficina_completa: string;
+  fecha: string;
+  tipo: string;
+  detalle: string;
+  foja: string;
+  archivo: string | null;
+  nombre_archivo: string | null;
+  tiene_archivo: boolean;
+  tipo_archivo: string | null;
+  hash: string | null;
+  extraida_en: string | null;
+  es_historica: boolean;
+  descargado: boolean;
+}
+
+export interface ExpedienteDetalle extends ExpedienteListado {
+  actuaciones: Actuacion[];
+  total_actuaciones: number;
+  fecha_extraccion: string;
+}
+
+export interface SolicitudExtraccion {
+  numero: string;
+  anio: string;
+  dependencia?: string;
+}
+
+export interface PaginacionResult<T> {
+  items: T[];
+  total: number;
+  pagina: number;
+  por_pagina: number;
+  total_paginas: number;
+}
+
+/**
+ * Configuración para la extracción masiva de expedientes.
+ * Todos los campos son opcionales y tienen valores por defecto en el backend.
+ */
 export interface ConfigExtraccion {
+  /** Ejecutar navegador sin interfaz gráfica (más rápido). Default: true */
   headless?: boolean;
+
+  /** Número de errores consecutivos antes de detener la extracción. Default: 10 */
   umbral_errores?: number;
+
+  /** Timeout en milisegundos para cargar cada página. Default: 30000 */
   timeout_pagina?: number;
+
+  /** Número máximo de reintentos por página fallida. Default: 3 */
   max_reintentos?: number;
+
+  /** Formatos de exportación deseados. Default: ['json'] */
+  exportar_formatos?: string[];
+
+  /** Fecha de corte (YYYY-MM-DD). Solo extraer expedientes desde esta fecha */
+  fecha_corte?: string;
 }
 
 export interface Comparacion {
@@ -83,6 +141,9 @@ export interface FiltrosExpedientes {
   ultima_actuacion_desde?: string;
   ultima_actuacion_hasta?: string;
 }
+
+// Alias para compatibilidad con el store
+export type ExpedienteFiltros = FiltrosExpedientes;
 
 /**
  * Estado de selección de expedientes

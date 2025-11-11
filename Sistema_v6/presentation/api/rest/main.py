@@ -65,7 +65,7 @@ from .routers import (
     auth,
     config,
     expedientes,
-    # extraccion_masiva,  # Temporalmente deshabilitado por problemas de importación
+    extraccion_masiva,
     health,
     monitoreo,
     workspaces,
@@ -185,11 +185,11 @@ async def log_requests(request: Request, call_next):
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(expedientes.router, prefix="/api/v1/expedientes", tags=["expedientes"])
-# app.include_router(
-#     extraccion_masiva.router,
-#     prefix="/api/v1/expedientes/extraer",
-#     tags=["extraccion_masiva"],
-# )  # Temporalmente deshabilitado
+app.include_router(
+    extraccion_masiva.router,
+    prefix="/api/v1/extraccion-masiva",
+    tags=["extraccion_masiva"]
+)
 app.include_router(workspaces.router, prefix="/api/v1/workspaces", tags=["workspaces"])
 app.include_router(monitoreo.router, prefix="/api/v1/monitoreo", tags=["monitoreo"])
 app.include_router(config.router, prefix="/api/v1", tags=["configuracion"])

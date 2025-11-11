@@ -20,6 +20,12 @@ from .models import (
     SesionExtraccion,
 )
 
+# Importar tipos de aplicación para type hints
+try:
+    from application.ports import IExpedienteRepository
+except ImportError:
+    IExpedienteRepository = None  # type: ignore
+
 
 class GestorBatch:
     """
@@ -36,14 +42,17 @@ class GestorBatch:
         self,
         config: Optional[ConfigExtraccionMasiva] = None,
         on_progress: Optional[Callable[[int, int, str], None]] = None,
+        expediente_repository: Optional["IExpedienteRepository"] = None,
     ):
         """
         Args:
             config: Configuración de extracción
             on_progress: Callback para reportar progreso (actual, total, mensaje)
+            expediente_repository: Repositorio para guardar expedientes procesados
         """
         self.config = config or ConfigExtraccionMasiva()
         self.on_progress = on_progress
+        self.expediente_repository = expediente_repository
         self._estados: Dict[str, EstadoExpediente] = {}
         self._errores: List[Dict] = []
 
@@ -199,16 +208,9 @@ class GestorBatch:
         # En la Tarea 8 se implementará la lógica real
 
         try:
-            # Simular búsqueda del expediente
-            await page.goto(
-                "https://jnqn.jusneuquen.gov.ar/portalCiudadanoNeuquen/private/listaExpedientes.seam"
-            )
-
-            # TODO: Implementar búsqueda por número de expediente
-            # TODO: Navegar a la página del expediente
-            # TODO: Extraer datos completos
-            # TODO: Descargar documentos si es necesario
-            # TODO: Guardar en repositorio
+            # TODO: Implementar búsqueda por número de expediente en el PJN
+            # La URL del listado será algo como:
+            # https://portalpjn.pjn.gov.ar/busqueda o similar
 
             # Por ahora, retornar éxito simulado
             await asyncio.sleep(0.5)  # Simular procesamiento
@@ -218,7 +220,7 @@ class GestorBatch:
                 "numero": numero_expediente,
                 "data": {
                     "numero": numero_expediente,
-                    # Más datos se agregarán en Tarea 8
+                    "mensaje": "Procesamiento simulado - implementación pendiente"
                 }
             }
 
@@ -231,16 +233,20 @@ class GestorBatch:
 
     async def _login_pjn(self, page: Page, username: str, password: str):
         """Realiza login en el portal PJN."""
-        url_login = "https://jnqn.jusneuquen.gov.ar/portalCiudadanoNeuquen/login.seam"
+        url_login = "https://portalpjn.pjn.gov.ar/inicio"
 
         await page.goto(url_login)
-        await page.wait_for_load_state("networkidle")
+        await page.wait_for_load_state("domcontentloaded")
 
-        await page.fill("input[name*='username'], input[id*='username']", username)
-        await page.fill("input[name*='password'], input[id*='password']", password)
+        # Selectores correctos del PJN
+        await page.fill("input[name='username']", username)
+        await page.fill("input[name='password']", password)
 
-        await page.click("button[type='submit'], input[type='submit']")
-        await page.wait_for_load_state("networkidle")
+        await page.click("#kc-login")
+
+        # Esperar confirmación de login exitoso
+        await page.wait_for_selector("text='Menú'", timeout=60000)
+        print("✅ Login exitoso en PJN")
 
     def _reportar_progreso(self, actual: int, total: int, mensaje: str):
         """Reporta progreso a través del callback si está configurado."""

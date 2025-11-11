@@ -7,20 +7,8 @@ import type {
   ExpedienteFiltros,
   SolicitudExtraccion,
   PaginacionResult,
+  ConfigExtraccion,
 } from '@/types/expediente'
-
-// Tipos para extracción masiva avanzada
-interface ConfigExtraccionMasiva {
-  usuario?: string
-  contrasena?: string
-  fechaDesde?: string
-  fechaHasta?: string
-  estados?: string[]
-  dependencias?: string[]
-  umbralErrores?: number
-  headless?: boolean
-  exportarFormatos?: string[]
-}
 
 interface ProgresoExtraccion {
   actual: number
@@ -48,9 +36,10 @@ interface ResumenExtraccion {
 
 interface ExtraccionMasivaState {
   sessionId: string | null
-  estado: 'idle' | 'running' | 'paused' | 'completed' | 'error' | 'cancelled'
+  estado: 'inactivo' | 'extrayendo' | 'pausado' | 'filtrado' | 'completado' | 'error' | 'cancelado'
   progreso: ProgresoExtraccion
   websocket: WebSocket | null
+  pollInterval: NodeJS.Timeout | null
 }
 
 interface ExpedientesState {
@@ -85,7 +74,7 @@ interface ExpedientesState {
   limpiarExpedienteActual: () => void
 
   // Acciones de extracción masiva avanzada
-  iniciarExtraccionMasivaAvanzada: (config: ConfigExtraccionMasiva) => Promise<string>
+  iniciarExtraccionMasivaAvanzada: (config: ConfigExtraccion) => Promise<string>
   conectarWebSocket: (sessionId: string) => void
   desconectarWebSocket: () => void
   pausarExtraccion: () => Promise<void>
@@ -94,6 +83,7 @@ interface ExpedientesState {
   obtenerProgreso: () => Promise<void>
   obtenerResumen: () => Promise<ResumenExtraccion>
   descargarReporte: (formato: 'json' | 'excel' | 'csv' | 'html') => Promise<void>
+  procesarExpedientesSeleccionados: (numeros: string[]) => Promise<string>
 }
 
 export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
@@ -112,7 +102,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
   isExtractingMasivo: false,
   extraccionMasiva: {
     sessionId: null,
-    estado: 'idle',
+    estado: 'inactivo',
     progreso: {
       actual: 0,
       total: 0,
@@ -125,6 +115,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
       velocidad: null,
     },
     websocket: null,
+    pollInterval: null,
   },
 
   // Listar expedientes con filtros y paginación
@@ -398,27 +389,45 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
   },
 
   // Iniciar extracción masiva avanzada con WebSocket
-  iniciarExtraccionMasivaAvanzada: async (config: ConfigExtraccionMasiva): Promise<string> => {
+  iniciarExtraccionMasivaAvanzada: async (config: ConfigExtraccion): Promise<string> => {
     try {
       toast.info('Iniciando extracción masiva avanzada...', {
         description: 'Configurando sesión de extracción',
       })
 
+      // Construir payload según formato esperado por el backend
+      const payload = {
+        fecha_corte: config.fecha_corte || undefined,
+        config: {
+          headless: config.headless ?? true,
+          umbral_errores: config.umbral_errores ?? 10,
+          timeout_pagina: config.timeout_pagina,
+          max_reintentos: config.max_reintentos,
+        }
+      }
+
       // Iniciar extracción en el backend
-      const response = await apiClient.post('/api/v1/expedientes/extraer/masivo', config)
+      const response = await apiClient.post('/api/v1/extraccion-masiva/listado', payload)
       const sessionId = response.data.session_id
 
-      // Actualizar estado
+      // Iniciar polling para obtener progreso
+      const pollInterval = setInterval(() => {
+        get().obtenerProgreso()
+      }, 1000) // Cada 1 segundo para updates más fluidos
+
+      // Actualizar estado con sesión y polling
       set({
         extraccionMasiva: {
           ...get().extraccionMasiva,
           sessionId,
-          estado: 'running',
+          estado: 'extrayendo',
+          pollInterval,
         },
       })
 
       // Conectar WebSocket automáticamente
-      get().conectarWebSocket(sessionId)
+      // TODO: WebSocket no disponible aún, usar polling
+      // get().conectarWebSocket(sessionId)
 
       toast.success('Extracción iniciada', {
         description: `Sesión: ${sessionId}`,
@@ -446,7 +455,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
     // Construir URL del WebSocket
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
-    const wsUrl = `${protocol}//${host}/api/v1/expedientes/extraer/${sessionId}/ws`
+    const wsUrl = `${protocol}//${host}/api/v1/extraccion-masiva/sesion/${sessionId}/ws`
 
     // Crear conexión WebSocket
     const ws = new WebSocket(wsUrl)
@@ -548,7 +557,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
     }
   },
 
-  // Pausar extracción
+  // Pausar extracción (TODO: implementar endpoint en backend)
   pausarExtraccion: async () => {
     const sessionId = get().extraccionMasiva.sessionId
     if (!sessionId) {
@@ -556,26 +565,12 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
       return
     }
 
-    try {
-      await apiClient.post(`/api/v1/expedientes/extraer/${sessionId}/pausar`)
-
-      set({
-        extraccionMasiva: {
-          ...get().extraccionMasiva,
-          estado: 'paused',
-        },
-      })
-
-      toast.info('Extracción pausada')
-    } catch (error: any) {
-      toast.error('Error al pausar extracción', {
-        description: error.response?.data?.detail || 'Error desconocido',
-      })
-      throw error
-    }
+    // TODO: Endpoint no implementado aún
+    toast.warning('Funcionalidad pausar no disponible aún')
+    return
   },
 
-  // Reanudar extracción
+  // Reanudar extracción (TODO: implementar endpoint en backend)
   reanudarExtraccion: async () => {
     const sessionId = get().extraccionMasiva.sessionId
     if (!sessionId) {
@@ -583,26 +578,12 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
       return
     }
 
-    try {
-      await apiClient.post(`/api/v1/expedientes/extraer/${sessionId}/reanudar`)
-
-      set({
-        extraccionMasiva: {
-          ...get().extraccionMasiva,
-          estado: 'running',
-        },
-      })
-
-      toast.success('Extracción reanudada')
-    } catch (error: any) {
-      toast.error('Error al reanudar extracción', {
-        description: error.response?.data?.detail || 'Error desconocido',
-      })
-      throw error
-    }
+    // TODO: Endpoint no implementado aún
+    toast.warning('Funcionalidad reanudar no disponible aún')
+    return
   },
 
-  // Cancelar extracción
+  // Cancelar extracción (TODO: implementar endpoint en backend)
   cancelarExtraccion: async () => {
     const sessionId = get().extraccionMasiva.sessionId
     if (!sessionId) {
@@ -610,53 +591,48 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
       return
     }
 
-    try {
-      await apiClient.post(`/api/v1/expedientes/extraer/${sessionId}/cancelar`)
-
-      // Desconectar WebSocket
-      get().desconectarWebSocket()
-
-      set({
-        extraccionMasiva: {
-          ...get().extraccionMasiva,
-          estado: 'cancelled',
-        },
-      })
-
-      toast.warning('Extracción cancelada')
-    } catch (error: any) {
-      toast.error('Error al cancelar extracción', {
-        description: error.response?.data?.detail || 'Error desconocido',
-      })
-      throw error
-    }
+    // TODO: Endpoint no implementado aún
+    toast.warning('Funcionalidad cancelar no disponible aún')
+    return
   },
 
-  // Obtener progreso actual
+  // Obtener progreso actual (polling como alternativa a WebSocket)
   obtenerProgreso: async () => {
-    const sessionId = get().extraccionMasiva.sessionId
+    const state = get()
+    const sessionId = state.extraccionMasiva.sessionId
     if (!sessionId) {
       return
     }
 
     try {
-      const response = await apiClient.get(`/api/v1/expedientes/extraer/${sessionId}/progreso`)
+      // Usar endpoint de sesión para obtener progreso
+      const response = await apiClient.get(`/api/v1/extraccion-masiva/sesion/${sessionId}`)
       const data = response.data
+
+      const nuevoEstado = data.estado || 'extrayendo'
+
+      // Si la extracción terminó (completado o error), detener el polling
+      if ((nuevoEstado === 'completado' || nuevoEstado === 'error') && state.extraccionMasiva.pollInterval) {
+        clearInterval(state.extraccionMasiva.pollInterval)
+      }
 
       set({
         extraccionMasiva: {
-          ...get().extraccionMasiva,
-          estado: data.estado,
+          ...state.extraccionMasiva,
+          estado: nuevoEstado,
+          pollInterval: (nuevoEstado === 'completado' || nuevoEstado === 'error') ? null : state.extraccionMasiva.pollInterval,
           progreso: {
-            actual: data.progreso_actual,
-            total: data.progreso_total,
-            porcentaje: data.porcentaje,
-            fase: data.fase,
-            mensaje: data.mensaje,
-            errores: data.errores,
-            tiempoTranscurrido: data.tiempo_transcurrido || 0,
-            tiempoEstimado: data.tiempo_estimado || null,
-            velocidad: data.velocidad || null,
+            actual: data.progreso_actual || 0,
+            total: data.progreso_total || 0,
+            porcentaje: data.progreso_actual && data.progreso_total
+              ? (data.progreso_actual / data.progreso_total) * 100
+              : 0,
+            fase: data.fase || '',
+            mensaje: data.mensaje || '',
+            errores: 0,
+            tiempoTranscurrido: 0,
+            tiempoEstimado: null,
+            velocidad: null,
           },
         },
       })
@@ -673,8 +649,22 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
     }
 
     try {
-      const response = await apiClient.get(`/api/v1/expedientes/extraer/${sessionId}/resumen`)
-      return response.data
+      // Usar endpoint de sesión
+      const response = await apiClient.get(`/api/v1/extraccion-masiva/sesion/${sessionId}`)
+      const data = response.data
+
+      // Mapear al formato esperado
+      return {
+        sessionId,
+        estado: data.estado,
+        total: data.progreso_total || 0,
+        exitosos: data.progreso_actual || 0,
+        errores: 0,
+        omitidos: 0,
+        duracionSegundos: 0,
+        velocidadPromedio: 0,
+        archivosGenerados: [],
+      }
     } catch (error: any) {
       toast.error('Error al obtener resumen', {
         description: error.response?.data?.detail || 'Error desconocido',
@@ -683,7 +673,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
     }
   },
 
-  // Descargar reporte en formato específico
+  // Descargar reporte en formato específico (TODO: implementar endpoint en backend)
   descargarReporte: async (formato: 'json' | 'excel' | 'csv' | 'html') => {
     const sessionId = get().extraccionMasiva.sessionId
     if (!sessionId) {
@@ -691,34 +681,53 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
       return
     }
 
+    // TODO: Endpoint no implementado aún
+    toast.warning(`Descarga de reportes no disponible aún (formato: ${formato})`)
+    return
+  },
+
+  // Procesar expedientes seleccionados
+  procesarExpedientesSeleccionados: async (numeros: string[]): Promise<string> => {
     try {
-      const response = await apiClient.get(
-        `/api/v1/expedientes/extraer/${sessionId}/descargar/${formato}`,
-        {
-          responseType: 'blob',
-        }
-      )
-
-      // Crear link de descarga
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = document.createElement('a')
-      link.href = url
-
-      // Determinar extensión del archivo
-      const extension = formato === 'excel' ? 'xlsx' : formato
-      link.setAttribute('download', `extraccion_${sessionId}.${extension}`)
-
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
-
-      toast.success('Reporte descargado', {
-        description: `Formato: ${formato.toUpperCase()}`,
+      toast.info('Procesando expedientes seleccionados...', {
+        description: `${numeros.length} expedientes`,
       })
+
+      // Llamar al backend para procesar los expedientes seleccionados
+      const response = await apiClient.post('/api/v1/extraccion-masiva/procesar-seleccionados', {
+        numeros_expedientes: numeros,
+      })
+
+      const sessionId = response.data.session_id
+      const resumen = response.data.resumen
+
+      // Actualizar estado con la sesión de procesamiento
+      set({
+        extraccionMasiva: {
+          ...get().extraccionMasiva,
+          sessionId,
+          estado: 'extrayendo',
+        },
+      })
+
+      toast.success('Procesamiento iniciado', {
+        description: `Sesión: ${sessionId}`,
+      })
+
+      // Conectar WebSocket para recibir actualizaciones de progreso
+      // TODO: WebSocket no disponible aún, usar polling
+      // get().conectarWebSocket(sessionId)
+
+      // Iniciar polling para obtener progreso
+      const pollInterval = setInterval(() => {
+        get().obtenerProgreso()
+      }, 1000) // Cada 1 segundo para updates más fluidos
+
+      return sessionId
     } catch (error: any) {
-      toast.error('Error al descargar reporte', {
-        description: error.response?.data?.detail || 'Error desconocido',
+      const errorMsg = error.response?.data?.detail || 'Error al procesar expedientes seleccionados'
+      toast.error('Error al procesar expedientes', {
+        description: errorMsg,
       })
       throw error
     }

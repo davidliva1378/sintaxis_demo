@@ -54,6 +54,8 @@ class ExtractorMasivo:
         username: str,
         password: str,
         fecha_corte: Optional[str] = None,
+        sesion: Optional[SesionExtraccion] = None,
+        callback_progreso: Optional[callable] = None,
     ) -> SesionExtraccion:
         """
         Extrae el listado completo de expedientes del PJN.
@@ -62,21 +64,25 @@ class ExtractorMasivo:
             username: Usuario PJN
             password: Contraseña PJN
             fecha_corte: Fecha mínima (YYYY-MM-DD) para detener extracción
+            sesion: Sesión existente a actualizar (opcional, se crea una nueva si no se provee)
+            callback_progreso: Función a llamar para reportar progreso (opcional)
 
         Returns:
             SesionExtraccion con información de la extracción y path al JSON
         """
-        session_id = str(uuid4())
-        tiempo_inicio = datetime.now().isoformat()
-
-        sesion = SesionExtraccion(
-            session_id=session_id,
-            estado="iniciando",
-            fase="listado",
-            tiempo_inicio=tiempo_inicio,
-            config=self.config.to_dict(),
-            mensaje="Iniciando navegador..."
-        )
+        if sesion is None:
+            session_id = str(uuid4())
+            tiempo_inicio = datetime.now().isoformat()
+            sesion = SesionExtraccion(
+                session_id=session_id,
+                estado="iniciando",
+                fase="listado",
+                tiempo_inicio=tiempo_inicio,
+                config=self.config.to_dict(),
+                mensaje="Iniciando navegador..."
+            )
+        else:
+            session_id = sesion.session_id
 
         try:
             async with async_playwright() as p:
@@ -90,22 +96,77 @@ class ExtractorMasivo:
 
                 # Login en PJN
                 sesion.mensaje = "Autenticando en PJN..."
+                if callback_progreso:
+                    callback_progreso(sesion)
                 await self._login_pjn(page, username, password)
 
                 # Navegar a listado de expedientes
                 sesion.mensaje = "Navegando a listado de expedientes..."
+                if callback_progreso:
+                    callback_progreso(sesion)
                 await self._navegar_a_listado(page)
 
                 # Extraer todas las páginas
                 sesion.estado = "extrayendo"
+                sesion.progreso_actual = 0
+                sesion.progreso_total = 0
                 sesion.mensaje = "Extrayendo expedientes de todas las páginas..."
+                if callback_progreso:
+                    callback_progreso(sesion)
 
-                expedientes_raw, motivo, metadata = await extraer_expedientes_completos(
-                    page,
-                    fecha_corte=fecha_corte,
-                    tiempo_maximo_segundos=None,  # Sin límite de tiempo
-                    orden="fecha",  # Ordenar por fecha para facilitar comparación
-                )
+                # Extraer expedientes con monitoreo de progreso
+                # Usamos un wrapper para capturar el progreso de páginas procesadas
+                import re
+                import sys
+                from io import StringIO
+
+                # Capturar stdout para monitorear progreso
+                old_stdout = sys.stdout
+                captured_output = StringIO()
+
+                class ProgressCapture:
+                    def __init__(self, original_stdout, callback, sesion_obj):
+                        self.original = original_stdout
+                        self.callback = callback
+                        self.sesion = sesion_obj
+                        self._processing = False  # Flag para evitar recursión
+
+                    def write(self, text):
+                        self.original.write(text)  # Mantener output original
+                        self.original.flush()
+
+                        # Evitar recursión infinita
+                        if self._processing:
+                            return
+
+                        # Detectar "Procesando página X"
+                        match = re.search(r'Procesando página (\d+)', text)
+                        if match:
+                            self._processing = True  # Activar flag
+                            try:
+                                pagina_actual = int(match.group(1))
+                                self.sesion.progreso_actual = pagina_actual
+                                self.sesion.mensaje = f"Procesando página {pagina_actual}"
+                                if self.callback:
+                                    self.callback(self.sesion)
+                            finally:
+                                self._processing = False  # Desactivar flag
+
+                    def flush(self):
+                        self.original.flush()
+
+                sys.stdout = ProgressCapture(old_stdout, callback_progreso, sesion)
+
+                try:
+                    expedientes_raw, motivo, metadata = await extraer_expedientes_completos(
+                        page,
+                        fecha_corte=fecha_corte,
+                        tiempo_maximo_segundos=None,  # Sin límite de tiempo
+                        orden="fecha",  # Ordenar por fecha para facilitar comparación
+                    )
+                finally:
+                    # Restaurar stdout original
+                    sys.stdout = old_stdout
 
                 # Convertir a ExpedienteListado
                 expedientes = [
@@ -128,14 +189,21 @@ class ExtractorMasivo:
                 # Cerrar navegador
                 await browser.close()
 
+                # Guardar página count antes de sobrescribir
+                paginas_procesadas = sesion.progreso_actual
+
                 # Actualizar sesión
                 sesion.estado = "completado"
                 sesion.fase = "listado"
                 sesion.tiempo_fin = datetime.now().isoformat()
+                sesion.paginas_procesadas = paginas_procesadas  # Total de páginas procesadas
                 sesion.progreso_actual = len(expedientes)
                 sesion.progreso_total = len(expedientes)
                 sesion.listado_path = str(listado_path)
                 sesion.mensaje = f"Extracción completada: {len(expedientes)} expedientes. Motivo: {motivo}"
+
+                if callback_progreso:
+                    callback_progreso(sesion)
 
                 return sesion
 
@@ -143,34 +211,44 @@ class ExtractorMasivo:
             sesion.estado = "error"
             sesion.tiempo_fin = datetime.now().isoformat()
             sesion.mensaje = f"Error en extracción: {str(e)}"
+            if callback_progreso:
+                callback_progreso(sesion)
             raise
 
     async def _login_pjn(self, page: Page, username: str, password: str):
         """Realiza login en el portal PJN."""
-        # URL del portal PJN Neuquén
-        url_login = "https://jnqn.jusneuquen.gov.ar/portalCiudadanoNeuquen/login.seam"
+        # URL correcta del portal PJN
+        url_login = "https://portalpjn.pjn.gov.ar/inicio"
 
         await page.goto(url_login)
-        await page.wait_for_load_state("networkidle")
+        await page.wait_for_load_state("domcontentloaded")
 
-        # Completar formulario de login
-        await page.fill("input[name*='username'], input[id*='username']", username)
-        await page.fill("input[name*='password'], input[id*='password']", password)
+        # Completar formulario de login con selectores correctos
+        await page.fill("input[name='username']", username)
+        await page.fill("input[name='password']", password)
 
         # Click en botón de login
-        await page.click("button[type='submit'], input[type='submit']")
-        await page.wait_for_load_state("networkidle")
+        await page.click("#kc-login")
+
+        # Esperar confirmación de login exitoso
+        await page.wait_for_selector("text='Menú'", timeout=60000)
+        print("✅ Login exitoso en PJN")
 
     async def _navegar_a_listado(self, page: Page):
         """Navega a la página de listado de expedientes."""
-        # Esta URL puede variar según el portal - ajustar según sea necesario
-        url_listado = "https://jnqn.jusneuquen.gov.ar/portalCiudadanoNeuquen/private/listaExpedientes.seam"
+        # URL correcta del sistema de consultas del PJN
+        url_consultas = "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam"
 
-        await page.goto(url_listado)
+        await page.goto(url_consultas)
         await page.wait_for_load_state("networkidle")
 
-        # Esperar que aparezca la tabla
-        await page.wait_for_selector("table.table-striped", timeout=30000)
+        # Esperar que aparezca la tabla de expedientes con el selector correcto
+        try:
+            await page.wait_for_selector("table.table-striped", timeout=30000)
+            print("✅ Tabla de expedientes encontrada")
+        except Exception as e:
+            print(f"⚠️ No se encontró tabla de expedientes: {e}")
+            raise
 
     def _guardar_listado(
         self,

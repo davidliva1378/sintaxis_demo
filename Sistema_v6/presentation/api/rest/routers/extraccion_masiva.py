@@ -12,13 +12,14 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel
 
-from Sistema_v6.extraccion_masiva import (
+from extraccion_masiva import (
     ExtractorMasivo,
     GestorBatch,
     ConfigExtraccionMasiva,
     SesionExtraccion,
     ResumenExtraccion,
 )
+from infrastructure.di_container import get_container
 
 
 # ============================================================================
@@ -66,7 +67,6 @@ class ProcesarSeleccionadosResponse(BaseModel):
 # ============================================================================
 
 router = APIRouter(
-    prefix="/extraccion-masiva",
     tags=["Extracción Masiva"]
 )
 
@@ -89,6 +89,48 @@ def _get_credentials() -> tuple[str, str]:
     return username, password
 
 
+async def _ejecutar_extraccion_background(
+    session_id: str,
+    username: str,
+    password: str,
+    config: ConfigExtraccionMasiva,
+    fecha_corte: Optional[str] = None,
+):
+    """Ejecuta la extracción en background y actualiza la sesión en _sesiones."""
+    try:
+        extractor = ExtractorMasivo(config=config)
+
+        # Obtener la sesión que ya está en _sesiones
+        sesion = _sesiones.get(session_id)
+        if not sesion:
+            return
+
+        # Callback para actualizar la sesión en tiempo real
+        def actualizar_sesion(sesion_actualizada: SesionExtraccion):
+            _sesiones[session_id] = sesion_actualizada
+
+        # Ejecutar extracción pasando la sesión y el callback
+        await extractor.extraer_listado_completo(
+            username=username,
+            password=password,
+            fecha_corte=fecha_corte,
+            sesion=sesion,
+            callback_progreso=actualizar_sesion,
+        )
+
+        # Comparar con BASE si existe
+        if sesion.listado_path:
+            comparacion = extractor.comparar_con_base(sesion.listado_path)
+            sesion.comparacion = comparacion
+            _sesiones[session_id] = sesion
+
+    except Exception as e:
+        # Actualizar sesión con error
+        if session_id in _sesiones:
+            _sesiones[session_id].estado = "error"
+            _sesiones[session_id].mensaje = f"Error en extracción: {str(e)}"
+
+
 @router.post("/listado", response_model=ListadoResponse)
 async def extraer_listado_completo(
     request: ListadoRequest,
@@ -98,16 +140,16 @@ async def extraer_listado_completo(
     Extrae el listado completo de expedientes del PJN.
 
     Flujo:
-    1. Inicia extracción completa de todas las páginas
-    2. Guarda JSON con metadata básica
-    3. Compara automáticamente con JSON BASE si existe
-    4. Retorna session_id y path al archivo
+    1. Crea sesión inicial y la guarda en _sesiones
+    2. Inicia extracción en background task
+    3. Retorna inmediatamente con session_id
+    4. El frontend hace polling a /sesion/{session_id} para obtener progreso
 
     Args:
         request: Configuración de extracción y fecha de corte opcional
 
     Returns:
-        ListadoResponse con información de la extracción
+        ListadoResponse con session_id y estado inicial
     """
     try:
         # Obtener credenciales
@@ -118,38 +160,48 @@ async def extraer_listado_completo(
             **request.config.dict()
         ) if request.config else ConfigExtraccionMasiva()
 
-        # Crear extractor
-        extractor = ExtractorMasivo(config=config)
+        # Crear sesión inicial
+        from datetime import datetime
+        from uuid import uuid4
 
-        # Ejecutar extracción
-        sesion = await extractor.extraer_listado_completo(
-            username=username,
-            password=password,
-            fecha_corte=request.fecha_corte,
+        session_id = str(uuid4())
+        sesion = SesionExtraccion(
+            session_id=session_id,
+            estado="iniciando",
+            fase="listado",
+            tiempo_inicio=datetime.now().isoformat(),
+            config=config.to_dict(),
+            progreso_actual=0,
+            progreso_total=0,
+            mensaje="Iniciando extracción masiva..."
         )
 
         # Guardar sesión
-        _sesiones[sesion.session_id] = sesion
+        _sesiones[session_id] = sesion
 
-        # Comparar con BASE (Tarea 1B)
-        comparacion = None
-        if sesion.listado_path:
-            comparacion = extractor.comparar_con_base(sesion.listado_path)
-            sesion.comparacion = comparacion
+        # Ejecutar extracción en background
+        background_tasks.add_task(
+            _ejecutar_extraccion_background,
+            session_id,
+            username,
+            password,
+            config,
+            request.fecha_corte,
+        )
 
         return ListadoResponse(
-            session_id=sesion.session_id,
-            estado=sesion.estado,
-            total=sesion.progreso_total,
-            listado_path=sesion.listado_path or "",
-            comparacion=comparacion,
-            mensaje=sesion.mensaje,
+            session_id=session_id,
+            estado="iniciando",
+            total=0,
+            listado_path="",
+            comparacion=None,
+            mensaje="Extracción iniciada en background",
         )
 
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error en extracción masiva: {str(e)}"
+            detail=f"Error al iniciar extracción masiva: {str(e)}"
         )
 
 
@@ -181,8 +233,15 @@ async def procesar_expedientes_seleccionados(
             **request.config.dict()
         ) if request.config else ConfigExtraccionMasiva()
 
-        # Crear gestor
-        gestor = GestorBatch(config=config)
+        # Obtener repositorio del DI Container
+        container = get_container()
+        expediente_repo = container.expediente_repo
+
+        # Crear gestor con repositorio
+        gestor = GestorBatch(
+            config=config,
+            expediente_repository=expediente_repo
+        )
 
         # Procesar seleccionados
         resumen = await gestor.procesar_seleccionados(
@@ -252,3 +311,46 @@ async def listar_sesiones() -> List[dict]:
         Lista de sesiones
     """
     return [sesion.to_dict() for sesion in _sesiones.values()]
+
+
+@router.get("/listado/{session_id}/expedientes", response_model=dict)
+async def obtener_expedientes_listado(session_id: str) -> dict:
+    """
+    Obtiene los expedientes extraídos de un listado completado.
+
+    Args:
+        session_id: ID de la sesión
+
+    Returns:
+        Diccionario con los expedientes del listado
+    """
+    sesion = _sesiones.get(session_id)
+
+    if not sesion:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Sesión {session_id} no encontrada"
+        )
+
+    if not sesion.listado_path:
+        raise HTTPException(
+            status_code=400,
+            detail=f"La sesión {session_id} no tiene un listado asociado"
+        )
+
+    # Cargar el listado desde el archivo JSON
+    extractor = ExtractorMasivo()
+
+    try:
+        listado_data = extractor.cargar_listado(sesion.listado_path)
+        return listado_data
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Archivo de listado no encontrado: {sesion.listado_path}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al cargar listado: {str(e)}"
+        )

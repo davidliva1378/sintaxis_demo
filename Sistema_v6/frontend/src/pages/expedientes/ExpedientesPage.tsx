@@ -103,7 +103,7 @@ export default function ExpedientesPage() {
           </Button>
           <Button
             variant="secondary"
-            onClick={() => window.open('http://localhost:8001/extraccion-masiva', '_blank')}
+            onClick={() => setMostrarExtraccionMasiva(true)}
           >
             <LayoutDashboard className="h-4 w-4 mr-2" />
             Dashboard Extracción
