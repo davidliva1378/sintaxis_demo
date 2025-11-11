@@ -20,6 +20,14 @@ from .models import (
     SesionExtraccion,
 )
 
+# Importar funciones de procesamiento de v5/v6
+from Sistema_v6.pjn.scraping.expedientes import (
+    buscar_expediente_por_numero,
+    extraer_datos_expediente
+)
+from Sistema_v6.pjn.services.actuaciones import procesar_actuaciones_expediente
+from Sistema_v6.pjn.persistence.actuaciones import cargar_actuaciones_json
+
 # Importar tipos de aplicación para type hints
 try:
     from application.ports import IExpedienteRepository
@@ -188,43 +196,180 @@ class GestorBatch:
         """
         Procesa un expediente individual.
 
-        TODO: IMPLEMENTAR LÓGICA REAL
-        Esta es la función clave que debe:
-        1. Navegar al expediente específico
-        2. Extraer datos completos (carátula, partes, actuaciones, etc.)
-        3. Descargar documentos si es necesario
-        4. Retornar datos estructurados
+        Flujo:
+        1. Buscar expediente por número en PJN
+        2. Extraer datos del expediente (metadata)
+        3. Procesar actuaciones usando servicio coordinador de v5
+        4. Descargar adjuntos si procesar_con_pdf=True
+        5. Clasificar actuaciones (opcional)
+        6. Guardar en repositorio
 
         Args:
             page: Página de Playwright
             numero_expediente: Número del expediente a procesar
-            context: Contexto del navegador (para múltiples páginas si es necesario)
+            context: Contexto del navegador
             browser: Instancia del navegador
 
         Returns:
             Dict con success y datos del expediente o error
         """
-        # PLACEHOLDER: Implementación temporal
-        # En la Tarea 8 se implementará la lógica real
-
         try:
-            # TODO: Implementar búsqueda por número de expediente en el PJN
-            # La URL del listado será algo como:
-            # https://portalpjn.pjn.gov.ar/busqueda o similar
+            # ==================================================================
+            # PASO 1: Buscar expediente en PJN
+            # ==================================================================
+            print(f"🔍 Buscando expediente: {numero_expediente}")
 
-            # Por ahora, retornar éxito simulado
-            await asyncio.sleep(0.5)  # Simular procesamiento
+            # Parsear número para extraer año
+            # Formatos soportados: "FPA 001234/2024", "001234/2024", "001234/2024/I"
+            partes = numero_expediente.replace("FPA", "").strip().split('/')
+            anio = partes[-1] if len(partes) > 1 else None
 
+            # Normalizar año (tomar primeros 4 dígitos)
+            if anio and len(anio) > 4:
+                anio = anio[:4]
+
+            # Navegar a la página de búsqueda de expedientes
+            print("🔍 Navegando a página de búsqueda de expedientes...")
+            await page.goto("https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam")
+            await page.wait_for_load_state("domcontentloaded")
+
+            exito, motivo = await buscar_expediente_por_numero(page, numero_expediente, anio)
+
+            if not exito:
+                print(f"❌ Expediente no encontrado: {numero_expediente} - {motivo}")
+                return {
+                    "success": False,
+                    "numero": numero_expediente,
+                    "error": f"No encontrado: {motivo}"
+                }
+
+            print(f"✅ Expediente encontrado: {numero_expediente}")
+
+            # ==================================================================
+            # PASO 2: Extraer metadata del expediente
+            # ==================================================================
+            datos_expediente = await extraer_datos_expediente(page)
+
+            if not datos_expediente:
+                print(f"❌ No se pudieron extraer datos: {numero_expediente}")
+                return {
+                    "success": False,
+                    "numero": numero_expediente,
+                    "error": "No se pudieron extraer datos del expediente"
+                }
+
+            print(f"📋 Metadata extraída: {datos_expediente.get('caratula', '')[:50]}...")
+
+            # ==================================================================
+            # PASO 3: Procesar actuaciones con servicio coordinador
+            # ==================================================================
+            print(f"📥 Extrayendo actuaciones de {numero_expediente}...")
+
+            # Agregar directorio_base y page a datos_expediente
+            datos_expediente["directorio_base"] = self.config.directorio_base
+            datos_expediente["page"] = page
+
+            ruta_json, resultado = await procesar_actuaciones_expediente(
+                datos_expediente,
+                descargar_adjuntos=self.config.procesar_con_pdf
+            )
+
+            # Verificar si hubo error
+            error_msg = resultado.get("error")
+            if error_msg:
+                print(f"❌ Error procesando actuaciones: {error_msg}")
+                return {
+                    "success": False,
+                    "numero": numero_expediente,
+                    "error": f"Error en actuaciones: {error_msg}"
+                }
+
+            # Calcular total de actuaciones
+            total_actuaciones = (
+                resultado.get("actuaciones_actuales", 0) +
+                resultado.get("actuaciones_historicas", 0)
+            )
+            print(f"✅ Actuaciones extraídas: {total_actuaciones}")
+
+            # Contar archivos descargados si se ejecutaron descargas
+            archivos_descargados = 0
+            if resultado.get("descargas_ejecutadas") and resultado.get("carpeta_adjuntos"):
+                try:
+                    from pathlib import Path
+                    adjuntos_path = Path(resultado["carpeta_adjuntos"]) / "adjuntos"
+                    if adjuntos_path.exists():
+                        archivos_descargados = len(list(adjuntos_path.glob("*.*")))
+                except Exception:
+                    pass
+            if self.config.procesar_con_pdf:
+                print(f"📎 Archivos descargados: {archivos_descargados}")
+
+            # ==================================================================
+            # PASO 4: Clasificación inteligente (opcional)
+            # ==================================================================
+            actuaciones_clasificadas = None
+            if self.config.procesar_con_pdf and ruta_json:
+                try:
+                    from Sistema_v5.generador_documentos.integracion_procesador import (
+                        FiltroContenidoInteligente
+                    )
+
+                    print(f"🧠 Clasificando actuaciones por utilidad jurídica...")
+
+                    # Cargar actuaciones desde JSON
+                    datos_actuaciones = cargar_actuaciones_json(str(ruta_json))
+                    actuaciones = datos_actuaciones.get("Actuaciones", [])
+
+                    # Aplicar filtro
+                    filtro = FiltroContenidoInteligente(
+                        min_utilidad=self.config.min_utilidad,
+                        incluir_vencimientos=True,
+                        ordenar_por_prioridad=True
+                    )
+
+                    actuaciones_clasificadas = filtro.filtrar_actuaciones(
+                        actuaciones,
+                        incluir_estadisticas=True
+                    )
+
+                    print(f"📊 Clasificación completada: {len(actuaciones_clasificadas)} actuaciones relevantes")
+
+                except Exception as e:
+                    print(f"⚠️ Error en clasificación (no crítico): {e}")
+
+            # ==================================================================
+            # PASO 5: Guardar en repositorio (si está disponible)
+            # ==================================================================
+            if self.expediente_repository:
+                try:
+                    # TODO: Convertir a modelo de dominio y guardar
+                    # expediente_dominio = ExpedienteDominio(...)
+                    # self.expediente_repository.save(expediente_dominio)
+                    pass
+                except Exception as e:
+                    print(f"⚠️ Error guardando en repositorio (no crítico): {e}")
+
+            # ==================================================================
+            # RETORNAR RESULTADO
+            # ==================================================================
             return {
                 "success": True,
                 "numero": numero_expediente,
                 "data": {
                     "numero": numero_expediente,
-                    "mensaje": "Procesamiento simulado - implementación pendiente"
+                    "caratula": datos_expediente.get("caratula", ""),
+                    "ruta_json": str(ruta_json) if ruta_json else None,
+                    "total_actuaciones": total_actuaciones,
+                    "archivos_descargados": archivos_descargados,
+                    "tiempo_procesamiento": resultado.get("tiempo_procesamiento", 0),
+                    "actuaciones_clasificadas": len(actuaciones_clasificadas) if actuaciones_clasificadas else 0
                 }
             }
 
         except Exception as e:
+            print(f"❌ Error procesando expediente {numero_expediente}: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 "success": False,
                 "numero": numero_expediente,

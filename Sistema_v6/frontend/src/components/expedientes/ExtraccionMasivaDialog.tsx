@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Progress } from '@/components/ui/progress'
-import { X, Download, Loader2, Filter, CheckSquare, Square, Pause, Play, XCircle, FileDown } from 'lucide-react'
+import { X, Download, Loader2, Filter, CheckSquare, Square, Pause, Play, XCircle, FileDown, Maximize2, Minimize2 } from 'lucide-react'
 import { useExpedientesStore } from '@/stores/expedientesStore'
 import type { ExpedienteResumen, ConfigExtraccion } from '@/types/expediente'
 import { FiltradoExpedientesDialog } from '../FiltradoExpedientesDialog'
@@ -49,6 +49,7 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
   const [mostrarFiltrosExtraccion, setMostrarFiltrosExtraccion] = useState(false)
   const [mostrarReporte, setMostrarReporte] = useState(false)
   const [countdown, setCountdown] = useState(5)
+  const [maximizado, setMaximizado] = useState(false)
 
   // Ref para evitar mostrar reporte múltiples veces para la misma sesión
   const reporteMostradoRef = useRef<string | null>(null)
@@ -371,9 +372,16 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
     }
 
     try {
-      // Enviar expedientes seleccionados para procesamiento
+      // Enviar expedientes seleccionados para procesamiento con configuración
       const numeros = expedientesConfirmados.map(exp => exp.numero)
-      const sessionId = await procesarExpedientesSeleccionados(numeros)
+
+      // Preparar configuración incluyendo procesarConPDF y otras opciones
+      const configProcesamiento: Partial<ConfigExtraccion> = {
+        ...config,
+        procesar_con_pdf: procesarConPDF,
+      }
+
+      const sessionId = await procesarExpedientesSeleccionados(numeros, configProcesamiento)
 
       // El estado cambia automáticamente a 'extrayendo' en el store
       // El progreso se mostrará en tiempo real
@@ -405,20 +413,38 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
         }
       }}
     >
-      <Card className="w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+      <Card className={`w-full overflow-hidden flex flex-col transition-all duration-200 ${
+        maximizado
+          ? 'max-w-[98vw] h-[95vh]'
+          : 'max-w-6xl max-h-[90vh]'
+      }`}>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Download className="h-5 w-5 text-blue-600" />
               <CardTitle>Extracción Masiva de Expedientes</CardTitle>
             </div>
-            <button
-              onClick={onClose}
-              disabled={isExtractingMasivo}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-50"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setMaximizado(!maximizado)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                title={maximizado ? "Restaurar tamaño" : "Maximizar"}
+              >
+                {maximizado ? (
+                  <Minimize2 className="h-5 w-5" />
+                ) : (
+                  <Maximize2 className="h-5 w-5" />
+                )}
+              </button>
+              <button
+                onClick={onClose}
+                disabled={isExtractingMasivo}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-50"
+                title="Cerrar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
           <CardDescription>
             Extraer todos los expedientes del PJN y seleccionar cuáles monitorear
@@ -893,7 +919,9 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
           {(extraccionMasiva.estado === 'completado' && expedientesExtraidos.length > 0 && !mostrarReporte) && (
             <div className="grid grid-cols-12 gap-6 h-full">
               {/* Panel de Filtros */}
-              <div className="col-span-3 space-y-4">
+              <div className={`col-span-3 space-y-4 overflow-y-auto pr-2 ${
+                maximizado ? 'max-h-[calc(95vh-12rem)]' : ''
+              }`}>
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold flex items-center gap-2">
                     <Filter className="h-4 w-4" />
@@ -1153,7 +1181,9 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                 </div>
 
                 {/* Lista de Expedientes */}
-                <div className="border rounded-lg overflow-auto max-h-96">
+                <div className={`border rounded-lg overflow-auto ${
+                  maximizado ? 'max-h-[calc(95vh-24rem)]' : 'max-h-[32rem]'
+                }`}>
                   <table className="w-full">
                     <thead className="bg-gray-50 dark:bg-gray-900">
                       <tr>

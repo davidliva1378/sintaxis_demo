@@ -8,9 +8,8 @@ from typing import Protocol, runtime_checkable
 
 from playwright.async_api import Locator, Page, TimeoutError, Error
 
-from ..utils.logging import get_logger
-
-logger = get_logger(__name__)
+import logging
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable

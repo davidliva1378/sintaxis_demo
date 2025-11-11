@@ -54,13 +54,21 @@ class ConfigExtraccionMasiva:
     umbral_errores: int = 10
     timeout_pagina: int = 30000
     max_reintentos: int = 3
+    procesar_con_pdf: bool = False
+    incluir_historicas: bool = True
+    min_utilidad: str = "MEDIA"
+    directorio_base: str = "./Sistema_v6/data/expedientes"
 
     def to_dict(self) -> Dict:
         return {
             "headless": self.headless,
             "umbral_errores": self.umbral_errores,
             "timeout_pagina": self.timeout_pagina,
-            "max_reintentos": self.max_reintentos
+            "max_reintentos": self.max_reintentos,
+            "procesar_con_pdf": self.procesar_con_pdf,
+            "incluir_historicas": self.incluir_historicas,
+            "min_utilidad": self.min_utilidad,
+            "directorio_base": self.directorio_base
         }
 
 

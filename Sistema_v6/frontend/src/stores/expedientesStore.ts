@@ -83,7 +83,7 @@ interface ExpedientesState {
   obtenerProgreso: () => Promise<void>
   obtenerResumen: () => Promise<ResumenExtraccion>
   descargarReporte: (formato: 'json' | 'excel' | 'csv' | 'html') => Promise<void>
-  procesarExpedientesSeleccionados: (numeros: string[]) => Promise<string>
+  procesarExpedientesSeleccionados: (numeros: string[], config?: Partial<ConfigExtraccion>) => Promise<string>
 }
 
 export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
@@ -687,16 +687,33 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
   },
 
   // Procesar expedientes seleccionados
-  procesarExpedientesSeleccionados: async (numeros: string[]): Promise<string> => {
+  procesarExpedientesSeleccionados: async (numeros: string[], config?: Partial<ConfigExtraccion>): Promise<string> => {
     try {
       toast.info('Procesando expedientes seleccionados...', {
         description: `${numeros.length} expedientes`,
       })
 
-      // Llamar al backend para procesar los expedientes seleccionados
-      const response = await apiClient.post('/api/v1/extraccion-masiva/procesar-seleccionados', {
+      // Preparar payload con config si se proporciona
+      const payload: any = {
         numeros_expedientes: numeros,
-      })
+      }
+
+      // Agregar config si se proporciona
+      if (config) {
+        payload.config = {
+          headless: config.headless ?? true,
+          umbral_errores: config.umbral_errores ?? 10,
+          timeout_pagina: config.timeout_pagina,
+          max_reintentos: config.max_reintentos,
+          procesar_con_pdf: config.procesar_con_pdf ?? false,
+          incluir_historicas: config.incluir_historicas ?? true,
+          min_utilidad: config.min_utilidad ?? "MEDIA",
+          directorio_base: config.directorio_base,
+        }
+      }
+
+      // Llamar al backend para procesar los expedientes seleccionados
+      const response = await apiClient.post('/api/v1/extraccion-masiva/procesar-seleccionados', payload)
 
       const sessionId = response.data.session_id
       const resumen = response.data.resumen

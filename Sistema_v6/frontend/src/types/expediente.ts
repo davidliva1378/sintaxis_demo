@@ -74,6 +74,18 @@ export interface ConfigExtraccion {
 
   /** Fecha de corte (YYYY-MM-DD). Solo extraer expedientes desde esta fecha */
   fecha_corte?: string;
+
+  /** Procesar con descarga de PDFs. Default: false */
+  procesar_con_pdf?: boolean;
+
+  /** Incluir actuaciones históricas. Default: true */
+  incluir_historicas?: boolean;
+
+  /** Utilidad mínima para clasificación ('ALTA', 'MEDIA', 'BAJA'). Default: 'MEDIA' */
+  min_utilidad?: string;
+
+  /** Directorio base para guardar expedientes. Default: './Sistema_v6/data/expedientes' */
+  directorio_base?: string;
 }
 
 export interface Comparacion {

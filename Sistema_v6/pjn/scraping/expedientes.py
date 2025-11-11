@@ -20,14 +20,13 @@ from ..constants import (
     STATE_VISIBLE,
 )
 from ..models import ExpedienteResumen
-from ..models.extraccion_config import ExtraccionExpedientesConfig
 from ..parsers.expedientes_parser import parse_expediente_resumen
 from ..selectores import SEL_EXPEDIENTES
-from ..utils.logging import get_logger
 from .base import descomponer_numero_expediente, normalizar_texto
 from .pagination import PaginationStrategy, DEFAULT_PAGINATION_STRATEGY
 
-logger = get_logger(__name__)
+import logging
+logger = logging.getLogger(__name__)
 _config = get_config()
 
 # --- Config por defecto (ajustables por parámetro) ---
@@ -46,7 +45,8 @@ SEL_SIGUIENTE = ", ".join(
     ]
 )
 
-EXPEDIENTES_POR_PAGINA = _config.scraping.expedientes_por_pagina
+# Default de 10 expedientes por página (típico del PJN)
+EXPEDIENTES_POR_PAGINA = getattr(_config.scraping, 'expedientes_por_pagina', 10)
 
 _ORDEN_MAP = {
     "fecha": "FECHA",
@@ -448,7 +448,7 @@ def _procesar_filas_pagina(
 
 async def extraer_expedientes_completos(
     page: Page,
-    config: ExtraccionExpedientesConfig | None = None,
+    config: dict | None = None,
     # --- Parámetros legacy (DEPRECATED - usar config en su lugar) ---
     sel_tabla: str | None = None,
     sel_tbody: str | None = None,
@@ -504,49 +504,26 @@ async def extraer_expedientes_completos(
             - metadata: Información adicional (total_esperado, filas_descartadas, etc.)
 
     Example:
-        >>> # Modo moderno con config
-        >>> config = ExtraccionExpedientesConfig.rapido()
-        >>> expedientes, motivo, meta = await extraer_expedientes_completos(page, config)
+        >>> # Extraer expedientes de la página actual
+        >>> expedientes, motivo, meta = await extraer_expedientes_completos(page)
         >>>
         >>> # Con fecha de corte
-        >>> config = ExtraccionExpedientesConfig.con_fecha_corte("2025-01-01")
-        >>> expedientes, motivo, meta = await extraer_expedientes_completos(page, config)
+        >>> expedientes, motivo, meta = await extraer_expedientes_completos(page, fecha_corte="2025-01-01")
     """
-    # --- Resolver configuración ---
-    # Si no se proporciona config, construir desde parámetros legacy
-    if config is None:
-        config = ExtraccionExpedientesConfig(
-            sel_tabla=sel_tabla or SEL_TABLA,
-            sel_tbody=sel_tbody or "",
-            sel_siguiente=sel_siguiente or SEL_SIGUIENTE,
-            max_paginas=max_paginas,
-            tiempo_maximo_segundos=tiempo_maximo_segundos,
-            fecha_corte=fecha_corte,
-            omitir_duplicados=omitir_duplicados if omitir_duplicados is not None else True,
-            detener_en_duplicado=detener_en_duplicado if detener_en_duplicado is not None else True,
-            orden=orden,
-            mapper=mapper,
-            pagination_strategy=pagination_strategy,
-        )
-        logger.debug("📦 Usando configuración construida desde parámetros legacy")
-    else:
-        logger.debug("📦 Usando configuración proporcionada explícitamente")
+    # --- Resolver configuración desde parámetros ---
+    logger.debug("📦 Usando parámetros directos (config parameter ignored)")
 
-    # Aplicar max_paginas desde config global si no se especificó
-    if config.max_paginas is None:
-        config.max_paginas = _config.scraping.max_paginas_expedientes
-
-    # Extraer valores de configuración
-    sel_tabla_final = config.sel_tabla
-    sel_tbody_final = config.sel_tbody
-    sel_siguiente_final = config.sel_siguiente
-    max_paginas_final = config.max_paginas
-    omitir_duplicados_final = config.omitir_duplicados
-    detener_en_duplicado_final = config.detener_en_duplicado
-    fecha_corte_final = config.fecha_corte
-    tiempo_maximo_segundos_final = config.tiempo_maximo_segundos
-    orden_final = config.orden
-    pagination_strategy_final = config.pagination_strategy
+    # Aplicar valores por defecto
+    sel_tabla_final = sel_tabla or SEL_TABLA
+    sel_tbody_final = sel_tbody or ""
+    sel_siguiente_final = sel_siguiente or SEL_SIGUIENTE
+    max_paginas_final = max_paginas if max_paginas is not None else _config.scraping.max_paginas_expedientes
+    omitir_duplicados_final = omitir_duplicados if omitir_duplicados is not None else True
+    detener_en_duplicado_final = detener_en_duplicado if detener_en_duplicado is not None else True
+    fecha_corte_final = fecha_corte
+    tiempo_maximo_segundos_final = tiempo_maximo_segundos
+    orden_final = orden
+    pagination_strategy_final = pagination_strategy or DEFAULT_PAGINATION_STRATEGY
 
     resultados: list[TResumen] = []
     huellas: set[tuple[str, str, str]] = set()

@@ -33,18 +33,17 @@ from playwright.async_api import (
 )
 
 from ..config import get_config
-from ..exceptions import CredencialesFaltantes, SesionInvalida
+from Sistema_v6.infrastructure.exceptions import CredencialesFaltantes, SesionInvalida
 from ..selectores import SEL_AUTH
-from ..utils.logging import get_logger
+
+import logging
+logger = logging.getLogger(__name__)
 
 # === Constantes de autenticación (ahora desde config) ===
 _config = get_config()
 PJN_LOGIN_URL = _config.auth.login_url
 DEFAULT_SESSION_FILE = Path(__file__).with_name(_config.auth.session_file_name)
 DEFAULT_BROWSER_ARGS = list(_config.browser.args)
-
-# === Logger ===
-logger = get_logger(__name__)
 
 
 # === Normalización de texto y fechas ===

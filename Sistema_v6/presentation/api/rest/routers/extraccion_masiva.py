@@ -32,6 +32,10 @@ class ConfigExtraccionRequest(BaseModel):
     umbral_errores: int = 10
     timeout_pagina: int = 30000
     max_reintentos: int = 3
+    procesar_con_pdf: bool = False
+    incluir_historicas: bool = True
+    min_utilidad: str = "MEDIA"
+    directorio_base: str = "./Sistema_v6/data/expedientes"
 
 
 class ListadoRequest(BaseModel):
