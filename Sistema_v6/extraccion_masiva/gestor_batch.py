@@ -25,6 +25,7 @@ from Sistema_v6.pjn.scraping.expedientes import (
     buscar_expediente_por_numero,
     extraer_datos_expediente
 )
+from Sistema_v6.pjn.scraping import descomponer_numero_expediente
 from Sistema_v6.pjn.services.actuaciones import procesar_actuaciones_expediente
 from Sistema_v6.pjn.persistence.actuaciones import cargar_actuaciones_json
 
@@ -219,21 +220,26 @@ class GestorBatch:
             # ==================================================================
             print(f"🔍 Buscando expediente: {numero_expediente}")
 
-            # Parsear número para extraer año
-            # Formatos soportados: "FPA 001234/2024", "001234/2024", "001234/2024/I"
-            partes = numero_expediente.replace("FPA", "").strip().split('/')
-            anio = partes[-1] if len(partes) > 1 else None
+            # Parsear número usando la función que maneja todos los formatos
+            # Soporta: "FPA 001234/2024", "FRE 001234/2024/I", "001234/2024/1", etc.
+            _, numero_limpio, anio_limpio = descomponer_numero_expediente(numero_expediente)
 
-            # Normalizar año (tomar primeros 4 dígitos)
-            if anio and len(anio) > 4:
-                anio = anio[:4]
+            if not numero_limpio:
+                print(f"❌ No se pudo parsear el número de expediente: {numero_expediente}")
+                return {
+                    "success": False,
+                    "numero": numero_expediente,
+                    "error": "Formato de número inválido"
+                }
+
+            print(f"🔢 Número parseado: {numero_limpio}/{anio_limpio or 'sin año'}")
 
             # Navegar a la página de búsqueda de expedientes
             print("🔍 Navegando a página de búsqueda de expedientes...")
             await page.goto("https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam")
             await page.wait_for_load_state("domcontentloaded")
 
-            exito, motivo = await buscar_expediente_por_numero(page, numero_expediente, anio)
+            exito, motivo = await buscar_expediente_por_numero(page, numero_limpio, anio_limpio)
 
             if not exito:
                 print(f"❌ Expediente no encontrado: {numero_expediente} - {motivo}")
@@ -243,7 +249,35 @@ class GestorBatch:
                     "error": f"No encontrado: {motivo}"
                 }
 
-            print(f"✅ Expediente encontrado: {numero_expediente}")
+            print(f"✅ Expediente encontrado en resultados: {numero_expediente}")
+
+            # ==================================================================
+            # Hacer clic en el enlace del expediente para abrir su página
+            # ==================================================================
+            print("👁 Abriendo página del expediente...")
+            try:
+                # Buscar el primer enlace del expediente en la tabla de resultados
+                enlace_expediente = await page.query_selector("table.table-striped tbody tr td a")
+                if not enlace_expediente:
+                    print(f"❌ No se encontró enlace para abrir expediente: {numero_expediente}")
+                    return {
+                        "success": False,
+                        "numero": numero_expediente,
+                        "error": "No se encontró enlace del expediente"
+                    }
+
+                await enlace_expediente.click()
+                await page.wait_for_load_state("load")
+                await page.wait_for_timeout(2000)  # Esperar a que cargue completamente
+                print(f"✅ Página del expediente abierta: {numero_expediente}")
+
+            except Exception as e:
+                print(f"❌ Error abriendo expediente: {e}")
+                return {
+                    "success": False,
+                    "numero": numero_expediente,
+                    "error": f"Error abriendo expediente: {str(e)}"
+                }
 
             # ==================================================================
             # PASO 2: Extraer metadata del expediente
