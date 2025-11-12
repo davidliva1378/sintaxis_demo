@@ -81,6 +81,7 @@ class ResumenExtraccion:
     omitidos: int
     tiempo_total: float
     errores_detalles: List[Dict] = field(default_factory=list)
+    archivos_descargados: int = 0
 
     def to_dict(self) -> Dict:
         return {
@@ -90,7 +91,8 @@ class ResumenExtraccion:
             "omitidos": self.omitidos,
             "tiempo_total": self.tiempo_total,
             "tasa_exito": round((self.exitosos / self.total * 100) if self.total > 0 else 0, 2),
-            "errores_detalles": self.errores_detalles
+            "errores_detalles": self.errores_detalles,
+            "archivos_descargados": self.archivos_descargados
         }
 
 
@@ -108,7 +110,8 @@ class SesionExtraccion:
     mensaje: str = ""
     listado_path: Optional[str] = None
     comparacion: Optional[Dict] = None
-    paginas_procesadas: int = 0  # Total de páginas procesadas en la extracción
+    paginas_procesadas: int = 0  # Total de páginas procesadas en la extracción masiva inicial
+    archivos_descargados: int = 0  # Total de archivos descargados durante procesamiento
 
     def to_dict(self) -> Dict:
         return {
@@ -123,5 +126,6 @@ class SesionExtraccion:
             "mensaje": self.mensaje,
             "listado_path": self.listado_path,
             "comparacion": self.comparacion,
-            "paginas_procesadas": self.paginas_procesadas
+            "paginas_procesadas": self.paginas_procesadas,
+            "archivos_descargados": self.archivos_descargados
         }

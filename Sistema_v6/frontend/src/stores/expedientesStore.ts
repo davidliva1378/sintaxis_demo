@@ -41,6 +41,7 @@ interface ExtraccionMasivaState {
   websocket: WebSocket | null
   pollInterval: NodeJS.Timeout | null
   paginas_procesadas: number
+  archivos_descargados: number
 }
 
 interface ExpedientesState {
@@ -119,6 +120,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
     websocket: null,
     pollInterval: null,
     paginas_procesadas: 0,
+    archivos_descargados: 0,
   },
 
   // Listar expedientes con filtros y paginación
@@ -622,8 +624,9 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
         tiempoTranscurrido = Math.floor((fin.getTime() - inicio.getTime()) / 1000) // en segundos
       }
 
-      // Extraer paginas_procesadas del backend
+      // Extraer paginas_procesadas y archivos_descargados del backend
       const paginasProcesadas = data.paginas_procesadas || 0
+      const archivosDescargados = data.archivos_descargados || 0
 
       // Si la extracción terminó (completado o error), detener el polling
       if ((nuevoEstado === 'completado' || nuevoEstado === 'error') && state.extraccionMasiva.pollInterval) {
@@ -651,6 +654,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
           estado: nuevoEstado,
           pollInterval: (nuevoEstado === 'completado' || nuevoEstado === 'error') ? null : state.extraccionMasiva.pollInterval,
           paginas_procesadas: paginasProcesadas,
+          archivos_descargados: archivosDescargados,
           progreso: {
             actual: data.progreso_actual || 0,
             total: data.progreso_total || 0,
@@ -852,6 +856,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
         websocket: null,
         pollInterval: null,
         paginas_procesadas: 0,
+        archivos_descargados: 0,
       },
     })
   },

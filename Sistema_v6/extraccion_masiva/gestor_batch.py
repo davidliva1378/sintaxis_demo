@@ -87,6 +87,7 @@ class GestorBatch:
         exitosos = 0
         errores = 0
         omitidos = 0
+        total_archivos_descargados = 0  # Acumulador de archivos descargados
 
         # Inicializar estados
         for numero in numeros_expedientes:
@@ -125,6 +126,9 @@ class GestorBatch:
                         if resultado["success"]:
                             self._estados[numero] = EstadoExpediente.PROCESADO
                             exitosos += 1
+                            # Acumular archivos descargados de este expediente
+                            if "data" in resultado and "archivos_descargados" in resultado["data"]:
+                                total_archivos_descargados += resultado["data"]["archivos_descargados"]
                         else:
                             self._estados[numero] = EstadoExpediente.ERROR
                             errores += 1
@@ -185,6 +189,7 @@ class GestorBatch:
                 omitidos=omitidos,
                 tiempo_total=tiempo_total,
                 errores_detalles=self._errores.copy(),
+                archivos_descargados=total_archivos_descargados,
             )
 
     async def _procesar_expediente(

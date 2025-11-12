@@ -924,18 +924,20 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                   </div>
                 </div>
 
-                {/* Páginas Procesadas */}
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                  <div className="text-sm text-amber-600 dark:text-amber-400 font-medium mb-1">
-                    Páginas Procesadas
+                {/* Páginas Procesadas (solo para extracción masiva inicial, no para expedientes seleccionados) */}
+                {tipoExtraccion === 'masiva' && (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                    <div className="text-sm text-amber-600 dark:text-amber-400 font-medium mb-1">
+                      Páginas Procesadas
+                    </div>
+                    <div className="text-3xl font-bold text-amber-900 dark:text-amber-100">
+                      {extraccionMasiva.paginas_procesadas || 0}
+                    </div>
+                    <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      páginas
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-amber-900 dark:text-amber-100">
-                    {extraccionMasiva.paginas_procesadas || 0}
-                  </div>
-                  <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                    páginas
-                  </div>
-                </div>
+                )}
 
                 {/* Archivos Descargados (solo si procesarConPDF) */}
                 {procesarConPDF && (
@@ -944,10 +946,10 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                       Archivos Descargados
                     </div>
                     <div className="text-3xl font-bold text-green-900 dark:text-green-100">
-                      {(extraccionMasiva as any).archivos_descargados || '0'}
+                      {extraccionMasiva.archivos_descargados || '0'}
                     </div>
                     <div className="text-xs text-green-600 dark:text-green-400 mt-1">
-                      PDFs
+                      archivos
                     </div>
                   </div>
                 )}

@@ -254,6 +254,7 @@ async def _ejecutar_procesamiento_background(
             _sesiones[session_id].progreso_actual = resumen.exitosos
             _sesiones[session_id].progreso_total = resumen.total
             _sesiones[session_id].mensaje = f"Procesados {resumen.exitosos}/{resumen.total} expedientes"
+            _sesiones[session_id].archivos_descargados = resumen.archivos_descargados
 
     except Exception as e:
         # Actualizar sesión con error
