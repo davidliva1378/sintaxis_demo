@@ -44,6 +44,7 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
   const [expedientesFiltrados, setExpedientesFiltrados] = useState<ExpedienteResumen[]>([])
   const [expedientesSeleccionados, setExpedientesSeleccionados] = useState<Set<string>>(new Set())
   const [procesarConPDF, setProcesarConPDF] = useState(false)
+  const [tipoExtraccion, setTipoExtraccion] = useState<'masiva' | 'seleccionados'>('masiva')
   const [logMensajes, setLogMensajes] = useState<string[]>([])
   const [mostrarOpcionesAvanzadas, setMostrarOpcionesAvanzadas] = useState(false)
   const [mostrarFiltrosExtraccion, setMostrarFiltrosExtraccion] = useState(false)
@@ -128,10 +129,12 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
   useEffect(() => {
     const cargarExpedientes = async () => {
       // Solo cargar si completó y no se mostró reporte para esta sesión
+      // NO intentar cargar para procesamiento de seleccionados (no genera listado)
       if (
         extraccionMasiva.estado === 'completado' &&
         extraccionMasiva.sessionId &&
-        reporteMostradoRef.current !== extraccionMasiva.sessionId
+        reporteMostradoRef.current !== extraccionMasiva.sessionId &&
+        tipoExtraccion === 'masiva' // Solo para extracción masiva inicial
       ) {
         try {
           // Cargar expedientes del listado completado
@@ -154,24 +157,43 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
           console.error('Error al cargar expedientes:', error)
           agregarLog(`❌ Error al cargar expedientes: ${error}`)
         }
+      } else if (
+        extraccionMasiva.estado === 'completado' &&
+        extraccionMasiva.sessionId &&
+        reporteMostradoRef.current !== extraccionMasiva.sessionId &&
+        tipoExtraccion === 'seleccionados' // Para procesamiento de seleccionados
+      ) {
+        // Solo mostrar reporte sin cargar expedientes (ya están cargados)
+        // NO iniciar countdown automático - usuario debe decidir manualmente
+        setMostrarReporte(true)
+        setCountdown(0) // Desactivar countdown automático
+        reporteMostradoRef.current = extraccionMasiva.sessionId
       }
     }
 
     cargarExpedientes()
-  }, [extraccionMasiva.estado, extraccionMasiva.sessionId])
+  }, [extraccionMasiva.estado, extraccionMasiva.sessionId, tipoExtraccion])
 
-  // Countdown automático para transición a filtros
+  // Countdown automático para transición a filtros (solo para extracción masiva)
   useEffect(() => {
-    if (mostrarReporte && countdown > 0) {
+    // Solo aplicar countdown automático para extracción masiva inicial
+    if (mostrarReporte && countdown > 0 && tipoExtraccion === 'masiva') {
       const timer = setTimeout(() => {
         setCountdown(countdown - 1)
       }, 1000)
       return () => clearTimeout(timer)
-    } else if (mostrarReporte && countdown === 0) {
-      // Transición automática a filtros
+    } else if (mostrarReporte && countdown === 0 && tipoExtraccion === 'masiva') {
+      // Transición automática a filtros solo para extracción masiva
       setMostrarReporte(false)
     }
-  }, [mostrarReporte, countdown])
+  }, [mostrarReporte, countdown, tipoExtraccion])
+
+  // Ocultar reporte cuando comience el procesamiento de seleccionados
+  useEffect(() => {
+    if (tipoExtraccion === 'seleccionados' && extraccionMasiva.estado === 'extrayendo' && mostrarReporte) {
+      setMostrarReporte(false)
+    }
+  }, [tipoExtraccion, extraccionMasiva.estado, mostrarReporte])
 
   // Cleanup: desconectar WebSocket y detener polling al cerrar
   useEffect(() => {
@@ -372,6 +394,10 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
     }
 
     try {
+      // Cambiar tipo de extracción y ocultar reporte
+      setTipoExtraccion('seleccionados')
+      setMostrarReporte(false)
+
       // Enviar expedientes seleccionados para procesamiento con configuración
       const numeros = expedientesConfirmados.map(exp => exp.numero)
 
@@ -381,15 +407,15 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
         procesar_con_pdf: procesarConPDF,
       }
 
+      // La función del store cambiará el estado a 'iniciando' inmediatamente
+      // Esto permite que React renderice la vista de progreso antes de la llamada al backend
       const sessionId = await procesarExpedientesSeleccionados(numeros, configProcesamiento)
 
-      // El estado cambia automáticamente a 'extrayendo' en el store
+      // El estado cambia automáticamente a 'extrayendo' en el store después de la respuesta
       // El progreso se mostrará en tiempo real
 
-      // Llamar onSuccess si se proporcionó
-      if (onSuccess) {
-        onSuccess(expedientesConfirmados)
-      }
+      // No llamar onSuccess aquí - se puede llamar cuando el usuario cierre el diálogo
+      // El callback onSuccess solo llama a listarExpedientes() que se ejecutará al cerrar
     } catch (error) {
       console.error('Error al procesar expedientes:', error)
       // El toast de error ya se muestra en el store
@@ -402,6 +428,26 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
       : [...filtros.situacion, situacion]
 
     setFiltros({ ...filtros, situacion: nuevasSituaciones })
+  }
+
+  const handleVolverAFiltrado = () => {
+    // Resetear selección
+    setExpedientesSeleccionados(new Set())
+
+    // Volver a mostrar filtrado
+    setMostrarReporte(false)
+
+    // Resetear tipo de extracción para próxima vez
+    setTipoExtraccion('masiva')
+  }
+
+  const handleCerrarDialogo = () => {
+    // Cerrar el diálogo
+    onClose()
+
+    // Opcional: Resetear estados si es necesario
+    setMostrarReporte(false)
+    setTipoExtraccion('masiva')
   }
 
   return (
@@ -700,12 +746,39 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
           )}
 
           {/* Tab de Extrayendo con progreso en tiempo real */}
-          {extraccionMasiva.estado === 'extrayendo' && (
+          {(extraccionMasiva.estado === 'extrayendo' || extraccionMasiva.estado === 'iniciando') && (
             <div className="space-y-6">
-              {/* Barra de progreso */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-lg">Extracción en Progreso</h3>
+              {/* Indicador de inicio cuando está iniciando */}
+              {extraccionMasiva.estado === 'iniciando' && (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <Loader2 className="h-16 w-16 animate-spin text-blue-600" />
+                  <div className="text-center space-y-2">
+                    <h3 className="font-semibold text-lg">Iniciando Procesamiento</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Preparando {tipoExtraccion === 'masiva' ? 'extracción masiva' : 'procesamiento de expedientes seleccionados'}...
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Barra de progreso (solo mostrar cuando ya está extrayendo) */}
+              {extraccionMasiva.estado === 'extrayendo' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                      <h3 className="font-semibold text-lg">
+                        {tipoExtraccion === 'masiva'
+                          ? 'Extracción Masiva en Progreso'
+                          : `Procesando ${extraccionMasiva.progreso.total} Expedientes Seleccionados`}
+                      </h3>
+                    {procesarConPDF && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-700 rounded-full">
+                        <FileDown className="h-3 w-3" />
+                        Descargando PDFs
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <span className="font-mono">{extraccionMasiva.progreso.actual}/{extraccionMasiva.progreso.total}</span>
                     <span>•</span>
@@ -788,6 +861,7 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                   </Button>
                 </div>
               </div>
+              )}
             </div>
           )}
 
@@ -801,16 +875,20 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                 </div>
                 <div className="text-center">
                   <h2 className="text-2xl font-bold text-green-900 dark:text-green-100">
-                    ¡Extracción Completada!
+                    {tipoExtraccion === 'masiva'
+                      ? '¡Extracción Masiva Completada!'
+                      : '¡Procesamiento Completado!'}
                   </h2>
                   <p className="text-gray-600 dark:text-gray-400 mt-1">
-                    Los expedientes han sido extraídos exitosamente
+                    {tipoExtraccion === 'masiva'
+                      ? 'Los expedientes han sido extraídos exitosamente'
+                      : 'Los expedientes seleccionados han sido procesados exitosamente'}
                   </p>
                 </div>
               </div>
 
               {/* Estadísticas */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className={`grid ${procesarConPDF ? 'grid-cols-4' : 'grid-cols-3'} gap-4`}>
                 {/* Total Extraído */}
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                   <div className="text-sm text-blue-600 dark:text-blue-400 font-medium mb-1">
@@ -855,6 +933,21 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                     páginas
                   </div>
                 </div>
+
+                {/* Archivos Descargados (solo si procesarConPDF) */}
+                {procesarConPDF && (
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                    <div className="text-sm text-green-600 dark:text-green-400 font-medium mb-1">
+                      Archivos Descargados
+                    </div>
+                    <div className="text-3xl font-bold text-green-900 dark:text-green-100">
+                      {(extraccionMasiva as any).archivos_descargados || '0'}
+                    </div>
+                    <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                      PDFs
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Comparación con extracción anterior */}
@@ -889,28 +982,51 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                 </div>
               )}
 
-              {/* Countdown y botón */}
+              {/* Botones contextuales según tipo de extracción */}
               <div className="flex flex-col items-center gap-4 pt-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {countdown > 0 ? (
-                    <>
-                      Cargando filtros automáticamente en{' '}
-                      <span className="font-bold text-blue-600 dark:text-blue-400 text-lg">
-                        {countdown}
-                      </span>{' '}
-                      segundos...
-                    </>
-                  ) : (
-                    'Cargando filtros...'
-                  )}
-                </p>
-                <Button
-                  onClick={() => setMostrarReporte(false)}
-                  size="lg"
-                  className="min-w-[200px]"
-                >
-                  Continuar Ahora
-                </Button>
+                {tipoExtraccion === 'seleccionados' ? (
+                  // Botones para extracción de seleccionados
+                  <div className="flex gap-3 justify-center flex-wrap">
+                    <Button
+                      onClick={handleVolverAFiltrado}
+                      variant="outline"
+                      size="lg"
+                    >
+                      Procesar Más Expedientes
+                    </Button>
+                    <Button
+                      onClick={handleCerrarDialogo}
+                      size="lg"
+                      className="min-w-[150px]"
+                    >
+                      Cerrar
+                    </Button>
+                  </div>
+                ) : (
+                  // Countdown automático para extracción masiva
+                  <>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {countdown > 0 ? (
+                        <>
+                          Cargando filtros automáticamente en{' '}
+                          <span className="font-bold text-blue-600 dark:text-blue-400 text-lg">
+                            {countdown}
+                          </span>{' '}
+                          segundos...
+                        </>
+                      ) : (
+                        'Cargando filtros...'
+                      )}
+                    </p>
+                    <Button
+                      onClick={() => setMostrarReporte(false)}
+                      size="lg"
+                      className="min-w-[200px]"
+                    >
+                      Continuar Ahora
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -1125,6 +1241,26 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                       />
                     </div>
                   )}
+                </div>
+
+                {/* Opción de procesamiento con PDF */}
+                <div className="space-y-2 border-t pt-4 mt-4">
+                  <label className="text-sm font-medium">Opciones de Extracción</label>
+                  <div className="flex items-start space-x-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <Checkbox
+                      id="procesar-pdf"
+                      checked={procesarConPDF}
+                      onCheckedChange={(checked) => setProcesarConPDF(checked as boolean)}
+                      className="mt-1"
+                    />
+                    <label htmlFor="procesar-pdf" className="flex-1 cursor-pointer">
+                      <div className="font-medium text-sm">Descargar archivos adjuntos</div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
+                        Descarga todos los documentos (PDFs) asociados a las actuaciones.
+                        Esto aumentará el tiempo de procesamiento pero obtendrás el expediente completo.
+                      </p>
+                    </label>
+                  </div>
                 </div>
               </div>
 

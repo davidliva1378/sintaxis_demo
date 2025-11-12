@@ -712,18 +712,49 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
         }
       }
 
+      // Cambiar estado a 'iniciando' ANTES de la llamada al backend
+      // Esto permite que React renderice la vista de progreso inmediatamente
+      set({
+        extraccionMasiva: {
+          ...get().extraccionMasiva,
+          estado: 'iniciando',
+          progreso: {
+            actual: 0,
+            total: numeros.length,
+            porcentaje: 0,
+            fase: 'Preparando procesamiento',
+            mensaje: 'Iniciando procesamiento de expedientes seleccionados...',
+            errores: 0,
+            tiempoTranscurrido: 0,
+            tiempoEstimado: null,
+            velocidad: null,
+          },
+        },
+      })
+
       // Llamar al backend para procesar los expedientes seleccionados
       const response = await apiClient.post('/api/v1/extraccion-masiva/procesar-seleccionados', payload)
 
       const sessionId = response.data.session_id
       const resumen = response.data.resumen
 
-      // Actualizar estado con la sesión de procesamiento
+      // Actualizar estado con la sesión de procesamiento (resetear progreso)
       set({
         extraccionMasiva: {
           ...get().extraccionMasiva,
           sessionId,
           estado: 'extrayendo',
+          progreso: {
+            actual: 0,
+            total: numeros.length,
+            porcentaje: 0,
+            fase: 'Procesando expedientes seleccionados',
+            mensaje: 'Iniciando procesamiento...',
+            errores: 0,
+            tiempoTranscurrido: 0,
+            tiempoEstimado: null,
+            velocidad: null,
+          },
         },
       })
 
@@ -739,6 +770,14 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
       const pollInterval = setInterval(() => {
         get().obtenerProgreso()
       }, 1000) // Cada 1 segundo para updates más fluidos
+
+      // Actualizar pollInterval en el estado
+      set({
+        extraccionMasiva: {
+          ...get().extraccionMasiva,
+          pollInterval,
+        },
+      })
 
       return sessionId
     } catch (error: any) {
