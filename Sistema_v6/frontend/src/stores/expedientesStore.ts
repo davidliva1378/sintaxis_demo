@@ -40,6 +40,7 @@ interface ExtraccionMasivaState {
   progreso: ProgresoExtraccion
   websocket: WebSocket | null
   pollInterval: NodeJS.Timeout | null
+  paginas_procesadas: number
 }
 
 interface ExpedientesState {
@@ -84,6 +85,7 @@ interface ExpedientesState {
   obtenerResumen: () => Promise<ResumenExtraccion>
   descargarReporte: (formato: 'json' | 'excel' | 'csv' | 'html') => Promise<void>
   procesarExpedientesSeleccionados: (numeros: string[], config?: Partial<ConfigExtraccion>) => Promise<string>
+  resetExtraccionMasiva: () => void
 }
 
 export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
@@ -116,6 +118,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
     },
     websocket: null,
     pollInterval: null,
+    paginas_procesadas: 0,
   },
 
   // Listar expedientes con filtros y paginación
@@ -611,6 +614,17 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
 
       const nuevoEstado = data.estado || 'extrayendo'
 
+      // Calcular tiempo transcurrido desde tiempo_inicio
+      let tiempoTranscurrido = 0
+      if (data.tiempo_inicio) {
+        const inicio = new Date(data.tiempo_inicio)
+        const fin = data.tiempo_fin ? new Date(data.tiempo_fin) : new Date()
+        tiempoTranscurrido = Math.floor((fin.getTime() - inicio.getTime()) / 1000) // en segundos
+      }
+
+      // Extraer paginas_procesadas del backend
+      const paginasProcesadas = data.paginas_procesadas || 0
+
       // Si la extracción terminó (completado o error), detener el polling
       if ((nuevoEstado === 'completado' || nuevoEstado === 'error') && state.extraccionMasiva.pollInterval) {
         clearInterval(state.extraccionMasiva.pollInterval)
@@ -636,6 +650,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
           ...state.extraccionMasiva,
           estado: nuevoEstado,
           pollInterval: (nuevoEstado === 'completado' || nuevoEstado === 'error') ? null : state.extraccionMasiva.pollInterval,
+          paginas_procesadas: paginasProcesadas,
           progreso: {
             actual: data.progreso_actual || 0,
             total: data.progreso_total || 0,
@@ -645,7 +660,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
             fase: data.fase || '',
             mensaje: data.mensaje || '',
             errores: 0,
-            tiempoTranscurrido: 0,
+            tiempoTranscurrido,
             tiempoEstimado: null,
             velocidad: null,
           },
@@ -802,5 +817,42 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
       })
       throw error
     }
+  },
+
+  // Resetear estado de extracción masiva
+  resetExtraccionMasiva: () => {
+    const state = get()
+
+    // Detener polling si está activo
+    if (state.extraccionMasiva.pollInterval) {
+      clearInterval(state.extraccionMasiva.pollInterval)
+    }
+
+    // Desconectar WebSocket si está conectado
+    if (state.extraccionMasiva.websocket) {
+      state.extraccionMasiva.websocket.close()
+    }
+
+    // Resetear estado a valores iniciales
+    set({
+      extraccionMasiva: {
+        sessionId: null,
+        estado: 'inactivo',
+        progreso: {
+          actual: 0,
+          total: 0,
+          porcentaje: 0,
+          fase: '',
+          mensaje: '',
+          errores: 0,
+          tiempoTranscurrido: 0,
+          tiempoEstimado: null,
+          velocidad: null,
+        },
+        websocket: null,
+        pollInterval: null,
+        paginas_procesadas: 0,
+      },
+    })
   },
 }))

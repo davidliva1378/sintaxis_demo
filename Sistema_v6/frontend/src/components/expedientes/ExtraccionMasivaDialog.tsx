@@ -38,6 +38,7 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
   const cancelarExtraccion = useExpedientesStore((state) => state.cancelarExtraccion)
   const desconectarWebSocket = useExpedientesStore((state) => state.desconectarWebSocket)
   const procesarExpedientesSeleccionados = useExpedientesStore((state) => state.procesarExpedientesSeleccionados)
+  const resetExtraccionMasiva = useExpedientesStore((state) => state.resetExtraccionMasiva)
 
   // Estados
   const [expedientesExtraidos, setExpedientesExtraidos] = useState<ExpedienteResumen[]>([])
@@ -77,6 +78,11 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
   // Estados de paginación
   const [paginaActual, setPaginaActual] = useState(1)
   const ITEMS_POR_PAGINA = 50
+
+  // Resetear estado al montar el componente (limpiar estado previo)
+  useEffect(() => {
+    resetExtraccionMasiva()
+  }, [])
 
   // Funciones auxiliares para fechas
   const parsearFecha = (fechaStr: string): Date | null => {
@@ -195,18 +201,12 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
     }
   }, [tipoExtraccion, extraccionMasiva.estado, mostrarReporte])
 
-  // Cleanup: desconectar WebSocket y detener polling al cerrar
+  // Cleanup: resetear estado completo al desmontar
   useEffect(() => {
     return () => {
-      if (extraccionMasiva.websocket) {
-        desconectarWebSocket()
-      }
-      // Detener polling si está activo
-      if (extraccionMasiva.pollInterval) {
-        clearInterval(extraccionMasiva.pollInterval)
-      }
+      resetExtraccionMasiva()
     }
-  }, [])
+  }, [resetExtraccionMasiva])
 
   const aplicarFiltros = () => {
     let filtered = [...expedientesExtraidos]
@@ -442,12 +442,15 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
   }
 
   const handleCerrarDialogo = () => {
-    // Cerrar el diálogo
-    onClose()
+    // Resetear estado de extracción masiva
+    resetExtraccionMasiva()
 
-    // Opcional: Resetear estados si es necesario
+    // Resetear estados locales
     setMostrarReporte(false)
     setTipoExtraccion('masiva')
+
+    // Cerrar el diálogo
+    onClose()
   }
 
   return (
@@ -772,6 +775,7 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                           ? 'Extracción Masiva en Progreso'
                           : `Procesando ${extraccionMasiva.progreso.total} Expedientes Seleccionados`}
                       </h3>
+                    </div>
                     {procesarConPDF && (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-700 rounded-full">
                         <FileDown className="h-3 w-3" />
@@ -784,83 +788,82 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                     <span>•</span>
                     <span>{extraccionMasiva.progreso.porcentaje.toFixed(1)}%</span>
                   </div>
-                </div>
 
-                <Progress value={extraccionMasiva.progreso.porcentaje} className="h-3" />
+                  <Progress value={extraccionMasiva.progreso.porcentaje} className="h-3" />
 
-                {/* Información de progreso */}
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="space-y-1">
-                    <div className="text-gray-600 dark:text-gray-400">Fase Actual</div>
-                    <div className="font-semibold">{extraccionMasiva.progreso.fase || 'Iniciando...'}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-gray-600 dark:text-gray-400">Estado</div>
-                    <div className="font-semibold capitalize">{extraccionMasiva.estado}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-gray-600 dark:text-gray-400">Errores</div>
-                    <div className="font-semibold text-red-600">{extraccionMasiva.progreso.errores}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-gray-600 dark:text-gray-400">Tiempo Transcurrido</div>
-                    <div className="font-semibold font-mono">
-                      {Math.floor(extraccionMasiva.progreso.tiempoTranscurrido / 60)}:{String(Math.floor(extraccionMasiva.progreso.tiempoTranscurrido % 60)).padStart(2, '0')}
-                    </div>
-                  </div>
-                  {extraccionMasiva.progreso.velocidad && (
+                  {/* Información de progreso */}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
                     <div className="space-y-1">
-                      <div className="text-gray-600 dark:text-gray-400">Velocidad</div>
-                      <div className="font-semibold">{extraccionMasiva.progreso.velocidad.toFixed(2)} exp/s</div>
+                      <div className="text-gray-600 dark:text-gray-400">Fase Actual</div>
+                      <div className="font-semibold">{extraccionMasiva.progreso.fase || 'Iniciando...'}</div>
                     </div>
-                  )}
-                  {extraccionMasiva.progreso.tiempoEstimado && (
                     <div className="space-y-1">
-                      <div className="text-gray-600 dark:text-gray-400">Tiempo Estimado</div>
+                      <div className="text-gray-600 dark:text-gray-400">Estado</div>
+                      <div className="font-semibold capitalize">{extraccionMasiva.estado}</div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-gray-600 dark:text-gray-400">Errores</div>
+                      <div className="font-semibold text-red-600">{extraccionMasiva.progreso.errores}</div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-gray-600 dark:text-gray-400">Tiempo Transcurrido</div>
                       <div className="font-semibold font-mono">
-                        {Math.floor(extraccionMasiva.progreso.tiempoEstimado / 60)}:{String(Math.floor(extraccionMasiva.progreso.tiempoEstimado % 60)).padStart(2, '0')}
+                        {Math.floor(extraccionMasiva.progreso.tiempoTranscurrido / 60)}:{String(Math.floor(extraccionMasiva.progreso.tiempoTranscurrido % 60)).padStart(2, '0')}
                       </div>
                     </div>
-                  )}
-                </div>
+                    {extraccionMasiva.progreso.velocidad && (
+                      <div className="space-y-1">
+                        <div className="text-gray-600 dark:text-gray-400">Velocidad</div>
+                        <div className="font-semibold">{extraccionMasiva.progreso.velocidad.toFixed(2)} exp/s</div>
+                      </div>
+                    )}
+                    {extraccionMasiva.progreso.tiempoEstimado && (
+                      <div className="space-y-1">
+                        <div className="text-gray-600 dark:text-gray-400">Tiempo Estimado</div>
+                        <div className="font-semibold font-mono">
+                          {Math.floor(extraccionMasiva.progreso.tiempoEstimado / 60)}:{String(Math.floor(extraccionMasiva.progreso.tiempoEstimado % 60)).padStart(2, '0')}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
-                {/* Mensaje actual */}
-                <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
-                  <p className="text-sm font-mono">{extraccionMasiva.progreso.mensaje || 'Esperando actualizaciones...'}</p>
-                </div>
+                  {/* Mensaje actual */}
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                    <p className="text-sm font-mono">{extraccionMasiva.progreso.mensaje || 'Esperando actualizaciones...'}</p>
+                  </div>
 
-                {/* Controles de extracción */}
-                <div className="flex gap-2">
-                  {extraccionMasiva.estado === 'extrayendo' && (
+                  {/* Controles de extracción */}
+                  <div className="flex gap-2">
+                    {extraccionMasiva.estado === 'extrayendo' && (
+                      <Button
+                        onClick={handlePausar}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        <Pause className="h-4 w-4 mr-2" />
+                        Pausar
+                      </Button>
+                    )}
+                    {extraccionMasiva.estado === 'pausado' && (
+                      <Button
+                        onClick={handleReanudar}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        <Play className="h-4 w-4 mr-2" />
+                        Reanudar
+                      </Button>
+                    )}
                     <Button
-                      onClick={handlePausar}
-                      variant="outline"
+                      onClick={handleCancelar}
+                      variant="destructive"
                       className="flex-1"
                     >
-                      <Pause className="h-4 w-4 mr-2" />
-                      Pausar
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Cancelar
                     </Button>
-                  )}
-                  {extraccionMasiva.estado === 'pausado' && (
-                    <Button
-                      onClick={handleReanudar}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      <Play className="h-4 w-4 mr-2" />
-                      Reanudar
-                    </Button>
-                  )}
-                  <Button
-                    onClick={handleCancelar}
-                    variant="destructive"
-                    className="flex-1"
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Cancelar
-                  </Button>
+                  </div>
                 </div>
-              </div>
               )}
             </div>
           )}
@@ -927,7 +930,7 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                     Páginas Procesadas
                   </div>
                   <div className="text-3xl font-bold text-amber-900 dark:text-amber-100">
-                    {(extraccionMasiva as any).paginas_procesadas || '0'}
+                    {extraccionMasiva.paginas_procesadas || 0}
                   </div>
                   <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                     páginas
