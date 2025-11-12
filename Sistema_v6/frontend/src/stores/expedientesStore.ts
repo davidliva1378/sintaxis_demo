@@ -614,6 +614,21 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
       // Si la extracción terminó (completado o error), detener el polling
       if ((nuevoEstado === 'completado' || nuevoEstado === 'error') && state.extraccionMasiva.pollInterval) {
         clearInterval(state.extraccionMasiva.pollInterval)
+
+        // Mostrar notificación de completado con duración extendida
+        if (nuevoEstado === 'completado') {
+          const exitosos = data.progreso_actual || 0
+          const total = data.progreso_total || 0
+          toast.success('Procesamiento completado', {
+            description: `${exitosos}/${total} expedientes procesados exitosamente`,
+            duration: 10000, // 10 segundos para que el usuario pueda leer
+          })
+        } else if (nuevoEstado === 'error') {
+          toast.error('Error en procesamiento', {
+            description: data.mensaje || 'Ocurrió un error durante el procesamiento',
+            duration: 10000,
+          })
+        }
       }
 
       set({

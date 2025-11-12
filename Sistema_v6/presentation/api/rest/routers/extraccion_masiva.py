@@ -209,24 +209,78 @@ async def extraer_listado_completo(
         )
 
 
+async def _ejecutar_procesamiento_background(
+    session_id: str,
+    numeros_expedientes: List[str],
+    username: str,
+    password: str,
+    config: ConfigExtraccionMasiva,
+    expediente_repo,
+):
+    """Ejecuta el procesamiento de expedientes seleccionados en background."""
+    try:
+        # Obtener la sesión que ya está en _sesiones
+        sesion = _sesiones.get(session_id)
+        if not sesion:
+            return
+
+        # Callback para actualizar progreso en tiempo real
+        def callback_progreso(actual: int, total: int, mensaje: str):
+            if session_id in _sesiones:
+                _sesiones[session_id].estado = "extrayendo"
+                _sesiones[session_id].progreso_actual = actual
+                _sesiones[session_id].progreso_total = total
+                _sesiones[session_id].mensaje = mensaje
+
+        # Crear gestor con callback
+        gestor = GestorBatch(
+            config=config,
+            on_progress=callback_progreso,
+            expediente_repository=expediente_repo
+        )
+
+        # Procesar seleccionados
+        resumen = await gestor.procesar_seleccionados(
+            numeros_expedientes=numeros_expedientes,
+            username=username,
+            password=password,
+        )
+
+        # Actualizar sesión con resultado final
+        from datetime import datetime
+        if session_id in _sesiones:
+            _sesiones[session_id].estado = "completado"
+            _sesiones[session_id].tiempo_fin = datetime.now().isoformat()
+            _sesiones[session_id].progreso_actual = resumen.exitosos
+            _sesiones[session_id].progreso_total = resumen.total
+            _sesiones[session_id].mensaje = f"Procesados {resumen.exitosos}/{resumen.total} expedientes"
+
+    except Exception as e:
+        # Actualizar sesión con error
+        if session_id in _sesiones:
+            _sesiones[session_id].estado = "error"
+            _sesiones[session_id].mensaje = f"Error en procesamiento: {str(e)}"
+
+
 @router.post("/procesar-seleccionados", response_model=ProcesarSeleccionadosResponse)
 async def procesar_expedientes_seleccionados(
     request: ProcesarSeleccionadosRequest,
+    background_tasks: BackgroundTasks,
 ) -> ProcesarSeleccionadosResponse:
     """
     Procesa SOLO los expedientes seleccionados por el usuario.
 
     Flujo:
-    1. Recibe lista de números de expediente
-    2. Procesa cada uno individualmente
-    3. Actualiza estados en tiempo real
-    4. Guarda solo los procesados exitosamente
+    1. Crea sesión inicial y la guarda en _sesiones
+    2. Inicia procesamiento en background task
+    3. Retorna inmediatamente con session_id
+    4. El frontend hace polling a /sesion/{session_id} para obtener progreso
 
     Args:
         request: Lista de números de expediente a procesar
 
     Returns:
-        ProcesarSeleccionadosResponse con resumen del procesamiento
+        ProcesarSeleccionadosResponse con session_id y estado inicial
     """
     try:
         # Obtener credenciales
@@ -241,46 +295,52 @@ async def procesar_expedientes_seleccionados(
         container = get_container()
         expediente_repo = container.expediente_repo
 
-        # Crear gestor con repositorio
-        gestor = GestorBatch(
-            config=config,
-            expediente_repository=expediente_repo
-        )
-
-        # Procesar seleccionados
-        resumen = await gestor.procesar_seleccionados(
-            numeros_expedientes=request.numeros_expedientes,
-            username=username,
-            password=password,
-        )
-
-        # Crear sesión para tracking
+        # Crear sesión inicial
         from datetime import datetime
         from uuid import uuid4
 
         session_id = str(uuid4())
         sesion = SesionExtraccion(
             session_id=session_id,
-            estado="completado",
+            estado="iniciando",
             fase="procesamiento",
             tiempo_inicio=datetime.now().isoformat(),
-            tiempo_fin=datetime.now().isoformat(),
-            progreso_actual=resumen.exitosos,
-            progreso_total=resumen.total,
-            mensaje=f"Procesados {resumen.exitosos}/{resumen.total} expedientes",
+            config=config.to_dict(),
+            progreso_actual=0,
+            progreso_total=len(request.numeros_expedientes),
+            mensaje="Iniciando procesamiento de expedientes seleccionados..."
         )
 
+        # Guardar sesión
         _sesiones[session_id] = sesion
+
+        # Ejecutar procesamiento en background
+        background_tasks.add_task(
+            _ejecutar_procesamiento_background,
+            session_id,
+            request.numeros_expedientes,
+            username,
+            password,
+            config,
+            expediente_repo,
+        )
 
         return ProcesarSeleccionadosResponse(
             session_id=session_id,
-            resumen=resumen.to_dict(),
+            resumen={
+                "total": len(request.numeros_expedientes),
+                "exitosos": 0,
+                "errores": 0,
+                "omitidos": 0,
+                "tiempo_total": 0,
+                "errores_detalles": []
+            },
         )
 
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error procesando expedientes: {str(e)}"
+            detail=f"Error al iniciar procesamiento: {str(e)}"
         )
 
 
