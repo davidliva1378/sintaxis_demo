@@ -21,6 +21,10 @@ from .models import (
     ConfigExtraccionMasiva,
     ResumenExtraccion,
     SesionExtraccion,
+    ComparacionDetallada,
+    CambioSituacion,
+    CambioUltimaActuacion,
+    CambioDependencia,
 )
 
 
@@ -161,8 +165,11 @@ class ExtractorMasivo:
                     expedientes_raw, motivo, metadata = await extraer_expedientes_completos(
                         page,
                         fecha_corte=fecha_corte,
-                        tiempo_maximo_segundos=None,  # Sin límite de tiempo
+                        tiempo_maximo_segundos=self.config.tiempo_maximo_segundos,
                         orden="fecha",  # Ordenar por fecha para facilitar comparación
+                        detener_en_duplicado=self.config.detener_en_duplicado,
+                        omitir_duplicados=self.config.omitir_duplicados,
+                        max_paginas=self.config.max_paginas,
                     )
                 finally:
                     # Restaurar stdout original
@@ -181,10 +188,29 @@ class ExtractorMasivo:
                     for exp in expedientes_raw
                 ]
 
+                # Agregar motivo de finalización al metadata
+                metadata["motivo_finalizacion"] = motivo
+                print(f"📊 Motivo de finalización: {motivo}")
+
                 # Guardar JSON
                 listado_path = self._guardar_listado(
                     session_id, expedientes, metadata
                 )
+
+                # Actualizar BASE permanente
+                try:
+                    base_path = self.actualizar_base_permanente(str(listado_path))
+                    print(f"✅ BASE permanente actualizado: {base_path}")
+                except Exception as e:
+                    print(f"⚠️ Error actualizando BASE (no crítico): {e}")
+
+                # Comparar con BASE si existe
+                try:
+                    comparacion = self.comparar_con_base(str(listado_path))
+                    if comparacion:
+                        sesion.comparacion = comparacion.to_dict()
+                except Exception as e:
+                    print(f"⚠️ Error en comparación (no crítico): {e}")
 
                 # Cerrar navegador
                 await browser.close()
@@ -200,7 +226,11 @@ class ExtractorMasivo:
                 sesion.progreso_actual = len(expedientes)
                 sesion.progreso_total = len(expedientes)
                 sesion.listado_path = str(listado_path)
-                sesion.mensaje = f"Extracción completada: {len(expedientes)} expedientes. Motivo: {motivo}"
+
+                # Generar mensaje descriptivo según el motivo
+                mensaje_motivo = self._describir_motivo(motivo, metadata)
+                sesion.mensaje = f"✅ Extracción completada: {len(expedientes)} expedientes extraídos. {mensaje_motivo}"
+                sesion.motivo_finalizacion = mensaje_motivo  # Guardar motivo descriptivo para el frontend
 
                 if callback_progreso:
                     callback_progreso(sesion)
@@ -294,48 +324,261 @@ class ExtractorMasivo:
         self,
         listado_nuevo_path: str,
         listado_base_path: Optional[str] = None
-    ) -> Optional[Dict]:
+    ) -> Optional[ComparacionDetallada]:
         """
-        Compara listado nuevo con JSON BASE (si existe).
+        Compara un listado nuevo con el BASE y detecta cambios detallados.
+
+        Cambios detectados:
+        - Nuevos expedientes
+        - Expedientes eliminados
+        - Cambios en situación
+        - Cambios en última actuación
+        - Cambios en dependencia
 
         Args:
-            listado_nuevo_path: Path al listado recién extraído
-            listado_base_path: Path al JSON BASE (si None, busca el más reciente)
+            listado_nuevo_path: Ruta al listado nuevo
+            listado_base_path: Ruta al BASE (si None, busca automáticamente)
 
         Returns:
-            Dict con estadísticas de comparación o None si no hay BASE
+            ComparacionDetallada con todos los cambios detectados
         """
-        # Si no se especifica BASE, buscar el más reciente
+        # Auto-buscar BASE si no se proporciona
         if listado_base_path is None:
-            archivos = sorted(self.data_dir.glob("listado_*.json"), reverse=True)
-            # El primero es el actual, el segundo sería el BASE
-            if len(archivos) < 2:
-                return None
-            listado_base_path = str(archivos[1])
+            # Buscar listado_base.json primero
+            base_permanente = self.data_dir / "listado_base.json"
+            if base_permanente.exists():
+                listado_base_path = str(base_permanente)
+            else:
+                # Fallback: buscar segundo archivo más reciente
+                archivos = sorted(self.data_dir.glob("listado_*.json"), reverse=True)
+                if len(archivos) < 2:
+                    print("⚠️ No hay BASE para comparar (primera extracción)")
+                    return None
+                listado_base_path = str(archivos[1])
 
-        if not os.path.exists(listado_base_path):
-            return None
+        print(f"📊 Comparando con BASE: {listado_base_path}")
 
         # Cargar ambos listados
-        nuevo = self.cargar_listado(listado_nuevo_path)
-        base = self.cargar_listado(listado_base_path)
+        try:
+            with open(listado_base_path, 'r', encoding='utf-8') as f:
+                base_data = json.load(f)
+            with open(listado_nuevo_path, 'r', encoding='utf-8') as f:
+                nuevo_data = json.load(f)
+        except Exception as e:
+            print(f"❌ Error cargando archivos para comparación: {e}")
+            return None
 
-        # Crear sets de números de expediente para comparación rápida
-        numeros_nuevo = {exp["numero"] for exp in nuevo["expedientes"]}
-        numeros_base = {exp["numero"] for exp in base["expedientes"]}
-
-        # Calcular diferencias
-        nuevos = numeros_nuevo - numeros_base
-        eliminados = numeros_base - numeros_nuevo
-        comunes = numeros_nuevo & numeros_base
-
-        return {
-            "total_nuevo": len(numeros_nuevo),
-            "total_base": len(numeros_base),
-            "nuevos": len(nuevos),
-            "eliminados": len(eliminados),
-            "comunes": len(comunes),
-            "listado_base_path": listado_base_path,
-            "expedientes_nuevos": list(nuevos),
-            "expedientes_eliminados": list(eliminados),
+        # Convertir a diccionarios indexados por número
+        base_dict = {
+            exp["numero"]: exp
+            for exp in base_data.get("expedientes", [])
         }
+        nuevo_dict = {
+            exp["numero"]: exp
+            for exp in nuevo_data.get("expedientes", [])
+        }
+
+        # Conjuntos de números
+        numeros_base = set(base_dict.keys())
+        numeros_nuevo = set(nuevo_dict.keys())
+
+        # 1. NUEVOS
+        nuevos_numeros = numeros_nuevo - numeros_base
+        nuevos = [
+            ExpedienteListado(**nuevo_dict[num])
+            for num in nuevos_numeros
+        ]
+
+        # 2. ELIMINADOS
+        eliminados_numeros = numeros_base - numeros_nuevo
+        eliminados = [
+            ExpedienteListado(**base_dict[num])
+            for num in eliminados_numeros
+        ]
+
+        # 3. COMUNES (para detectar cambios)
+        comunes = numeros_base & numeros_nuevo
+
+        cambios_situacion = []
+        cambios_ultima_actuacion = []
+        cambios_dependencia = []
+
+        for numero in comunes:
+            exp_base = base_dict[numero]
+            exp_nuevo = nuevo_dict[numero]
+
+            # Detectar cambio en SITUACION
+            if exp_base.get("situacion") != exp_nuevo.get("situacion"):
+                cambios_situacion.append(CambioSituacion(
+                    numero=numero,
+                    caratula=exp_nuevo.get("caratula", ""),
+                    situacion_anterior=exp_base.get("situacion", ""),
+                    situacion_nueva=exp_nuevo.get("situacion", "")
+                ))
+
+            # Detectar cambio en ULTIMA_ACTUACION
+            if exp_base.get("ultima_actuacion") != exp_nuevo.get("ultima_actuacion"):
+                cambios_ultima_actuacion.append(CambioUltimaActuacion(
+                    numero=numero,
+                    caratula=exp_nuevo.get("caratula", ""),
+                    ultima_actuacion_anterior=exp_base.get("ultima_actuacion", ""),
+                    ultima_actuacion_nueva=exp_nuevo.get("ultima_actuacion", "")
+                ))
+
+            # Detectar cambio en DEPENDENCIA
+            if exp_base.get("dependencia") != exp_nuevo.get("dependencia"):
+                cambios_dependencia.append(CambioDependencia(
+                    numero=numero,
+                    caratula=exp_nuevo.get("caratula", ""),
+                    dependencia_anterior=exp_base.get("dependencia", ""),
+                    dependencia_nueva=exp_nuevo.get("dependencia", "")
+                ))
+
+        total_cambios = (
+            len(nuevos) +
+            len(eliminados) +
+            len(cambios_situacion) +
+            len(cambios_ultima_actuacion) +
+            len(cambios_dependencia)
+        )
+
+        comparacion = ComparacionDetallada(
+            nuevos=nuevos,
+            eliminados=eliminados,
+            cambios_situacion=cambios_situacion,
+            cambios_ultima_actuacion=cambios_ultima_actuacion,
+            cambios_dependencia=cambios_dependencia,
+            total_cambios=total_cambios
+        )
+
+        print(f"✅ Comparación completada:")
+        print(f"   📌 Nuevos: {len(nuevos)}")
+        print(f"   📌 Eliminados: {len(eliminados)}")
+        print(f"   📌 Cambios situación: {len(cambios_situacion)}")
+        print(f"   📌 Cambios última actuación: {len(cambios_ultima_actuacion)}")
+        print(f"   📌 Cambios dependencia: {len(cambios_dependencia)}")
+
+        return comparacion
+
+    def _describir_motivo(self, motivo: str, metadata: Dict) -> str:
+        """
+        Convierte el código de motivo técnico en un mensaje descriptivo para el usuario.
+
+        Args:
+            motivo: Código del motivo de finalización
+            metadata: Metadatos con información adicional
+
+        Returns:
+            Mensaje descriptivo para mostrar al usuario
+        """
+        paginas = metadata.get("paginas_recorridas", metadata.get("paginas_procesadas", "?"))
+
+        descripciones = {
+            "fin_listado": f"📄 Se procesaron todas las páginas disponibles ({paginas} páginas).",
+            "limite_paginas": f"📄 Se alcanzó el límite de páginas configurado ({paginas} páginas).",
+            "limite_tiempo": f"⏱️ Se alcanzó el tiempo máximo de extracción ({paginas} páginas procesadas).",
+            "duplicado_encontrado": f"🔄 Se encontraron expedientes duplicados y se detuvo la extracción ({paginas} páginas).",
+            "limite_fecha": f"📅 Se alcanzó la fecha de corte configurada ({paginas} páginas procesadas).",
+            "bucle_detectado": f"🔁 Se detectó un bucle en la paginación y se detuvo ({paginas} páginas).",
+        }
+
+        return descripciones.get(motivo, f"ℹ️ Finalizado: {motivo} ({paginas} páginas)")
+
+    def actualizar_base_permanente(
+        self,
+        listado_nuevo_path: str
+    ) -> str:
+        """
+        Actualiza el JSON BASE permanente con los datos del listado nuevo.
+
+        Estrategia de Merge:
+        1. Si no existe listado_base.json → crearlo con el nuevo listado
+        2. Si existe:
+           - AGREGAR expedientes nuevos
+           - ACTUALIZAR expedientes existentes (situación, última actuación, etc.)
+           - NUNCA ELIMINAR expedientes
+
+        Args:
+            listado_nuevo_path: Ruta al listado recién extraído
+
+        Returns:
+            Ruta al listado_base.json actualizado
+        """
+        base_path = self.data_dir / "listado_base.json"
+
+        # Cargar listado nuevo
+        try:
+            with open(listado_nuevo_path, 'r', encoding='utf-8') as f:
+                nuevo_data = json.load(f)
+        except Exception as e:
+            print(f"❌ Error cargando listado nuevo: {e}")
+            raise
+
+        # Si no existe BASE, crearlo
+        if not base_path.exists():
+            print(f"📝 Creando BASE permanente por primera vez...")
+            with open(base_path, 'w', encoding='utf-8') as f:
+                json.dump(nuevo_data, f, ensure_ascii=False, indent=2)
+            print(f"✅ BASE creado: {base_path}")
+            return str(base_path)
+
+        # Cargar BASE existente
+        try:
+            with open(base_path, 'r', encoding='utf-8') as f:
+                base_data = json.load(f)
+        except Exception as e:
+            print(f"❌ Error cargando BASE existente: {e}")
+            raise
+
+        # Convertir a diccionarios indexados por número
+        base_dict = {
+            exp["numero"]: exp
+            for exp in base_data.get("expedientes", [])
+        }
+        nuevo_dict = {
+            exp["numero"]: exp
+            for exp in nuevo_data.get("expedientes", [])
+        }
+
+        # Contadores
+        agregados = 0
+        actualizados = 0
+
+        # MERGE: Agregar nuevos + Actualizar existentes
+        for numero, exp_nuevo in nuevo_dict.items():
+            if numero not in base_dict:
+                # AGREGAR nuevo
+                base_dict[numero] = exp_nuevo
+                agregados += 1
+            else:
+                # ACTUALIZAR existente (solo si hay cambios)
+                exp_base = base_dict[numero]
+                cambio = False
+
+                # Comparar cada campo y actualizar si cambió
+                for campo in ["situacion", "ultima_actuacion", "dependencia", "caratula", "fecha_inicio"]:
+                    if exp_base.get(campo) != exp_nuevo.get(campo):
+                        exp_base[campo] = exp_nuevo.get(campo)
+                        cambio = True
+
+                if cambio:
+                    actualizados += 1
+
+        # Guardar BASE actualizado
+        base_data["expedientes"] = list(base_dict.values())
+        base_data["metadata"] = {
+            "total": len(base_dict),
+            "ultima_actualizacion": datetime.now().isoformat(),
+            "total_agregados_ultima_vez": agregados,
+            "total_actualizados_ultima_vez": actualizados
+        }
+
+        with open(base_path, 'w', encoding='utf-8') as f:
+            json.dump(base_data, f, ensure_ascii=False, indent=2)
+
+        print(f"✅ BASE actualizado:")
+        print(f"   📌 Total en BASE: {len(base_dict)}")
+        print(f"   📌 Agregados: {agregados}")
+        print(f"   📌 Actualizados: {actualizados}")
+
+        return str(base_path)

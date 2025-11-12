@@ -86,6 +86,19 @@ export interface ConfigExtraccion {
 
   /** Directorio base para guardar expedientes. Default: './Sistema_v6/data/expedientes' */
   directorio_base?: string;
+
+  // Opciones avanzadas de extracción
+  /** Detener extracción al encontrar expedientes duplicados entre páginas. Default: true */
+  detener_en_duplicado?: boolean;
+
+  /** Omitir expedientes duplicados (los deduplica automáticamente). Default: true */
+  omitir_duplicados?: boolean;
+
+  /** Límite de páginas a procesar. Default: None (sin límite) */
+  max_paginas?: number;
+
+  /** Tiempo máximo en segundos antes de detener la extracción. Default: None (sin límite) */
+  tiempo_maximo_segundos?: number;
 }
 
 export interface Comparacion {
@@ -97,6 +110,43 @@ export interface Comparacion {
   listado_base_path: string;
   expedientes_nuevos: string[];
   expedientes_eliminados: string[];
+}
+
+// ============================================================================
+// COMPARACIÓN DETALLADA
+// ============================================================================
+
+export interface CambioSituacion {
+  numero: string
+  caratula: string
+  situacion_anterior: string
+  situacion_nueva: string
+}
+
+export interface CambioUltimaActuacion {
+  numero: string
+  caratula: string
+  ultima_actuacion_anterior: string
+  ultima_actuacion_nueva: string
+}
+
+export interface CambioDependencia {
+  numero: string
+  caratula: string
+  dependencia_anterior: string
+  dependencia_nueva: string
+}
+
+export interface ComparacionDetallada {
+  nuevos: ExpedienteListado[]
+  eliminados: ExpedienteListado[]
+  cambios_situacion: CambioSituacion[]
+  cambios_ultima_actuacion: CambioUltimaActuacion[]
+  cambios_dependencia: CambioDependencia[]
+  total_cambios: number
+  total_nuevos: number
+  total_eliminados: number
+  total_modificados: number
 }
 
 export interface ListadoResponse {
@@ -133,6 +183,7 @@ export interface SesionExtraccion {
   mensaje: string;
   listado_path?: string;
   comparacion?: Comparacion;
+  motivo_finalizacion?: string;  // Motivo descriptivo de por qué terminó la extracción
 }
 
 /**

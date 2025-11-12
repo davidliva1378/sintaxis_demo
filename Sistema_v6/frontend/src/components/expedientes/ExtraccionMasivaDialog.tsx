@@ -4,12 +4,14 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import { Progress } from '@/components/ui/progress'
 import { X, Download, Loader2, Filter, CheckSquare, Square, Pause, Play, XCircle, FileDown, Maximize2, Minimize2 } from 'lucide-react'
 import { useExpedientesStore } from '@/stores/expedientesStore'
 import type { ExpedienteResumen, ConfigExtraccion } from '@/types/expediente'
 import { FiltradoExpedientesDialog } from '../FiltradoExpedientesDialog'
 import { DateInputArgentino } from '@/components/ui/date-input-argentino'
+import { ComparacionDetalladaPanel } from './ComparacionDetalladaPanel'
 
 interface ExtraccionMasivaDialogProps {
   onClose: () => void
@@ -634,6 +636,84 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                         ))}
                       </div>
                     </div>
+
+                    {/* Separator */}
+                    <div className="border-t my-4"></div>
+                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Control de Paginación</p>
+
+                    {/* Detener en duplicado */}
+                    <div className="flex items-center justify-between space-x-4">
+                      <div className="flex-1">
+                        <label htmlFor="detener-duplicado" className="text-sm font-medium">
+                          Detener al encontrar duplicados
+                        </label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Detiene la extracción cuando encuentra expedientes duplicados entre páginas
+                        </p>
+                      </div>
+                      <Switch
+                        id="detener-duplicado"
+                        checked={config.detener_en_duplicado ?? true}
+                        onCheckedChange={(checked) => setConfig({...config, detener_en_duplicado: checked})}
+                      />
+                    </div>
+
+                    {/* Omitir duplicados */}
+                    <div className="flex items-center justify-between space-x-4">
+                      <div className="flex-1">
+                        <label htmlFor="omitir-duplicado" className="text-sm font-medium">
+                          Omitir expedientes duplicados
+                        </label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Filtra automáticamente los expedientes duplicados de la lista final
+                        </p>
+                      </div>
+                      <Switch
+                        id="omitir-duplicado"
+                        checked={config.omitir_duplicados ?? true}
+                        onCheckedChange={(checked) => setConfig({...config, omitir_duplicados: checked})}
+                      />
+                    </div>
+
+                    {/* Límite de páginas */}
+                    <div className="space-y-2">
+                      <label htmlFor="max-paginas" className="text-sm font-medium">
+                        Límite de páginas (opcional)
+                      </label>
+                      <Input
+                        id="max-paginas"
+                        type="number"
+                        min={1}
+                        max={500}
+                        placeholder="Sin límite"
+                        value={config.max_paginas || ''}
+                        onChange={(e) => setConfig({...config, max_paginas: e.target.value ? parseInt(e.target.value) : undefined})}
+                        className="w-40"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Número máximo de páginas a procesar (dejar vacío = sin límite)
+                      </p>
+                    </div>
+
+                    {/* Tiempo máximo */}
+                    <div className="space-y-2">
+                      <label htmlFor="tiempo-maximo" className="text-sm font-medium">
+                        Tiempo máximo (segundos, opcional)
+                      </label>
+                      <Input
+                        id="tiempo-maximo"
+                        type="number"
+                        min={60}
+                        max={7200}
+                        placeholder="Sin límite"
+                        value={config.tiempo_maximo_segundos || ''}
+                        onChange={(e) => setConfig({...config, tiempo_maximo_segundos: e.target.value ? parseInt(e.target.value) : undefined})}
+                        className="w-40"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Tiempo máximo antes de detener la extracción (dejar vacío = sin límite)
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -890,6 +970,25 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                 </div>
               </div>
 
+              {/* Motivo de Finalización */}
+              {extraccionMasiva.motivo_finalizacion && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="text-blue-600 dark:text-blue-400 text-lg">
+                      ℹ️
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                        Motivo de Finalización
+                      </h4>
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        {extraccionMasiva.motivo_finalizacion}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Estadísticas */}
               <div className={`grid ${procesarConPDF ? 'grid-cols-4' : 'grid-cols-3'} gap-4`}>
                 {/* Total Extraído */}
@@ -955,35 +1054,13 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                 )}
               </div>
 
-              {/* Comparación con extracción anterior */}
-              {extraccionMasiva.sessionId && (
-                <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
-                  <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
-                    <span>📊</span> Comparación con Extracción Anterior
+              {/* Comparación con BASE */}
+              {extraccionMasiva.comparacion && (
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <span>📊</span> Comparación con BASE
                   </h3>
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600 dark:text-gray-400">Nuevos:</span>
-                      <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
-                        +0
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600 dark:text-gray-400">Eliminados:</span>
-                      <span className="ml-2 font-semibold text-red-600 dark:text-red-400">
-                        -0
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600 dark:text-gray-400">Sin cambios:</span>
-                      <span className="ml-2 font-semibold text-gray-600 dark:text-gray-400">
-                        {expedientesExtraidos.length}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                    * Comparación disponible cuando exista una extracción previa
-                  </p>
+                  <ComparacionDetalladaPanel comparacion={extraccionMasiva.comparacion} />
                 </div>
               )}
 

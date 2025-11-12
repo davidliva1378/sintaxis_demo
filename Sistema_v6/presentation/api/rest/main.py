@@ -62,6 +62,7 @@ from infrastructure.di_container import get_container
 from infrastructure.exceptions import PJNError
 
 from .routers import (
+    admin,
     auth,
     config,
     expedientes,
@@ -193,6 +194,7 @@ app.include_router(
 app.include_router(workspaces.router, prefix="/api/v1/workspaces", tags=["workspaces"])
 app.include_router(monitoreo.router, prefix="/api/v1/monitoreo", tags=["monitoreo"])
 app.include_router(config.router, prefix="/api/v1", tags=["configuracion"])
+app.include_router(admin.router, prefix="/api/v1", tags=["administracion"])
 
 
 # === Root Endpoint ===

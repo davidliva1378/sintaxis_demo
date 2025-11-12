@@ -404,7 +404,7 @@ async def extraer_expedientes_completos(
                 return _finalizar("limite_tiempo")
 
         # 3) Intentar ir a la siguiente página; cortar si no hay
-        if paginas_recorridas >= max_paginas:
+        if max_paginas is not None and paginas_recorridas >= max_paginas:
             return _finalizar("limite_paginas")
 
         next_btn = page.locator(sel_siguiente)

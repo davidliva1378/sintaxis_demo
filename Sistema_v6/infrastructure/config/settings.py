@@ -241,6 +241,8 @@ class APISettings(BaseSettings):
     cors_origins: list[str] = Field(
         default_factory=lambda: [
             "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:3002",
             "http://localhost:5173",
             "http://localhost:5174",
             "http://localhost:8080"

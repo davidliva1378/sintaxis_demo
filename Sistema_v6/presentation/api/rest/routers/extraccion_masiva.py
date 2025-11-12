@@ -8,9 +8,13 @@ Endpoints:
 """
 
 import os
+import traceback
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
+
+logger = logging.getLogger(__name__)
 
 from extraccion_masiva import (
     ExtractorMasivo,
@@ -36,6 +40,18 @@ class ConfigExtraccionRequest(BaseModel):
     incluir_historicas: bool = True
     min_utilidad: str = "MEDIA"
     directorio_base: str = "./Sistema_v6/data/expedientes"
+    # Opciones avanzadas de extracción
+    detener_en_duplicado: bool = True
+    omitir_duplicados: bool = True
+    max_paginas: Optional[int] = None
+    tiempo_maximo_segundos: Optional[int] = None
+
+    @validator('max_paginas', 'tiempo_maximo_segundos')
+    def validate_positive_or_none(cls, v):
+        """Valida que los valores sean None o enteros positivos."""
+        if v is not None and v <= 0:
+            raise ValueError('Debe ser un valor positivo o None')
+        return v
 
 
 class ListadoRequest(BaseModel):
@@ -129,6 +145,10 @@ async def _ejecutar_extraccion_background(
             _sesiones[session_id] = sesion
 
     except Exception as e:
+        # Capturar y loguear el traceback completo
+        tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+        logger.error(f"❌ Error completo en extracción masiva:\n{tb_str}")
+
         # Actualizar sesión con error
         if session_id in _sesiones:
             _sesiones[session_id].estado = "error"
@@ -257,6 +277,10 @@ async def _ejecutar_procesamiento_background(
             _sesiones[session_id].archivos_descargados = resumen.archivos_descargados
 
     except Exception as e:
+        # Capturar y loguear el traceback completo
+        tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+        logger.error(f"❌ Error completo en procesamiento:\n{tb_str}")
+
         # Actualizar sesión con error
         if session_id in _sesiones:
             _sesiones[session_id].estado = "error"

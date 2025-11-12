@@ -8,6 +8,7 @@ import type {
   SolicitudExtraccion,
   PaginacionResult,
   ConfigExtraccion,
+  ComparacionDetallada,
 } from '@/types/expediente'
 
 interface ProgresoExtraccion {
@@ -42,6 +43,8 @@ interface ExtraccionMasivaState {
   pollInterval: NodeJS.Timeout | null
   paginas_procesadas: number
   archivos_descargados: number
+  comparacion: ComparacionDetallada | null
+  motivo_finalizacion: string | null
 }
 
 interface ExpedientesState {
@@ -121,6 +124,8 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
     pollInterval: null,
     paginas_procesadas: 0,
     archivos_descargados: 0,
+    comparacion: null,
+    motivo_finalizacion: null,
   },
 
   // Listar expedientes con filtros y paginación
@@ -408,6 +413,14 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
           umbral_errores: config.umbral_errores ?? 10,
           timeout_pagina: config.timeout_pagina,
           max_reintentos: config.max_reintentos,
+          procesar_con_pdf: config.procesar_con_pdf ?? false,
+          incluir_historicas: config.incluir_historicas ?? true,
+          min_utilidad: config.min_utilidad ?? 'MEDIA',
+          directorio_base: config.directorio_base ?? './Sistema_v6/data/expedientes',
+          detener_en_duplicado: config.detener_en_duplicado ?? true,
+          omitir_duplicados: config.omitir_duplicados ?? true,
+          max_paginas: config.max_paginas,
+          tiempo_maximo_segundos: config.tiempo_maximo_segundos,
         }
       }
 
@@ -624,9 +637,11 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
         tiempoTranscurrido = Math.floor((fin.getTime() - inicio.getTime()) / 1000) // en segundos
       }
 
-      // Extraer paginas_procesadas y archivos_descargados del backend
+      // Extraer paginas_procesadas, archivos_descargados, comparacion y motivo_finalizacion del backend
       const paginasProcesadas = data.paginas_procesadas || 0
       const archivosDescargados = data.archivos_descargados || 0
+      const comparacion = (data.comparacion as ComparacionDetallada | null) || null
+      const motivoFinalizacion = data.motivo_finalizacion || null
 
       // Si la extracción terminó (completado o error), detener el polling
       if ((nuevoEstado === 'completado' || nuevoEstado === 'error') && state.extraccionMasiva.pollInterval) {
@@ -655,6 +670,8 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
           pollInterval: (nuevoEstado === 'completado' || nuevoEstado === 'error') ? null : state.extraccionMasiva.pollInterval,
           paginas_procesadas: paginasProcesadas,
           archivos_descargados: archivosDescargados,
+          comparacion: comparacion,
+          motivo_finalizacion: motivoFinalizacion,
           progreso: {
             actual: data.progreso_actual || 0,
             total: data.progreso_total || 0,
@@ -743,6 +760,10 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
           incluir_historicas: config.incluir_historicas ?? true,
           min_utilidad: config.min_utilidad ?? "MEDIA",
           directorio_base: config.directorio_base,
+          detener_en_duplicado: config.detener_en_duplicado ?? true,
+          omitir_duplicados: config.omitir_duplicados ?? true,
+          max_paginas: config.max_paginas,
+          tiempo_maximo_segundos: config.tiempo_maximo_segundos,
         }
       }
 
@@ -857,6 +878,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
         pollInterval: null,
         paginas_procesadas: 0,
         archivos_descargados: 0,
+        comparacion: null,
       },
     })
   },

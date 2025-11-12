@@ -1,14 +1,28 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import ThemeToggle from './ThemeToggle'
-import { LogOut, User, Shield } from 'lucide-react'
+import { LogOut, User, Shield, Settings, RotateCcw, Trash2, BarChart3 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import SystemStatsDialog from '@/components/admin/SystemStatsDialog'
+import ResetSystemDialog from '@/components/admin/ResetSystemDialog'
+import { adminApi } from '@/api/adminApi'
+import { toast } from 'sonner'
 
 export default function Header() {
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
+  const [showStatsDialog, setShowStatsDialog] = useState(false)
+  const [showResetDialog, setShowResetDialog] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -22,6 +36,17 @@ export default function Header() {
       .join('')
       .toUpperCase()
       .slice(0, 2)
+  }
+
+  const handleLimpiarCache = async () => {
+    try {
+      const result = await adminApi.limpiarCache()
+      toast.success(
+        `${result.mensaje}. ${result.archivos_eliminados} archivos eliminados, ${result.espacio_liberado_mb.toFixed(1)} MB liberados`
+      )
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Error al limpiar cache')
+    }
   }
 
   return (
@@ -54,6 +79,32 @@ export default function Header() {
 
         {/* Theme Toggle */}
         <ThemeToggle />
+
+        {/* Admin Dropdown (solo para superusers) */}
+        {user?.is_superuser && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" title="Administración">
+                <Settings className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={() => setShowResetDialog(true)}>
+                <RotateCcw className="mr-2 h-4 w-4" />
+                <span>Resetear Sistema</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowStatsDialog(true)}>
+                <BarChart3 className="mr-2 h-4 w-4" />
+                <span>Estadísticas</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLimpiarCache}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                <span>Limpiar Cache</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         {/* User Info */}
         {user && (
@@ -92,6 +143,10 @@ export default function Header() {
           </div>
         )}
       </div>
+
+      {/* Admin Dialogs */}
+      <SystemStatsDialog open={showStatsDialog} onOpenChange={setShowStatsDialog} />
+      <ResetSystemDialog open={showResetDialog} onOpenChange={setShowResetDialog} />
     </header>
   )
 }

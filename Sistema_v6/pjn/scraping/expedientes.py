@@ -517,13 +517,31 @@ async def extraer_expedientes_completos(
     sel_tabla_final = sel_tabla or SEL_TABLA
     sel_tbody_final = sel_tbody or ""
     sel_siguiente_final = sel_siguiente or SEL_SIGUIENTE
-    max_paginas_final = max_paginas if max_paginas is not None else _config.scraping.max_paginas_expedientes
+    max_paginas_final = max_paginas if max_paginas is not None else getattr(_config.scraping, 'max_paginas_expedientes', None)
     omitir_duplicados_final = omitir_duplicados if omitir_duplicados is not None else True
     detener_en_duplicado_final = detener_en_duplicado if detener_en_duplicado is not None else True
     fecha_corte_final = fecha_corte
     tiempo_maximo_segundos_final = tiempo_maximo_segundos
     orden_final = orden
     pagination_strategy_final = pagination_strategy or DEFAULT_PAGINATION_STRATEGY
+
+    # DEBUG: Log para diagnosticar el problema
+    logger.debug(f"🔍 Valores finales de paginación: max_paginas_final={max_paginas_final} (type={type(max_paginas_final)}), tiempo_maximo_segundos_final={tiempo_maximo_segundos_final} (type={type(tiempo_maximo_segundos_final)})")
+
+    # Validación adicional: Asegurar que los valores sean None o enteros positivos
+    if max_paginas_final is not None and not isinstance(max_paginas_final, int):
+        logger.warning(f"⚠️ max_paginas_final tiene tipo inválido: {type(max_paginas_final)}. Convirtiéndolo a None.")
+        max_paginas_final = None
+    if max_paginas_final is not None and max_paginas_final <= 0:
+        logger.warning(f"⚠️ max_paginas_final tiene valor inválido: {max_paginas_final}. Convirtiéndolo a None.")
+        max_paginas_final = None
+
+    if tiempo_maximo_segundos_final is not None and not isinstance(tiempo_maximo_segundos_final, (int, float)):
+        logger.warning(f"⚠️ tiempo_maximo_segundos_final tiene tipo inválido: {type(tiempo_maximo_segundos_final)}. Convirtiéndolo a None.")
+        tiempo_maximo_segundos_final = None
+    if tiempo_maximo_segundos_final is not None and tiempo_maximo_segundos_final <= 0:
+        logger.warning(f"⚠️ tiempo_maximo_segundos_final tiene valor inválido: {tiempo_maximo_segundos_final}. Convirtiéndolo a None.")
+        tiempo_maximo_segundos_final = None
 
     resultados: list[TResumen] = []
     huellas: set[tuple[str, str, str]] = set()

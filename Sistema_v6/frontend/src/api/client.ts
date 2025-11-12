@@ -100,4 +100,5 @@ export const extraccionMasivaApi = {
   },
 };
 
+export { apiClient };
 export default apiClient;
