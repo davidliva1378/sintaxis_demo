@@ -12,6 +12,7 @@ import type { ExpedienteResumen, ConfigExtraccion } from '@/types/expediente'
 import { FiltradoExpedientesDialog } from '../FiltradoExpedientesDialog'
 import { DateInputArgentino } from '@/components/ui/date-input-argentino'
 import { ComparacionDetalladaPanel } from './ComparacionDetalladaPanel'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 interface ExtraccionMasivaDialogProps {
   onClose: () => void
@@ -54,6 +55,7 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
   const [mostrarReporte, setMostrarReporte] = useState(false)
   const [countdown, setCountdown] = useState(5)
   const [maximizado, setMaximizado] = useState(false)
+  const [mostrarModalReintento, setMostrarModalReintento] = useState(false)
 
   // Ref para evitar mostrar reporte múltiples veces para la misma sesión
   const reporteMostradoRef = useRef<string | null>(null)
@@ -181,6 +183,13 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
 
     cargarExpedientes()
   }, [extraccionMasiva.estado, extraccionMasiva.sessionId, tipoExtraccion])
+
+  // Detectar estado error_agotado y mostrar modal
+  useEffect(() => {
+    if (extraccionMasiva.estado === 'error_agotado' && extraccionMasiva.sessionId) {
+      setMostrarModalReintento(true)
+    }
+  }, [extraccionMasiva.estado, extraccionMasiva.sessionId])
 
   // Countdown automático para transición a filtros (solo para extracción masiva)
   useEffect(() => {
@@ -328,6 +337,37 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
     } catch (error) {
       console.error('Error al cancelar:', error)
     }
+  }
+
+  const handleReintentar = async () => {
+    setMostrarModalReintento(false)
+    resetExtraccionMasiva()
+    // El usuario deberá iniciar manualmente una nueva extracción
+    agregarLog('🔄 Reintentos agotados. Puede iniciar una nueva extracción.')
+  }
+
+  const handleContinuarConParciales = () => {
+    setMostrarModalReintento(false)
+    // Intentar cargar los expedientes parciales obtenidos
+    const cargarExpedientesParciales = async () => {
+      try {
+        if (extraccionMasiva.sessionId) {
+          const response = await fetch(`http://localhost:8000/api/v1/extraccion-masiva/listado/${extraccionMasiva.sessionId}/expedientes`)
+          const data = await response.json()
+          if (data.expedientes && data.expedientes.length > 0) {
+            setExpedientesExtraidos(data.expedientes)
+            setMostrarReporte(false)
+            agregarLog(`✅ ${data.expedientes.length} expedientes parciales cargados para filtrado`)
+          } else {
+            agregarLog('⚠️ No se obtuvieron expedientes en los intentos realizados')
+          }
+        }
+      } catch (error) {
+        console.error('Error al cargar expedientes parciales:', error)
+        agregarLog('❌ Error al cargar expedientes parciales')
+      }
+    }
+    cargarExpedientesParciales()
   }
 
   const handleDescargarReporte = async (formato: 'json' | 'excel' | 'csv' | 'html') => {
@@ -864,9 +904,23 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                     )}
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <span className="font-mono">{extraccionMasiva.progreso.actual}/{extraccionMasiva.progreso.total}</span>
-                    <span>•</span>
-                    <span>{extraccionMasiva.progreso.porcentaje.toFixed(1)}%</span>
+                    {extraccionMasiva.progreso.total > 0 ? (
+                      <>
+                        <span className="font-mono">Página {extraccionMasiva.progreso.actual}/{extraccionMasiva.progreso.total}</span>
+                        {extraccionMasiva.total_esperado && extraccionMasiva.total_esperado > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="font-semibold text-blue-600">
+                              ~{(extraccionMasiva.progreso.actual * 15).toLocaleString()}/{extraccionMasiva.total_esperado.toLocaleString()} expedientes
+                            </span>
+                          </>
+                        )}
+                        <span>•</span>
+                        <span>{extraccionMasiva.progreso.porcentaje.toFixed(1)}%</span>
+                      </>
+                    ) : (
+                      <span className="font-mono">Página {extraccionMasiva.progreso.actual} • Calculando total...</span>
+                    )}
                   </div>
 
                   <Progress value={extraccionMasiva.progreso.porcentaje} className="h-3" />
@@ -991,7 +1045,7 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
 
               {/* Estadísticas */}
               <div className={`grid ${procesarConPDF ? 'grid-cols-4' : 'grid-cols-3'} gap-4`}>
-                {/* Total Extraído */}
+                {/* Total Extraído con completitud */}
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                   <div className="text-sm text-blue-600 dark:text-blue-400 font-medium mb-1">
                     Total Extraído
@@ -999,9 +1053,17 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
                   <div className="text-3xl font-bold text-blue-900 dark:text-blue-100">
                     {expedientesExtraidos.length}
                   </div>
-                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    expedientes
-                  </div>
+                  {extraccionMasiva.total_esperado && extraccionMasiva.total_esperado > 0 && (
+                    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                      de {extraccionMasiva.total_esperado.toLocaleString()} ({((expedientesExtraidos.length / extraccionMasiva.total_esperado) * 100).toFixed(1)}%)
+                      {expedientesExtraidos.length >= extraccionMasiva.total_esperado ? ' ✅' : ' ⚠️'}
+                    </div>
+                  )}
+                  {!extraccionMasiva.total_esperado && (
+                    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                      expedientes
+                    </div>
+                  )}
                 </div>
 
                 {/* Tiempo Total */}
@@ -1576,6 +1638,57 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
           </div>
         </div>
       </Card>
+
+      {/* Modal de Reintentos Agotados */}
+      <Dialog open={mostrarModalReintento} onOpenChange={setMostrarModalReintento}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Reintentos Agotados</DialogTitle>
+            <DialogDescription>
+              La extracción falló tras {extraccionMasiva.intentos_realizados} intentos.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="rounded-lg bg-red-50 p-4 border border-red-200">
+              <p className="text-sm font-medium text-red-800 mb-2">
+                Último motivo: {extraccionMasiva.motivo_finalizacion || 'Error desconocido'}
+              </p>
+
+              {extraccionMasiva.historial_intentos.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  <p className="text-xs font-semibold text-red-700">Historial de intentos:</p>
+                  {extraccionMasiva.historial_intentos.map((intento, idx) => (
+                    <p key={idx} className="text-xs text-red-600">
+                      • Intento {intento.intento}: {intento.motivo} ({intento.total_expedientes} expedientes)
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <p className="text-sm text-gray-600">
+              ¿Qué desea hacer?
+            </p>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={handleReintentar}
+              className="w-full sm:w-auto"
+            >
+              Reintentar Extracción
+            </Button>
+            <Button
+              onClick={handleContinuarConParciales}
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+            >
+              Continuar con Parciales
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

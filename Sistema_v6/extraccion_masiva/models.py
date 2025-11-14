@@ -4,7 +4,7 @@ Modelos de datos para el sistema de extracción masiva.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from enum import Enum
 
 
@@ -195,7 +195,7 @@ class ResumenExtraccion:
 class SesionExtraccion:
     """Sesión de extracción masiva."""
     session_id: str
-    estado: str  # iniciando, extrayendo, completado, error
+    estado: str  # iniciando, extrayendo, completado, error, error_agotado
     fase: str  # listado, procesamiento
     tiempo_inicio: str
     tiempo_fin: Optional[str] = None
@@ -208,6 +208,12 @@ class SesionExtraccion:
     paginas_procesadas: int = 0  # Total de páginas procesadas en la extracción masiva inicial
     archivos_descargados: int = 0  # Total de archivos descargados durante procesamiento
     motivo_finalizacion: Optional[str] = None  # Motivo por el cual terminó la extracción
+    # Campos de reintentos
+    intentos_realizados: int = 0  # Número de intentos realizados
+    intentos_maximos: int = 3  # Máximo de reintentos permitidos
+    historial_intentos: List[Dict[str, Any]] = field(default_factory=list)  # Historial de cada intento
+    # Metadata de extracción (incluye total_esperado, paginas_esperadas, etc.)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict:
         return {
@@ -224,5 +230,9 @@ class SesionExtraccion:
             "comparacion": self.comparacion,
             "paginas_procesadas": self.paginas_procesadas,
             "archivos_descargados": self.archivos_descargados,
-            "motivo_finalizacion": self.motivo_finalizacion
+            "motivo_finalizacion": self.motivo_finalizacion,
+            "intentos_realizados": self.intentos_realizados,
+            "intentos_maximos": self.intentos_maximos,
+            "historial_intentos": self.historial_intentos,
+            "metadata": self.metadata
         }

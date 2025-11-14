@@ -127,7 +127,9 @@ async def _ejecutar_extraccion_background(
 
         # Callback para actualizar la sesión en tiempo real
         def actualizar_sesion(sesion_actualizada: SesionExtraccion):
+            logger.info(f"📡 Callback recibido: session_id={session_id}, estado={sesion_actualizada.estado}")
             _sesiones[session_id] = sesion_actualizada
+            logger.info(f"✓ Sesión actualizada en _sesiones")
 
         # Ejecutar extracción pasando la sesión y el callback
         await extractor.extraer_listado_completo(

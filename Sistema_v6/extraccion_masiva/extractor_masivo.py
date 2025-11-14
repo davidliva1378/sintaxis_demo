@@ -4,6 +4,7 @@ Extractor Masivo - Obtiene listado completo de expedientes del PJN.
 Reutiliza la lógica probada de Sistema_v4 con interfaz simplificada.
 """
 
+import asyncio
 import json
 import os
 from datetime import datetime
@@ -12,6 +13,27 @@ from typing import Optional, Dict, List
 from uuid import uuid4
 
 from playwright.async_api import Page, async_playwright
+
+# Definición de motivos exitosos vs errores
+# EXITOSOS: La extracción terminó correctamente (llegó al final o alcanzó límite configurado)
+MOTIVOS_EXITOSOS = {
+    "fin_listado",              # Final natural del paginado
+    "limite_paginas",           # Alcanzó max_paginas configurado
+    "limite_fecha",             # Superó fecha_corte configurada
+    "duplicado_encontrado",     # Detectó expediente repetido (con detener_en_duplicado=True)
+    "limite_tiempo",            # Superó tiempo_maximo_segundos
+    "sin_siguiente",            # No existe control para pasar de página (llegó al final)
+    "sin_siguiente_habilitado", # No hay botón "Siguiente" habilitado (llegó al final)
+}
+
+# ERRORES: La extracción falló por problemas técnicos
+# - "siguiente_timeout": el botón "Siguiente" no apareció a tiempo
+# - "siguiente_deshabilitado": el botón se deshabilitó al intentar usarlo
+# - "error_click": falló el clic en "Siguiente"
+# - "bucle_detectado": se detectó un ciclo al intentar avanzar
+
+# Delays progresivos para reintentos (segundos)
+DELAYS_REINTENTOS = [5, 10, 20]
 
 from Sistema_v4.operaciones.expedientes.expedientes_v4 import (
     extraer_expedientes_completos,
@@ -83,10 +105,14 @@ class ExtractorMasivo:
                 fase="listado",
                 tiempo_inicio=tiempo_inicio,
                 config=self.config.to_dict(),
-                mensaje="Iniciando navegador..."
+                mensaje="Iniciando navegador...",
+                intentos_maximos=self.config.max_reintentos
             )
         else:
             session_id = sesion.session_id
+            # Asegurar que intentos_maximos esté configurado
+            if sesion.intentos_maximos == 0:
+                sesion.intentos_maximos = self.config.max_reintentos
 
         try:
             async with async_playwright() as p:
@@ -110,23 +136,36 @@ class ExtractorMasivo:
                     callback_progreso(sesion)
                 await self._navegar_a_listado(page)
 
+                # Intentar obtener el total esperado del PJN
+                try:
+                    from Sistema_v4.operaciones.expedientes.expedientes_v4 import _extraer_total_esperado, EXPEDIENTES_POR_PAGINA
+                    total_esperado = await _extraer_total_esperado(page)
+                    if total_esperado and isinstance(total_esperado, int):
+                        # Calcular páginas esperadas (15 expedientes por página por defecto en PJN)
+                        import math
+                        paginas_esperadas = math.ceil(total_esperado / EXPEDIENTES_POR_PAGINA)
+                        sesion.progreso_total = paginas_esperadas
+                        print(f"\n📊 El PJN reporta {total_esperado:,} expedientes disponibles (~{paginas_esperadas} páginas)\n")
+                        if callback_progreso:
+                            callback_progreso(sesion)
+                except Exception as e:
+                    print(f"⚠️ No se pudo obtener total esperado: {e}")
+
                 # Extraer todas las páginas
                 sesion.estado = "extrayendo"
                 sesion.progreso_actual = 0
-                sesion.progreso_total = 0
+                # progreso_total ya puede estar configurado si se obtuvo total_esperado
                 sesion.mensaje = "Extrayendo expedientes de todas las páginas..."
                 if callback_progreso:
                     callback_progreso(sesion)
 
-                # Extraer expedientes con monitoreo de progreso
-                # Usamos un wrapper para capturar el progreso de páginas procesadas
+                # Preparar monitoreo de progreso
                 import re
                 import sys
                 from io import StringIO
 
                 # Capturar stdout para monitorear progreso
                 old_stdout = sys.stdout
-                captured_output = StringIO()
 
                 class ProgressCapture:
                     def __init__(self, original_stdout, callback, sesion_obj):
@@ -159,21 +198,141 @@ class ExtractorMasivo:
                     def flush(self):
                         self.original.flush()
 
-                sys.stdout = ProgressCapture(old_stdout, callback_progreso, sesion)
+                # LOOP DE REINTENTOS
+                motivo = None
+                expedientes_raw = None
+                metadata = None
+                exito = False
 
-                try:
-                    expedientes_raw, motivo, metadata = await extraer_expedientes_completos(
-                        page,
-                        fecha_corte=fecha_corte,
-                        tiempo_maximo_segundos=self.config.tiempo_maximo_segundos,
-                        orden="fecha",  # Ordenar por fecha para facilitar comparación
-                        detener_en_duplicado=self.config.detener_en_duplicado,
-                        omitir_duplicados=self.config.omitir_duplicados,
-                        max_paginas=self.config.max_paginas,
-                    )
-                finally:
-                    # Restaurar stdout original
-                    sys.stdout = old_stdout
+                while sesion.intentos_realizados < sesion.intentos_maximos and not exito:
+                    sesion.intentos_realizados += 1
+                    print(f"\n{'='*60}")
+                    print(f"🔄 Intento {sesion.intentos_realizados}/{sesion.intentos_maximos}")
+                    print(f"{'='*60}\n")
+
+                    try:
+                        # Activar captura de progreso
+                        sys.stdout = ProgressCapture(old_stdout, callback_progreso, sesion)
+
+                        # Extraer expedientes con monitoreo de progreso
+                        expedientes_raw, motivo, metadata = await extraer_expedientes_completos(
+                            page,
+                            fecha_corte=fecha_corte,
+                            tiempo_maximo_segundos=self.config.tiempo_maximo_segundos,
+                            orden="fecha",  # Ordenar por fecha para facilitar comparación
+                            detener_en_duplicado=self.config.detener_en_duplicado,
+                            omitir_duplicados=self.config.omitir_duplicados,
+                            max_paginas=self.config.max_paginas,
+                        )
+
+                        # Restaurar stdout
+                        sys.stdout = old_stdout
+
+                        # Actualizar progreso_total si tenemos paginas_esperadas en metadata
+                        if metadata and "paginas_esperadas" in metadata:
+                            sesion.progreso_total = metadata["paginas_esperadas"]
+                            if callback_progreso:
+                                callback_progreso(sesion)
+
+                        # Registrar intento en historial
+                        sesion.historial_intentos.append({
+                            "intento": sesion.intentos_realizados,
+                            "timestamp": datetime.now().isoformat(),
+                            "motivo": motivo,
+                            "total_expedientes": len(expedientes_raw) if expedientes_raw else 0,
+                            "metadata": metadata
+                        })
+
+                        # Verificar si el motivo es exitoso
+                        if motivo in MOTIVOS_EXITOSOS:
+                            print(f"\n✅ Extracción exitosa: {motivo}")
+                            exito = True
+                        else:
+                            print(f"\n❌ Error en extracción: {motivo}")
+                            # Si quedan intentos, esperar y reintentar
+                            if sesion.intentos_realizados < sesion.intentos_maximos:
+                                delay_idx = sesion.intentos_realizados - 1
+                                delay = DELAYS_REINTENTOS[min(delay_idx, len(DELAYS_REINTENTOS) - 1)]
+                                print(f"⏳ Esperando {delay}s antes de reintentar...")
+                                sesion.mensaje = f"Error: {motivo}. Reintentando en {delay}s..."
+                                if callback_progreso:
+                                    callback_progreso(sesion)
+                                await asyncio.sleep(delay)
+                                # Volver a navegar al listado para reintentar
+                                await self._navegar_a_listado(page)
+                            else:
+                                # Agotados los reintentos
+                                print(f"\n🚫 Reintentos agotados. Último motivo: {motivo}")
+                                sesion.estado = "error_agotado"
+
+                    except Exception as e_intento:
+                        # Restaurar stdout en caso de error
+                        sys.stdout = old_stdout
+
+                        # Determinar tipo de error
+                        error_str = str(e_intento).lower()
+                        if any(keyword in error_str for keyword in ['target closed', 'browser', 'context closed', 'connection closed']):
+                            motivo = "navegador_cerrado"
+                            print(f"\n❌ El navegador se cerró inesperadamente durante intento {sesion.intentos_realizados}")
+                        elif 'timeout' in error_str:
+                            motivo = "timeout_conexion"
+                            print(f"\n❌ Timeout de conexión durante intento {sesion.intentos_realizados}")
+                        else:
+                            motivo = "error_desconocido"
+                            print(f"\n❌ Error durante intento {sesion.intentos_realizados}: {e_intento}")
+
+                        # Registrar error en historial
+                        sesion.historial_intentos.append({
+                            "intento": sesion.intentos_realizados,
+                            "timestamp": datetime.now().isoformat(),
+                            "motivo": motivo,
+                            "error": str(e_intento),
+                            "total_expedientes": 0
+                        })
+
+                        # Si el navegador se cerró, no tiene sentido reintentar
+                        if motivo == "navegador_cerrado":
+                            print(f"\n🚫 No se puede reintentar con navegador cerrado")
+                            sesion.estado = "error_agotado"
+                            sesion.mensaje = "El navegador se cerró inesperadamente"
+                            sesion.motivo_finalizacion = "navegador_cerrado"
+                            if callback_progreso:
+                                callback_progreso(sesion)
+                            raise Exception("Navegador cerrado - no se puede continuar")
+
+                        # Si quedan intentos, esperar y reintentar
+                        if sesion.intentos_realizados < sesion.intentos_maximos:
+                            delay_idx = sesion.intentos_realizados - 1
+                            delay = DELAYS_REINTENTOS[min(delay_idx, len(DELAYS_REINTENTOS) - 1)]
+                            print(f"⏳ Esperando {delay}s antes de reintentar...")
+                            sesion.mensaje = f"Error: {motivo}. Reintentando en {delay}s..."
+                            if callback_progreso:
+                                callback_progreso(sesion)
+                            await asyncio.sleep(delay)
+                            # Volver a navegar al listado para reintentar
+                            try:
+                                await self._navegar_a_listado(page)
+                            except Exception as nav_error:
+                                print(f"⚠️ Error al renavegar: {nav_error}")
+                                # Si no puede navegar, probablemente el navegador está muerto
+                                if 'closed' in str(nav_error).lower():
+                                    print(f"🚫 Navegador no disponible - abortando")
+                                    sesion.estado = "error_agotado"
+                                    raise
+                        else:
+                            # Agotados los reintentos
+                            print(f"\n🚫 Reintentos agotados. Último error: {e_intento}")
+                            sesion.estado = "error_agotado"
+                            raise
+
+                # Verificar si se agotaron los reintentos sin éxito
+                if sesion.estado == "error_agotado":
+                    sesion.tiempo_fin = datetime.now().isoformat()
+                    sesion.mensaje = f"❌ Extracción fallida tras {sesion.intentos_realizados} intentos. Último motivo: {motivo}"
+                    sesion.motivo_finalizacion = motivo
+                    if callback_progreso:
+                        callback_progreso(sesion)
+                    raise Exception(f"Extracción fallida tras {sesion.intentos_realizados} intentos: {motivo}")
 
                 # Convertir a ExpedienteListado
                 expedientes = [
@@ -212,13 +371,16 @@ class ExtractorMasivo:
                 except Exception as e:
                     print(f"⚠️ Error en comparación (no crítico): {e}")
 
-                # Cerrar navegador
-                await browser.close()
-
                 # Guardar página count antes de sobrescribir
                 paginas_procesadas = sesion.progreso_actual
 
                 # Actualizar sesión
+                print(f"\n{'='*60}")
+                print(f"✅ FINALIZANDO EXTRACCIÓN")
+                print(f"   Total expedientes: {len(expedientes)}")
+                print(f"   Motivo: {motivo}")
+                print(f"   Estableciendo estado = 'completado'")
+                print(f"{'='*60}\n")
                 sesion.estado = "completado"
                 sesion.fase = "listado"
                 sesion.tiempo_fin = datetime.now().isoformat()
@@ -226,15 +388,30 @@ class ExtractorMasivo:
                 sesion.progreso_actual = len(expedientes)
                 sesion.progreso_total = len(expedientes)
                 sesion.listado_path = str(listado_path)
+                sesion.metadata = metadata  # Incluye total_esperado, paginas_esperadas, etc.
 
                 # Generar mensaje descriptivo según el motivo
                 mensaje_motivo = self._describir_motivo(motivo, metadata)
-                sesion.mensaje = f"✅ Extracción completada: {len(expedientes)} expedientes extraídos. {mensaje_motivo}"
+
+                # Construir mensaje con información de total_esperado si está disponible
+                total_esperado = metadata.get("total_esperado")
+                if total_esperado:
+                    porcentaje = (len(expedientes) / total_esperado * 100) if total_esperado > 0 else 0
+                    completitud = f"{len(expedientes)}/{total_esperado} ({porcentaje:.1f}%)"
+                    sesion.mensaje = f"✅ Extracción completada: {completitud} expedientes. {mensaje_motivo}"
+                else:
+                    sesion.mensaje = f"✅ Extracción completada: {len(expedientes)} expedientes extraídos. {mensaje_motivo}"
+
                 sesion.motivo_finalizacion = mensaje_motivo  # Guardar motivo descriptivo para el frontend
 
                 if callback_progreso:
+                    print(f"📡 Llamando callback_progreso con estado = '{sesion.estado}'")
                     callback_progreso(sesion)
+                    print(f"✓ Callback ejecutado correctamente")
+                else:
+                    print(f"⚠️ No hay callback_progreso configurado")
 
+                print(f"✅ Retornando sesión con estado = '{sesion.estado}'")
                 return sesion
 
         except Exception as e:
@@ -474,12 +651,19 @@ class ExtractorMasivo:
         paginas = metadata.get("paginas_recorridas", metadata.get("paginas_procesadas", "?"))
 
         descripciones = {
+            # EXITOSOS
             "fin_listado": f"📄 Se procesaron todas las páginas disponibles ({paginas} páginas).",
             "limite_paginas": f"📄 Se alcanzó el límite de páginas configurado ({paginas} páginas).",
             "limite_tiempo": f"⏱️ Se alcanzó el tiempo máximo de extracción ({paginas} páginas procesadas).",
             "duplicado_encontrado": f"🔄 Se encontraron expedientes duplicados y se detuvo la extracción ({paginas} páginas).",
             "limite_fecha": f"📅 Se alcanzó la fecha de corte configurada ({paginas} páginas procesadas).",
+            "sin_siguiente": f"✅ Se llegó al final del listado - no hay más páginas ({paginas} páginas).",
+            "sin_siguiente_habilitado": f"✅ Se llegó al final del listado - última página alcanzada ({paginas} páginas).",
+            # ERRORES
             "bucle_detectado": f"🔁 Se detectó un bucle en la paginación y se detuvo ({paginas} páginas).",
+            "siguiente_timeout": f"⏱️ Timeout esperando botón 'Siguiente' ({paginas} páginas procesadas).",
+            "siguiente_deshabilitado": f"⚠️ El botón 'Siguiente' se deshabilitó inesperadamente ({paginas} páginas).",
+            "error_click": f"❌ Error al hacer clic en botón 'Siguiente' ({paginas} páginas).",
         }
 
         return descripciones.get(motivo, f"ℹ️ Finalizado: {motivo} ({paginas} páginas)")

@@ -37,7 +37,7 @@ interface ResumenExtraccion {
 
 interface ExtraccionMasivaState {
   sessionId: string | null
-  estado: 'inactivo' | 'extrayendo' | 'pausado' | 'filtrado' | 'completado' | 'error' | 'cancelado'
+  estado: 'inactivo' | 'iniciando' | 'extrayendo' | 'pausado' | 'filtrado' | 'completado' | 'error' | 'cancelado' | 'error_agotado'
   progreso: ProgresoExtraccion
   websocket: WebSocket | null
   pollInterval: NodeJS.Timeout | null
@@ -45,6 +45,19 @@ interface ExtraccionMasivaState {
   archivos_descargados: number
   comparacion: ComparacionDetallada | null
   motivo_finalizacion: string | null
+  // Campos de reintentos
+  intentos_realizados: number
+  intentos_maximos: number
+  historial_intentos: Array<{
+    intento: number
+    timestamp: string
+    motivo: string
+    total_expedientes: number
+    metadata?: any
+    error?: string
+  }>
+  // Total esperado reportado por PJN
+  total_esperado: number | null
 }
 
 interface ExpedientesState {
@@ -126,6 +139,12 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
     archivos_descargados: 0,
     comparacion: null,
     motivo_finalizacion: null,
+    // Campos de reintentos
+    intentos_realizados: 0,
+    intentos_maximos: 3,
+    historial_intentos: [],
+    // Total esperado reportado por PJN
+    total_esperado: null,
   },
 
   // Listar expedientes con filtros y paginación
@@ -619,6 +638,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
     const state = get()
     const sessionId = state.extraccionMasiva.sessionId
     if (!sessionId) {
+      console.log('[POLLING] No hay sessionId, saltando polling')
       return
     }
 
@@ -628,6 +648,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
       const data = response.data
 
       const nuevoEstado = data.estado || 'extrayendo'
+      console.log(`[POLLING] Session: ${sessionId}, Estado: ${nuevoEstado}, Progreso: ${data.progreso_actual}/${data.progreso_total}`)
 
       // Calcular tiempo transcurrido desde tiempo_inicio
       let tiempoTranscurrido = 0
@@ -642,23 +663,44 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
       const archivosDescargados = data.archivos_descargados || 0
       const comparacion = (data.comparacion as ComparacionDetallada | null) || null
       const motivoFinalizacion = data.motivo_finalizacion || null
+      // Extraer campos de reintentos
+      const intentosRealizados = data.intentos_realizados || 0
+      const intentosMaximos = data.intentos_maximos || 3
+      const historialIntentos = data.historial_intentos || []
+      // Extraer total esperado del metadata (si existe)
+      const totalEsperado = data.metadata?.total_esperado || null
 
-      // Si la extracción terminó (completado o error), detener el polling
-      if ((nuevoEstado === 'completado' || nuevoEstado === 'error') && state.extraccionMasiva.pollInterval) {
+      // Si la extracción terminó (completado, error o error_agotado), detener el polling
+      if ((nuevoEstado === 'completado' || nuevoEstado === 'error' || nuevoEstado === 'error_agotado') && state.extraccionMasiva.pollInterval) {
+        console.log(`[POLLING] Detectado estado final: ${nuevoEstado}. Deteniendo polling...`)
         clearInterval(state.extraccionMasiva.pollInterval)
 
         // Mostrar notificación de completado con duración extendida
         if (nuevoEstado === 'completado') {
           const exitosos = data.progreso_actual || 0
           const total = data.progreso_total || 0
+
+          // Validar completitud si hay total_esperado
+          let descripcion = `${exitosos}/${total} expedientes procesados exitosamente`
+          if (totalEsperado && totalEsperado > 0) {
+            const porcentaje = ((exitosos / totalEsperado) * 100).toFixed(1)
+            const completitud = exitosos >= totalEsperado ? '✅ Extracción completa' : `⚠️ Extracción parcial (${porcentaje}%)`
+            descripcion = `${completitud}: ${exitosos}/${totalEsperado} expedientes`
+          }
+
           toast.success('Procesamiento completado', {
-            description: `${exitosos}/${total} expedientes procesados exitosamente`,
+            description: descripcion,
             duration: 10000, // 10 segundos para que el usuario pueda leer
           })
         } else if (nuevoEstado === 'error') {
           toast.error('Error en procesamiento', {
             description: data.mensaje || 'Ocurrió un error durante el procesamiento',
             duration: 10000,
+          })
+        } else if (nuevoEstado === 'error_agotado') {
+          toast.error('Reintentos agotados', {
+            description: `Se agotaron los ${intentosRealizados} intentos. ${motivoFinalizacion || 'Error desconocido'}`,
+            duration: 15000, // 15 segundos para que el usuario pueda leer y decidir
           })
         }
       }
@@ -667,11 +709,15 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
         extraccionMasiva: {
           ...state.extraccionMasiva,
           estado: nuevoEstado,
-          pollInterval: (nuevoEstado === 'completado' || nuevoEstado === 'error') ? null : state.extraccionMasiva.pollInterval,
+          pollInterval: (nuevoEstado === 'completado' || nuevoEstado === 'error' || nuevoEstado === 'error_agotado') ? null : state.extraccionMasiva.pollInterval,
           paginas_procesadas: paginasProcesadas,
           archivos_descargados: archivosDescargados,
           comparacion: comparacion,
           motivo_finalizacion: motivoFinalizacion,
+          intentos_realizados: intentosRealizados,
+          intentos_maximos: intentosMaximos,
+          historial_intentos: historialIntentos,
+          total_esperado: totalEsperado,
           progreso: {
             actual: data.progreso_actual || 0,
             total: data.progreso_total || 0,
@@ -688,7 +734,18 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
         },
       })
     } catch (error: any) {
-      console.error('Error al obtener progreso:', error)
+      console.error('[POLLING] Error al obtener progreso:', error)
+      // Si hay error en el polling, detener el polling
+      if (state.extraccionMasiva.pollInterval) {
+        console.log('[POLLING] Deteniendo polling debido a error')
+        clearInterval(state.extraccionMasiva.pollInterval)
+        set({
+          extraccionMasiva: {
+            ...state.extraccionMasiva,
+            pollInterval: null,
+          },
+        })
+      }
     }
   },
 
@@ -879,6 +936,11 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
         paginas_procesadas: 0,
         archivos_descargados: 0,
         comparacion: null,
+        motivo_finalizacion: null,
+        intentos_realizados: 0,
+        intentos_maximos: 3,
+        historial_intentos: [],
+        total_esperado: null,
       },
     })
   },
