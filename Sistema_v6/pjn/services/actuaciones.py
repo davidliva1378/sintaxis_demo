@@ -134,11 +134,19 @@ async def procesar_actuaciones_expediente(
         if descargas_ejecutadas and carpeta_adjuntos:
             try:
                 from pathlib import Path
-                adjuntos_path = Path(carpeta_adjuntos) / "adjuntos"
+                import logging
+                logger = logging.getLogger(__name__)
+                adjuntos_path = Path(carpeta_adjuntos)
                 if adjuntos_path.exists():
-                    total_adjuntos = len(list(adjuntos_path.glob("*.*")))
-            except Exception:
-                pass
+                    archivos = list(adjuntos_path.glob("*.*"))
+                    total_adjuntos = len(archivos)
+                    logger.info(f"Contados {total_adjuntos} adjuntos en {adjuntos_path}")
+                else:
+                    logger.warning(f"Ruta de adjuntos no existe: {adjuntos_path}")
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error al contar adjuntos: {e}")
 
         # Actualizar manifest
         try:
@@ -163,17 +171,22 @@ async def procesar_actuaciones_expediente(
                 proc["total_adjuntos_descargados"] = total_adjuntos
                 proc["estado_sincronizacion"] = "actualizado"
 
-                # Guardar manifest actualizado
-                manifest_path.write_text(
-                    json.dumps(manifest_actual, indent=2, ensure_ascii=False),
-                    encoding="utf-8"
-                )
+                # Guardar manifest actualizado usando escritura atómica
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"Actualizando manifest: {total_adjuntos} adjuntos, {total_actuaciones} actuaciones")
+                gestor._persistir_json_atomico(manifest_path, manifest_actual)
                 manifest = manifest_actual
+                logger.info(f"Manifest actualizado exitosamente para {numero_expediente}")
         except Exception as e:
             # No fallar si no se puede actualizar manifest
             import logging
+            import traceback
             logger = logging.getLogger(__name__)
-            logger.warning(f"No se pudo actualizar manifest para {numero_expediente}: {e}")
+            logger.error(
+                f"No se pudo actualizar manifest para {numero_expediente}: {e}\n"
+                f"Traceback: {traceback.format_exc()}"
+            )
 
     resumen: ResultadoProcesamiento = {
         "actuaciones_actuales": len(actuales),
