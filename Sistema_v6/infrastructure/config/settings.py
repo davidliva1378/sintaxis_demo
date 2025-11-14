@@ -74,6 +74,7 @@ class ScrapingSettings(BaseSettings):
         timeout_descarga: Timeout para descarga de archivos en ms
         max_paginas_expedientes: Máximo de páginas a extraer (None = sin límite)
         max_reintentos_descarga: Máximo de reintentos para descargas
+        caratula_coincidencia_parcial: Si True, permite coincidencia parcial en carátulas
     """
 
     model_config = SettingsConfigDict(env_prefix="SCRAPING_", case_sensitive=False)
@@ -83,6 +84,7 @@ class ScrapingSettings(BaseSettings):
     timeout_descarga: int = 30000
     max_paginas_expedientes: int | None = 200
     max_reintentos_descarga: int = 3
+    caratula_coincidencia_parcial: bool = True
 
 
 class StorageSettings(BaseSettings):

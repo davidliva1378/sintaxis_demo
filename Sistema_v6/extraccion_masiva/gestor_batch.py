@@ -23,6 +23,7 @@ from .models import (
 # Importar funciones de procesamiento de v5/v6
 from Sistema_v6.pjn.scraping.expedientes import (
     buscar_expediente_por_numero,
+    buscar_expedientes,
     extraer_datos_expediente
 )
 from Sistema_v6.pjn.scraping import descomponer_numero_expediente
@@ -52,16 +53,19 @@ class GestorBatch:
         config: Optional[ConfigExtraccionMasiva] = None,
         on_progress: Optional[Callable[[int, int, str], None]] = None,
         expediente_repository: Optional["IExpedienteRepository"] = None,
+        caratulas: Optional[Dict[str, str]] = None,
     ):
         """
         Args:
             config: Configuración de extracción
             on_progress: Callback para reportar progreso (actual, total, mensaje)
             expediente_repository: Repositorio para guardar expedientes procesados
+            caratulas: Diccionario {numero_expediente: caratula} para filtrado preciso
         """
         self.config = config or ConfigExtraccionMasiva()
         self.on_progress = on_progress
         self.expediente_repository = expediente_repository
+        self.caratulas = caratulas or {}
         self._estados: Dict[str, EstadoExpediente] = {}
         self._errores: List[Dict] = []
 
@@ -117,10 +121,11 @@ class GestorBatch:
                     try:
                         self._estados[numero] = EstadoExpediente.PROCESANDO
 
-                        # TODO: Implementar procesamiento real del expediente
-                        # Por ahora, placeholder que simula procesamiento
+                        # Obtener carátula del expediente desde el diccionario de carátulas
+                        caratula_expediente = self.caratulas.get(numero)
+
                         resultado = await self._procesar_expediente(
-                            page, numero, context, browser
+                            page, numero, caratula_expediente, context, browser
                         )
 
                         if resultado["success"]:
@@ -196,6 +201,7 @@ class GestorBatch:
         self,
         page: Page,
         numero_expediente: str,
+        caratula_esperada: str | None,
         context: BrowserContext,
         browser: Browser,
     ) -> Dict:
@@ -203,7 +209,7 @@ class GestorBatch:
         Procesa un expediente individual.
 
         Flujo:
-        1. Buscar expediente por número en PJN
+        1. Buscar expediente por número en PJN (con filtrado por carátula opcional)
         2. Extraer datos del expediente (metadata)
         3. Procesar actuaciones usando servicio coordinador de v5
         4. Descargar adjuntos si procesar_con_pdf=True
@@ -213,6 +219,7 @@ class GestorBatch:
         Args:
             page: Página de Playwright
             numero_expediente: Número del expediente a procesar
+            caratula_esperada: Carátula esperada para filtrar búsqueda (None = sin filtro)
             context: Contexto del navegador
             browser: Instancia del navegador
 
@@ -244,44 +251,68 @@ class GestorBatch:
             await page.goto("https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam")
             await page.wait_for_load_state("domcontentloaded")
 
-            exito, motivo = await buscar_expediente_por_numero(page, numero_limpio, anio_limpio)
+            # Buscar expediente con filtrado por carátula
+            print(f"🔍 Buscando expediente: {numero_limpio}/{anio_limpio}" +
+                  (f" con carátula: '{caratula_esperada}'" if caratula_esperada else ""))
 
-            if not exito:
-                print(f"❌ Expediente no encontrado: {numero_expediente} - {motivo}")
+            # Usar buscar_expedientes con carátula
+            filas = await buscar_expedientes(
+                page,
+                numero=numero_limpio,
+                anio=anio_limpio,
+                caratula=caratula_esperada
+            )
+
+            # Fallback: Reintentar sin carátula si no hay coincidencias
+            if not filas and caratula_esperada:
+                print(
+                    f"⚠️ No se hallaron coincidencias para carátula '{caratula_esperada}'. "
+                    f"Reintentando sin filtro para expediente {numero_expediente}..."
+                )
+                filas = await buscar_expedientes(
+                    page,
+                    numero=numero_limpio,
+                    anio=anio_limpio,
+                    caratula=None
+                )
+
+            # Verificar si se encontró el expediente
+            if not filas:
+                print(f"❌ No se encontró expediente {numero_expediente}")
                 return {
                     "success": False,
-                    "numero": numero_expediente,
-                    "error": f"No encontrado: {motivo}"
+                    "error": "Expediente no encontrado",
+                    "expediente": numero_expediente
                 }
 
-            print(f"✅ Expediente encontrado en resultados: {numero_expediente}")
+            # Selección de expediente cuando hay múltiples resultados
+            if len(filas) > 1:
+                print(
+                    f"⚠️ Múltiples expedientes encontrados ({len(filas)}) para {numero_expediente}. "
+                    f"Usando el primero de la lista."
+                )
 
-            # ==================================================================
-            # Hacer clic en el enlace del expediente para abrir su página
-            # ==================================================================
-            print("👁 Abriendo página del expediente...")
+            # Navegar al expediente seleccionado
             try:
-                # Buscar el primer enlace del expediente en la tabla de resultados
-                enlace_expediente = await page.query_selector("table.table-striped tbody tr td a")
+                enlace_expediente = await filas[0].query_selector("a")
                 if not enlace_expediente:
-                    print(f"❌ No se encontró enlace para abrir expediente: {numero_expediente}")
+                    print(f"❌ No se encontró enlace en fila del expediente {numero_expediente}")
                     return {
                         "success": False,
-                        "numero": numero_expediente,
-                        "error": "No se encontró enlace del expediente"
+                        "error": "Enlace de expediente no encontrado",
+                        "expediente": numero_expediente
                     }
 
                 await enlace_expediente.click()
-                await page.wait_for_load_state("load")
-                await page.wait_for_timeout(2000)  # Esperar a que cargue completamente
-                print(f"✅ Página del expediente abierta: {numero_expediente}")
+                await page.wait_for_load_state("domcontentloaded")
+                print(f"✅ Navegado a expediente {numero_expediente}")
 
             except Exception as e:
-                print(f"❌ Error abriendo expediente: {e}")
+                print(f"❌ Error al navegar a expediente {numero_expediente}: {str(e)}")
                 return {
                     "success": False,
-                    "numero": numero_expediente,
-                    "error": f"Error abriendo expediente: {str(e)}"
+                    "error": f"Error al navegar: {str(e)}",
+                    "expediente": numero_expediente
                 }
 
             # ==================================================================

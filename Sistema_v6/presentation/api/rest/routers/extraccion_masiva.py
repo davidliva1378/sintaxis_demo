@@ -252,11 +252,36 @@ async def _ejecutar_procesamiento_background(
                 _sesiones[session_id].progreso_total = total
                 _sesiones[session_id].mensaje = mensaje
 
-        # Crear gestor con callback
+        # Cargar listado BASE para obtener carátulas
+        from pathlib import Path
+        import json
+
+        caratulas_expedientes = {}
+        listado_base_path = Path(config.directorio_base) / "expedientes_base.json"
+
+        if listado_base_path.exists():
+            try:
+                with open(listado_base_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    # Crear diccionario numero -> caratula
+                    expedientes = data.get("expedientes", [])
+                    caratulas_expedientes = {
+                        exp.get("numero"): exp.get("caratula")
+                        for exp in expedientes
+                        if exp.get("numero") and exp.get("caratula")
+                    }
+                    logger.info(f"📋 Cargadas {len(caratulas_expedientes)} carátulas desde listado BASE")
+            except Exception as e:
+                logger.warning(f"⚠️ No se pudo cargar listado BASE para carátulas: {e}")
+        else:
+            logger.warning(f"⚠️ No existe listado BASE en {listado_base_path}")
+
+        # Crear gestor con callback y carátulas
         gestor = GestorBatch(
             config=config,
             on_progress=callback_progreso,
-            expediente_repository=expediente_repo
+            expediente_repository=expediente_repo,
+            caratulas=caratulas_expedientes
         )
 
         # Procesar seleccionados
