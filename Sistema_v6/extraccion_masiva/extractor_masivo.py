@@ -114,142 +114,195 @@ class ExtractorMasivo:
             if sesion.intentos_maximos == 0:
                 sesion.intentos_maximos = self.config.max_reintentos
 
+        # Preparar clases auxiliares para monitoreo de progreso
+        import re
+        import sys
+
+        class ProgressCapture:
+            def __init__(self, original_stdout, callback, sesion_obj):
+                self.original = original_stdout
+                self.callback = callback
+                self.sesion = sesion_obj
+                self._processing = False  # Flag para evitar recursión
+
+            def write(self, text):
+                self.original.write(text)  # Mantener output original
+                self.original.flush()
+
+                # Evitar recursión infinita
+                if self._processing:
+                    return
+
+                # Detectar "Procesando página X"
+                match = re.search(r'Procesando página (\d+)', text)
+                if match:
+                    self._processing = True  # Activar flag
+                    try:
+                        pagina_actual = int(match.group(1))
+                        self.sesion.progreso_actual = pagina_actual
+                        self.sesion.mensaje = f"Procesando página {pagina_actual}"
+                        if self.callback:
+                            self.callback(self.sesion)
+                    finally:
+                        self._processing = False  # Desactivar flag
+
+            def flush(self):
+                self.original.flush()
+
         try:
             async with async_playwright() as p:
-                # Iniciar navegador
+                # Crear browser UNA vez (fuera del loop de reintentos)
                 browser = await p.chromium.launch(
                     headless=self.config.headless
                 )
-                context = await browser.new_context()
-                page = await context.new_page()
-                page.set_default_timeout(self.config.timeout_pagina)
+                print("🌐 Navegador principal creado")
 
-                # Login en PJN
-                sesion.mensaje = "Autenticando en PJN..."
-                if callback_progreso:
-                    callback_progreso(sesion)
-                await self._login_pjn(page, username, password)
-
-                # Navegar a listado de expedientes
-                sesion.mensaje = "Navegando a listado de expedientes..."
-                if callback_progreso:
-                    callback_progreso(sesion)
-                await self._navegar_a_listado(page)
-
-                # Intentar obtener el total esperado del PJN
                 try:
-                    from Sistema_v4.operaciones.expedientes.expedientes_v4 import _extraer_total_esperado, EXPEDIENTES_POR_PAGINA
-                    total_esperado = await _extraer_total_esperado(page)
-                    if total_esperado and isinstance(total_esperado, int):
-                        # Calcular páginas esperadas (15 expedientes por página por defecto en PJN)
-                        import math
-                        paginas_esperadas = math.ceil(total_esperado / EXPEDIENTES_POR_PAGINA)
-                        sesion.progreso_total = paginas_esperadas
-                        print(f"\n📊 El PJN reporta {total_esperado:,} expedientes disponibles (~{paginas_esperadas} páginas)\n")
-                        if callback_progreso:
-                            callback_progreso(sesion)
-                except Exception as e:
-                    print(f"⚠️ No se pudo obtener total esperado: {e}")
+                    # Variables del loop de reintentos
+                    motivo = None
+                    expedientes_raw = None
+                    metadata = None
+                    exito = False
 
-                # Extraer todas las páginas
-                sesion.estado = "extrayendo"
-                sesion.progreso_actual = 0
-                # progreso_total ya puede estar configurado si se obtuvo total_esperado
-                sesion.mensaje = "Extrayendo expedientes de todas las páginas..."
-                if callback_progreso:
-                    callback_progreso(sesion)
+                    # LOOP DE REINTENTOS
+                    while sesion.intentos_realizados < sesion.intentos_maximos and not exito:
+                        sesion.intentos_realizados += 1
+                        print(f"\n{'='*60}")
+                        print(f"🔄 Intento {sesion.intentos_realizados}/{sesion.intentos_maximos}")
+                        print(f"{'='*60}")
+                        print(f"📄 Creando contexto/página nueva para intento {sesion.intentos_realizados}...\n")
 
-                # Preparar monitoreo de progreso
-                import re
-                import sys
-                from io import StringIO
+                        # Crear contexto/página NUEVA para este intento
+                        context = await browser.new_context()
+                        page = await context.new_page()
 
-                # Capturar stdout para monitorear progreso
-                old_stdout = sys.stdout
+                        # Guardar referencia a stdout original
+                        old_stdout = sys.stdout
 
-                class ProgressCapture:
-                    def __init__(self, original_stdout, callback, sesion_obj):
-                        self.original = original_stdout
-                        self.callback = callback
-                        self.sesion = sesion_obj
-                        self._processing = False  # Flag para evitar recursión
+                        try:
+                            # Login y navegación con página limpia
+                            await self._login_y_navegar(
+                                page, username, password, sesion, callback_progreso
+                            )
 
-                    def write(self, text):
-                        self.original.write(text)  # Mantener output original
-                        self.original.flush()
+                            # Intentar obtener total esperado (solo en primer intento)
+                            if sesion.intentos_realizados == 1:
+                                try:
+                                    from Sistema_v4.operaciones.expedientes.expedientes_v4 import _extraer_total_esperado, EXPEDIENTES_POR_PAGINA
+                                    total_esperado = await _extraer_total_esperado(page)
+                                    if total_esperado and isinstance(total_esperado, int):
+                                        # Calcular páginas esperadas (15 expedientes por página por defecto en PJN)
+                                        import math
+                                        paginas_esperadas = math.ceil(total_esperado / EXPEDIENTES_POR_PAGINA)
+                                        sesion.progreso_total = paginas_esperadas
+                                        print(f"\n📊 El PJN reporta {total_esperado:,} expedientes disponibles (~{paginas_esperadas} páginas)\n")
+                                        if callback_progreso:
+                                            callback_progreso(sesion)
+                                except Exception as e:
+                                    print(f"⚠️ No se pudo obtener total esperado: {e}")
 
-                        # Evitar recursión infinita
-                        if self._processing:
-                            return
-
-                        # Detectar "Procesando página X"
-                        match = re.search(r'Procesando página (\d+)', text)
-                        if match:
-                            self._processing = True  # Activar flag
-                            try:
-                                pagina_actual = int(match.group(1))
-                                self.sesion.progreso_actual = pagina_actual
-                                self.sesion.mensaje = f"Procesando página {pagina_actual}"
-                                if self.callback:
-                                    self.callback(self.sesion)
-                            finally:
-                                self._processing = False  # Desactivar flag
-
-                    def flush(self):
-                        self.original.flush()
-
-                # LOOP DE REINTENTOS
-                motivo = None
-                expedientes_raw = None
-                metadata = None
-                exito = False
-
-                while sesion.intentos_realizados < sesion.intentos_maximos and not exito:
-                    sesion.intentos_realizados += 1
-                    print(f"\n{'='*60}")
-                    print(f"🔄 Intento {sesion.intentos_realizados}/{sesion.intentos_maximos}")
-                    print(f"{'='*60}\n")
-
-                    try:
-                        # Activar captura de progreso
-                        sys.stdout = ProgressCapture(old_stdout, callback_progreso, sesion)
-
-                        # Extraer expedientes con monitoreo de progreso
-                        expedientes_raw, motivo, metadata = await extraer_expedientes_completos(
-                            page,
-                            fecha_corte=fecha_corte,
-                            tiempo_maximo_segundos=self.config.tiempo_maximo_segundos,
-                            orden="fecha",  # Ordenar por fecha para facilitar comparación
-                            detener_en_duplicado=self.config.detener_en_duplicado,
-                            omitir_duplicados=self.config.omitir_duplicados,
-                            max_paginas=self.config.max_paginas,
-                        )
-
-                        # Restaurar stdout
-                        sys.stdout = old_stdout
-
-                        # Actualizar progreso_total si tenemos paginas_esperadas en metadata
-                        if metadata and "paginas_esperadas" in metadata:
-                            sesion.progreso_total = metadata["paginas_esperadas"]
+                            # Preparar estado de extracción
+                            sesion.estado = "extrayendo"
+                            sesion.progreso_actual = 0
+                            sesion.mensaje = "Extrayendo expedientes de todas las páginas..."
                             if callback_progreso:
                                 callback_progreso(sesion)
 
-                        # Registrar intento en historial
-                        sesion.historial_intentos.append({
-                            "intento": sesion.intentos_realizados,
-                            "timestamp": datetime.now().isoformat(),
-                            "motivo": motivo,
-                            "total_expedientes": len(expedientes_raw) if expedientes_raw else 0,
-                            "metadata": metadata
-                        })
+                            # Capturar stdout para monitorear progreso
+                            sys.stdout = ProgressCapture(old_stdout, callback_progreso, sesion)
 
-                        # Verificar si el motivo es exitoso
-                        if motivo in MOTIVOS_EXITOSOS:
-                            print(f"\n✅ Extracción exitosa: {motivo}")
-                            exito = True
-                        else:
-                            print(f"\n❌ Error en extracción: {motivo}")
-                            # Si quedan intentos, esperar y reintentar
+                            try:
+                                # Extraer expedientes con monitoreo de progreso
+                                expedientes_raw, motivo, metadata = await extraer_expedientes_completos(
+                                    page,
+                                    fecha_corte=fecha_corte,
+                                    tiempo_maximo_segundos=self.config.tiempo_maximo_segundos,
+                                    orden="fecha",  # Ordenar por fecha para facilitar comparación
+                                    detener_en_duplicado=self.config.detener_en_duplicado,
+                                    omitir_duplicados=self.config.omitir_duplicados,
+                                    max_paginas=self.config.max_paginas,
+                                )
+                            finally:
+                                # Restaurar stdout SIEMPRE
+                                sys.stdout = old_stdout
+
+                            # Actualizar progreso_total si tenemos paginas_esperadas en metadata
+                            if metadata and "paginas_esperadas" in metadata:
+                                sesion.progreso_total = metadata["paginas_esperadas"]
+                                if callback_progreso:
+                                    callback_progreso(sesion)
+
+                            # Registrar intento en historial
+                            sesion.historial_intentos.append({
+                                "intento": sesion.intentos_realizados,
+                                "timestamp": datetime.now().isoformat(),
+                                "motivo": motivo,
+                                "total_expedientes": len(expedientes_raw) if expedientes_raw else 0,
+                                "metadata": metadata
+                            })
+
+                            # Verificar si el motivo es exitoso
+                            if motivo in MOTIVOS_EXITOSOS:
+                                print(f"\n✅ Extracción exitosa: {motivo}")
+                                exito = True
+                            else:
+                                print(f"\n❌ Error en extracción: {motivo}")
+                                # Si quedan intentos, esperar y reintentar (próximo loop tendrá página nueva)
+                                if sesion.intentos_realizados < sesion.intentos_maximos:
+                                    delay_idx = sesion.intentos_realizados - 1
+                                    delay = DELAYS_REINTENTOS[min(delay_idx, len(DELAYS_REINTENTOS) - 1)]
+                                    print(f"⏳ Esperando {delay}s antes de reintentar...")
+                                    sesion.mensaje = f"Error: {motivo}. Reintentando en {delay}s..."
+                                    if callback_progreso:
+                                        callback_progreso(sesion)
+                                    await asyncio.sleep(delay)
+                                else:
+                                    # Agotados los reintentos
+                                    print(f"\n🚫 Reintentos agotados. Último motivo: {motivo}")
+                                    sesion.estado = "error_agotado"
+
+                        except Exception as e_intento:
+                            # Restaurar stdout en caso de error
+                            if sys.stdout != old_stdout:
+                                sys.stdout = old_stdout
+
+                            # Determinar tipo de error con mejor precisión
+                            error_str = str(e_intento).lower()
+                            error_type = type(e_intento).__name__
+
+                            if any(keyword in error_str for keyword in ['target closed', 'browser', 'context closed', 'connection closed']):
+                                motivo = "navegador_cerrado"
+                                print(f"\n❌ El navegador se cerró inesperadamente durante intento {sesion.intentos_realizados}")
+                            elif error_type == 'TimeoutError' or 'timeout' in error_str:
+                                motivo = "timeout_conexion"
+                                print(f"\n❌ Timeout de conexión durante intento {sesion.intentos_realizados}")
+                                print(f"   Detalles: {e_intento}")
+                            else:
+                                motivo = "error_desconocido"
+                                print(f"\n❌ Error durante intento {sesion.intentos_realizados}")
+                                print(f"   Tipo: {error_type}")
+                                print(f"   Mensaje: {e_intento}")
+
+                            # Registrar error en historial
+                            sesion.historial_intentos.append({
+                                "intento": sesion.intentos_realizados,
+                                "timestamp": datetime.now().isoformat(),
+                                "motivo": motivo,
+                                "error": str(e_intento),
+                                "total_expedientes": 0
+                            })
+
+                            # Si el navegador se cerró, no tiene sentido reintentar
+                            if motivo == "navegador_cerrado":
+                                print(f"\n🚫 No se puede reintentar con navegador cerrado")
+                                sesion.estado = "error_agotado"
+                                sesion.mensaje = "El navegador se cerró inesperadamente"
+                                sesion.motivo_finalizacion = "navegador_cerrado"
+                                if callback_progreso:
+                                    callback_progreso(sesion)
+                                raise Exception("Navegador cerrado - no se puede continuar")
+
+                            # Si quedan intentos, esperar y reintentar (próximo loop tendrá página nueva)
                             if sesion.intentos_realizados < sesion.intentos_maximos:
                                 delay_idx = sesion.intentos_realizados - 1
                                 delay = DELAYS_REINTENTOS[min(delay_idx, len(DELAYS_REINTENTOS) - 1)]
@@ -258,166 +311,111 @@ class ExtractorMasivo:
                                 if callback_progreso:
                                     callback_progreso(sesion)
                                 await asyncio.sleep(delay)
-                                # Volver a navegar al listado para reintentar
-                                await self._navegar_a_listado(page)
                             else:
                                 # Agotados los reintentos
-                                print(f"\n🚫 Reintentos agotados. Último motivo: {motivo}")
+                                print(f"\n🚫 Reintentos agotados. Último error: {e_intento}")
                                 sesion.estado = "error_agotado"
+                                raise
 
-                    except Exception as e_intento:
-                        # Restaurar stdout en caso de error
-                        sys.stdout = old_stdout
+                        finally:
+                            # CRUCIAL: Cerrar contexto/página SIEMPRE al terminar cada intento
+                            print(f"🔒 Cerrando contexto/página del intento {sesion.intentos_realizados}...")
+                            await page.close()
+                            await context.close()
 
-                        # Determinar tipo de error con mejor precisión
-                        error_str = str(e_intento).lower()
-                        error_type = type(e_intento).__name__
+                    # Después del loop: procesar resultado final
+                    if sesion.estado == "error_agotado":
+                        sesion.tiempo_fin = datetime.now().isoformat()
+                        sesion.mensaje = f"❌ Extracción fallida tras {sesion.intentos_realizados} intentos. Último motivo: {motivo}"
+                        sesion.motivo_finalizacion = motivo
+                        if callback_progreso:
+                            callback_progreso(sesion)
+                        raise Exception(f"Extracción fallida tras {sesion.intentos_realizados} intentos: {motivo}")
 
-                        if any(keyword in error_str for keyword in ['target closed', 'browser', 'context closed', 'connection closed']):
-                            motivo = "navegador_cerrado"
-                            print(f"\n❌ El navegador se cerró inesperadamente durante intento {sesion.intentos_realizados}")
-                        elif error_type == 'TimeoutError' or 'timeout' in error_str:
-                            motivo = "timeout_conexion"
-                            print(f"\n❌ Timeout de conexión durante intento {sesion.intentos_realizados}")
-                            print(f"   Detalles: {e_intento}")
-                        else:
-                            motivo = "error_desconocido"
-                            print(f"\n❌ Error durante intento {sesion.intentos_realizados}")
-                            print(f"   Tipo: {error_type}")
-                            print(f"   Mensaje: {e_intento}")
+                    # Convertir a ExpedienteListado
+                    expedientes = [
+                        ExpedienteListado(
+                            numero=exp.get("numero", ""),
+                            caratula=exp.get("caratula", ""),
+                            dependencia=exp.get("dependencia", ""),
+                            situacion=exp.get("situacion", ""),
+                            fecha_inicio=exp.get("fecha_inicio", ""),
+                            ultima_actuacion=exp.get("ultima_actuacion", ""),
+                        )
+                        for exp in expedientes_raw
+                    ]
 
-                        # Registrar error en historial
-                        sesion.historial_intentos.append({
-                            "intento": sesion.intentos_realizados,
-                            "timestamp": datetime.now().isoformat(),
-                            "motivo": motivo,
-                            "error": str(e_intento),
-                            "total_expedientes": 0
-                        })
+                    # Agregar motivo de finalización al metadata
+                    metadata["motivo_finalizacion"] = motivo
+                    print(f"📊 Motivo de finalización: {motivo}")
 
-                        # Si el navegador se cerró, no tiene sentido reintentar
-                        if motivo == "navegador_cerrado":
-                            print(f"\n🚫 No se puede reintentar con navegador cerrado")
-                            sesion.estado = "error_agotado"
-                            sesion.mensaje = "El navegador se cerró inesperadamente"
-                            sesion.motivo_finalizacion = "navegador_cerrado"
-                            if callback_progreso:
-                                callback_progreso(sesion)
-                            raise Exception("Navegador cerrado - no se puede continuar")
-
-                        # Si quedan intentos, esperar y reintentar
-                        if sesion.intentos_realizados < sesion.intentos_maximos:
-                            delay_idx = sesion.intentos_realizados - 1
-                            delay = DELAYS_REINTENTOS[min(delay_idx, len(DELAYS_REINTENTOS) - 1)]
-                            print(f"⏳ Esperando {delay}s antes de reintentar...")
-                            sesion.mensaje = f"Error: {motivo}. Reintentando en {delay}s..."
-                            if callback_progreso:
-                                callback_progreso(sesion)
-                            await asyncio.sleep(delay)
-                            # Volver a navegar al listado para reintentar
-                            try:
-                                await self._navegar_a_listado(page)
-                            except Exception as nav_error:
-                                print(f"⚠️ Error al renavegar: {nav_error}")
-                                # Si no puede navegar, probablemente el navegador está muerto
-                                if 'closed' in str(nav_error).lower():
-                                    print(f"🚫 Navegador no disponible - abortando")
-                                    sesion.estado = "error_agotado"
-                                    raise
-                        else:
-                            # Agotados los reintentos
-                            print(f"\n🚫 Reintentos agotados. Último error: {e_intento}")
-                            sesion.estado = "error_agotado"
-                            raise
-
-                # Verificar si se agotaron los reintentos sin éxito
-                if sesion.estado == "error_agotado":
-                    sesion.tiempo_fin = datetime.now().isoformat()
-                    sesion.mensaje = f"❌ Extracción fallida tras {sesion.intentos_realizados} intentos. Último motivo: {motivo}"
-                    sesion.motivo_finalizacion = motivo
-                    if callback_progreso:
-                        callback_progreso(sesion)
-                    raise Exception(f"Extracción fallida tras {sesion.intentos_realizados} intentos: {motivo}")
-
-                # Convertir a ExpedienteListado
-                expedientes = [
-                    ExpedienteListado(
-                        numero=exp.get("numero", ""),
-                        caratula=exp.get("caratula", ""),
-                        dependencia=exp.get("dependencia", ""),
-                        situacion=exp.get("situacion", ""),
-                        fecha_inicio=exp.get("fecha_inicio", ""),
-                        ultima_actuacion=exp.get("ultima_actuacion", ""),
+                    # Guardar JSON
+                    listado_path = self._guardar_listado(
+                        session_id, expedientes, metadata
                     )
-                    for exp in expedientes_raw
-                ]
 
-                # Agregar motivo de finalización al metadata
-                metadata["motivo_finalizacion"] = motivo
-                print(f"📊 Motivo de finalización: {motivo}")
+                    # Actualizar BASE permanente
+                    try:
+                        base_path = self.actualizar_base_permanente(str(listado_path))
+                        print(f"✅ BASE permanente actualizado: {base_path}")
+                    except Exception as e:
+                        print(f"⚠️ Error actualizando BASE (no crítico): {e}")
 
-                # Guardar JSON
-                listado_path = self._guardar_listado(
-                    session_id, expedientes, metadata
-                )
+                    # Comparar con BASE si existe
+                    try:
+                        comparacion = self.comparar_con_base(str(listado_path))
+                        if comparacion:
+                            sesion.comparacion = comparacion.to_dict()
+                    except Exception as e:
+                        print(f"⚠️ Error en comparación (no crítico): {e}")
 
-                # Actualizar BASE permanente
-                try:
-                    base_path = self.actualizar_base_permanente(str(listado_path))
-                    print(f"✅ BASE permanente actualizado: {base_path}")
-                except Exception as e:
-                    print(f"⚠️ Error actualizando BASE (no crítico): {e}")
+                    # Guardar página count antes de sobrescribir
+                    paginas_procesadas = sesion.progreso_actual
 
-                # Comparar con BASE si existe
-                try:
-                    comparacion = self.comparar_con_base(str(listado_path))
-                    if comparacion:
-                        sesion.comparacion = comparacion.to_dict()
-                except Exception as e:
-                    print(f"⚠️ Error en comparación (no crítico): {e}")
+                    # Actualizar sesión
+                    print(f"\n{'='*60}")
+                    print(f"✅ FINALIZANDO EXTRACCIÓN")
+                    print(f"   Total expedientes: {len(expedientes)}")
+                    print(f"   Motivo: {motivo}")
+                    print(f"   Estableciendo estado = 'completado'")
+                    print(f"{'='*60}\n")
+                    sesion.estado = "completado"
+                    sesion.fase = "listado"
+                    sesion.tiempo_fin = datetime.now().isoformat()
+                    sesion.paginas_procesadas = paginas_procesadas  # Total de páginas procesadas
+                    sesion.progreso_actual = len(expedientes)
+                    sesion.progreso_total = len(expedientes)
+                    sesion.listado_path = str(listado_path)
+                    sesion.metadata = metadata  # Incluye total_esperado, paginas_esperadas, etc.
 
-                # Guardar página count antes de sobrescribir
-                paginas_procesadas = sesion.progreso_actual
+                    # Generar mensaje descriptivo según el motivo
+                    mensaje_motivo = self._describir_motivo(motivo, metadata)
 
-                # Actualizar sesión
-                print(f"\n{'='*60}")
-                print(f"✅ FINALIZANDO EXTRACCIÓN")
-                print(f"   Total expedientes: {len(expedientes)}")
-                print(f"   Motivo: {motivo}")
-                print(f"   Estableciendo estado = 'completado'")
-                print(f"{'='*60}\n")
-                sesion.estado = "completado"
-                sesion.fase = "listado"
-                sesion.tiempo_fin = datetime.now().isoformat()
-                sesion.paginas_procesadas = paginas_procesadas  # Total de páginas procesadas
-                sesion.progreso_actual = len(expedientes)
-                sesion.progreso_total = len(expedientes)
-                sesion.listado_path = str(listado_path)
-                sesion.metadata = metadata  # Incluye total_esperado, paginas_esperadas, etc.
+                    # Construir mensaje con información de total_esperado si está disponible
+                    total_esperado = metadata.get("total_esperado")
+                    if total_esperado:
+                        porcentaje = (len(expedientes) / total_esperado * 100) if total_esperado > 0 else 0
+                        completitud = f"{len(expedientes)}/{total_esperado} ({porcentaje:.1f}%)"
+                        sesion.mensaje = f"✅ Extracción completada: {completitud} expedientes. {mensaje_motivo}"
+                    else:
+                        sesion.mensaje = f"✅ Extracción completada: {len(expedientes)} expedientes extraídos. {mensaje_motivo}"
 
-                # Generar mensaje descriptivo según el motivo
-                mensaje_motivo = self._describir_motivo(motivo, metadata)
+                    sesion.motivo_finalizacion = mensaje_motivo  # Guardar motivo descriptivo para el frontend
 
-                # Construir mensaje con información de total_esperado si está disponible
-                total_esperado = metadata.get("total_esperado")
-                if total_esperado:
-                    porcentaje = (len(expedientes) / total_esperado * 100) if total_esperado > 0 else 0
-                    completitud = f"{len(expedientes)}/{total_esperado} ({porcentaje:.1f}%)"
-                    sesion.mensaje = f"✅ Extracción completada: {completitud} expedientes. {mensaje_motivo}"
-                else:
-                    sesion.mensaje = f"✅ Extracción completada: {len(expedientes)} expedientes extraídos. {mensaje_motivo}"
+                    if callback_progreso:
+                        print(f"📡 Llamando callback_progreso con estado = '{sesion.estado}'")
+                        callback_progreso(sesion)
+                        print(f"✓ Callback ejecutado correctamente")
+                    else:
+                        print(f"⚠️ No hay callback_progreso configurado")
 
-                sesion.motivo_finalizacion = mensaje_motivo  # Guardar motivo descriptivo para el frontend
+                    print(f"✅ Retornando sesión con estado = '{sesion.estado}'")
+                    return sesion
 
-                if callback_progreso:
-                    print(f"📡 Llamando callback_progreso con estado = '{sesion.estado}'")
-                    callback_progreso(sesion)
-                    print(f"✓ Callback ejecutado correctamente")
-                else:
-                    print(f"⚠️ No hay callback_progreso configurado")
-
-                print(f"✅ Retornando sesión con estado = '{sesion.estado}'")
-                return sesion
+                finally:
+                    # Cerrar browser al final (success o error)
+                    print("🚪 Cerrando navegador principal...")
+                    await browser.close()
 
         except Exception as e:
             sesion.estado = "error"
@@ -461,6 +459,44 @@ class ExtractorMasivo:
         except Exception as e:
             print(f"⚠️ No se encontró tabla de expedientes: {e}")
             raise
+
+    async def _login_y_navegar(
+        self,
+        page: Page,
+        username: str,
+        password: str,
+        sesion: Optional[SesionExtraccion] = None,
+        callback_progreso: Optional[callable] = None
+    ):
+        """
+        Helper: Realiza login y navegación a listado con página limpia.
+
+        Este método encapsula la secuencia completa de autenticación y navegación,
+        permitiendo su reutilización en cada intento de extracción con estado limpio.
+
+        Args:
+            page: Página de Playwright (debe ser nueva/limpia)
+            username: Usuario PJN
+            password: Contraseña PJN
+            sesion: Sesión de extracción (opcional, para callbacks)
+            callback_progreso: Callback para reportar progreso (opcional)
+        """
+        # Configurar timeout de página
+        page.set_default_timeout(self.config.timeout_pagina)
+
+        # Login en PJN
+        if sesion:
+            sesion.mensaje = "Autenticando en PJN..."
+            if callback_progreso:
+                callback_progreso(sesion)
+        await self._login_pjn(page, username, password)
+
+        # Navegar a listado de expedientes
+        if sesion:
+            sesion.mensaje = "Navegando a listado de expedientes..."
+            if callback_progreso:
+                callback_progreso(sesion)
+        await self._navegar_a_listado(page)
 
     def _guardar_listado(
         self,
