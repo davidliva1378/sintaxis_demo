@@ -160,15 +160,34 @@ async def _is_locator_enabled(locator: Locator) -> bool:
     return True
 
 
-async def _tbody_fingerprint(tbody: Locator | ElementHandle) -> str:
+async def _tbody_fingerprint(tbody: Locator | ElementHandle, timeout_ms: int = 5000) -> str:
     """
     Crea un fingerprint simple del tbody para detectar cambio de página.
 
     Al recibir directamente el locator/handle podemos usar cualquier motor de
     selectores soportados por Playwright (css=, xpath=, text=, etc.).
+
+    Args:
+        tbody: Locator o ElementHandle del tbody
+        timeout_ms: Timeout en milisegundos para prevenir bloqueos (default: 5000ms)
+
+    Raises:
+        TimeoutError: Si la operación excede el timeout (navegador posiblemente corrupto)
     """
-    html = await tbody.inner_html()
-    return _build_fingerprint(html)
+    try:
+        html = await asyncio.wait_for(
+            tbody.inner_html(),
+            timeout=timeout_ms / 1000
+        )
+        return _build_fingerprint(html)
+    except asyncio.TimeoutError:
+        logger.error(
+            "⏱️ Timeout obteniendo tbody fingerprint después de %dms - navegador posiblemente corrupto",
+            timeout_ms
+        )
+        raise TimeoutError(
+            f"Timeout obteniendo tbody fingerprint después de {timeout_ms}ms"
+        )
 
 _SEL_TOTAL_EXPEDIENTES = "strong:has-text('Se han encontrado')"
 
