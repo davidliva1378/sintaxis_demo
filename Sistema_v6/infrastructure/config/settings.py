@@ -72,6 +72,8 @@ class ScrapingSettings(BaseSettings):
         timeout_default: Timeout por defecto en ms para operaciones de scraping
         timeout_login: Timeout para operaciones de login en ms
         timeout_descarga: Timeout para descarga de archivos en ms
+        timeout_tabla_expedientes: Timeout para tablas de expedientes en ms (sitios lentos)
+        timeout_loading_hidden: Timeout para elementos aparecer/desaparecer en ms
         max_paginas_expedientes: Máximo de páginas a extraer (None = sin límite)
         max_reintentos_descarga: Máximo de reintentos para descargas
         caratula_coincidencia_parcial: Si True, permite coincidencia parcial en carátulas
@@ -82,6 +84,8 @@ class ScrapingSettings(BaseSettings):
     timeout_default: int = 8000
     timeout_login: int = 60000
     timeout_descarga: int = 30000
+    timeout_tabla_expedientes: int = 30000  # 30s para sitios lentos
+    timeout_loading_hidden: int = 12000  # 12s para elementos aparecer/desaparecer
     max_paginas_expedientes: int | None = 200
     max_reintentos_descarga: int = 3
     caratula_coincidencia_parcial: bool = True

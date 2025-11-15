@@ -269,17 +269,22 @@ class ExtractorMasivo:
                         # Restaurar stdout en caso de error
                         sys.stdout = old_stdout
 
-                        # Determinar tipo de error
+                        # Determinar tipo de error con mejor precisión
                         error_str = str(e_intento).lower()
+                        error_type = type(e_intento).__name__
+
                         if any(keyword in error_str for keyword in ['target closed', 'browser', 'context closed', 'connection closed']):
                             motivo = "navegador_cerrado"
                             print(f"\n❌ El navegador se cerró inesperadamente durante intento {sesion.intentos_realizados}")
-                        elif 'timeout' in error_str:
+                        elif error_type == 'TimeoutError' or 'timeout' in error_str:
                             motivo = "timeout_conexion"
                             print(f"\n❌ Timeout de conexión durante intento {sesion.intentos_realizados}")
+                            print(f"   Detalles: {e_intento}")
                         else:
                             motivo = "error_desconocido"
-                            print(f"\n❌ Error durante intento {sesion.intentos_realizados}: {e_intento}")
+                            print(f"\n❌ Error durante intento {sesion.intentos_realizados}")
+                            print(f"   Tipo: {error_type}")
+                            print(f"   Mensaje: {e_intento}")
 
                         # Registrar error en historial
                         sesion.historial_intentos.append({

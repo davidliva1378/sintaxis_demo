@@ -339,18 +339,28 @@ async def _aplicar_ordenamiento_tabla(
         return
 
     try:
+        logger.info("🔄 Iniciando ordenamiento por %s...", orden.upper())
         await page.select_option(_SEL_ORDEN_SELECT, value=valor_orden)
         await page.locator(_SEL_ORDENAR_LINK).click()
+
+        # Esperar que tabla se oculte (máx 8s)
         try:
             await tabla.wait_for(state=STATE_HIDDEN, timeout=_config.scraping.timeout_default)
+            logger.debug("   ✓ Tabla ocultada")
         except TimeoutError:
-            pass
+            logger.warning("   ⚠️ Tabla no se ocultó, continuando...")
+
+        # Esperar que tabla reaparezca ordenada (máx 30s)
         await tabla.wait_for(state=STATE_VISIBLE, timeout=_config.scraping.timeout_tabla_expedientes)
-        logger.info("🔽 Tabla ordenada por %s", orden.upper())
+        logger.info("✅ Tabla ordenada por %s", orden.upper())
     except TimeoutError as exc:
-        logger.warning(
-            "⚠️ El reordenamiento por %s no se completó a tiempo: %s", orden, exc
+        logger.error(
+            "❌ FALLO ORDENAMIENTO: Timeout ordenando por %s después de %dms: %s",
+            orden,
+            _config.scraping.timeout_tabla_expedientes,
+            exc
         )
+        logger.error("   ⚠️ Continuando extracción con orden PREDETERMINADO (alfabético)")
     except Error as exc:
         logger.warning("⚠️ No se pudo reordenar la tabla por %s: %s", orden, exc)
 
@@ -590,7 +600,12 @@ async def extraer_expedientes_completos(
 
     # Aseguramos presencia de tabla
     tabla = page.locator(sel_tabla_final)
-    await tabla.wait_for(state=STATE_VISIBLE, timeout=_config.scraping.timeout_tabla_expedientes)
+    try:
+        await tabla.wait_for(state=STATE_VISIBLE, timeout=_config.scraping.timeout_tabla_expedientes)
+        logger.debug("✓ Tabla de expedientes visible")
+    except TimeoutError as exc:
+        logger.error("❌ Timeout esperando tabla de expedientes (>%dms)", _config.scraping.timeout_tabla_expedientes)
+        raise TimeoutError(f"Tabla de expedientes no apareció en {_config.scraping.timeout_tabla_expedientes}ms") from exc
 
     total_esperado = await _extraer_total_esperado(page)
     if total_esperado is not None:
