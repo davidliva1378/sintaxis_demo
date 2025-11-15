@@ -249,28 +249,46 @@ async def _navegar_siguiente_pagina(
         return False, "siguiente_deshabilitado"
 
     # Hacer clic
+    # ⚠️ TIMEOUT CRÍTICO: click puede bloquearse si elemento no es clickeable
     try:
-        await boton.click()
+        await asyncio.wait_for(
+            boton.click(timeout=15000),
+            timeout=20.0  # 15s del click + 5s de margen
+        )
+    except asyncio.TimeoutError:
+        logger.error("Timeout al hacer clic en 'Siguiente' (20s)")
+        return False, "error_click_timeout"
     except (TimeoutError, Error) as exc:
         logger.error("Fallo al hacer clic en 'Siguiente': %s", exc)
         return False, "error_click"
 
     # Esperar a que cambie el tbody
+    # ⚠️ TIMEOUT CRÍTICO: El loop completo necesita timeout para evitar bloqueo
     max_wait_ms = 12_000
     poll_interval_ms = 400
-    elapsed_ms = 0
-    fingerprint_cambio = False
 
-    while elapsed_ms < max_wait_ms:
-        despues = await _tbody_fingerprint(tbody_locator)
-        if despues != fingerprint_actual:
-            fingerprint_cambio = True
-            break
-        wait_time = min(poll_interval_ms, max_wait_ms - elapsed_ms)
-        if wait_time <= 0:
-            break
-        await page.wait_for_timeout(wait_time)
-        elapsed_ms += wait_time
+    async def _wait_for_change():
+        """Helper para esperar cambio de tbody con polling."""
+        elapsed_ms = 0
+        while elapsed_ms < max_wait_ms:
+            despues = await _tbody_fingerprint(tbody_locator)
+            if despues != fingerprint_actual:
+                return True  # Cambio detectado
+            wait_time = min(poll_interval_ms, max_wait_ms - elapsed_ms)
+            if wait_time <= 0:
+                break
+            await page.wait_for_timeout(wait_time)
+            elapsed_ms += wait_time
+        return False  # No hubo cambio
+
+    try:
+        fingerprint_cambio = await asyncio.wait_for(
+            _wait_for_change(),
+            timeout=20.0  # 12s del loop + 8s de margen
+        )
+    except asyncio.TimeoutError:
+        logger.error("Timeout esperando cambio de tbody tras click en Siguiente (20s)")
+        return False, "timeout_esperando_cambio"
 
     if not fingerprint_cambio:
         return False, "fin_listado"
@@ -666,12 +684,16 @@ async def extraer_expedientes_completos(
         paginas_visitadas[fingerprint_actual] = paginas_recorridas
 
         # 1) Extraer filas visibles de ESTA página en un solo evaluate
-        filas: list[list[str]] = await page.evaluate(
-            """(tbodySelector) => Array.from(
-                    document.querySelectorAll(`${tbodySelector} tr`),
-                    tr => Array.from(tr.cells, c => c.innerText.trim())
-                )""",
-            sel_tbody_final,
+        # ⚠️ TIMEOUT CRÍTICO: page.evaluate puede bloquearse si DOM está inconsistente
+        filas: list[list[str]] = await asyncio.wait_for(
+            page.evaluate(
+                """(tbodySelector) => Array.from(
+                        document.querySelectorAll(`${tbodySelector} tr`),
+                        tr => Array.from(tr.cells, c => c.innerText.trim())
+                    )""",
+                sel_tbody_final,
+            ),
+            timeout=30.0
         )
 
         # 2) Procesar filas de la página actual
@@ -780,7 +802,8 @@ async def extraer_datos_expediente(page: Page) -> dict[str, str] | None:
     """Extrae los campos principales del expediente actualmente abierto."""
 
     try:
-        await page.wait_for_load_state("load")
+        # ⚠️ Timeout explícito para evitar bloqueo si página nunca termina de cargar
+        await page.wait_for_load_state("load", timeout=30000)
         await page.wait_for_timeout(2_000)
 
         numero = await page.query_selector(SEL_EXPEDIENTES.NUMERO_DETALLE)
@@ -822,7 +845,8 @@ async def abrir_expediente_desde_fila(
 
     logger.info("👁 Haciendo clic para abrir el expediente...")
     await enlace.click()
-    await page.wait_for_load_state("load")
+    # ⚠️ Timeout explícito para evitar bloqueo si página nunca termina de cargar
+    await page.wait_for_load_state("load", timeout=30000)
     await page.wait_for_timeout(2_000)
 
     datos = await extraer_datos_expediente(page)

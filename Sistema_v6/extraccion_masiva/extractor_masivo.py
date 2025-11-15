@@ -150,31 +150,42 @@ class ExtractorMasivo:
                 self.original.flush()
 
         try:
-            async with async_playwright() as p:
-                # Crear browser UNA vez (fuera del loop de reintentos)
-                browser = await p.chromium.launch(
-                    headless=self.config.headless
-                )
-                print("🌐 Navegador principal creado")
+            # Variables del loop de reintentos (fuera del loop)
+            motivo = None
+            expedientes_raw = None
+            metadata = None
+            exito = False
 
-                try:
-                    # Variables del loop de reintentos
-                    motivo = None
-                    expedientes_raw = None
-                    metadata = None
-                    exito = False
+            # LOOP DE REINTENTOS
+            # ⚠️ OPCIÓN B: Crear browser NUEVO en cada intento para garantizar estado 100% limpio
+            while sesion.intentos_realizados < sesion.intentos_maximos and not exito:
+                sesion.intentos_realizados += 1
+                print(f"\n{'='*60}")
+                print(f"🔄 Intento {sesion.intentos_realizados}/{sesion.intentos_maximos}")
+                print(f"{'='*60}")
 
-                    # LOOP DE REINTENTOS
-                    while sesion.intentos_realizados < sesion.intentos_maximos and not exito:
-                        sesion.intentos_realizados += 1
-                        print(f"\n{'='*60}")
-                        print(f"🔄 Intento {sesion.intentos_realizados}/{sesion.intentos_maximos}")
-                        print(f"{'='*60}")
-                        print(f"📄 Creando contexto/página nueva para intento {sesion.intentos_realizados}...\n")
+                # Crear browser NUEVO para este intento (estado 100% limpio)
+                async with async_playwright() as p:
+                    print(f"🌐 Creando navegador limpio para intento {sesion.intentos_realizados}...\n")
+                    browser = await p.chromium.launch(headless=self.config.headless)
 
-                        # Crear contexto/página NUEVA para este intento
-                        context = await browser.new_context()
-                        page = await context.new_page()
+                    try:
+                        # Crear contexto/página con timeout
+                        try:
+                            context = await asyncio.wait_for(
+                                browser.new_context(),
+                                timeout=30.0
+                            )
+                            page = await asyncio.wait_for(
+                                context.new_page(),
+                                timeout=30.0
+                            )
+                            print("✅ Navegador/contexto/página creados exitosamente\n")
+                        except asyncio.TimeoutError:
+                            print("❌ TIMEOUT creando contexto/página")
+                            raise TimeoutError(
+                                "Timeout creando contexto/página del navegador (30s)"
+                            )
 
                         # Guardar referencia a stdout original
                         old_stdout = sys.stdout
@@ -213,14 +224,21 @@ class ExtractorMasivo:
 
                             try:
                                 # Extraer expedientes con monitoreo de progreso
-                                expedientes_raw, motivo, metadata = await extraer_expedientes_completos(
-                                    page,
-                                    fecha_corte=fecha_corte,
-                                    tiempo_maximo_segundos=self.config.tiempo_maximo_segundos,
-                                    orden="fecha",  # Ordenar por fecha para facilitar comparación
-                                    detener_en_duplicado=self.config.detener_en_duplicado,
-                                    omitir_duplicados=self.config.omitir_duplicados,
-                                    max_paginas=self.config.max_paginas,
+                                # ⚠️ TIMEOUT GLOBAL: Cancela TODA la extracción si se bloquea
+                                timeout_total = self.config.tiempo_maximo_segundos or 3600  # 1 hora por defecto
+                                print(f"⏱️ Timeout global configurado: {timeout_total}s para extracción completa\n")
+
+                                expedientes_raw, motivo, metadata = await asyncio.wait_for(
+                                    extraer_expedientes_completos(
+                                        page,
+                                        fecha_corte=fecha_corte,
+                                        tiempo_maximo_segundos=self.config.tiempo_maximo_segundos,
+                                        orden="fecha",  # Ordenar por fecha para facilitar comparación
+                                        detener_en_duplicado=self.config.detener_en_duplicado,
+                                        omitir_duplicados=self.config.omitir_duplicados,
+                                        max_paginas=self.config.max_paginas,
+                                    ),
+                                    timeout=timeout_total
                                 )
                             finally:
                                 # Restaurar stdout SIEMPRE
@@ -265,6 +283,14 @@ class ExtractorMasivo:
                             # Restaurar stdout en caso de error
                             if sys.stdout != old_stdout:
                                 sys.stdout = old_stdout
+
+                            # Imprimir traceback completo para debugging
+                            import traceback
+                            print(f"\n{'='*60}")
+                            print(f"🔍 TRACEBACK COMPLETO DEL ERROR:")
+                            print(f"{'='*60}")
+                            traceback.print_exc()
+                            print(f"{'='*60}\n")
 
                             # Determinar tipo de error con mejor precisión
                             error_str = str(e_intento).lower()
@@ -320,102 +346,116 @@ class ExtractorMasivo:
                         finally:
                             # CRUCIAL: Cerrar contexto/página SIEMPRE al terminar cada intento
                             print(f"🔒 Cerrando contexto/página del intento {sesion.intentos_realizados}...")
-                            await page.close()
-                            await context.close()
+                            try:
+                                # ⚠️ Timeout en cierre para evitar bloqueo si navegador ya murió
+                                await asyncio.wait_for(page.close(), timeout=5.0)
+                                await asyncio.wait_for(context.close(), timeout=5.0)
+                                print("✅ Contexto/página cerrados correctamente")
+                            except asyncio.TimeoutError:
+                                print("⏱️ Timeout cerrando página/contexto (navegador probablemente cerrado)")
+                            except Exception as e_close:
+                                print(f"⚠️ Error cerrando página/contexto: {e_close}")
 
-                    # Después del loop: procesar resultado final
-                    if sesion.estado == "error_agotado":
-                        sesion.tiempo_fin = datetime.now().isoformat()
-                        sesion.mensaje = f"❌ Extracción fallida tras {sesion.intentos_realizados} intentos. Último motivo: {motivo}"
-                        sesion.motivo_finalizacion = motivo
-                        if callback_progreso:
-                            callback_progreso(sesion)
-                        raise Exception(f"Extracción fallida tras {sesion.intentos_realizados} intentos: {motivo}")
+                    finally:
+                        # Cerrar browser EXPLÍCITAMENTE con timeout
+                        print(f"🚪 Cerrando navegador del intento {sesion.intentos_realizados}...")
+                        try:
+                            # ⚠️ Timeout en cierre de browser para evitar bloqueo
+                            await asyncio.wait_for(browser.close(), timeout=5.0)
+                            print("✅ Navegador cerrado correctamente\n")
+                        except asyncio.TimeoutError:
+                            print("⏱️ Timeout cerrando navegador (probablemente ya estaba cerrado)\n")
+                        except Exception as e_browser:
+                            print(f"⚠️ Error cerrando navegador: {e_browser}\n")
 
-                    # Convertir a ExpedienteListado
-                    expedientes = [
-                        ExpedienteListado(
-                            numero=exp.get("numero", ""),
-                            caratula=exp.get("caratula", ""),
-                            dependencia=exp.get("dependencia", ""),
-                            situacion=exp.get("situacion", ""),
-                            fecha_inicio=exp.get("fecha_inicio", ""),
-                            ultima_actuacion=exp.get("ultima_actuacion", ""),
-                        )
-                        for exp in expedientes_raw
-                    ]
+            # Después del loop: procesar resultado final
+            if sesion.estado == "error_agotado":
+                sesion.tiempo_fin = datetime.now().isoformat()
+                sesion.mensaje = f"❌ Extracción fallida tras {sesion.intentos_realizados} intentos. Último motivo: {motivo}"
+                sesion.motivo_finalizacion = motivo
+                if callback_progreso:
+                    callback_progreso(sesion)
+                raise Exception(f"Extracción fallida tras {sesion.intentos_realizados} intentos: {motivo}")
 
-                    # Agregar motivo de finalización al metadata
-                    metadata["motivo_finalizacion"] = motivo
-                    print(f"📊 Motivo de finalización: {motivo}")
+            # Convertir a ExpedienteListado
+            expedientes = [
+                ExpedienteListado(
+                    numero=exp.get("numero", ""),
+                    caratula=exp.get("caratula", ""),
+                    dependencia=exp.get("dependencia", ""),
+                    situacion=exp.get("situacion", ""),
+                    fecha_inicio=exp.get("fecha_inicio", ""),
+                    ultima_actuacion=exp.get("ultima_actuacion", ""),
+                )
+                for exp in expedientes_raw
+            ]
 
-                    # Guardar JSON
-                    listado_path = self._guardar_listado(
-                        session_id, expedientes, metadata
-                    )
+            # Agregar motivo de finalización al metadata
+            metadata["motivo_finalizacion"] = motivo
+            print(f"📊 Motivo de finalización: {motivo}")
 
-                    # Actualizar BASE permanente
-                    try:
-                        base_path = self.actualizar_base_permanente(str(listado_path))
-                        print(f"✅ BASE permanente actualizado: {base_path}")
-                    except Exception as e:
-                        print(f"⚠️ Error actualizando BASE (no crítico): {e}")
+            # Guardar JSON
+            listado_path = self._guardar_listado(
+                session_id, expedientes, metadata
+            )
 
-                    # Comparar con BASE si existe
-                    try:
-                        comparacion = self.comparar_con_base(str(listado_path))
-                        if comparacion:
-                            sesion.comparacion = comparacion.to_dict()
-                    except Exception as e:
-                        print(f"⚠️ Error en comparación (no crítico): {e}")
+            # Actualizar BASE permanente
+            try:
+                base_path = self.actualizar_base_permanente(str(listado_path))
+                print(f"✅ BASE permanente actualizado: {base_path}")
+            except Exception as e:
+                print(f"⚠️ Error actualizando BASE (no crítico): {e}")
 
-                    # Guardar página count antes de sobrescribir
-                    paginas_procesadas = sesion.progreso_actual
+            # Comparar con BASE si existe
+            try:
+                comparacion = self.comparar_con_base(str(listado_path))
+                if comparacion:
+                    sesion.comparacion = comparacion.to_dict()
+            except Exception as e:
+                print(f"⚠️ Error en comparación (no crítico): {e}")
 
-                    # Actualizar sesión
-                    print(f"\n{'='*60}")
-                    print(f"✅ FINALIZANDO EXTRACCIÓN")
-                    print(f"   Total expedientes: {len(expedientes)}")
-                    print(f"   Motivo: {motivo}")
-                    print(f"   Estableciendo estado = 'completado'")
-                    print(f"{'='*60}\n")
-                    sesion.estado = "completado"
-                    sesion.fase = "listado"
-                    sesion.tiempo_fin = datetime.now().isoformat()
-                    sesion.paginas_procesadas = paginas_procesadas  # Total de páginas procesadas
-                    sesion.progreso_actual = len(expedientes)
-                    sesion.progreso_total = len(expedientes)
-                    sesion.listado_path = str(listado_path)
-                    sesion.metadata = metadata  # Incluye total_esperado, paginas_esperadas, etc.
+            # Guardar página count antes de sobrescribir
+            paginas_procesadas = sesion.progreso_actual
 
-                    # Generar mensaje descriptivo según el motivo
-                    mensaje_motivo = self._describir_motivo(motivo, metadata)
+            # Actualizar sesión
+            print(f"\n{'='*60}")
+            print(f"✅ FINALIZANDO EXTRACCIÓN")
+            print(f"   Total expedientes: {len(expedientes)}")
+            print(f"   Motivo: {motivo}")
+            print(f"   Estableciendo estado = 'completado'")
+            print(f"{'='*60}\n")
+            sesion.estado = "completado"
+            sesion.fase = "listado"
+            sesion.tiempo_fin = datetime.now().isoformat()
+            sesion.paginas_procesadas = paginas_procesadas  # Total de páginas procesadas
+            sesion.progreso_actual = len(expedientes)
+            sesion.progreso_total = len(expedientes)
+            sesion.listado_path = str(listado_path)
+            sesion.metadata = metadata  # Incluye total_esperado, paginas_esperadas, etc.
 
-                    # Construir mensaje con información de total_esperado si está disponible
-                    total_esperado = metadata.get("total_esperado")
-                    if total_esperado:
-                        porcentaje = (len(expedientes) / total_esperado * 100) if total_esperado > 0 else 0
-                        completitud = f"{len(expedientes)}/{total_esperado} ({porcentaje:.1f}%)"
-                        sesion.mensaje = f"✅ Extracción completada: {completitud} expedientes. {mensaje_motivo}"
-                    else:
-                        sesion.mensaje = f"✅ Extracción completada: {len(expedientes)} expedientes extraídos. {mensaje_motivo}"
+            # Generar mensaje descriptivo según el motivo
+            mensaje_motivo = self._describir_motivo(motivo, metadata)
 
-                    sesion.motivo_finalizacion = mensaje_motivo  # Guardar motivo descriptivo para el frontend
+            # Construir mensaje con información de total_esperado si está disponible
+            total_esperado = metadata.get("total_esperado")
+            if total_esperado:
+                porcentaje = (len(expedientes) / total_esperado * 100) if total_esperado > 0 else 0
+                completitud = f"{len(expedientes)}/{total_esperado} ({porcentaje:.1f}%)"
+                sesion.mensaje = f"✅ Extracción completada: {completitud} expedientes. {mensaje_motivo}"
+            else:
+                sesion.mensaje = f"✅ Extracción completada: {len(expedientes)} expedientes extraídos. {mensaje_motivo}"
 
-                    if callback_progreso:
-                        print(f"📡 Llamando callback_progreso con estado = '{sesion.estado}'")
-                        callback_progreso(sesion)
-                        print(f"✓ Callback ejecutado correctamente")
-                    else:
-                        print(f"⚠️ No hay callback_progreso configurado")
+            sesion.motivo_finalizacion = mensaje_motivo  # Guardar motivo descriptivo para el frontend
 
-                    print(f"✅ Retornando sesión con estado = '{sesion.estado}'")
-                    return sesion
+            if callback_progreso:
+                print(f"📡 Llamando callback_progreso con estado = '{sesion.estado}'")
+                callback_progreso(sesion)
+                print(f"✓ Callback ejecutado correctamente")
+            else:
+                print(f"⚠️ No hay callback_progreso configurado")
 
-                finally:
-                    # Cerrar browser al final (success o error)
-                    print("🚪 Cerrando navegador principal...")
-                    await browser.close()
+            print(f"✅ Retornando sesión con estado = '{sesion.estado}'")
+            return sesion
 
         except Exception as e:
             sesion.estado = "error"
@@ -430,15 +470,34 @@ class ExtractorMasivo:
         # URL correcta del portal PJN
         url_login = "https://portalpjn.pjn.gov.ar/inicio"
 
-        await page.goto(url_login)
-        await page.wait_for_load_state("domcontentloaded")
+        # ⚠️ TIMEOUT: Navegación a página de login (60s)
+        await asyncio.wait_for(
+            page.goto(url_login, timeout=60000),
+            timeout=65.0
+        )
+        # ⚠️ TIMEOUT: Espera de carga DOM (30s)
+        await asyncio.wait_for(
+            page.wait_for_load_state("domcontentloaded", timeout=30000),
+            timeout=35.0
+        )
 
         # Completar formulario de login con selectores correctos
-        await page.fill("input[name='username']", username)
-        await page.fill("input[name='password']", password)
+        # ⚠️ TIMEOUT: Llenado de formulario (15s cada uno)
+        await asyncio.wait_for(
+            page.fill("input[name='username']", username, timeout=15000),
+            timeout=20.0
+        )
+        await asyncio.wait_for(
+            page.fill("input[name='password']", password, timeout=15000),
+            timeout=20.0
+        )
 
         # Click en botón de login
-        await page.click("#kc-login")
+        # ⚠️ TIMEOUT: Click en botón login (15s)
+        await asyncio.wait_for(
+            page.click("#kc-login", timeout=15000),
+            timeout=20.0
+        )
 
         # Esperar confirmación de login exitoso
         await page.wait_for_selector("text='Menú'", timeout=60000)
@@ -449,8 +508,17 @@ class ExtractorMasivo:
         # URL correcta del sistema de consultas del PJN
         url_consultas = "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam"
 
-        await page.goto(url_consultas)
-        await page.wait_for_load_state("networkidle")
+        # ⚠️ TIMEOUT: Navegación a consultas (60s)
+        await asyncio.wait_for(
+            page.goto(url_consultas, timeout=60000),
+            timeout=65.0
+        )
+        # ⚠️ OPTIMIZACIÓN: Cambio de "networkidle" a "domcontentloaded" con timeout
+        # "networkidle" es muy propenso a bloquearse, "domcontentloaded" es más confiable
+        await asyncio.wait_for(
+            page.wait_for_load_state("domcontentloaded", timeout=30000),
+            timeout=35.0
+        )
 
         # Esperar que aparezca la tabla de expedientes con el selector correcto
         try:

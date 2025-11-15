@@ -5,6 +5,7 @@ implementaciones concretas para diferentes frameworks de paginación web.
 """
 
 from typing import Protocol, runtime_checkable
+import asyncio
 
 from playwright.async_api import Locator, Page, TimeoutError, Error
 
@@ -141,8 +142,15 @@ class PrimeFacesPaginationStrategy:
             return False, "siguiente_deshabilitado"
 
         # Hacer clic
+        # ⚠️ TIMEOUT CRÍTICO: click puede bloquearse si elemento no es clickeable
         try:
-            await boton.click()
+            await asyncio.wait_for(
+                boton.click(timeout=15000),
+                timeout=20.0  # 15s del click + 5s de margen
+            )
+        except asyncio.TimeoutError:
+            logger.error("Timeout al hacer clic en 'Siguiente' (20s)")
+            return False, "error_click_timeout"
         except (TimeoutError, Error) as exc:
             logger.error("Fallo al hacer clic en 'Siguiente': %s", exc)
             return False, "error_click"
@@ -191,20 +199,32 @@ class PrimeFacesPaginationStrategy:
         """
         from .expedientes import _tbody_fingerprint
 
-        elapsed_ms = 0
-        while elapsed_ms < self.max_wait_content_ms:
-            despues = await _tbody_fingerprint(tbody_locator)
-            if despues != fingerprint_actual:
-                return True
+        # ⚠️ TIMEOUT CRÍTICO: El loop completo necesita timeout para evitar bloqueo
+        async def _wait_for_change():
+            """Helper para esperar cambio de tbody con polling."""
+            elapsed_ms = 0
+            while elapsed_ms < self.max_wait_content_ms:
+                despues = await _tbody_fingerprint(tbody_locator)
+                if despues != fingerprint_actual:
+                    return True
 
-            wait_time = min(self.poll_interval_ms, self.max_wait_content_ms - elapsed_ms)
-            if wait_time <= 0:
-                break
+                wait_time = min(self.poll_interval_ms, self.max_wait_content_ms - elapsed_ms)
+                if wait_time <= 0:
+                    break
 
-            await page.wait_for_timeout(wait_time)
-            elapsed_ms += wait_time
+                await page.wait_for_timeout(wait_time)
+                elapsed_ms += wait_time
 
-        return False
+            return False
+
+        try:
+            return await asyncio.wait_for(
+                _wait_for_change(),
+                timeout=20.0  # self.max_wait_content_ms (12s) + 8s de margen
+            )
+        except asyncio.TimeoutError:
+            logger.error("Timeout esperando cambio de contenido tras click en Siguiente (20s)")
+            return False
 
 
 # Estrategia por defecto (PrimeFaces)
