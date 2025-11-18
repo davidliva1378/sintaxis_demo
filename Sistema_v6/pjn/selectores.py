@@ -71,11 +71,13 @@ class ExpedientesSelectores:
     ENLACE_EXPEDIENTE: ClassVar[str] = "a"  # Dentro de fila
 
     # Detalle del expediente abierto (IDs JSF - frágiles)
+    # Última actualización: 2025-11-18
+    # Cambio: j_idt96 → j_idt99 (el PJN regeneró los IDs JSF)
     NUMERO_DETALLE: ClassVar[str] = "span[style='color:#000000;']"
-    CARATULA_DETALLE: ClassVar[str] = r"#expediente\:j_idt96\:detailCover"
-    DEPENDENCIA_DETALLE: ClassVar[str] = r"#expediente\:j_idt96\:detailDependencia"
-    JURISDICCION_DETALLE: ClassVar[str] = r"#expediente\:j_idt96\:detailCamera"
-    SITUACION_DETALLE: ClassVar[str] = r"#expediente\:j_idt96\:detailSituation"
+    CARATULA_DETALLE: ClassVar[str] = r"#expediente\:j_idt99\:detailCover"
+    DEPENDENCIA_DETALLE: ClassVar[str] = r"#expediente\:j_idt99\:detailDependencia"
+    JURISDICCION_DETALLE: ClassVar[str] = r"#expediente\:j_idt99\:detailCamera"
+    SITUACION_DETALLE: ClassVar[str] = r"#expediente\:j_idt99\:detailSituation"
 
     # Mensajes
     MENSAJE_SIN_RESULTADOS: ClassVar[str] = "text=No se han encontrado expedientes"

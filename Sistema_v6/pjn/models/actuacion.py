@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from Sistema_v6.core.domain.utils.coercion import coerce_bool, coerce_int, coerce_str, get_first
+from core.domain.utils.coercion import coerce_bool, coerce_int, coerce_str, get_first
 
 
 @dataclass(slots=True)

@@ -10,10 +10,10 @@ import os
 from datetime import datetime, timedelta
 from PySide6.QtCore import QThread, Signal
 
-from Sistema_v6.configuracion.urls import URL_CONSULTAS
-from Sistema_v6.pjn.monitor.extraer_expedientes import extraer_expedientes
-from Sistema_v6.pjn.auto_login import reutilizar_sesion_async
-from Sistema_v6.utils.logging import registrar_log
+from configuracion.urls import URL_CONSULTAS
+from pjn.monitor.extraer_expedientes import extraer_expedientes
+from pjn.auto_login import reutilizar_sesion_async
+from utils.logging import registrar_log
 
 
 def obtener_fecha_corte(config: dict) -> str | None:

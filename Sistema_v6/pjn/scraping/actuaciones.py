@@ -12,7 +12,7 @@ from pathlib import Path
 from playwright.async_api import ElementHandle, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
-from Sistema_v6.infrastructure.exceptions import (
+from infrastructure.exceptions import (
     ActuacionesNoDisponibles,
     DescargaFallida,
     ExtraccionError,

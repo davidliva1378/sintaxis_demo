@@ -10,9 +10,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, TypedDict
 
-from Sistema_v6.gestor_directorios import GestorDirectoriosExpedientes
-from Sistema_v6.pjn.scraping import normalizar_numero_expediente
-from Sistema_v6.pjn.scraping.actuaciones import (
+from gestor_directorios import GestorDirectoriosExpedientes
+from pjn.scraping import normalizar_numero_expediente
+from pjn.scraping.actuaciones import (
     descargar_archivos_de_json,
     extraer_actuaciones_completas,
 )

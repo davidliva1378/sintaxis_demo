@@ -11,10 +11,10 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[3]
 if str(PACKAGE_ROOT) not in sys.path:
     sys.path.append(str(PACKAGE_ROOT))
 
-from Sistema_v6.pjn.config import get_config
-from Sistema_v6.pjn.models import Actuacion, ActuacionesArchivo
-from Sistema_v6.pjn.parsers.actuaciones_parser import construir_actuaciones_archivo
-from Sistema_v6.pjn.scraping.base import normalizar_numero_expediente
+from pjn.config import get_config
+from pjn.models import Actuacion, ActuacionesArchivo
+from pjn.parsers.actuaciones_parser import construir_actuaciones_archivo
+from pjn.scraping.base import normalizar_numero_expediente
 
 import logging
 logger = logging.getLogger(__name__)

@@ -7,7 +7,7 @@ import requests
 from playwright.sync_api import sync_playwright
 from datetime import date, datetime
 from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QMessageBox
-from Sistema_v6.pjn.auto_login import iniciar_sesion  # 🔹 Importamos la función de autologin
+from pjn.auto_login import iniciar_sesion  # 🔹 Importamos la función de autologin
 from src.database_v1 import conectar_bd  # 🔹 Importamos la conexión a la base de datos
 
 
@@ -292,7 +292,7 @@ if __name__ == "__main__":
 # import json
 # import re
 # from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget
-# from Sistema_v6.pjn.auto_login import iniciar_sesion  # 🔹 Importamos la función de autologin
+# from pjn.auto_login import iniciar_sesion  # 🔹 Importamos la función de autologin
 #
 #
 # class NavegadorPersonalizado(QMainWindow):
@@ -440,7 +440,7 @@ if __name__ == "__main__":
 # # import json
 # # import re
 # # from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget
-# # from Sistema_v6.pjn.auto_login import iniciar_sesion  # 🔹 Importamos la función de autologin
+# # from pjn.auto_login import iniciar_sesion  # 🔹 Importamos la función de autologin
 # #
 # #
 # # class NavegadorPersonalizado(QMainWindow):

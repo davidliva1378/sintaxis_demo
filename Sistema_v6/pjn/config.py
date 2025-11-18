@@ -5,7 +5,7 @@ Re-exporta la configuración desde el módulo principal de configuración.
 
 from __future__ import annotations
 
-from Sistema_v6.infrastructure.config.settings import Settings, get_settings
+from infrastructure.config.settings import Settings, get_settings
 
 def get_config() -> Settings:
     """Obtiene la instancia de configuración.

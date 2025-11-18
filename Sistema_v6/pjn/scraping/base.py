@@ -33,7 +33,7 @@ from playwright.async_api import (
 )
 
 from ..config import get_config
-from Sistema_v6.infrastructure.exceptions import CredencialesFaltantes, SesionInvalida
+from infrastructure.exceptions import CredencialesFaltantes, SesionInvalida
 from ..selectores import SEL_AUTH
 
 import logging
