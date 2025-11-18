@@ -271,6 +271,39 @@ async def obtener_expediente(numero: str):
         )
 
 
+@router.post("/reload", status_code=status.HTTP_200_OK)
+async def recargar_expedientes():
+    """Recarga la lista de expedientes desde el almacenamiento, invalidando la caché.
+
+    Returns:
+        dict con mensaje de confirmación
+
+    Raises:
+        HTTPException: Si hay error al recargar
+    """
+    logger.info("POST /expedientes/reload")
+
+    try:
+        # Obtener repositorio
+        container = get_container()
+        repo = container.expediente_repo
+
+        # Recargar desde archivo
+        await repo.recargar()
+
+        return {
+            "success": True,
+            "message": "Expedientes recargados exitosamente"
+        }
+
+    except Exception as e:
+        logger.exception("Error al recargar expedientes")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno: {str(e)}",
+        )
+
+
 @router.get("/{numero}/actuaciones", response_model=list[ActuacionResponse], status_code=status.HTTP_200_OK)
 async def obtener_actuaciones(numero: str):
     """Obtiene las actuaciones de un expediente.

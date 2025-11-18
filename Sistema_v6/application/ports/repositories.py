@@ -78,6 +78,11 @@ class IExpedienteRepository(ABC):
         pass
 
     @abstractmethod
+    async def recargar(self) -> None:
+        """Recarga los expedientes desde el almacenamiento, invalidando la caché."""
+        pass
+
+    @abstractmethod
     async def filtrar_por_dependencia(self, dependencia: str) -> list[ExpedienteResumen]:
         """Filtra expedientes por dependencia.
 

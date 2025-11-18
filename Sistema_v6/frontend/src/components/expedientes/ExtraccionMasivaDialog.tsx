@@ -491,6 +491,11 @@ export default function ExtraccionMasivaDialog({ onClose, onSuccess }: Extraccio
     setMostrarReporte(false)
     setTipoExtraccion('masiva')
 
+    // Llamar onSuccess si hay expedientes procesados (para refrescar la lista en el padre)
+    if (tipoExtraccion === 'seleccionados' && expedientesExtraidos.length > 0 && onSuccess) {
+      onSuccess(expedientesExtraidos)
+    }
+
     // Cerrar el diálogo
     onClose()
   }

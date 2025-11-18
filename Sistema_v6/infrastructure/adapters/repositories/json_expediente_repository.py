@@ -11,6 +11,7 @@ from typing import Sequence
 
 from application.ports import IExpedienteRepository, IStoragePort
 from core.domain.entities import ExpedienteResumen
+from core.domain.expediente_utils import normalizar_numero_expediente
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +45,18 @@ class JsonExpedienteRepository(IExpedienteRepository):
         self._expedientes: dict[str, ExpedienteResumen] = {}
         self._cargado = False
 
-    async def _cargar(self) -> None:
-        """Carga expedientes desde el archivo JSON si existe."""
-        if self._cargado:
+    async def _cargar(self, forzar: bool = False) -> None:
+        """Carga expedientes desde el archivo JSON si existe.
+
+        Args:
+            forzar: Si True, recarga los datos incluso si ya están cargados
+        """
+        if self._cargado and not forzar:
             return
+
+        # Limpiar expedientes existentes si estamos recargando
+        if forzar:
+            self._expedientes.clear()
 
         if await self._storage.existe_archivo(self._archivo_json):
             logger.debug(f"Cargando expedientes desde {self._archivo_json}")
@@ -70,6 +79,11 @@ class JsonExpedienteRepository(IExpedienteRepository):
                 logger.error(f"Error al cargar expedientes: {e}")
 
         self._cargado = True
+
+    async def recargar(self) -> None:
+        """Recarga los expedientes desde el archivo JSON, invalidando la caché."""
+        logger.info("Recargando expedientes desde archivo")
+        await self._cargar(forzar=True)
 
     async def _persistir(self) -> None:
         """Persiste los expedientes en el archivo JSON."""
@@ -101,7 +115,8 @@ class JsonExpedienteRepository(IExpedienteRepository):
     async def obtener_por_numero(self, numero: str) -> ExpedienteResumen | None:
         """Obtiene un expediente por su número."""
         await self._cargar()
-        return self._expedientes.get(numero)
+        numero_normalizado = normalizar_numero_expediente(numero)
+        return self._expedientes.get(numero_normalizado)
 
     async def obtener_todos(self) -> list[ExpedienteResumen]:
         """Obtiene todos los expedientes del repositorio."""
@@ -126,7 +141,8 @@ class JsonExpedienteRepository(IExpedienteRepository):
     async def existe(self, numero: str) -> bool:
         """Verifica si existe un expediente con el número dado."""
         await self._cargar()
-        return numero in self._expedientes
+        numero_normalizado = normalizar_numero_expediente(numero)
+        return numero_normalizado in self._expedientes
 
     async def eliminar(self, numero: str) -> bool:
         """Elimina un expediente del repositorio."""

@@ -10,6 +10,7 @@ import ExpedientesFiltros from '@/components/expedientes/ExpedientesFiltros'
 import ExtraerExpedienteDialog from '@/components/expedientes/ExtraerExpedienteDialog'
 import ExtraccionMasivaDialog from '@/components/expedientes/ExtraccionMasivaDialog'
 import AddToWorkspaceDialog from '@/components/workspaces/AddToWorkspaceDialog'
+import apiClient from '@/lib/api'
 
 export default function ExpedientesPage() {
   const navigate = useNavigate()
@@ -221,7 +222,13 @@ export default function ExpedientesPage() {
       {mostrarExtraccionMasiva && (
         <ExtraccionMasivaDialog
           onClose={() => setMostrarExtraccionMasiva(false)}
-          onSuccess={(expedientes) => {
+          onSuccess={async (expedientes) => {
+            // Recargar desde archivo en backend para obtener datos frescos
+            try {
+              await apiClient.post('/api/v1/expedientes/reload')
+            } catch (error) {
+              console.error('Error al recargar expedientes:', error)
+            }
             // Actualizar la lista de expedientes
             listarExpedientes()
           }}

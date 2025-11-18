@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Mapping
 
+from ..expediente_utils import normalizar_numero_expediente
 from ..utils.coercion import coerce_str, get_first
 
 
@@ -60,8 +61,9 @@ class ExpedienteResumen:
             ... }
             >>> exp = ExpedienteResumen.from_dict(data)
         """
+        numero_raw = coerce_str(get_first(data, "numero", "Numero")) or ""
         return cls(
-            numero=coerce_str(get_first(data, "numero", "Numero")) or "",
+            numero=normalizar_numero_expediente(numero_raw),
             dependencia=coerce_str(get_first(data, "dependencia", "Dependencia")) or "",
             caratula=coerce_str(get_first(data, "caratula", "Caratula")) or "",
             situacion=coerce_str(get_first(data, "situacion", "Situacion")),
