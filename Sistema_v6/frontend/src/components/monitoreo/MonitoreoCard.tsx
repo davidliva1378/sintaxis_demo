@@ -53,8 +53,11 @@ export default function MonitoreoCard({
 
   const handleVerify = async () => {
     setIsVerifying(true)
-    await onVerify(expediente.id)
-    setIsVerifying(false)
+    try {
+      await onVerify(expediente.id)
+    } finally {
+      setIsVerifying(false)
+    }
   }
 
   const handleToggle = () => {

@@ -17,6 +17,7 @@ from infrastructure.di_container import get_container
 from infrastructure.exceptions import PJNError
 
 from ..schemas.expediente_schemas import (
+    ActuacionResponse,
     ExpedienteResponse,
     ExtraerExpedientesRequest,
     ExtraerExpedientesResponse,
@@ -204,6 +205,9 @@ async def listar_expedientes(activos_solo: bool = False, dias: int = 30):
             success=True,
             total=len(expedientes_response),
             expedientes=expedientes_response,
+            pagina=1,
+            por_pagina=len(expedientes_response),
+            total_paginas=1,
         )
 
     except Exception as e:
@@ -212,6 +216,9 @@ async def listar_expedientes(activos_solo: bool = False, dias: int = 30):
             success=False,
             total=0,
             expedientes=[],
+            pagina=1,
+            por_pagina=0,
+            total_paginas=0,
             error=str(e),
         )
 
@@ -258,6 +265,63 @@ async def obtener_expediente(numero: str):
 
     except Exception as e:
         logger.exception(f"Error al obtener expediente {numero}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno: {str(e)}",
+        )
+
+
+@router.get("/{numero}/actuaciones", response_model=list[ActuacionResponse], status_code=status.HTTP_200_OK)
+async def obtener_actuaciones(numero: str):
+    """Obtiene las actuaciones de un expediente.
+
+    Args:
+        numero: Número del expediente
+
+    Returns:
+        Lista de actuaciones del expediente
+
+    Raises:
+        HTTPException: Si el expediente no existe o no tiene actuaciones
+    """
+    logger.info(f"GET /expedientes/{numero}/actuaciones")
+
+    try:
+        # Obtener repositorio de actuaciones
+        container = get_container()
+        actuacion_repo = container.actuacion_repo
+
+        # Buscar actuaciones
+        actuaciones = await actuacion_repo.obtener_actuaciones(numero)
+
+        if actuaciones is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No se encontraron actuaciones para el expediente {numero}",
+            )
+
+        # Convertir a response
+        actuaciones_response = [
+            ActuacionResponse(
+                indice=act.indice,
+                oficina=act.oficina,
+                tipo=act.tipo,
+                fecha=act.fecha,
+                detalle=act.detalle,
+                foja=act.foja,
+                firmante=None,  # La entidad no tiene firmante
+                archivos=[act.nombre_archivo] if act.nombre_archivo else [],
+            )
+            for act in actuaciones
+        ]
+
+        return actuaciones_response
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.exception(f"Error al obtener actuaciones de {numero}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error interno: {str(e)}",

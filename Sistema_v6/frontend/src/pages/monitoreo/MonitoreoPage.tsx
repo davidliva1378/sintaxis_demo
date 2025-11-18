@@ -37,6 +37,20 @@ export default function MonitoreoPage() {
     obtenerEstadisticas()
   }, [listarExpedientes, obtenerEstadisticas])
 
+  // Polling: actualizar estado del scheduler cada 10 segundos
+  useEffect(() => {
+    // Actualizar inmediatamente
+    obtenerEstadisticas()
+
+    // Configurar polling
+    const interval = setInterval(() => {
+      obtenerEstadisticas()
+    }, 10000) // 10 segundos
+
+    // Cleanup al desmontar
+    return () => clearInterval(interval)
+  }, [obtenerEstadisticas])
+
   const handleToggleMonitoreo = async () => {
     if (configuracion) {
       await toggleMonitoreo(!configuracion.activo)

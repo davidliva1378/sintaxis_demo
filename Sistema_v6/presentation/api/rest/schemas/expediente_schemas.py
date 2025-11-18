@@ -53,13 +53,14 @@ class ActuacionResponse(BaseModel):
 
     indice: int
     oficina: str
-    tipo_actuacion: str | None = None
+    tipo: str | None = None
     fecha: str | None = None
     detalle: str | None = None
+    foja: str | None = None
     firmante: str | None = None
     archivos: list[str] = Field(default_factory=list)
 
-    model_config = {"json_schema_extra": {"example": {"indice": 1, "oficina": "Secretaría 1", "tipo_actuacion": "Providencia", "fecha": "2024-01-15", "detalle": "Se corre vista...", "firmante": "Juan Pérez", "archivos": ["documento_123.pdf"]}}}
+    model_config = {"json_schema_extra": {"example": {"indice": 1, "oficina": "Secretaría 1", "tipo": "Providencia", "fecha": "2024-01-15", "detalle": "Se corre vista...", "foja": "10 / 150", "firmante": "Juan Pérez", "archivos": ["documento_123.pdf"]}}}
 
 
 class ExtraerExpedientesResponse(BaseModel):
@@ -91,6 +92,9 @@ class ListarExpedientesResponse(BaseModel):
     success: bool
     total: int
     expedientes: list[ExpedienteResponse]
+    pagina: int = 1
+    por_pagina: int = 20
+    total_paginas: int = 1
     error: str | None = None
 
-    model_config = {"json_schema_extra": {"example": {"success": True, "total": 2, "expedientes": [{"numero": "CNM 0001/2024", "dependencia": "Juzgado Federal 1", "caratula": "CASO X C/ Y S/ MATERIA", "situacion": "En trámite", "ultima_actuacion": "2024-01-15"}]}}}
+    model_config = {"json_schema_extra": {"example": {"success": True, "total": 2, "expedientes": [{"numero": "CNM 0001/2024", "dependencia": "Juzgado Federal 1", "caratula": "CASO X C/ Y S/ MATERIA", "situacion": "En trámite", "ultima_actuacion": "2024-01-15"}], "pagina": 1, "por_pagina": 20, "total_paginas": 1}}}

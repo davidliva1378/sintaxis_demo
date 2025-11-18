@@ -52,6 +52,8 @@ class MonitorearExpedientesUseCase:
         storage: IStoragePort,
         workspace_port: IWorkspacePort,
         notificacion_port: INotificacionPort | None = None,
+        detector_cambios: "DetectorCambios | None" = None,
+        gestor_estados: "GestorEstadosExpedientes | None" = None,
     ):
         """Inicializa el use case con sus dependencias.
 
@@ -62,6 +64,8 @@ class MonitorearExpedientesUseCase:
             storage: Port para almacenamiento
             workspace_port: Port para workspaces
             notificacion_port: Port para notificaciones (opcional)
+            detector_cambios: Detector de cambios multi-campo (opcional)
+            gestor_estados: Gestor de estados de expedientes (opcional)
         """
         self._scraper = scraper
         self._expediente_repo = expediente_repo
@@ -69,6 +73,10 @@ class MonitorearExpedientesUseCase:
         self._storage = storage
         self._workspace_port = workspace_port
         self._notificacion_port = notificacion_port
+
+        # Nuevos componentes de Fase 1
+        self._detector_cambios = detector_cambios
+        self._gestor_estados = gestor_estados
 
     async def execute(
         self, command: MonitorearExpedientesCommand
@@ -114,59 +122,121 @@ class MonitorearExpedientesUseCase:
                 exp.numero: exp for exp in expedientes_actualizados
             }
 
-            # 3. Comparar y detectar cambios
+            # 3. Filtrar expedientes por estado (si gestor disponible)
+            expedientes_monitoreados = expedientes
+            if self._gestor_estados:
+                logger.info("Filtrando expedientes por estado...")
+                estados = await self._gestor_estados.cargar_estados()
+                expedientes_monitoreados = [
+                    exp for exp in expedientes
+                    if estados.get(exp.numero, "activo") == "activo"
+                ]
+                logger.info(
+                    f"Expedientes activos: {len(expedientes_monitoreados)} "
+                    f"de {len(expedientes)} totales"
+                )
+
+            # 4. Comparar y detectar cambios (multi-campo si detector disponible)
             cambios_detectados: list[CambioDetectado] = []
             expedientes_verificados = 0
 
-            for expediente_anterior in expedientes:
-                try:
-                    expedientes_verificados += 1
-                    logger.debug(f"Verificando {expediente_anterior.numero}")
+            # Opción A: Usar DetectorCambios (detección multi-campo)
+            if self._detector_cambios:
+                logger.info("Usando DetectorCambios (4 campos)")
 
-                    # Buscar versión actualizada
-                    expediente_actual = dict_actualizados.get(expediente_anterior.numero)
-                    if not expediente_actual:
-                        logger.warning(
-                            f"Expediente {expediente_anterior.numero} no encontrado en datos actualizados"
-                        )
-                        continue
+                # Filtrar expedientes actualizados que estamos monitoreando
+                expedientes_actuales_filtrados = [
+                    dict_actualizados[exp.numero]
+                    for exp in expedientes_monitoreados
+                    if exp.numero in dict_actualizados
+                ]
 
-                    # Verificar si hubo cambio en última actuación
-                    if (
-                        expediente_anterior.ultima_actuacion
-                        != expediente_actual.ultima_actuacion
-                    ):
-                        logger.info(
-                            f"Cambio detectado en {expediente_anterior.numero}: "
-                            f"última actuación {expediente_anterior.ultima_actuacion} → "
-                            f"{expediente_actual.ultima_actuacion}"
-                        )
+                # Detectar cambios
+                from application.services.detector_cambios import CambioExpediente
 
-                        cambio = CambioDetectado(
-                            numero_expediente=expediente_anterior.numero,
-                            tipo="actuacion_nueva",
-                            descripcion=f"Nueva actuación: {expediente_actual.ultima_actuacion}",
-                            datos_adicionales={
-                                "fecha_anterior": expediente_anterior.ultima_actuacion,
-                                "fecha_nueva": expediente_actual.ultima_actuacion,
-                            },
-                        )
-                        cambios_detectados.append(cambio)
+                cambios_multi: list[CambioExpediente] = self._detector_cambios.detectar_cambios_expedientes(
+                    actuales=expedientes_actuales_filtrados,
+                    anteriores=expedientes_monitoreados
+                )
 
-                        # Actualizar workspace con nuevas actuaciones
-                        await self._actualizar_workspace(
-                            expediente_actual,
-                            command.base_path,
-                            command.descargar_nuevos_archivos,
-                        )
-
-                        # Actualizar repositorio
-                        await self._expediente_repo.guardar(expediente_actual)
-
-                except Exception as e:
-                    logger.error(
-                        f"Error al verificar {expediente_anterior.numero}: {e}"
+                # Convertir a CambioDetectado para compatibilidad
+                for cambio_multi in cambios_multi:
+                    cambio = CambioDetectado(
+                        numero_expediente=cambio_multi.expediente.numero,
+                        tipo=cambio_multi.tipo_cambio,
+                        descripcion=self._generar_descripcion_cambio(cambio_multi),
+                        datos_adicionales={
+                            "campos_cambiados": cambio_multi.campos_cambiados,
+                            "valores_anteriores": cambio_multi.valores_anteriores,
+                        },
                     )
+                    cambios_detectados.append(cambio)
+
+                    # Actualizar workspace con nuevas actuaciones
+                    await self._actualizar_workspace(
+                        cambio_multi.expediente,
+                        command.base_path,
+                        command.descargar_nuevos_archivos,
+                    )
+
+                    # Actualizar repositorio
+                    await self._expediente_repo.guardar(cambio_multi.expediente)
+
+                expedientes_verificados = len(expedientes_actuales_filtrados)
+
+            # Opción B: Comparación simple (solo última_actuación - legacy)
+            else:
+                logger.info("Usando comparación simple (solo última_actuación)")
+
+                for expediente_anterior in expedientes_monitoreados:
+                    try:
+                        expedientes_verificados += 1
+                        logger.debug(f"Verificando {expediente_anterior.numero}")
+
+                        # Buscar versión actualizada
+                        expediente_actual = dict_actualizados.get(expediente_anterior.numero)
+                        if not expediente_actual:
+                            logger.warning(
+                                f"Expediente {expediente_anterior.numero} no encontrado en datos actualizados"
+                            )
+                            continue
+
+                        # Verificar si hubo cambio en última actuación
+                        if (
+                            expediente_anterior.ultima_actuacion
+                            != expediente_actual.ultima_actuacion
+                        ):
+                            logger.info(
+                                f"Cambio detectado en {expediente_anterior.numero}: "
+                                f"última actuación {expediente_anterior.ultima_actuacion} → "
+                                f"{expediente_actual.ultima_actuacion}"
+                            )
+
+                            cambio = CambioDetectado(
+                                numero_expediente=expediente_anterior.numero,
+                                tipo="actuacion_nueva",
+                                descripcion=f"Nueva actuación: {expediente_actual.ultima_actuacion}",
+                                datos_adicionales={
+                                    "fecha_anterior": expediente_anterior.ultima_actuacion,
+                                    "fecha_nueva": expediente_actual.ultima_actuacion,
+                                },
+                            )
+                            cambios_detectados.append(cambio)
+
+                            # Actualizar workspace con nuevas actuaciones
+                            await self._actualizar_workspace(
+                                expediente_actual,
+                                command.base_path,
+                                command.descargar_nuevos_archivos,
+                            )
+
+                            # Actualizar repositorio
+                            await self._expediente_repo.guardar(expediente_actual)
+
+                    except Exception as e:
+                        logger.error(
+                            f"Error al verificar {expediente_anterior.numero}: {e}"
+                        )
 
             # 4. Actualizar JSON "sistema" si hubo cambios
             if cambios_detectados:
@@ -222,6 +292,66 @@ class MonitorearExpedientesUseCase:
             error_msg = f"Error al monitorear expedientes: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return Result.fail(error_msg, error_code="MONITOREO_ERROR")
+
+    def _generar_descripcion_cambio(self, cambio: "CambioExpediente") -> str:
+        """Genera una descripción legible del cambio detectado.
+
+        Args:
+            cambio: CambioExpediente con los detalles del cambio
+
+        Returns:
+            Descripción en texto del cambio
+        """
+        from application.services.detector_cambios import CambioExpediente
+
+        tipo = cambio.tipo_cambio
+        campos = cambio.campos_cambiados
+        valores_ant = cambio.valores_anteriores
+
+        # Descripción según tipo de cambio
+        if tipo == "nueva_actuacion":
+            fecha_anterior = valores_ant.get("ultima_actuacion", "")
+            fecha_nueva = cambio.expediente.ultima_actuacion
+            return f"Nueva actuación: {fecha_anterior} → {fecha_nueva}"
+
+        elif tipo == "cambio_situacion":
+            situacion_anterior = valores_ant.get("situacion", "")
+            situacion_nueva = cambio.expediente.situacion
+            return f"Cambio de situación: '{situacion_anterior}' → '{situacion_nueva}'"
+
+        elif tipo == "cambio_dependencia":
+            dep_anterior = valores_ant.get("dependencia", "")
+            dep_nueva = cambio.expediente.dependencia
+            return f"Cambio de dependencia: '{dep_anterior}' → '{dep_nueva}'"
+
+        elif tipo == "cambio_caratula":
+            return "Cambio en carátula del expediente"
+
+        elif tipo == "multiples_cambios":
+            descripciones = []
+            if "ultima_actuacion" in campos:
+                descripciones.append(
+                    f"actuación ({valores_ant.get('ultima_actuacion', '')} → "
+                    f"{cambio.expediente.ultima_actuacion})"
+                )
+            if "situacion" in campos:
+                descripciones.append(
+                    f"situación ('{valores_ant.get('situacion', '')}' → "
+                    f"'{cambio.expediente.situacion}')"
+                )
+            if "dependencia" in campos:
+                descripciones.append(
+                    f"dependencia ('{valores_ant.get('dependencia', '')}' → "
+                    f"'{cambio.expediente.dependencia}')"
+                )
+            if "caratula" in campos:
+                descripciones.append("carátula")
+
+            return f"Múltiples cambios: {', '.join(descripciones)}"
+
+        else:
+            # Fallback genérico
+            return f"Cambio detectado en: {', '.join(campos)}"
 
     async def _actualizar_workspace(
         self,

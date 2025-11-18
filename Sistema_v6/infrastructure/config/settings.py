@@ -109,7 +109,7 @@ class StorageSettings(BaseSettings):
     base_path: Path = Field(default_factory=lambda: Path.cwd() / "data")
     json_base_file: str = "expedientes_base.json"
     json_sistema_file: str = "expedientes_sistema.json"
-    workspaces_dir: str = "workspaces"
+    workspaces_dir: str = "expedientes"
     downloads_dir: str = "descargas"
     pretty_json: bool = True
     ensure_ascii: bool = False

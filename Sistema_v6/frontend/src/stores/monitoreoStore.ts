@@ -13,7 +13,7 @@ import type {
   ActualizarMonitoreo,
   FrecuenciaMonitoreo,
 } from '@/types/monitoreo'
-// import apiClient from '@/lib/api'
+import * as monitoreoApi from '@/api/monitoreoApi'
 
 interface MonitoreoState {
   // Estado
@@ -58,31 +58,34 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
   // Obtener configuración del monitoreo
   obtenerConfiguracion: async () => {
     try {
-      // TODO: Reemplazar con llamada real a la API
-      // const response = await apiClient.get<ConfiguracionMonitoreo>('/api/v1/monitoreo/configuracion')
-      // set({ configuracion: response.data })
+      // Llamada real a la API del scheduler
+      const estadoScheduler = await monitoreoApi.obtenerEstadoMonitoreo()
 
-      // Mock data por ahora
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Mapear estado del scheduler a ConfiguracionMonitoreo
+      const frecuencia: FrecuenciaMonitoreo = estadoScheduler.intervalo_actual_minutos
+        ? estadoScheduler.intervalo_actual_minutos < 60
+          ? `${estadoScheduler.intervalo_actual_minutos}min`
+          : '1hora'
+        : '1hora'
 
-      const mockConfig: ConfiguracionMonitoreo = {
+      const config: ConfiguracionMonitoreo = {
         id: 1,
         usuario_id: 1,
-        activo: true,
-        frecuencia: '1hora',
-        notificar_email: true,
-        notificar_sistema: true,
-        hora_inicio: '09:00',
-        hora_fin: '18:00',
-        dias_semana: [1, 2, 3, 4, 5], // Lunes a Viernes
+        activo: estadoScheduler.activo,
+        frecuencia,
+        notificar_email: true, // TODO: Obtener de configuración backend
+        notificar_sistema: true, // TODO: Obtener de configuración backend
+        hora_inicio: '08:00', // TODO: Obtener de configuración backend
+        hora_fin: '18:00', // TODO: Obtener de configuración backend
+        dias_semana: [1, 2, 3, 4, 5], // TODO: Obtener de configuración backend
         created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
         updated_at: new Date().toISOString(),
       }
 
-      set({ configuracion: mockConfig })
+      set({ configuracion: config })
     } catch (error: any) {
       console.error('Error al obtener configuración:', error)
-      toast.error('Error al cargar la configuración')
+      toast.error('Error al cargar la configuración del monitoreo')
     }
   },
 
@@ -112,22 +115,39 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
   // Toggle monitoreo activo/pausado
   toggleMonitoreo: async (activo: boolean) => {
     try {
-      // TODO: Reemplazar con llamada real a la API
-      // await apiClient.patch('/api/v1/monitoreo/toggle', { activo })
+      // Llamada real a la API del scheduler
+      if (activo) {
+        const response = await monitoreoApi.iniciarScheduler()
+        if (!response.success) {
+          toast.error(response.mensaje)
+          return
+        }
+        toast.success('Monitoreo activado', {
+          description: response.intervalo_minutos
+            ? `Verificando cada ${response.intervalo_minutos} minutos`
+            : undefined,
+        })
+      } else {
+        const response = await monitoreoApi.detenerScheduler()
+        if (!response.success) {
+          toast.error(response.mensaje)
+          return
+        }
+        toast.success('Monitoreo pausado')
+      }
 
-      // Mock data por ahora
-      await new Promise(resolve => setTimeout(resolve, 400))
-
+      // Actualizar configuración local
       set(state => ({
         configuracion: state.configuracion
           ? { ...state.configuracion, activo, updated_at: new Date().toISOString() }
           : null,
       }))
 
-      toast.success(activo ? 'Monitoreo activado' : 'Monitoreo pausado')
+      // Refrescar estado para obtener datos actualizados
+      await get().obtenerConfiguracion()
     } catch (error: any) {
       console.error('Error al cambiar estado del monitoreo:', error)
-      toast.error('Error al cambiar el estado')
+      toast.error(`Error al ${activo ? 'iniciar' : 'detener'} el monitoreo: ${error.message}`)
     }
   },
 
@@ -274,27 +294,48 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
 
   // Verificar expediente manualmente
   verificarExpediente: async (id: number) => {
+    set({ isLoading: true })
     try {
-      // TODO: Reemplazar con llamada real a la API
-      // await apiClient.post(`/api/v1/monitoreo/expedientes/${id}/verificar`)
-
-      // Mock data por ahora
-      await new Promise(resolve => setTimeout(resolve, 1500))
-
-      set(state => ({
-        expedientes: state.expedientes.map(e =>
-          e.id === id
-            ? { ...e, ultima_verificacion: new Date().toISOString() }
-            : e
-        ),
-      }))
-
-      toast.success('Verificación completada', {
-        description: 'No se detectaron cambios nuevos',
+      // Toast de inicio
+      toast.info('Verificando expediente...', {
+        id: 'verifying',
+        description: 'Conectando con PJN...'
       })
+
+      // Llamada real a la API
+      const response = await monitoreoApi.verificarManual()
+
+      if (response.success) {
+        const cambiosDetectados = response.cambios_detectados || 0
+
+        // Actualizar última verificación
+        set(state => ({
+          expedientes: state.expedientes.map(e =>
+            e.id === id
+              ? { ...e, ultima_verificacion: new Date().toISOString() }
+              : e
+          ),
+        }))
+
+        // Toast de éxito con detalles
+        toast.success('Verificación completada', {
+          description: cambiosDetectados > 0
+            ? `${cambiosDetectados} cambio${cambiosDetectados > 1 ? 's' : ''} detectado${cambiosDetectados > 1 ? 's' : ''}`
+            : 'No se detectaron cambios nuevos',
+        })
+      } else {
+        toast.error('Error en verificación', {
+          description: response.error || 'Error desconocido'
+        })
+      }
     } catch (error: any) {
       console.error('Error al verificar expediente:', error)
-      toast.error('Error al verificar expediente')
+      toast.error('Error al verificar expediente', {
+        description: error.message || 'Error de conexión'
+      })
+    } finally {
+      set({ isLoading: false })
+      toast.dismiss('verifying')
     }
   },
 
@@ -421,28 +462,31 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
   // Obtener estadísticas
   obtenerEstadisticas: async () => {
     try {
-      // TODO: Reemplazar con llamada real a la API
-      // const response = await apiClient.get<EstadisticasMonitoreo>('/api/v1/monitoreo/estadisticas')
-      // set({ estadisticas: response.data })
+      // Obtener estado real del scheduler
+      const estadoScheduler = await monitoreoApi.obtenerEstadoMonitoreo()
 
-      // Mock data por ahora
-      await new Promise(resolve => setTimeout(resolve, 400))
-
-      const mockEstadisticas: EstadisticasMonitoreo = {
+      // Combinar con datos locales del store
+      const estadisticas: EstadisticasMonitoreo = {
         total_expedientes: get().expedientes.length,
         expedientes_activos: get().expedientes.filter(e => e.activo).length,
         expedientes_pausados: get().expedientes.filter(e => !e.activo).length,
-        cambios_hoy: 2,
-        cambios_semana: 8,
-        cambios_mes: 25,
+        cambios_hoy: 2, // TODO: Obtener del backend cuando esté disponible
+        cambios_semana: 8, // TODO: Obtener del backend cuando esté disponible
+        cambios_mes: 25, // TODO: Obtener del backend cuando esté disponible
         cambios_sin_leer: get().cambios.filter(c => !c.leido).length,
-        ultima_ejecucion: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-        proxima_ejecucion: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(),
+        ultima_ejecucion: estadoScheduler.proxima_ejecucion
+          ? new Date(
+              new Date(estadoScheduler.proxima_ejecucion).getTime() -
+                (estadoScheduler.intervalo_actual_minutos || 60) * 60 * 1000
+            ).toISOString()
+          : null,
+        proxima_ejecucion: estadoScheduler.proxima_ejecucion,
       }
 
-      set({ estadisticas: mockEstadisticas })
+      set({ estadisticas })
     } catch (error: any) {
       console.error('Error al obtener estadísticas:', error)
+      // En caso de error, mantener datos locales
     }
   },
 

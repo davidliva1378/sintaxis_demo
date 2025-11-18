@@ -412,10 +412,49 @@ class GestorBatch:
             # ==================================================================
             if self.expediente_repository:
                 try:
-                    # TODO: Convertir a modelo de dominio y guardar
-                    # expediente_dominio = ExpedienteDominio(...)
-                    # self.expediente_repository.save(expediente_dominio)
-                    pass
+                    # Importar modelo de dominio
+                    from core.domain.entities import ExpedienteResumen
+
+                    # Obtener última actuación del JSON si existe
+                    ultima_actuacion = None
+                    try:
+                        if ruta_json and resultado.get("ruta_actuaciones"):
+                            import json
+                            from pathlib import Path
+                            ruta_act = Path(resultado["ruta_actuaciones"])
+                            if ruta_act.exists():
+                                with open(ruta_act, 'r', encoding='utf-8') as f:
+                                    act_data = json.load(f)
+                                    actuaciones = act_data.get("actuaciones_actuales", [])
+                                    if actuaciones and len(actuaciones) > 0:
+                                        # Última actuación es la primera en la lista
+                                        ultima_actuacion = actuaciones[0].get("fecha")
+                    except Exception as e_act:
+                        print(f"⚠️ No se pudo obtener última actuación: {e_act}")
+
+                    # Validar que los datos sean válidos antes de guardar
+                    dependencia = datos_expediente.get("dependencia", "")
+                    caratula = datos_expediente.get("caratula", "")
+
+                    # No guardar expedientes con datos inválidos o "No encontrada"
+                    if (dependencia and dependencia != "No encontrada" and
+                        caratula and caratula != "No encontrada"):
+
+                        # Crear expediente de dominio
+                        expediente_dominio = ExpedienteResumen.from_dict({
+                            "numero": datos_expediente.get("numero", numero_expediente),
+                            "dependencia": dependencia,
+                            "caratula": caratula,
+                            "situacion": datos_expediente.get("situacion"),
+                            "ultima_actuacion": ultima_actuacion
+                        })
+
+                        # Guardar en repositorio
+                        await self.expediente_repository.save(expediente_dominio)
+                        print(f"💾 Expediente guardado en repositorio: {numero_expediente}")
+                    else:
+                        print(f"⚠️ Expediente {numero_expediente} no guardado: datos inválidos o incompletos")
+
                 except Exception as e:
                     print(f"⚠️ Error guardando en repositorio (no crítico): {e}")
 

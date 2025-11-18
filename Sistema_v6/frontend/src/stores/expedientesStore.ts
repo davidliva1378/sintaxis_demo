@@ -160,64 +160,31 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
         ...currentFiltros,
       }
 
-      // Nota: Este endpoint será implementado en el backend en futuras fases
-      // Por ahora, devolver datos de ejemplo
-      const mockData: PaginacionResult<ExpedienteResumen> = {
-        items: [
-          {
-            numero: 'JUZ-FAM-2024-0123',
-            dependencia: 'JUZGADO DE FAMILIA N°1',
-            caratula: 'PEREZ, JUAN C/ GOMEZ, MARIA S/ DIVORCIO',
-            situacion: 'EN TRAMITE',
-            ultima_actuacion: '2025-01-15',
-          },
-          {
-            numero: 'JUZ-CIV-2024-0456',
-            dependencia: 'JUZGADO CIVIL N°2',
-            caratula: 'RODRIGUEZ, CARLOS C/ MARTINEZ, ANA S/ DAÑOS Y PERJUICIOS',
-            situacion: 'SENTENCIA',
-            ultima_actuacion: '2025-01-10',
-          },
-          {
-            numero: 'JUZ-LAB-2024-0789',
-            dependencia: 'JUZGADO LABORAL N°3',
-            caratula: 'LOPEZ, MARIA C/ EMPRESA XYZ S.A. S/ DESPIDO',
-            situacion: 'EN TRAMITE',
-            ultima_actuacion: '2025-01-05',
-          },
-        ],
-        total: 3,
-        pagina: currentPagina,
-        por_pagina: get().paginacion.por_pagina,
-        total_paginas: 1,
+      // Llamada real al backend
+      const response = await apiClient.get<{
+        success: boolean
+        total: number
+        expedientes: ExpedienteResumen[]
+        pagina: number
+        por_pagina: number
+        total_paginas: number
+        error?: string
+      }>('/api/v1/expedientes', { params })
+
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Error al cargar expedientes')
       }
 
       set({
-        expedientes: mockData.items,
+        expedientes: response.data.expedientes,
         paginacion: {
-          pagina: mockData.pagina,
-          por_pagina: mockData.por_pagina,
-          total: mockData.total,
-          total_paginas: mockData.total_paginas,
+          pagina: response.data.pagina,
+          por_pagina: response.data.por_pagina,
+          total: response.data.total,
+          total_paginas: response.data.total_paginas,
         },
         filtros: currentFiltros,
       })
-
-      // Implementación real (comentada para futuras fases):
-      // const response = await apiClient.get<PaginacionResult<ExpedienteResumen>>(
-      //   '/api/v1/expedientes',
-      //   { params }
-      // )
-      // set({
-      //   expedientes: response.data.items,
-      //   paginacion: {
-      //     pagina: response.data.pagina,
-      //     por_pagina: response.data.por_pagina,
-      //     total: response.data.total,
-      //     total_paginas: response.data.total_paginas,
-      //   },
-      //   filtros: currentFiltros,
-      // })
     } catch (error: any) {
       toast.error('Error al cargar expedientes', {
         description: error.response?.data?.detail || 'No se pudieron cargar los expedientes',
@@ -232,60 +199,32 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
   obtenerExpediente: async (numero: string) => {
     set({ isLoading: true })
     try {
-      // Datos de ejemplo (será reemplazado con llamada real al backend)
-      const mockExpediente: ExpedienteDetalle = {
-        numero: numero,
-        dependencia: 'JUZGADO DE FAMILIA N°1',
-        caratula: 'PEREZ, JUAN C/ GOMEZ, MARIA S/ DIVORCIO',
-        situacion: 'EN TRAMITE',
-        ultima_actuacion: '2025-01-15',
-        actuaciones: [
-          {
-            indice: 1,
-            oficina: 'JUZGADO FAM N°1',
-            oficina_completa: 'JUZGADO DE FAMILIA N°1',
-            fecha: '2024-01-10',
-            tipo: 'SENTENCIA',
-            detalle: 'Se dicta sentencia favorable',
-            foja: '125',
-            archivo: null,
-            nombre_archivo: null,
-            tiene_archivo: false,
-            tipo_archivo: null,
-            hash: null,
-            extraida_en: null,
-            es_historica: false,
-            descargado: false,
-          },
-          {
-            indice: 2,
-            oficina: 'JUZGADO FAM N°1',
-            oficina_completa: 'JUZGADO DE FAMILIA N°1',
-            fecha: '2024-01-15',
-            tipo: 'RESOLUCION',
-            detalle: 'Se notifica a las partes',
-            foja: '126',
-            archivo: '/archivos/123.pdf',
-            nombre_archivo: 'resolucion_123.pdf',
-            tiene_archivo: true,
-            tipo_archivo: 'pdf',
-            hash: 'abc123',
-            extraida_en: '2024-01-16T10:00:00',
-            es_historica: false,
-            descargado: false,
-          },
-        ],
-        total_actuaciones: 2,
-        fecha_extraccion: '2025-01-16T10:00:00',
+      // Obtener expediente y actuaciones en paralelo
+      const [expedienteResponse, actuacionesResponse] = await Promise.all([
+        apiClient.get<{
+          numero: string
+          dependencia: string
+          caratula: string
+          situacion: string | null
+          ultima_actuacion: string | null
+        }>(`/api/v1/expedientes/${numero}`),
+        apiClient.get<Actuacion[]>(`/api/v1/expedientes/${numero}/actuaciones`).catch(() => ({ data: [] })),
+      ])
+
+      // Convertir respuesta a ExpedienteDetalle
+      const expedienteDetalle: ExpedienteDetalle = {
+        numero: expedienteResponse.data.numero,
+        dependencia: expedienteResponse.data.dependencia,
+        caratula: expedienteResponse.data.caratula,
+        situacion: expedienteResponse.data.situacion || 'SIN DATOS',
+        ultima_actuacion: expedienteResponse.data.ultima_actuacion || '',
+        fecha_inicio: '', // No disponible en el backend actual
+        actuaciones: actuacionesResponse.data || [],
+        total_actuaciones: (actuacionesResponse.data || []).length,
+        fecha_extraccion: new Date().toISOString(),
       }
 
-      set({ expedienteActual: mockExpediente })
-
-      // Implementación real (comentada para futuras fases):
-      // const response = await apiClient.get<ExpedienteDetalle>(
-      //   `/api/v1/expedientes/${numero}`
-      // )
-      // set({ expedienteActual: response.data })
+      set({ expedienteActual: expedienteDetalle })
     } catch (error: any) {
       toast.error('Error al cargar expediente', {
         description: error.response?.data?.detail || 'No se pudo cargar el expediente',

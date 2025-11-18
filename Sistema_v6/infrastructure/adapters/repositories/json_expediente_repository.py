@@ -87,6 +87,10 @@ class JsonExpedienteRepository(IExpedienteRepository):
         self._expedientes[expediente.numero] = expediente
         await self._persistir()
 
+    async def save(self, expediente: ExpedienteResumen) -> None:
+        """Alias de guardar() para compatibilidad."""
+        await self.guardar(expediente)
+
     async def guardar_varios(self, expedientes: Sequence[ExpedienteResumen]) -> None:
         """Guarda múltiples expedientes en el repositorio."""
         await self._cargar()

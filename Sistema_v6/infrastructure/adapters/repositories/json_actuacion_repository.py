@@ -53,8 +53,25 @@ class JsonActuacionRepository(IActuacionRepository):
         """
         from core.domain.utils import normalizar_numero_expediente
 
-        nombre_dir = normalizar_numero_expediente(numero_expediente)
-        return self._workspaces_base / nombre_dir / "actuaciones.json"
+        nombre_normalizado = normalizar_numero_expediente(numero_expediente)
+        # Los directorios usan guiones bajos, no guiones
+        nombre_busqueda = nombre_normalizado.replace('-', '_')
+
+        # Buscar el directorio que contenga el número normalizado
+        # Los directorios tienen formato: {numero}_{nombre_normalizado}
+        if self._workspaces_base.exists():
+            for dir_path in self._workspaces_base.iterdir():
+                if dir_path.is_dir() and nombre_busqueda in dir_path.name:
+                    # Intentar encontrar el archivo de actuaciones
+                    # Formato: {dir}/json/actuaciones-{nombre}.json
+                    json_dir = dir_path / "json"
+                    if json_dir.exists():
+                        # Buscar cualquier archivo que comience con "actuaciones-"
+                        for archivo in json_dir.glob("actuaciones-*.json"):
+                            return archivo
+
+        # Fallback al path original si no se encuentra
+        return self._workspaces_base / nombre_normalizado / "json" / f"actuaciones-{nombre_normalizado}.json"
 
     async def guardar_archivo(
         self, numero_expediente: str, archivo: ActuacionesArchivo

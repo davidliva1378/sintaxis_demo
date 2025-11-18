@@ -37,3 +37,60 @@ class MonitoreoResponse(BaseModel):
     error: str | None = None
 
     model_config = {"json_schema_extra": {"example": {"success": True, "total_expedientes": 25, "cambios_detectados": 3, "cambios": [{"numero_expediente": "CNM 0001/2024", "tipo_cambio": "nueva_actuacion", "descripcion": "Nueva actuación detectada", "fecha_deteccion": "2024-01-15T10:30:00"}]}}}
+
+
+class EstadoMonitoreoResponse(BaseModel):
+    """Response con el estado actual del scheduler de monitoreo."""
+
+    activo: bool = Field(description="Si el scheduler está activo")
+    ejecutando: bool = Field(description="Si hay una verificación en curso")
+    intervalo_actual_minutos: int | None = Field(
+        description="Intervalo actual de verificación en minutos"
+    )
+    es_horario_laboral: bool = Field(description="Si está en horario laboral")
+    proxima_ejecucion: str | None = Field(description="Timestamp de próxima ejecución")
+    jobs_programados: int = Field(description="Número de jobs programados")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "activo": True,
+                "ejecutando": False,
+                "intervalo_actual_minutos": 15,
+                "es_horario_laboral": True,
+                "proxima_ejecucion": "2025-11-17T19:00:00",
+                "jobs_programados": 1,
+            }
+        }
+    }
+
+
+class StartSchedulerResponse(BaseModel):
+    """Response al iniciar el scheduler."""
+
+    success: bool
+    mensaje: str
+    intervalo_minutos: int | None = None
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "success": True,
+                "mensaje": "Scheduler iniciado correctamente",
+                "intervalo_minutos": 15,
+            }
+        }
+    }
+
+
+class StopSchedulerResponse(BaseModel):
+    """Response al detener el scheduler."""
+
+    success: bool
+    mensaje: str
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {"success": True, "mensaje": "Scheduler detenido correctamente"}
+        }
+    }

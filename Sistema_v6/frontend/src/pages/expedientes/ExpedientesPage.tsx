@@ -47,7 +47,9 @@ export default function ExpedientesPage() {
   }
 
   const handleVerDetalle = (numero: string) => {
-    navigate(`/expedientes/${numero}`)
+    // Convertir espacios y barras a guiones para URL amigable
+    const numeroNormalizado = numero.replace(/\s+/g, '-').replace(/\//g, '-')
+    navigate(`/expedientes/${numeroNormalizado}`)
   }
 
   const handleAgregarAWorkspace = (numero: string, caratula: string) => {
