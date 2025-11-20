@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   ArrowLeft,
   FileText,
@@ -11,11 +12,29 @@ import {
   Clock,
   Loader2,
   AlertCircle,
+  BarChart3,
+  ListTodo,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { toast } from 'sonner'
 import { useExpedientesStore } from '@/stores/expedientesStore'
 import ActuacionesList from '@/components/expedientes/ActuacionesList'
+import EstadisticasExpedientePanel from '@/components/expedientes/EstadisticasExpedientePanel'
+import ActuacionesClasificadasList from '@/components/expedientes/ActuacionesClasificadasList'
+import VencimientosExpedientePanel from '@/components/expedientes/VencimientosExpedientePanel'
+import ProcesamientoStatusBadge from '@/components/expedientes/ProcesamientoStatusBadge'
+import {
+  obtenerEstadisticasExpediente,
+  procesarExpediente,
+  obtenerActuacionesClasificadasExpediente
+} from '@/api/procesamientoApi'
+import type {
+  EstadisticasExpediente,
+  VencimientoUrgente,
+  ActuacionPorUtilidad,
+  ActuacionInput
+} from '@/types/procesamiento'
 
 export default function ExpedienteDetallePage() {
   const { numero } = useParams<{ numero: string }>()
@@ -28,6 +47,14 @@ export default function ExpedienteDetallePage() {
     limpiarExpedienteActual,
   } = useExpedientesStore()
 
+  // Estado de procesamiento
+  const [estadisticas, setEstadisticas] = useState<EstadisticasExpediente | null>(null)
+  const [vencimientos, setVencimientos] = useState<VencimientoUrgente[]>([])
+  const [actuacionesClasificadas, setActuacionesClasificadas] = useState<ActuacionPorUtilidad[]>([])
+  const [isLoadingProcesamiento, setIsLoadingProcesamiento] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [isProcesado, setIsProcesado] = useState(false)
+
   useEffect(() => {
     if (numero) {
       obtenerExpediente(numero)
@@ -37,6 +64,84 @@ export default function ExpedienteDetallePage() {
       limpiarExpedienteActual()
     }
   }, [numero])
+
+  // Cargar datos de procesamiento cuando se tenga el expediente
+  useEffect(() => {
+    if (expedienteActual?.numero) {
+      cargarDatosProcesamiento(expedienteActual.numero)
+    }
+  }, [expedienteActual?.numero])
+
+  const cargarDatosProcesamiento = async (numeroExp: string) => {
+    setIsLoadingProcesamiento(true)
+    try {
+      // Cargar estadísticas y actuaciones clasificadas en paralelo
+      const [stats, actuaciones] = await Promise.all([
+        obtenerEstadisticasExpediente(numeroExp),
+        obtenerActuacionesClasificadasExpediente(numeroExp)
+      ])
+
+      setEstadisticas(stats)
+      setActuacionesClasificadas(actuaciones)
+      setIsProcesado(true)
+    } catch (error) {
+      // No hay datos de procesamiento - expediente no procesado
+      setIsProcesado(false)
+      setEstadisticas(null)
+      setActuacionesClasificadas([])
+    } finally {
+      setIsLoadingProcesamiento(false)
+    }
+  }
+
+  const handleProcesar = async () => {
+    if (!expedienteActual) return
+
+    setIsProcessing(true)
+    try {
+      // Convertir actuaciones al formato requerido
+      const actuacionesInput: ActuacionInput[] = expedienteActual.actuaciones.map((act, index) => ({
+        id: act.indice || index + 1,
+        tipo: act.tipo || '',
+        detalle: act.detalle || '',
+        tiene_archivo: (act.archivos?.length || 0) > 0 || act.tiene_archivo,
+        expediente_numero: expedienteActual.numero
+      }))
+
+      // Construir diccionario de rutas de PDFs
+      const rutas_pdf: Record<number, string> = {}
+      expedienteActual.actuaciones.forEach((act, index) => {
+        const id = act.indice || index + 1
+        if (act.ruta_pdf) {
+          rutas_pdf[id] = act.ruta_pdf
+        }
+      })
+
+      const resultado = await procesarExpediente({
+        numero_expediente: expedienteActual.numero,
+        actuaciones: actuacionesInput,
+        rutas_pdf: Object.keys(rutas_pdf).length > 0 ? rutas_pdf : undefined,
+        guardar_en_bd: true
+      })
+
+      setEstadisticas(resultado.estadisticas)
+      setVencimientos(resultado.vencimientos_urgentes)
+      setIsProcesado(true)
+
+      toast.success('Expediente procesado', {
+        description: `${resultado.estadisticas.total_actuaciones} actuaciones clasificadas`
+      })
+
+      // Recargar datos completos
+      await cargarDatosProcesamiento(expedienteActual.numero)
+    } catch (error) {
+      toast.error('Error al procesar', {
+        description: error instanceof Error ? error.message : 'Error desconocido'
+      })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
 
   const formatFechaExtraccion = (fecha: string | null) => {
     if (!fecha) return 'Desconocida'
@@ -73,7 +178,7 @@ export default function ExpedienteDetallePage() {
               Expediente no encontrado
             </h3>
             <p className="text-gray-600 dark:text-gray-400">
-              No se pudo cargar la información del expediente
+              No se pudo cargar la informacion del expediente
             </p>
           </CardContent>
         </Card>
@@ -90,16 +195,24 @@ export default function ExpedienteDetallePage() {
           Volver
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            {expedienteActual.numero}
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              {expedienteActual.numero}
+            </h1>
+            <ProcesamientoStatusBadge
+              isProcesado={isProcesado}
+              isProcessing={isProcessing}
+              onProcesar={handleProcesar}
+              compact
+            />
+          </div>
           <p className="mt-1 text-gray-600 dark:text-gray-400">
             Detalle del expediente
           </p>
         </div>
       </div>
 
-      {/* Información Principal */}
+      {/* Informacion Principal */}
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between">
@@ -135,7 +248,7 @@ export default function ExpedienteDetallePage() {
                 <Calendar className="h-5 w-5 text-gray-400 mt-0.5" />
                 <div>
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Última Actuación
+                    Ultima Actuacion
                   </p>
                   <p className="text-base text-gray-900 dark:text-white">
                     {expedienteActual.ultima_actuacion}
@@ -161,7 +274,7 @@ export default function ExpedienteDetallePage() {
                 <Clock className="h-5 w-5 text-gray-400 mt-0.5" />
                 <div>
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Extraído el
+                    Extraido el
                   </p>
                   <p className="text-base text-gray-900 dark:text-white">
                     {formatFechaExtraccion(expedienteActual.fecha_extraccion)}
@@ -173,13 +286,88 @@ export default function ExpedienteDetallePage() {
         </CardContent>
       </Card>
 
-      {/* Actuaciones */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-          Actuaciones ({expedienteActual.actuaciones.length})
-        </h2>
-        <ActuacionesList actuaciones={expedienteActual.actuaciones} />
-      </div>
+      {/* Tabs */}
+      <Tabs defaultValue="actuaciones" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="actuaciones" className="flex items-center gap-2">
+            <ListTodo className="h-4 w-4" />
+            Actuaciones ({expedienteActual.actuaciones.length})
+          </TabsTrigger>
+          <TabsTrigger value="procesamiento" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Procesamiento
+            {isProcesado && estadisticas && (
+              <Badge variant="secondary" className="ml-1 h-5 text-xs">
+                {estadisticas.vencimientos_urgentes}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="vencimientos" className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Vencimientos
+            {vencimientos.length > 0 && (
+              <Badge variant="destructive" className="ml-1 h-5 text-xs">
+                {vencimientos.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="actuaciones" className="mt-6">
+          <ActuacionesList actuaciones={expedienteActual.actuaciones} />
+        </TabsContent>
+
+        <TabsContent value="procesamiento" className="mt-6 space-y-6">
+          {!isProcesado ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Expediente no procesado
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  Procesa el expediente para ver la clasificacion de actuaciones, vencimientos y estadisticas
+                </p>
+                <Button onClick={handleProcesar} disabled={isProcessing}>
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      Procesar Expediente
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <EstadisticasExpedientePanel
+                estadisticas={estadisticas}
+                isLoading={isLoadingProcesamiento}
+              />
+
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-4">Actuaciones Clasificadas</h3>
+                <ActuacionesClasificadasList
+                  actuaciones={actuacionesClasificadas}
+                  isLoading={isLoadingProcesamiento}
+                />
+              </div>
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="vencimientos" className="mt-6">
+          <VencimientosExpedientePanel
+            vencimientos={vencimientos}
+            isLoading={isLoadingProcesamiento}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

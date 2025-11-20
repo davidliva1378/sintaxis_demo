@@ -69,6 +69,7 @@ from .routers import (
     extraccion_masiva,
     health,
     monitoreo,
+    procesamiento,
     workspaces,
 )
 
@@ -193,6 +194,7 @@ app.include_router(
 )
 app.include_router(workspaces.router, prefix="/api/v1/workspaces", tags=["workspaces"])
 app.include_router(monitoreo.router, prefix="/api/v1/monitoreo", tags=["monitoreo"])
+app.include_router(procesamiento.router, prefix="/api/v1", tags=["procesamiento"])
 app.include_router(config.router, prefix="/api/v1", tags=["configuracion"])
 app.include_router(admin.router, prefix="/api/v1", tags=["administracion"])
 

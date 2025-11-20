@@ -17,7 +17,7 @@ export type ExpedienteResumen = ExpedienteListado;
 export interface Actuacion {
   indice: number;
   oficina: string;
-  oficina_completa: string;
+  oficina_completa?: string;
   fecha: string;
   tipo: string;
   detalle: string;
@@ -30,6 +30,10 @@ export interface Actuacion {
   extraida_en: string | null;
   es_historica: boolean;
   descargado: boolean;
+  /** Lista de archivos adjuntos */
+  archivos?: string[];
+  /** Ruta al archivo PDF en el servidor */
+  ruta_pdf?: string | null;
 }
 
 export interface ExpedienteDetalle extends ExpedienteListado {

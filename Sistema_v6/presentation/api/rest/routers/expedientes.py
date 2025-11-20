@@ -333,20 +333,44 @@ async def obtener_actuaciones(numero: str):
                 detail=f"No se encontraron actuaciones para el expediente {numero}",
             )
 
+        # Obtener path base de workspaces para construir rutas de PDF
+        from core.domain.utils import normalizar_numero_expediente
+        numero_normalizado = normalizar_numero_expediente(numero).replace('-', '_')
+        workspaces_base = actuacion_repo._workspaces_base
+
+        # Buscar el directorio del expediente
+        pdf_base_path = None
+        if workspaces_base.exists():
+            for dir_path in workspaces_base.iterdir():
+                if dir_path.is_dir() and numero_normalizado in dir_path.name:
+                    pdf_dir = dir_path / "pdfs"
+                    if pdf_dir.exists():
+                        pdf_base_path = pdf_dir
+                    break
+
         # Convertir a response
-        actuaciones_response = [
-            ActuacionResponse(
-                indice=act.indice,
-                oficina=act.oficina,
-                tipo=act.tipo,
-                fecha=act.fecha,
-                detalle=act.detalle,
-                foja=act.foja,
-                firmante=None,  # La entidad no tiene firmante
-                archivos=[act.nombre_archivo] if act.nombre_archivo else [],
+        actuaciones_response = []
+        for act in actuaciones:
+            # Construir ruta_pdf si tiene archivo
+            ruta_pdf = None
+            if act.nombre_archivo and pdf_base_path:
+                posible_ruta = pdf_base_path / act.nombre_archivo
+                if posible_ruta.exists():
+                    ruta_pdf = str(posible_ruta)
+
+            actuaciones_response.append(
+                ActuacionResponse(
+                    indice=act.indice,
+                    oficina=act.oficina,
+                    tipo=act.tipo,
+                    fecha=act.fecha,
+                    detalle=act.detalle,
+                    foja=act.foja,
+                    firmante=None,  # La entidad no tiene firmante
+                    archivos=[act.nombre_archivo] if act.nombre_archivo else [],
+                    ruta_pdf=ruta_pdf,
+                )
             )
-            for act in actuaciones
-        ]
 
         return actuaciones_response
 

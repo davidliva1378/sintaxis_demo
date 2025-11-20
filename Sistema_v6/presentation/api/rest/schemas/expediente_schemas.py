@@ -59,8 +59,9 @@ class ActuacionResponse(BaseModel):
     foja: str | None = None
     firmante: str | None = None
     archivos: list[str] = Field(default_factory=list)
+    ruta_pdf: str | None = Field(None, description="Ruta al archivo PDF en el servidor")
 
-    model_config = {"json_schema_extra": {"example": {"indice": 1, "oficina": "Secretaría 1", "tipo": "Providencia", "fecha": "2024-01-15", "detalle": "Se corre vista...", "foja": "10 / 150", "firmante": "Juan Pérez", "archivos": ["documento_123.pdf"]}}}
+    model_config = {"json_schema_extra": {"example": {"indice": 1, "oficina": "Secretaría 1", "tipo": "Providencia", "fecha": "2024-01-15", "detalle": "Se corre vista...", "foja": "10 / 150", "firmante": "Juan Pérez", "archivos": ["documento_123.pdf"], "ruta_pdf": "/workspaces/exp_123/pdfs/documento.pdf"}}}
 
 
 class ExtraerExpedientesResponse(BaseModel):

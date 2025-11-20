@@ -30,11 +30,11 @@ export const useAuthStore = create<AuthState>()(
       login: async (username: string, password: string) => {
         set({ isLoading: true })
         try {
-          const formData = new FormData()
-          formData.append('username', username)
-          formData.append('password', password)
+          const params = new URLSearchParams()
+          params.append('username', username)
+          params.append('password', password)
 
-          const response = await apiClient.post<TokenResponse>('/api/v1/auth/login', formData, {
+          const response = await apiClient.post<TokenResponse>('/api/v1/auth/login', params, {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           })
 
