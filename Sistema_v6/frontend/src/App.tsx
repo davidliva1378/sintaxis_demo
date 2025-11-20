@@ -9,6 +9,7 @@ import ExpedienteDetallePage from './pages/expedientes/ExpedienteDetallePage'
 import WorkspacesPage from './pages/workspaces/WorkspacesPage'
 import WorkspaceDetailPage from './pages/workspaces/WorkspaceDetailPage'
 import MonitoreoPage from './pages/monitoreo/MonitoreoPage'
+import ProcesamientoPage from './pages/procesamiento/ProcesamientoPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import MainLayout from './components/layout/MainLayout'
@@ -92,6 +93,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <MonitoreoPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/procesamiento"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ProcesamientoPage />
                 </MainLayout>
               </ProtectedRoute>
             }

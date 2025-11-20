@@ -5,6 +5,7 @@ import {
   FileText,
   FolderOpen,
   Activity,
+  Zap,
   Settings,
 } from 'lucide-react'
 
@@ -31,6 +32,11 @@ const navigation = [
     href: '/monitoreo',
     icon: Activity,
     badge: 'Próximamente',
+  },
+  {
+    name: 'Procesamiento',
+    href: '/procesamiento',
+    icon: Zap,
   },
   {
     name: 'Configuración',
