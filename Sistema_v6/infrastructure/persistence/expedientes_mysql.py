@@ -1,0 +1,464 @@
+"""
+Repositorio MySQL para expedientes.
+
+Sincroniza expedientes_index.json con la tabla expedientes de MySQL.
+Provee métodos para:
+- Crear/actualizar expedientes
+- Obtener ID por número normalizado
+- Sincronización masiva desde JSON
+"""
+
+import os
+import json
+import logging
+from pathlib import Path
+from datetime import datetime
+from typing import Optional, Dict, Any, List
+
+import mysql.connector
+from mysql.connector import Error as MySQLError
+
+logger = logging.getLogger(__name__)
+
+
+class ExpedientesRepository:
+    """
+    Repositorio para gestionar expedientes en MySQL.
+
+    Mantiene sincronización entre expedientes_index.json y tabla MySQL.
+    """
+
+    def __init__(self, db_config: Optional[Dict[str, Any]] = None):
+        """
+        Inicializa el repositorio.
+
+        Args:
+            db_config: Configuración de BD. Si no se provee, usa variables de entorno.
+        """
+        if db_config:
+            self.db_config = db_config
+        else:
+            self.db_config = {
+                'host': os.getenv('MYSQL_HOST', 'localhost'),
+                'port': int(os.getenv('MYSQL_PORT', '3306')),
+                'database': os.getenv('MYSQL_DATABASE', 'sintaxis'),
+                'user': os.getenv('MYSQL_USER', 'root'),
+                'password': os.getenv('MYSQL_PASSWORD', ''),
+                'charset': 'utf8mb4',
+                'collation': 'utf8mb4_unicode_ci'
+            }
+
+        logger.info(f"ExpedientesRepository inicializado para BD: {self.db_config.get('database')}")
+
+    def _get_connection(self):
+        """Obtiene una conexión a la base de datos."""
+        try:
+            conn = mysql.connector.connect(**self.db_config)
+            return conn
+        except MySQLError as e:
+            logger.error(f"Error conectando a MySQL: {e}")
+            raise
+
+    def crear_o_actualizar(
+        self,
+        expediente_id: int,
+        numero_normalizado: str,
+        numero_original: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """
+        Crea o actualiza un expediente en MySQL.
+
+        Args:
+            expediente_id: ID del índice JSON
+            numero_normalizado: Número normalizado (ej: FPA_012332_2019)
+            numero_original: Número original (ej: FPA 012332/2019)
+            metadata: Datos adicionales (dependencia, caratula, etc.)
+
+        Returns:
+            True si se guardó correctamente
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Extraer campos de metadata
+            dependencia = None
+            caratula = None
+            situacion = None
+            ultima_actuacion = None
+            estado_monitoreo = 'activo'
+            prioridad = 'normal'
+
+            if metadata:
+                # Datos del portal
+                estado_portal = metadata.get('estado_portal', {})
+                dependencia = estado_portal.get('dependencia') or metadata.get('dependencia')
+                caratula = estado_portal.get('caratula') or metadata.get('caratula')
+                situacion = estado_portal.get('situacion') or metadata.get('situacion')
+                ultima_actuacion_str = estado_portal.get('ultima_actuacion') or metadata.get('ultima_actuacion')
+
+                if ultima_actuacion_str:
+                    try:
+                        # Intentar parsear la fecha
+                        for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y']:
+                            try:
+                                ultima_actuacion = datetime.strptime(ultima_actuacion_str, fmt).date()
+                                break
+                            except ValueError:
+                                continue
+                    except Exception:
+                        pass
+
+                # Datos de monitoreo
+                monitoreo = metadata.get('monitoreo', {})
+                estado_monitoreo = monitoreo.get('estado', 'activo')
+                prioridad = monitoreo.get('prioridad', 'normal')
+
+            query = """
+                INSERT INTO expedientes (
+                    id,
+                    numero_normalizado,
+                    numero_original,
+                    dependencia,
+                    caratula,
+                    situacion,
+                    ultima_actuacion,
+                    estado_monitoreo,
+                    prioridad,
+                    fecha_creacion
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    numero_original = VALUES(numero_original),
+                    dependencia = COALESCE(VALUES(dependencia), dependencia),
+                    caratula = COALESCE(VALUES(caratula), caratula),
+                    situacion = COALESCE(VALUES(situacion), situacion),
+                    ultima_actuacion = COALESCE(VALUES(ultima_actuacion), ultima_actuacion),
+                    estado_monitoreo = VALUES(estado_monitoreo),
+                    prioridad = VALUES(prioridad)
+            """
+
+            params = (
+                expediente_id,
+                numero_normalizado,
+                numero_original,
+                dependencia,
+                caratula,
+                situacion,
+                ultima_actuacion,
+                estado_monitoreo,
+                prioridad,
+                datetime.now()
+            )
+
+            cursor.execute(query, params)
+            conn.commit()
+
+            logger.debug(f"Expediente {numero_normalizado} guardado con ID {expediente_id}")
+
+            cursor.close()
+            conn.close()
+
+            return True
+
+        except MySQLError as e:
+            logger.error(f"Error guardando expediente {numero_normalizado}: {e}")
+            return False
+
+    def obtener_por_numero(self, numero_normalizado: str) -> Optional[Dict[str, Any]]:
+        """
+        Obtiene un expediente por su número normalizado.
+
+        Args:
+            numero_normalizado: Número normalizado del expediente
+
+        Returns:
+            Dict con datos del expediente o None
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor(dictionary=True)
+
+            query = "SELECT * FROM expedientes WHERE numero_normalizado = %s"
+            cursor.execute(query, (numero_normalizado,))
+
+            resultado = cursor.fetchone()
+
+            cursor.close()
+            conn.close()
+
+            return resultado
+
+        except MySQLError as e:
+            logger.error(f"Error obteniendo expediente {numero_normalizado}: {e}")
+            return None
+
+    def obtener_id(self, numero_normalizado: str) -> Optional[int]:
+        """
+        Obtiene el ID de un expediente por su número normalizado.
+
+        Args:
+            numero_normalizado: Número normalizado del expediente
+
+        Returns:
+            ID del expediente o None si no existe
+        """
+        expediente = self.obtener_por_numero(numero_normalizado)
+        return expediente['id'] if expediente else None
+
+    def actualizar_extraccion(
+        self,
+        expediente_id: int,
+        total_actuaciones: int = 0,
+        total_pdfs: int = 0
+    ) -> bool:
+        """
+        Actualiza datos de extracción de un expediente.
+
+        Args:
+            expediente_id: ID del expediente
+            total_actuaciones: Total de actuaciones extraídas
+            total_pdfs: Total de PDFs descargados
+
+        Returns:
+            True si se actualizó correctamente
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            query = """
+                UPDATE expedientes
+                SET fecha_ultima_extraccion = %s,
+                    total_actuaciones = %s,
+                    total_pdfs_descargados = %s
+                WHERE id = %s
+            """
+
+            cursor.execute(query, (datetime.now(), total_actuaciones, total_pdfs, expediente_id))
+            conn.commit()
+
+            cursor.close()
+            conn.close()
+
+            return True
+
+        except MySQLError as e:
+            logger.error(f"Error actualizando extracción de expediente {expediente_id}: {e}")
+            return False
+
+    def actualizar_procesamiento(self, expediente_id: int) -> bool:
+        """
+        Marca un expediente como procesado.
+
+        Args:
+            expediente_id: ID del expediente
+
+        Returns:
+            True si se actualizó correctamente
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            query = """
+                UPDATE expedientes
+                SET fecha_ultimo_procesamiento = %s
+                WHERE id = %s
+            """
+
+            cursor.execute(query, (datetime.now(), expediente_id))
+            conn.commit()
+
+            cursor.close()
+            conn.close()
+
+            return True
+
+        except MySQLError as e:
+            logger.error(f"Error actualizando procesamiento de expediente {expediente_id}: {e}")
+            return False
+
+    def sincronizar_desde_json(self, ruta_index: Path) -> Dict[str, int]:
+        """
+        Sincroniza todos los expedientes desde expedientes_index.json a MySQL.
+
+        Args:
+            ruta_index: Ruta al archivo expedientes_index.json
+
+        Returns:
+            Dict con estadísticas de sincronización
+        """
+        stats = {
+            'procesados': 0,
+            'creados': 0,
+            'actualizados': 0,
+            'errores': 0
+        }
+
+        if not ruta_index.exists():
+            logger.warning(f"Archivo de índice no encontrado: {ruta_index}")
+            return stats
+
+        try:
+            with open(ruta_index, 'r', encoding='utf-8') as f:
+                indice = json.load(f)
+
+            expedientes = indice.get('expedientes', {})
+
+            for numero_normalizado, exp_id in expedientes.items():
+                stats['procesados'] += 1
+
+                # Verificar si ya existe
+                existente = self.obtener_por_numero(numero_normalizado)
+
+                # Reconstruir número original (revertir normalización básica)
+                numero_original = numero_normalizado.replace('_', ' ').replace(' ', '/', 1)
+
+                # Intentar cargar metadata del manifest.json si existe
+                metadata = None
+                directorio_expediente = ruta_index.parent / f"{exp_id:06d}_{numero_normalizado}"
+                manifest_path = directorio_expediente / "manifest.json"
+
+                if manifest_path.exists():
+                    try:
+                        with open(manifest_path, 'r', encoding='utf-8') as f:
+                            manifest = json.load(f)
+                            metadata = manifest.get('metadata', {})
+                            # Usar número original del manifest si está disponible
+                            if 'numero_expediente' in metadata:
+                                numero_original = metadata['numero_expediente']
+                    except Exception as e:
+                        logger.debug(f"No se pudo leer manifest de {numero_normalizado}: {e}")
+
+                success = self.crear_o_actualizar(
+                    expediente_id=exp_id,
+                    numero_normalizado=numero_normalizado,
+                    numero_original=numero_original,
+                    metadata=metadata
+                )
+
+                if success:
+                    if existente:
+                        stats['actualizados'] += 1
+                    else:
+                        stats['creados'] += 1
+                else:
+                    stats['errores'] += 1
+
+            logger.info(
+                f"Sincronización completada: {stats['procesados']} procesados, "
+                f"{stats['creados']} creados, {stats['actualizados']} actualizados, "
+                f"{stats['errores']} errores"
+            )
+
+        except Exception as e:
+            logger.error(f"Error en sincronización desde JSON: {e}")
+            stats['errores'] += 1
+
+        return stats
+
+    def listar_todos(self, estado: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Lista todos los expedientes.
+
+        Args:
+            estado: Filtrar por estado de monitoreo (opcional)
+
+        Returns:
+            Lista de expedientes
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor(dictionary=True)
+
+            if estado:
+                query = "SELECT * FROM expedientes WHERE estado_monitoreo = %s ORDER BY id"
+                cursor.execute(query, (estado,))
+            else:
+                query = "SELECT * FROM expedientes ORDER BY id"
+                cursor.execute(query)
+
+            resultados = cursor.fetchall()
+
+            cursor.close()
+            conn.close()
+
+            return resultados
+
+        except MySQLError as e:
+            logger.error(f"Error listando expedientes: {e}")
+            return []
+
+    def contar(self) -> int:
+        """
+        Cuenta el total de expedientes en MySQL.
+
+        Returns:
+            Cantidad de expedientes
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT COUNT(*) FROM expedientes")
+            resultado = cursor.fetchone()
+
+            cursor.close()
+            conn.close()
+
+            return resultado[0] if resultado else 0
+
+        except MySQLError as e:
+            logger.error(f"Error contando expedientes: {e}")
+            return 0
+
+    def eliminar_todos(self) -> int:
+        """
+        Elimina todos los expedientes (usado en reset).
+
+        Returns:
+            Cantidad de registros eliminados
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Obtener count antes de eliminar
+            cursor.execute("SELECT COUNT(*) FROM expedientes")
+            count = cursor.fetchone()[0]
+
+            cursor.execute("DELETE FROM expedientes")
+            conn.commit()
+
+            cursor.close()
+            conn.close()
+
+            logger.info(f"Eliminados {count} expedientes de MySQL")
+            return count
+
+        except MySQLError as e:
+            logger.error(f"Error eliminando expedientes: {e}")
+            return 0
+
+
+# Instancia global (singleton pattern)
+_repository_instance: Optional[ExpedientesRepository] = None
+
+
+def get_expedientes_repository(db_config: Optional[Dict[str, Any]] = None) -> ExpedientesRepository:
+    """
+    Obtiene la instancia del repositorio de expedientes.
+
+    Args:
+        db_config: Configuración de BD (opcional)
+
+    Returns:
+        ExpedientesRepository
+    """
+    global _repository_instance
+
+    if _repository_instance is None or db_config is not None:
+        _repository_instance = ExpedientesRepository(db_config)
+
+    return _repository_instance

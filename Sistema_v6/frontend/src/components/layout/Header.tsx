@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import ThemeToggle from './ThemeToggle'
-import { LogOut, User, Shield, Settings, RotateCcw, Trash2, BarChart3 } from 'lucide-react'
+import { LogOut, User, Shield, Settings, RotateCcw, Trash2, BarChart3, Database } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import SystemStatsDialog from '@/components/admin/SystemStatsDialog'
 import ResetSystemDialog from '@/components/admin/ResetSystemDialog'
+import SincronizacionDialog from '@/components/admin/SincronizacionDialog'
 import { adminApi } from '@/api/adminApi'
 import { toast } from 'sonner'
 
@@ -23,6 +24,7 @@ export default function Header() {
   const { user, logout } = useAuthStore()
   const [showStatsDialog, setShowStatsDialog] = useState(false)
   const [showResetDialog, setShowResetDialog] = useState(false)
+  const [showSyncDialog, setShowSyncDialog] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -97,6 +99,10 @@ export default function Header() {
                 <BarChart3 className="mr-2 h-4 w-4" />
                 <span>Estadísticas</span>
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowSyncDialog(true)}>
+                <Database className="mr-2 h-4 w-4" />
+                <span>Sincronización MySQL</span>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLimpiarCache}>
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -147,6 +153,7 @@ export default function Header() {
       {/* Admin Dialogs */}
       <SystemStatsDialog open={showStatsDialog} onOpenChange={setShowStatsDialog} />
       <ResetSystemDialog open={showResetDialog} onOpenChange={setShowResetDialog} />
+      <SincronizacionDialog open={showSyncDialog} onOpenChange={setShowSyncDialog} />
     </header>
   )
 }

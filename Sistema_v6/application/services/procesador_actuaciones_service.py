@@ -44,7 +44,30 @@ except ImportError as e:
 import mysql.connector
 from mysql.connector import Error as MySQLError
 
+# Importar repositorio de expedientes para obtener expediente_id
+try:
+    from Sistema_v6.infrastructure.persistence.expedientes_mysql import get_expedientes_repository
+    _expedientes_repo_available = True
+except ImportError:
+    _expedientes_repo_available = False
+
 logger = logging.getLogger(__name__)
+
+
+def _normalizar_numero_expediente(numero: str) -> str:
+    """
+    Normaliza un número de expediente para buscar en MySQL.
+
+    Convierte formatos como "FPA 012332/2019" a "FPA_012332_2019"
+    """
+    import re
+    # Eliminar espacios extras
+    normalizado = numero.strip()
+    # Reemplazar / y espacios por _
+    normalizado = re.sub(r'[\s/]+', '_', normalizado)
+    # Eliminar caracteres especiales excepto _ y alfanuméricos
+    normalizado = re.sub(r'[^\w_]', '', normalizado)
+    return normalizado.upper()
 
 
 # ============================================================================
@@ -118,7 +141,8 @@ class ActuacionesRepository:
         actuacion_id: int,
         resultado: ResultadoProcesamiento,
         expediente_numero: str = None,
-        actuacion_data: dict = None
+        actuacion_data: dict = None,
+        expediente_id: int = None
     ) -> bool:
         """
         Guarda los resultados de clasificación en la tabla actuaciones.
@@ -130,6 +154,7 @@ class ActuacionesRepository:
             resultado: Resultado del procesamiento
             expediente_numero: Número del expediente
             actuacion_data: Dict con datos de la actuación (tipo, detalle, etc.)
+            expediente_id: ID del expediente en MySQL (opcional)
 
         Returns:
             True si se guardó correctamente
@@ -163,6 +188,7 @@ class ActuacionesRepository:
             query = """
                 INSERT INTO actuaciones (
                     id,
+                    expediente_id,
                     expediente_numero,
                     tipo,
                     detalle,
@@ -177,8 +203,9 @@ class ActuacionesRepository:
                     fecha_clasificacion,
                     texto_extraido,
                     hash_contenido
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
+                    expediente_id = VALUES(expediente_id),
                     expediente_numero = VALUES(expediente_numero),
                     tipo = VALUES(tipo),
                     detalle = VALUES(detalle),
@@ -197,6 +224,7 @@ class ActuacionesRepository:
 
             params = (
                 actuacion_id,
+                expediente_id,
                 expediente_numero,
                 tipo,
                 detalle,
@@ -231,15 +259,20 @@ class ActuacionesRepository:
         self,
         actuacion_id: int,
         expediente_numero: str,
-        vencimientos: list
+        vencimientos: list,
+        expediente_id: int = None
     ) -> int:
         """
         Guarda vencimientos detectados en la tabla vencimientos.
+
+        Usa INSERT ON DUPLICATE KEY UPDATE para evitar duplicados cuando
+        se reprocesa el mismo expediente.
 
         Args:
             actuacion_id: ID de la actuación
             expediente_numero: Número de expediente
             vencimientos: Lista de objetos Vencimiento
+            expediente_id: ID del expediente en MySQL (opcional)
 
         Returns:
             Cantidad de vencimientos guardados
@@ -251,10 +284,12 @@ class ActuacionesRepository:
             conn = self._get_connection()
             cursor = conn.cursor()
 
+            # Usar INSERT ON DUPLICATE KEY UPDATE para deduplicación
             query = """
                 INSERT INTO vencimientos (
                     actuacion_id,
                     expediente_numero,
+                    expediente_id,
                     tipo,
                     fecha_notificacion,
                     plazo_dias,
@@ -264,7 +299,14 @@ class ActuacionesRepository:
                     texto_fuente,
                     confianza,
                     estado
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    fecha_notificacion = VALUES(fecha_notificacion),
+                    plazo_dias = VALUES(plazo_dias),
+                    dias_habiles = VALUES(dias_habiles),
+                    descripcion = VALUES(descripcion),
+                    texto_fuente = VALUES(texto_fuente),
+                    confianza = VALUES(confianza)
             """
 
             guardados = 0
@@ -272,6 +314,7 @@ class ActuacionesRepository:
                 params = (
                     actuacion_id,
                     expediente_numero,
+                    expediente_id,
                     venc.tipo.value,  # Enum a string
                     venc.fecha_notificacion,
                     venc.plazo_dias,
@@ -362,13 +405,18 @@ class ActuacionesRepository:
 
     def guardar_estadisticas(
         self,
-        estadisticas: EstadisticasProcesamiento
+        estadisticas: EstadisticasProcesamiento,
+        expediente_id: int = None
     ) -> bool:
         """
         Guarda estadísticas de procesamiento.
 
+        Usa INSERT ON DUPLICATE KEY UPDATE para mantener solo el último
+        registro de estadísticas por expediente (evita duplicados).
+
         Args:
             estadisticas: Objeto EstadisticasProcesamiento
+            expediente_id: ID del expediente en MySQL (opcional)
 
         Returns:
             True si se guardó correctamente
@@ -377,9 +425,11 @@ class ActuacionesRepository:
             conn = self._get_connection()
             cursor = conn.cursor()
 
+            # Usar INSERT ON DUPLICATE KEY UPDATE para deduplicación
             query = """
                 INSERT INTO procesamiento_estadisticas (
                     expediente_numero,
+                    expediente_id,
                     fecha_procesamiento,
                     total_actuaciones,
                     actuaciones_alta,
@@ -392,11 +442,25 @@ class ActuacionesRepository:
                     duplicados_detectados,
                     tiempo_procesamiento_seg,
                     version_procesador
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    fecha_procesamiento = VALUES(fecha_procesamiento),
+                    total_actuaciones = VALUES(total_actuaciones),
+                    actuaciones_alta = VALUES(actuaciones_alta),
+                    actuaciones_media = VALUES(actuaciones_media),
+                    actuaciones_baja = VALUES(actuaciones_baja),
+                    actuaciones_nula = VALUES(actuaciones_nula),
+                    reduccion_estimada_pct = VALUES(reduccion_estimada_pct),
+                    vencimientos_detectados = VALUES(vencimientos_detectados),
+                    vencimientos_urgentes = VALUES(vencimientos_urgentes),
+                    duplicados_detectados = VALUES(duplicados_detectados),
+                    tiempo_procesamiento_seg = VALUES(tiempo_procesamiento_seg),
+                    version_procesador = VALUES(version_procesador)
             """
 
             params = (
                 estadisticas.expediente_numero,
+                expediente_id,
                 datetime.now(),
                 estadisticas.total_actuaciones,
                 estadisticas.actuaciones_alta,
@@ -554,6 +618,19 @@ class ProcesadorActuacionesService:
 
         # Guardar en BD si se solicita
         if guardar_en_bd:
+            # Obtener expediente_id de MySQL
+            expediente_id = None
+            if _expedientes_repo_available:
+                try:
+                    numero_normalizado = _normalizar_numero_expediente(numero_expediente)
+                    repo_expedientes = get_expedientes_repository()
+                    expediente_id = repo_expedientes.obtener_id(numero_normalizado)
+                    if expediente_id:
+                        logger.debug(f"Obtenido expediente_id {expediente_id} para {numero_expediente}")
+                    else:
+                        logger.warning(f"No se encontró expediente_id para {numero_expediente}")
+                except Exception as e:
+                    logger.warning(f"Error obteniendo expediente_id: {e}")
             # Guardar clasificaciones individuales
             for actuacion in actuaciones:
                 act_id = actuacion.get('id')
@@ -563,7 +640,8 @@ class ProcesadorActuacionesService:
                         act_id,
                         resultado,
                         expediente_numero=numero_expediente,
-                        actuacion_data=actuacion
+                        actuacion_data=actuacion,
+                        expediente_id=expediente_id
                     )
 
                     # Guardar vencimientos
@@ -571,7 +649,8 @@ class ProcesadorActuacionesService:
                         self.repository.guardar_vencimientos(
                             act_id,
                             numero_expediente,
-                            resultado.vencimientos
+                            resultado.vencimientos,
+                            expediente_id=expediente_id
                         )
 
             # Guardar duplicados
@@ -597,7 +676,7 @@ class ProcesadorActuacionesService:
                 tiempo_procesamiento_seg=tiempo_procesamiento
             )
 
-            self.repository.guardar_estadisticas(estadisticas)
+            self.repository.guardar_estadisticas(estadisticas, expediente_id=expediente_id)
 
         logger.info(
             f"Expediente {numero_expediente} procesado en {tiempo_procesamiento:.2f}s: "

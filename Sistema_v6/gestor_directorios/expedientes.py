@@ -26,6 +26,13 @@ except ImportError:  # pragma: no cover - fallback cuando se ejecuta fuera del p
 if TYPE_CHECKING:  # pragma: no cover - solo para hints
     from Sistema_v6.infrastructure.config.settings import Settings as SystemConfig
 
+# Importar repositorio MySQL para sincronización
+try:
+    from Sistema_v6.infrastructure.persistence.expedientes_mysql import get_expedientes_repository
+    _mysql_available = True
+except ImportError:
+    _mysql_available = False
+
 
 ESTRUCTURA_POR_DEFECTO: dict[str, dict[str, object] | None] = {
     "actuaciones": {
@@ -363,7 +370,10 @@ class GestorDirectoriosExpedientes:
         from datetime import datetime
 
         numero_normalizado = normalizar_numero_expediente(numero_expediente)
-        identificador = self._obtener_o_registrar_identificador(numero_normalizado)
+        identificador = self._obtener_o_registrar_identificador(
+            numero_normalizado,
+            numero_original=numero_expediente
+        )
         destino = self._obtener_ruta_expediente(numero_normalizado, identificador)
 
         # Verificar si ya existe manifest
@@ -755,17 +765,44 @@ class GestorDirectoriosExpedientes:
         }
         self._persistir_json_atomico(indice_path, payload)
 
-    def _obtener_o_registrar_identificador(self, numero_normalizado: str) -> int:
-        """Obtiene el identificador del expediente o registra uno nuevo."""
+    def _obtener_o_registrar_identificador(
+        self,
+        numero_normalizado: str,
+        numero_original: str = None,
+        metadata: dict = None
+    ) -> int:
+        """Obtiene el identificador del expediente o registra uno nuevo.
+
+        También sincroniza con MySQL si está disponible.
+        """
 
         last_id, expedientes = self._cargar_indice()
-        if numero_normalizado in expedientes:
-            return expedientes[numero_normalizado]
+        es_nuevo = numero_normalizado not in expedientes
 
-        nuevo_id = last_id + 1
-        expedientes[numero_normalizado] = nuevo_id
-        self._guardar_indice(nuevo_id, expedientes)
-        return nuevo_id
+        if es_nuevo:
+            nuevo_id = last_id + 1
+            expedientes[numero_normalizado] = nuevo_id
+            self._guardar_indice(nuevo_id, expedientes)
+            identificador = nuevo_id
+        else:
+            identificador = expedientes[numero_normalizado]
+
+        # Sincronizar con MySQL
+        if _mysql_available:
+            try:
+                repo = get_expedientes_repository()
+                repo.crear_o_actualizar(
+                    expediente_id=identificador,
+                    numero_normalizado=numero_normalizado,
+                    numero_original=numero_original or numero_normalizado.replace('_', ' ').replace(' ', '/', 1),
+                    metadata=metadata
+                )
+            except Exception as e:
+                # No fallar si MySQL no está disponible
+                import logging
+                logging.getLogger(__name__).warning(f"No se pudo sincronizar expediente con MySQL: {e}")
+
+        return identificador
 
     def _persistir_json_atomico(self, destino: Path, contenido: dict[str, Any]) -> None:
         """Escribe un archivo JSON en disco utilizando reemplazo atómico."""
