@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import FileResponse
 
 from application.dtos import (
     ExtraerExpedientesCommand,
@@ -343,7 +344,7 @@ async def obtener_actuaciones(numero: str):
         if workspaces_base.exists():
             for dir_path in workspaces_base.iterdir():
                 if dir_path.is_dir() and numero_normalizado in dir_path.name:
-                    pdf_dir = dir_path / "pdfs"
+                    pdf_dir = dir_path / "actuaciones"
                     if pdf_dir.exists():
                         pdf_base_path = pdf_dir
                     break
@@ -362,6 +363,7 @@ async def obtener_actuaciones(numero: str):
                 ActuacionResponse(
                     indice=act.indice,
                     oficina=act.oficina,
+                    oficina_completa=getattr(act, 'oficina_completa', None),
                     tipo=act.tipo,
                     fecha=act.fecha,
                     detalle=act.detalle,
@@ -369,6 +371,11 @@ async def obtener_actuaciones(numero: str):
                     firmante=None,  # La entidad no tiene firmante
                     archivos=[act.nombre_archivo] if act.nombre_archivo else [],
                     ruta_pdf=ruta_pdf,
+                    tiene_archivo=act.tiene_archivo,
+                    nombre_archivo=act.nombre_archivo,
+                    tipo_archivo=getattr(act, 'tipo_archivo', None),
+                    descargado=getattr(act, 'descargado', False),
+                    es_historica=getattr(act, 'es_historica', False),
                 )
             )
 
@@ -379,6 +386,93 @@ async def obtener_actuaciones(numero: str):
 
     except Exception as e:
         logger.exception(f"Error al obtener actuaciones de {numero}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno: {str(e)}",
+        )
+
+
+@router.get("/{numero}/actuaciones/{indice}/pdf", status_code=status.HTTP_200_OK)
+async def descargar_pdf_actuacion(numero: str, indice: int):
+    """Descarga el PDF de una actuación específica.
+
+    Args:
+        numero: Número del expediente
+        indice: Índice de la actuación
+
+    Returns:
+        FileResponse con el archivo PDF
+
+    Raises:
+        HTTPException: Si el archivo no existe
+    """
+    logger.info(f"GET /expedientes/{numero}/actuaciones/{indice}/pdf")
+
+    try:
+        # Obtener repositorio de actuaciones
+        container = get_container()
+        actuacion_repo = container.actuacion_repo
+
+        # Buscar actuaciones
+        actuaciones = await actuacion_repo.obtener_actuaciones(numero)
+
+        if actuaciones is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No se encontraron actuaciones para el expediente {numero}",
+            )
+
+        # Buscar la actuación por índice
+        actuacion = None
+        for act in actuaciones:
+            if act.indice == indice:
+                actuacion = act
+                break
+
+        if actuacion is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No se encontró la actuación {indice} en el expediente {numero}",
+            )
+
+        if not actuacion.nombre_archivo:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"La actuación {indice} no tiene archivo adjunto",
+            )
+
+        # Obtener path base de workspaces para construir ruta de PDF
+        from core.domain.utils import normalizar_numero_expediente
+        numero_normalizado = normalizar_numero_expediente(numero).replace('-', '_')
+        workspaces_base = actuacion_repo._workspaces_base
+
+        # Buscar el directorio del expediente
+        pdf_path = None
+        if workspaces_base.exists():
+            for dir_path in workspaces_base.iterdir():
+                if dir_path.is_dir() and numero_normalizado in dir_path.name:
+                    posible_ruta = dir_path / "actuaciones" / actuacion.nombre_archivo
+                    if posible_ruta.exists():
+                        pdf_path = posible_ruta
+                    break
+
+        if pdf_path is None or not pdf_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Archivo PDF no encontrado: {actuacion.nombre_archivo}",
+            )
+
+        return FileResponse(
+            path=str(pdf_path),
+            filename=actuacion.nombre_archivo,
+            media_type="application/pdf"
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.exception(f"Error al descargar PDF de {numero}/{indice}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error interno: {str(e)}",

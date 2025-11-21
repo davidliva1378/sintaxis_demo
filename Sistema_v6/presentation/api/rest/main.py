@@ -63,8 +63,11 @@ from infrastructure.exceptions import PJNError
 
 from .routers import (
     admin,
+    agenda,
+    analisis,
     auth,
     config,
+    escritos,
     expedientes,
     extraccion_masiva,
     health,
@@ -197,6 +200,9 @@ app.include_router(monitoreo.router, prefix="/api/v1/monitoreo", tags=["monitore
 app.include_router(procesamiento.router, prefix="/api/v1", tags=["procesamiento"])
 app.include_router(config.router, prefix="/api/v1", tags=["configuracion"])
 app.include_router(admin.router, prefix="/api/v1", tags=["administracion"])
+app.include_router(analisis.router, prefix="/api/v1", tags=["analisis"])
+app.include_router(agenda.router, prefix="/api/v1", tags=["agenda"])
+app.include_router(escritos.router, prefix="/api/v1", tags=["escritos"])
 
 
 # === Root Endpoint ===

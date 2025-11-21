@@ -11,6 +11,9 @@ import WorkspaceDetailPage from './pages/workspaces/WorkspaceDetailPage'
 import MonitoreoPage from './pages/monitoreo/MonitoreoPage'
 import ProcesamientoPage from './pages/procesamiento/ProcesamientoPage'
 import SettingsPage from './pages/settings/SettingsPage'
+import AgendaPage from './pages/agenda/AgendaPage'
+import EscritosPage from './pages/escritos/EscritosPage'
+import DestacadosPage from './pages/destacados/DestacadosPage'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import MainLayout from './components/layout/MainLayout'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
@@ -113,6 +116,36 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <SettingsPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/agenda"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <AgendaPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/escritos"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <EscritosPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/destacados"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <DestacadosPage />
                 </MainLayout>
               </ProtectedRoute>
             }

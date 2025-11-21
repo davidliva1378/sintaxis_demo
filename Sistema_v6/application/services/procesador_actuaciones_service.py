@@ -176,7 +176,7 @@ class ActuacionesRepository:
             texto_extraido = None
             if resultado.texto:
                 import hashlib
-                texto_extraido = resultado.texto.texto
+                texto_extraido = resultado.texto.texto_completo
                 hash_contenido = hashlib.md5(texto_extraido.encode()).hexdigest()
 
             # Datos de la actuación

@@ -14,6 +14,7 @@ import {
   AlertCircle,
   BarChart3,
   ListTodo,
+  StickyNote,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -24,10 +25,12 @@ import EstadisticasExpedientePanel from '@/components/expedientes/EstadisticasEx
 import ActuacionesClasificadasList from '@/components/expedientes/ActuacionesClasificadasList'
 import VencimientosExpedientePanel from '@/components/expedientes/VencimientosExpedientePanel'
 import ProcesamientoStatusBadge from '@/components/expedientes/ProcesamientoStatusBadge'
+import MiAnalisisList from '@/components/expedientes/MiAnalisisList'
 import {
   obtenerEstadisticasExpediente,
   procesarExpediente,
-  obtenerActuacionesClasificadasExpediente
+  obtenerActuacionesClasificadasExpediente,
+  obtenerVencimientosExpediente
 } from '@/api/procesamientoApi'
 import type {
   EstadisticasExpediente,
@@ -75,20 +78,23 @@ export default function ExpedienteDetallePage() {
   const cargarDatosProcesamiento = async (numeroExp: string) => {
     setIsLoadingProcesamiento(true)
     try {
-      // Cargar estadísticas y actuaciones clasificadas en paralelo
-      const [stats, actuaciones] = await Promise.all([
+      // Cargar estadísticas, actuaciones clasificadas y vencimientos en paralelo
+      const [stats, actuaciones, venc] = await Promise.all([
         obtenerEstadisticasExpediente(numeroExp),
-        obtenerActuacionesClasificadasExpediente(numeroExp)
+        obtenerActuacionesClasificadasExpediente(numeroExp),
+        obtenerVencimientosExpediente(numeroExp)
       ])
 
       setEstadisticas(stats)
       setActuacionesClasificadas(actuaciones)
+      setVencimientos(venc)
       setIsProcesado(true)
     } catch (error) {
       // No hay datos de procesamiento - expediente no procesado
       setIsProcesado(false)
       setEstadisticas(null)
       setActuacionesClasificadas([])
+      setVencimientos([])
     } finally {
       setIsLoadingProcesamiento(false)
     }
@@ -288,10 +294,14 @@ export default function ExpedienteDetallePage() {
 
       {/* Tabs */}
       <Tabs defaultValue="actuaciones" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="actuaciones" className="flex items-center gap-2">
             <ListTodo className="h-4 w-4" />
             Actuaciones ({expedienteActual.actuaciones.length})
+          </TabsTrigger>
+          <TabsTrigger value="mi-analisis" className="flex items-center gap-2">
+            <StickyNote className="h-4 w-4" />
+            Mi Analisis
           </TabsTrigger>
           <TabsTrigger value="procesamiento" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
@@ -314,7 +324,17 @@ export default function ExpedienteDetallePage() {
         </TabsList>
 
         <TabsContent value="actuaciones" className="mt-6">
-          <ActuacionesList actuaciones={expedienteActual.actuaciones} />
+          <ActuacionesList
+            actuaciones={expedienteActual.actuaciones}
+            expedienteNumero={expedienteActual.numero}
+          />
+        </TabsContent>
+
+        <TabsContent value="mi-analisis" className="mt-6">
+          <MiAnalisisList
+            actuaciones={expedienteActual.actuaciones}
+            expedienteNumero={expedienteActual.numero}
+          />
         </TabsContent>
 
         <TabsContent value="procesamiento" className="mt-6 space-y-6">

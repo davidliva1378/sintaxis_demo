@@ -53,6 +53,7 @@ class ActuacionResponse(BaseModel):
 
     indice: int
     oficina: str
+    oficina_completa: str | None = None
     tipo: str | None = None
     fecha: str | None = None
     detalle: str | None = None
@@ -60,8 +61,13 @@ class ActuacionResponse(BaseModel):
     firmante: str | None = None
     archivos: list[str] = Field(default_factory=list)
     ruta_pdf: str | None = Field(None, description="Ruta al archivo PDF en el servidor")
+    tiene_archivo: bool = False
+    nombre_archivo: str | None = None
+    tipo_archivo: str | None = None
+    descargado: bool = False
+    es_historica: bool = False
 
-    model_config = {"json_schema_extra": {"example": {"indice": 1, "oficina": "Secretaría 1", "tipo": "Providencia", "fecha": "2024-01-15", "detalle": "Se corre vista...", "foja": "10 / 150", "firmante": "Juan Pérez", "archivos": ["documento_123.pdf"], "ruta_pdf": "/workspaces/exp_123/pdfs/documento.pdf"}}}
+    model_config = {"json_schema_extra": {"example": {"indice": 1, "oficina": "Secretaría 1", "oficina_completa": "Secretaría Civil 1", "tipo": "Providencia", "fecha": "2024-01-15", "detalle": "Se corre vista...", "foja": "10 / 150", "firmante": "Juan Pérez", "archivos": ["documento_123.pdf"], "ruta_pdf": "/workspaces/exp_123/actuaciones/documento.pdf", "tiene_archivo": True, "nombre_archivo": "documento_123.pdf", "tipo_archivo": "pdf", "descargado": True, "es_historica": False}}}
 
 
 class ExtraerExpedientesResponse(BaseModel):

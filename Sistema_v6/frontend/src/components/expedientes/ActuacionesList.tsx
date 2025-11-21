@@ -1,15 +1,61 @@
+import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { FileText, Download, Calendar, Building2, File } from 'lucide-react'
+import { FileText, Download, Calendar, Building2, File, Eye } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { toast } from 'sonner'
 import type { Actuacion } from '@/types/expediente'
+import PDFViewer from './PDFViewer'
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 interface ActuacionesListProps {
   actuaciones: Actuacion[]
+  expedienteNumero: string
 }
 
-export default function ActuacionesList({ actuaciones }: ActuacionesListProps) {
+export default function ActuacionesList({ actuaciones, expedienteNumero }: ActuacionesListProps) {
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false)
+  const [selectedActuacion, setSelectedActuacion] = useState<Actuacion | null>(null)
+  const handleDescargarPdf = async (indice: number, nombreArchivo: string) => {
+    try {
+      const token = localStorage.getItem('access_token')
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/expedientes/${encodeURIComponent(expedienteNumero)}/actuaciones/${indice}/pdf`,
+        {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        }
+      )
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Error al descargar' }))
+        throw new Error(error.detail || `Error ${response.status}`)
+      }
+
+      // Crear blob y descargar
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = nombreArchivo
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      toast.success('PDF descargado', { description: nombreArchivo })
+    } catch (error) {
+      toast.error('Error al descargar PDF', {
+        description: error instanceof Error ? error.message : 'Error desconocido'
+      })
+    }
+  }
+
+  const handleVisualizarPdf = (actuacion: Actuacion) => {
+    setSelectedActuacion(actuacion)
+    setPdfViewerOpen(true)
+  }
   const formatFecha = (fecha: string | null) => {
     if (!fecha) return 'Sin fecha'
 
@@ -124,16 +170,20 @@ export default function ActuacionesList({ actuaciones }: ActuacionesListProps) {
 
                 {/* Archivo adjunto */}
                 {actuacion.tiene_archivo && actuacion.nombre_archivo && (
-                  <div className="flex items-center gap-2 mt-2">
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
                     <button
                       className="flex items-center gap-1 px-3 py-1 text-sm text-blue-600 bg-blue-50 dark:bg-blue-900/20 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
-                      onClick={() => {
-                        // Implementar descarga en futuras fases
-                        alert('Funcionalidad de descarga pendiente de implementación')
-                      }}
+                      onClick={() => handleVisualizarPdf(actuacion)}
+                    >
+                      <Eye className="h-4 w-4" />
+                      Ver PDF
+                    </button>
+                    <button
+                      className="flex items-center gap-1 px-3 py-1 text-sm text-green-600 bg-green-50 dark:bg-green-900/20 rounded hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                      onClick={() => handleDescargarPdf(actuacion.indice, actuacion.nombre_archivo!)}
                     >
                       <Download className="h-4 w-4" />
-                      Descargar {actuacion.nombre_archivo}
+                      Descargar
                     </button>
                     {actuacion.descargado && (
                       <Badge variant="secondary" className="text-xs">
@@ -156,6 +206,20 @@ export default function ActuacionesList({ actuaciones }: ActuacionesListProps) {
           </CardContent>
         </Card>
       ))}
+
+      {/* PDF Viewer Modal */}
+      {selectedActuacion && (
+        <PDFViewer
+          open={pdfViewerOpen}
+          onOpenChange={setPdfViewerOpen}
+          expedienteNumero={expedienteNumero}
+          actuacionIndice={selectedActuacion.indice}
+          actuacionTipo={selectedActuacion.tipo || undefined}
+          actuacionFecha={selectedActuacion.fecha || undefined}
+          actuacionDetalle={selectedActuacion.detalle || undefined}
+          nombreArchivo={selectedActuacion.nombre_archivo!}
+        />
+      )}
     </div>
   )
 }

@@ -6,6 +6,9 @@ import {
   FolderOpen,
   Activity,
   Zap,
+  Calendar,
+  PenTool,
+  Star,
   Settings,
 } from 'lucide-react'
 
@@ -37,6 +40,21 @@ const navigation = [
     name: 'Procesamiento',
     href: '/procesamiento',
     icon: Zap,
+  },
+  {
+    name: 'Agenda',
+    href: '/agenda',
+    icon: Calendar,
+  },
+  {
+    name: 'Escritos',
+    href: '/escritos',
+    icon: PenTool,
+  },
+  {
+    name: 'Destacados',
+    href: '/destacados',
+    icon: Star,
   },
   {
     name: 'Configuración',
