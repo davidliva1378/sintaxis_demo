@@ -242,6 +242,9 @@ class ExtractorTexto:
         texto = re.sub(r'\r\n', '\n', texto)
         texto = re.sub(r'\r', '\n', texto)
 
+        # Limpiar códigos insertados dentro del texto (antes de dividir en líneas)
+        texto = self._limpiar_codigos_insertados(texto)
+
         # Eliminar líneas muy cortas (probablemente encabezados/pies)
         lineas = texto.split('\n')
         lineas_filtradas = []
@@ -253,6 +256,10 @@ class ExtractorTexto:
             if len(linea_limpia) < 3:
                 continue
             if linea_limpia.isdigit() and len(linea_limpia) < 4:
+                continue
+
+            # Eliminar códigos de barras y códigos numéricos largos
+            if self._es_codigo_barras(linea_limpia):
                 continue
 
             # Eliminar patrones de encabezado/pie típicos
@@ -287,6 +294,10 @@ class ExtractorTexto:
             r'^poder\s+judicial\s+de\s+la\s+nación',
             r'^expediente\s+n[°º]?\s*\d+',
             r'^hoja\s+n[°º]?\s*\d+',
+            # Patrones adicionales
+            r'^-\s*\d+\s*-$',  # Formato "- 1 -"
+            r'^\[\s*\d+\s*\]$',  # Formato "[1]"
+            r'^pag\.?\s*\d+$',
         ]
 
         linea_lower = linea.lower()
@@ -296,6 +307,63 @@ class ExtractorTexto:
                 return True
 
         return False
+
+    def _es_codigo_barras(self, linea: str) -> bool:
+        """
+        Detecta si una línea es un código de barras u otro código numérico.
+
+        Args:
+            linea: Línea a analizar
+
+        Returns:
+            True si es código de barras/numérico
+        """
+        linea_limpia = linea.strip()
+
+        # Códigos numéricos largos (códigos de barras del PJN)
+        if re.match(r'^\d{10,20}$', linea_limpia):
+            return True
+
+        # Códigos alfanuméricos largos (hashes, firmas digitales)
+        if re.match(r'^[A-Z0-9]{20,}$', linea_limpia):
+            return True
+
+        # Patrones de firma digital
+        if re.match(r'^#\d+#\d+#\d+', linea_limpia):
+            return True
+
+        # Números separados por guiones (códigos de expediente mal formados)
+        if re.match(r'^\d+[-/]\d+[-/]\d+[-/]\d+', linea_limpia):
+            return True
+
+        return False
+
+    def _limpiar_codigos_insertados(self, texto: str) -> str:
+        """
+        Elimina códigos numéricos insertados dentro del texto.
+
+        Los códigos de barras a veces se insertan en medio de palabras
+        rompiéndolas: "pala25000096559010bra" -> "palabra"
+
+        Args:
+            texto: Texto a limpiar
+
+        Returns:
+            Texto sin códigos insertados
+        """
+        # Patrón: letras + números largos + letras (código insertado en palabra)
+        texto = re.sub(r'([a-záéíóúñü]+)\d{10,}([a-záéíóúñü]+)', r'\1\2', texto, flags=re.IGNORECASE)
+
+        # Eliminar códigos numéricos largos sueltos (no en medio de palabras)
+        texto = re.sub(r'\s\d{10,20}\s', ' ', texto)
+
+        # Eliminar hashes/códigos alfanuméricos largos
+        texto = re.sub(r'\s[A-Z0-9]{20,}\s', ' ', texto)
+
+        # Eliminar patrones de firma digital del PJN
+        texto = re.sub(r'#\d+#\d+#\d+', '', texto)
+
+        return texto
 
     def extraer_primeros_n_caracteres(
         self,
