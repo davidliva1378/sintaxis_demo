@@ -11,7 +11,7 @@ Exporta:
 """
 
 try:
-    from Sistema_v5.generador_documentos.integracion_procesador import (
+    from core.generador_documentos.integracion_procesador import (
         FiltroContenidoInteligente,
         generar_contexto_filtrado,
         PROCESADOR_DISPONIBLE
@@ -22,7 +22,7 @@ except ImportError:
     PROCESADOR_DISPONIBLE = False
 
 try:
-    from Sistema_v5.generador_documentos.generador_base import (
+    from core.generador_documentos.generador_base import (
         GeneradorDocumentosBase,
     )
 except ImportError:

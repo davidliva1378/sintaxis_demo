@@ -10,7 +10,6 @@ Wrapper sobre Sistema_v5.procesador_pdf que provee:
 Integra el módulo procesador_pdf con el sistema Sistema_v6.
 """
 
-import sys
 from pathlib import Path
 from typing import Optional, Protocol
 from dataclasses import dataclass
@@ -18,13 +17,8 @@ from datetime import datetime
 import logging
 import json
 
-# Agregar Sistema_v5 al path para importar procesador_pdf
-sistema_v5_path = Path(__file__).parent.parent.parent.parent / "Sistema_v5"
-if str(sistema_v5_path) not in sys.path:
-    sys.path.insert(0, str(sistema_v5_path))
-
 try:
-    from Sistema_v5.procesador_pdf import (
+    from core.procesador_pdf import (
         procesar_actuacion,
         procesar_expediente,
         ClasificadorActuaciones,
@@ -37,8 +31,8 @@ try:
 except ImportError as e:
     logging.error(f"Error importando procesador_pdf: {e}")
     raise ImportError(
-        "No se pudo importar procesador_pdf desde Sistema_v5. "
-        "Verifique que el módulo existe en Sistema_v5/procesador_pdf/"
+        "No se pudo importar procesador_pdf desde core. "
+        "Verifique que el módulo existe en Sistema_v6/core/procesador_pdf/"
     ) from e
 
 import mysql.connector

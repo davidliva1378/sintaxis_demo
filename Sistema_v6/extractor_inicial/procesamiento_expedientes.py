@@ -21,7 +21,7 @@ import logging
 
 # Intentar importar procesador_pdf (opcional)
 try:
-    from Sistema_v5.procesador_pdf import (
+    from core.procesador_pdf import (
         ClasificadorActuaciones,
         DetectorDuplicados,
         AnalizadorVencimientos,

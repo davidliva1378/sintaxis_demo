@@ -456,7 +456,7 @@ def fase_5_procesar_con_pdf(
     try:
         # Verificar si procesador_pdf está disponible
         try:
-            from Sistema_v5.procesador_pdf import ClasificadorActuaciones
+            from core.procesador_pdf import ClasificadorActuaciones
             from core.flujo_inicial.procesamiento_expedientes import ProcesadorExpedientesInicial
         except ImportError:
             logger.warning("⚠️  procesador_pdf no está disponible")

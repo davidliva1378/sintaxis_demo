@@ -10,9 +10,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
-from Sistema_v5.procesador_pdf.models import TextoExtraido, ResultadoProcesamiento
-from Sistema_v5.procesador_pdf.extractor_texto import ExtractorTexto
-from Sistema_v5.procesador_pdf.limpiador_texto import LimpiadorTexto
+from core.procesador_pdf.models import TextoExtraido, ResultadoProcesamiento
+from core.procesador_pdf.extractor_texto import ExtractorTexto
+from core.procesador_pdf.limpiador_texto import LimpiadorTexto
 
 logger = logging.getLogger(__name__)
 

@@ -380,7 +380,7 @@ class GestorBatch:
             actuaciones_clasificadas = None
             if self.config.procesar_con_pdf and ruta_json:
                 try:
-                    from Sistema_v5.generador_documentos.integracion_procesador import (
+                    from core.generador_documentos.integracion_procesador import (
                         FiltroContenidoInteligente
                     )
 

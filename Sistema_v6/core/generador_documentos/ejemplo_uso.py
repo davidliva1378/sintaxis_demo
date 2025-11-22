@@ -17,7 +17,7 @@ from pathlib import Path
 
 # Importar el generador
 try:
-    from Sistema_v5.generador_documentos import (
+    from core.generador_documentos import (
         FiltroContenidoInteligente,
         GeneradorDocumentosBase,
         generar_contexto_filtrado,
@@ -25,7 +25,7 @@ try:
     )
 except ImportError as e:
     print(f"❌ Error importando generador: {e}")
-    print("   Ejecuta desde la raíz del proyecto: python Sistema_v5/generador_documentos/ejemplo_uso.py")
+    print("   Ejecuta desde la raíz del proyecto: python Sistema_v6/core/generador_documentos/ejemplo_uso.py")
     exit(1)
 
 

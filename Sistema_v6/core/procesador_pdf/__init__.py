@@ -8,7 +8,7 @@ Este módulo provee herramientas para:
 - Analizar vencimientos y plazos procesales
 
 Uso básico:
-    from Sistema_v5.procesador_pdf import (
+    from core.procesador_pdf import (
         ClasificadorActuaciones,
         DetectorDuplicados,
         ExtractorTexto,
