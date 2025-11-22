@@ -81,7 +81,7 @@ Este documento contiene el plan de mejoras identificadas durante la revisión ex
 
 | # | Tarea | Estado | Prioridad | Complejidad |
 |---|-------|--------|-----------|-------------|
-| 2.1 | Implementar Rate Limiting | ⏳ Pendiente | Alta | Moderada |
+| 2.1 | Implementar Rate Limiting | 🔄 Parcial | Alta | Moderada |
 | 2.2 | Connection Pooling de BD | ⏳ Pendiente | Media | Moderada |
 | 2.3 | Mejorar manejo de errores | ⏳ Pendiente | Media | Moderada |
 | 2.4 | Centralizar logging | ⏳ Pendiente | Media | Moderada |
@@ -114,9 +114,9 @@ Este documento contiene el plan de mejoras identificadas durante la revisión ex
 **Estado:** ✅ RESUELTO
 
 - **Problema:** Diferentes formatos (`_` vs `-`) causaban fallas en JOINs
-- **Solución:** Unificar a formato con guiones, migrar datos en MySQL
+- **Solución:** Unificar a formato con guiones bajos (`FPA_015960_2018`) para compatibilidad con datos existentes en MySQL
 - **Archivos modificados:**
-  - `core/domain/expediente_utils.py`
+  - `core/domain/expediente_utils.py` - Normalización usa `_` en lugar de `-`
   - `application/services/procesador_actuaciones_service.py`
 
 ### 2. Falta de Autenticación en Admin
@@ -145,11 +145,29 @@ Este documento contiene el plan de mejoras identificadas durante la revisión ex
 - **Sistema_v5 eliminado:** ~22 GB liberados
 
 ### 5. Falta de Rate Limiting
-**Estado:** ⏳ PENDIENTE
+**Estado:** 🔄 PARCIAL
 
 - **Problema:** API vulnerable a ataques de fuerza bruta
-- **Solución:** Implementar slowapi o fastapi-limiter
-- **Archivos a modificar:** `presentation/api/rest/main.py`
+- **Solución:** Implementar slowapi con limiter centralizado
+- **Implementado:**
+  - `presentation/api/rest/rate_limiter.py` - Limiter centralizado
+  - `presentation/api/rest/main.py` - Integración con app
+  - `presentation/api/rest/routers/auth.py` - Login 10/min, Register 5/min
+- **Pendiente:** Extender a endpoints de extracción, procesamiento, escritos
+
+### 6. Error en escritos.py - Database Settings
+**Estado:** ✅ RESUELTO
+
+- **Problema:** `AttributeError: 'Settings' object has no attribute 'database'`
+- **Solución:** Usar `os.getenv()` para configuración MySQL
+- **Archivo modificado:** `presentation/api/rest/routers/escritos.py`
+
+### 7. Error en LoginPage.tsx - Validación
+**Estado:** ✅ RESUELTO
+
+- **Problema:** React intentaba renderizar objeto de error de FastAPI directamente
+- **Solución:** Manejar tanto string como array de errores de validación
+- **Archivo modificado:** `frontend/src/pages/auth/LoginPage.tsx`
 
 ---
 
@@ -417,6 +435,7 @@ pytest tests/
 | 2025-11-22 | 1.6 | Integración de Plan_monitor (Monitor Universal ~49%, 5 fases) |
 | 2025-11-22 | 1.7 | Fase 1 completada - Migración procesador_pdf/generador_documentos, eliminación Sistema_v5 (~22 GB liberados) |
 | 2025-11-22 | 1.8 | Agregada Fase 1.5 - Plan de consolidación Sistema_v6 (autosuficiencia) |
+| 2025-11-22 | 1.9 | Fase 2.1 Rate Limiting parcial (auth), fixes críticos: escritos.py, LoginPage.tsx, normalización expedientes |
 
 ---
 
@@ -723,27 +742,31 @@ pytest tests/
 
 ## Próximos Pasos Recomendados
 
-### Fase 1 Completada ✅
+### Fase 1 Completada ✅ | Fase 2.1 Parcial 🔄
 
-1. **Inmediato (Fase 2 - Seguridad):**
-   - **Tarea 2.1:** Implementar Rate Limiting (Alta prioridad)
+1. **Inmediato (Completar Fase 2.1 - Rate Limiting):**
+   - **Tarea 2.1 (continuar):** Extender Rate Limiting a:
+     - Endpoints de extracción de expedientes (5/min)
+     - Endpoints de procesamiento (10/min)
+     - Endpoints de escritos (20/min)
+   - Documentar configuración de límites
+
+2. **Corto plazo (Seguridad):**
    - **SEC-001:** Configurar CORS con orígenes específicos
    - **SEC-002:** JWT Secret Key obligatorio en producción
-
-2. **Corto plazo:**
    - **SEC-003:** Remover .env del repositorio
-   - **Tarea 2.2:** Connection Pooling de BD
-   - **Tarea 2.3:** Mejorar manejo de errores
 
 3. **Medio plazo:**
+   - **Tarea 2.2:** Connection Pooling de BD
+   - **Tarea 2.3:** Mejorar manejo de errores
    - UI de procesamiento con pestañas
-   - Panel de analytics
 
 4. **Largo plazo:**
+   - Panel de analytics
    - Integración IA completa (Fase 8)
    - Chat con asistente IA
 
 ---
 
 *Documento generado para seguimiento por agente IA - Sistema PJN v6*
-*Actualizado: 2025-11-22 - Fase 1 completada*
+*Actualizado: 2025-11-22 - Fase 2.1 Rate Limiting parcial*

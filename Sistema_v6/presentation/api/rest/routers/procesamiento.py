@@ -10,11 +10,13 @@ Endpoints para:
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request
 from pydantic import BaseModel, Field
 from datetime import date, datetime
 import logging
 import os
+
+from presentation.api.rest.rate_limiter import limiter
 
 from application.services.procesador_actuaciones_service import ProcesadorActuacionesService
 
@@ -185,8 +187,10 @@ router = APIRouter(
 
 
 @router.post("/actuacion", response_model=ResultadoProcesamientoResponse)
+@limiter.limit("10/minute")
 async def procesar_actuacion(
-    request: ProcesarActuacionRequest,
+    request: Request,
+    data: ProcesarActuacionRequest,
     servicio: ProcesadorActuacionesService = Depends(get_procesador_service)
 ):
     """
@@ -202,12 +206,12 @@ async def procesar_actuacion(
         Resultado del procesamiento con clasificación y vencimientos
     """
     try:
-        actuacion_dict = request.actuacion.model_dump()
+        actuacion_dict = data.actuacion.model_dump()
 
         resultado = await servicio.procesar_actuacion_individual(
             actuacion=actuacion_dict,
-            ruta_pdf=request.ruta_pdf,
-            guardar_en_bd=request.guardar_en_bd
+            ruta_pdf=data.ruta_pdf,
+            guardar_en_bd=data.guardar_en_bd
         )
 
         # Convertir resultado a response
@@ -251,8 +255,10 @@ async def procesar_actuacion(
 
 
 @router.post("/expediente", response_model=ResultadoExpedienteResponse)
+@limiter.limit("5/minute")
 async def procesar_expediente(
-    request: ProcesarExpedienteRequest,
+    request: Request,
+    data: ProcesarExpedienteRequest,
     background_tasks: BackgroundTasks,
     servicio: ProcesadorActuacionesService = Depends(get_procesador_service)
 ):
@@ -274,13 +280,13 @@ async def procesar_expediente(
         Resultado del procesamiento con estadísticas y vencimientos urgentes
     """
     try:
-        actuaciones_dict = [act.model_dump() for act in request.actuaciones]
+        actuaciones_dict = [act.model_dump() for act in data.actuaciones]
 
         resultado = await servicio.procesar_expediente_completo(
-            numero_expediente=request.numero_expediente,
+            numero_expediente=data.numero_expediente,
             actuaciones=actuaciones_dict,
-            rutas_pdf=request.rutas_pdf,
-            guardar_en_bd=request.guardar_en_bd
+            rutas_pdf=data.rutas_pdf,
+            guardar_en_bd=data.guardar_en_bd
         )
 
         # Convertir estadísticas a response
@@ -313,7 +319,7 @@ async def procesar_expediente(
                 if hasattr(res, 'vencimientos') and v in res.vencimientos:
                     actuacion_id = act_id
                     # Buscar en lista original de actuaciones
-                    for act in request.actuaciones:
+                    for act in data.actuaciones:
                         if act.id == act_id:
                             actuacion_tipo = act.tipo
                             actuacion_detalle = act.detalle
@@ -355,7 +361,7 @@ async def procesar_expediente(
             vencimientos_urgentes.append({
                 'id': i + 1,
                 'actuacion_id': actuacion_id or 0,
-                'expediente_numero': request.numero_expediente,
+                'expediente_numero': data.numero_expediente,
                 'tipo': tipo_str,
                 'fecha_vencimiento': str(fecha_venc) if fecha_venc else None,
                 'dias_restantes': dias_restantes,
@@ -366,14 +372,14 @@ async def procesar_expediente(
             })
 
         return ResultadoExpedienteResponse(
-            expediente_numero=request.numero_expediente,
+            expediente_numero=data.numero_expediente,
             estadisticas=estadisticas,
             vencimientos_urgentes=vencimientos_urgentes,
             con_errores=resultado['con_errores']
         )
 
     except Exception as e:
-        logger.error(f"Error procesando expediente {request.numero_expediente}: {e}")
+        logger.error(f"Error procesando expediente {data.numero_expediente}: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"Error al procesar expediente: {str(e)}"

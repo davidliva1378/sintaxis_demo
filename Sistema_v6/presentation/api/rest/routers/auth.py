@@ -7,9 +7,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+
+from presentation.api.rest.rate_limiter import limiter
 
 from infrastructure.persistence.database import Usuario, get_db
 from infrastructure.security import (
@@ -91,7 +93,8 @@ async def get_current_active_user(
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register_user(user_data: UserRegister, db: Session = Depends(get_db)) -> Usuario:
+@limiter.limit("5/minute")
+def register_user(request: Request, user_data: UserRegister, db: Session = Depends(get_db)) -> Usuario:
     """Registra un nuevo usuario.
 
     Args:
@@ -134,7 +137,9 @@ def register_user(user_data: UserRegister, db: Session = Depends(get_db)) -> Usu
 
 
 @router.post("/login", response_model=Token)
+@limiter.limit("10/minute")
 def login(
+    request: Request,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Session = Depends(get_db),
 ) -> dict:

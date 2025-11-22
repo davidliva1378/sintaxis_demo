@@ -7,10 +7,11 @@ import os
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from infrastructure.config import get_settings
+from presentation.api.rest.rate_limiter import limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/escritos", tags=["escritos"])
@@ -93,13 +94,15 @@ class EstadisticasEscritos(BaseModel):
 def get_db_connection():
     """Obtiene conexión a MySQL."""
     import mysql.connector
-    settings = get_settings()
+    import os
     return mysql.connector.connect(
-        host=settings.database.host,
-        port=settings.database.port,
-        user=settings.database.user,
-        password=settings.database.password,
-        database=settings.database.name
+        host=os.getenv('MYSQL_HOST', 'localhost'),
+        port=int(os.getenv('MYSQL_PORT', '3306')),
+        database=os.getenv('MYSQL_DATABASE', 'sintaxis'),
+        user=os.getenv('MYSQL_USER', 'root'),
+        password=os.getenv('MYSQL_PASSWORD', ''),
+        charset='utf8mb4',
+        collation='utf8mb4_unicode_ci'
     )
 
 
@@ -210,7 +213,8 @@ async def obtener_plantilla(plantilla_id: int):
 
 
 @router.post("/plantillas", response_model=PlantillaResponse)
-async def crear_plantilla(data: PlantillaCreate):
+@limiter.limit("20/minute")
+async def crear_plantilla(request: Request, data: PlantillaCreate):
     """Crea una nueva plantilla."""
     user_id = get_current_user_id()
     conn = get_db_connection()
@@ -440,7 +444,8 @@ async def obtener_escrito(escrito_id: int):
 
 
 @router.post("", response_model=EscritoResponse)
-async def crear_escrito(data: EscritoCreate):
+@limiter.limit("20/minute")
+async def crear_escrito(request: Request, data: EscritoCreate):
     """Crea un nuevo escrito."""
     user_id = get_current_user_id()
     conn = get_db_connection()

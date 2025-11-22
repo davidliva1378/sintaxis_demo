@@ -7,12 +7,14 @@ import logging
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 import mysql.connector
 import os
+
+from presentation.api.rest.rate_limiter import limiter
 
 from application.dtos import (
     ExtraerExpedientesCommand,
@@ -90,7 +92,8 @@ def _get_db_connection():
 
 
 @router.post("/extraer", response_model=ExtraerExpedientesResponse, status_code=status.HTTP_200_OK)
-async def extraer_expedientes(request: ExtraerExpedientesRequest):
+@limiter.limit("5/minute")
+async def extraer_expedientes(request: Request, data: ExtraerExpedientesRequest):
     """Extrae la lista completa de expedientes del PJN.
 
     Args:
@@ -106,11 +109,11 @@ async def extraer_expedientes(request: ExtraerExpedientesRequest):
 
     try:
         # Preparar comando
-        guardar_en = Path(request.guardar_en) if request.guardar_en else None
+        guardar_en = Path(data.guardar_en) if data.guardar_en else None
         command = ExtraerExpedientesCommand(
-            usuario=request.usuario,
-            contrasena=request.contrasena,
-            headless=request.headless,
+            usuario=data.usuario,
+            contrasena=data.contrasena,
+            headless=data.headless,
             guardar_en=guardar_en,
         )
 
@@ -158,7 +161,8 @@ async def extraer_expedientes(request: ExtraerExpedientesRequest):
 
 
 @router.post("/filtrar", response_model=FiltrarExpedientesResponse, status_code=status.HTTP_200_OK)
-async def filtrar_expedientes(request: FiltrarExpedientesRequest):
+@limiter.limit("10/minute")
+async def filtrar_expedientes(request: Request, data: FiltrarExpedientesRequest):
     """Filtra expedientes según selección del usuario.
 
     Args:
@@ -175,11 +179,11 @@ async def filtrar_expedientes(request: FiltrarExpedientesRequest):
     try:
         # Preparar comando
         command = FiltrarExpedientesCommand(
-            numeros_seleccionados=request.numeros_seleccionados,
-            origen=Path(request.origen),
-            destino=Path(request.destino) if request.destino else None,
-            incluir_activos=request.incluir_activos,
-            dias_actividad=request.dias_actividad,
+            numeros_seleccionados=data.numeros_seleccionados,
+            origen=Path(data.origen),
+            destino=Path(data.destino) if data.destino else None,
+            incluir_activos=data.incluir_activos,
+            dias_actividad=data.dias_actividad,
         )
 
         # Ejecutar use case

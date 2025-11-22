@@ -56,10 +56,13 @@ from typing import AsyncIterator
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from infrastructure.config import get_settings
 from infrastructure.di_container import get_container
 from infrastructure.exceptions import PJNError
+from .rate_limiter import limiter
 
 from .routers import (
     admin,
@@ -113,6 +116,10 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Configurar Rate Limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configurar CORS
 settings = get_settings()
