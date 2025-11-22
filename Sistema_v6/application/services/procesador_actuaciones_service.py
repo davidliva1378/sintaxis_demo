@@ -44,6 +44,10 @@ except ImportError as e:
 import mysql.connector
 from mysql.connector import Error as MySQLError
 
+# Importar servicio de extracción de texto estructurado
+from Sistema_v6.application.services.extraccion_texto_service import ExtraccionTextoService
+from Sistema_v6.core.domain.expediente_utils import normalizar_numero_expediente
+
 # Importar repositorio de expedientes para obtener expediente_id
 try:
     from Sistema_v6.infrastructure.persistence.expedientes_mysql import get_expedientes_repository
@@ -51,23 +55,18 @@ try:
 except ImportError:
     _expedientes_repo_available = False
 
+# Importar servicio de integración IA
+try:
+    from Sistema_v6.application.services.ia.ia_integration_service import get_ia_integration_service
+    _ia_integration_available = True
+except ImportError:
+    _ia_integration_available = False
+
 logger = logging.getLogger(__name__)
 
 
-def _normalizar_numero_expediente(numero: str) -> str:
-    """
-    Normaliza un número de expediente para buscar en MySQL.
-
-    Convierte formatos como "FPA 012332/2019" a "FPA_012332_2019"
-    """
-    import re
-    # Eliminar espacios extras
-    normalizado = numero.strip()
-    # Reemplazar / y espacios por _
-    normalizado = re.sub(r'[\s/]+', '_', normalizado)
-    # Eliminar caracteres especiales excepto _ y alfanuméricos
-    normalizado = re.sub(r'[^\w_]', '', normalizado)
-    return normalizado.upper()
+# La función normalizar_numero_expediente se importa de core.domain.expediente_utils
+# Formato unificado: FPA-015960-2018 (con guiones)
 
 
 # ============================================================================
@@ -171,13 +170,25 @@ class ActuacionesRepository:
             # Convertir keywords_detectados a JSON
             keywords_json = json.dumps(clasificacion.keywords_detectados) if clasificacion.keywords_detectados else None
 
-            # Hash del contenido (si hay texto extraído)
+            # Hash del contenido y texto estructurado (si hay texto extraído)
             hash_contenido = None
             texto_extraido = None
+            texto_json = None
+            tiene_texto_extraido = False
+            metodo_extraccion = None
+
             if resultado.texto:
                 import hashlib
                 texto_extraido = resultado.texto.texto_completo
                 hash_contenido = hashlib.md5(texto_extraido.encode()).hexdigest()
+
+                # Generar texto estructurado para almacenamiento JSON
+                extraccion_service = ExtraccionTextoService(usar_ocr=False)
+                texto_estructurado = extraccion_service.convertir_resultado(resultado)
+                if texto_estructurado:
+                    texto_json = ExtraccionTextoService.generar_json_para_db(texto_estructurado)
+                    tiene_texto_extraido = True
+                    metodo_extraccion = resultado.texto.metodo_extraccion
 
             # Datos de la actuación
             tipo = actuacion_data.get('tipo', '') if actuacion_data else ''
@@ -202,8 +213,11 @@ class ActuacionesRepository:
                     keywords_detectados,
                     fecha_clasificacion,
                     texto_extraido,
-                    hash_contenido
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    hash_contenido,
+                    texto_json,
+                    tiene_texto_extraido,
+                    metodo_extraccion
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     expediente_id = VALUES(expediente_id),
                     expediente_numero = VALUES(expediente_numero),
@@ -219,7 +233,10 @@ class ActuacionesRepository:
                     keywords_detectados = VALUES(keywords_detectados),
                     fecha_clasificacion = VALUES(fecha_clasificacion),
                     texto_extraido = VALUES(texto_extraido),
-                    hash_contenido = VALUES(hash_contenido)
+                    hash_contenido = VALUES(hash_contenido),
+                    texto_json = VALUES(texto_json),
+                    tiene_texto_extraido = VALUES(tiene_texto_extraido),
+                    metodo_extraccion = VALUES(metodo_extraccion)
             """
 
             params = (
@@ -238,7 +255,10 @@ class ActuacionesRepository:
                 keywords_json,
                 datetime.now(),
                 texto_extraido,
-                hash_contenido
+                hash_contenido,
+                texto_json,
+                tiene_texto_extraido,
+                metodo_extraccion
             )
 
             cursor.execute(query, params)
@@ -248,6 +268,78 @@ class ActuacionesRepository:
 
             cursor.close()
             conn.close()
+
+            # Integrar con IA si hay texto extraído y el servicio está disponible
+            if texto_extraido and _ia_integration_available:
+                try:
+                    ia_service = get_ia_integration_service(
+                        habilitar_clasificacion=True,
+                        habilitar_rag=True,
+                        habilitar_ner=True
+                    )
+                    resultado_ia = ia_service.procesar_actuacion(
+                        actuacion_id=str(actuacion_id),
+                        texto=texto_extraido,
+                        metadata={
+                            "expediente_id": expediente_id,
+                            "expediente_numero": expediente_numero,
+                            "actuacion_id": actuacion_id,
+                            "tipo": tipo,
+                            "detalle": detalle,
+                            "caratula": ""
+                        },
+                        clasificar=True,
+                        indexar=True,
+                        extraer_entidades=True
+                    )
+
+                    # Persistir clasificación IA en MySQL
+                    if resultado_ia and not resultado_ia.get("skipped"):
+                        try:
+                            conn2 = self._get_connection()
+                            cursor2 = conn2.cursor()
+
+                            clasificacion_ia = resultado_ia.get("clasificacion")
+                            indexado = resultado_ia.get("indexado", False)
+
+                            if clasificacion_ia:
+                                update_query = """
+                                    UPDATE actuaciones SET
+                                        tipo_ia = %s,
+                                        confianza_ia = %s,
+                                        justificacion_ia = %s,
+                                        metodo_ia = %s,
+                                        fecha_clasificacion_ia = %s,
+                                        indexado_rag = %s
+                                    WHERE id = %s
+                                """
+                                cursor2.execute(update_query, (
+                                    clasificacion_ia.get("tipo"),
+                                    clasificacion_ia.get("confianza"),
+                                    clasificacion_ia.get("justificacion"),
+                                    clasificacion_ia.get("metodo"),
+                                    datetime.now(),
+                                    indexado,
+                                    actuacion_id
+                                ))
+                            elif indexado:
+                                # Solo actualizar indexado_rag si no hay clasificación
+                                cursor2.execute(
+                                    "UPDATE actuaciones SET indexado_rag = %s WHERE id = %s",
+                                    (True, actuacion_id)
+                                )
+
+                            conn2.commit()
+                            cursor2.close()
+                            conn2.close()
+
+                        except MySQLError as e2:
+                            logger.warning(f"Error guardando clasificación IA: {e2}")
+
+                    logger.debug(f"Actuación {actuacion_id} procesada con IA")
+                except Exception as e:
+                    logger.warning(f"Error en integración IA para actuación {actuacion_id}: {e}")
+                    # No falla el proceso principal si IA falla
 
             return True
 
@@ -622,7 +714,7 @@ class ProcesadorActuacionesService:
             expediente_id = None
             if _expedientes_repo_available:
                 try:
-                    numero_normalizado = _normalizar_numero_expediente(numero_expediente)
+                    numero_normalizado = normalizar_numero_expediente(numero_expediente)
                     repo_expedientes = get_expedientes_repository()
                     expediente_id = repo_expedientes.obtener_id(numero_normalizado)
                     if expediente_id:

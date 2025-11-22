@@ -9,13 +9,15 @@ Endpoints:
 - DELETE /cache: Limpia cache del sistema
 """
 
-from typing import List, Optional
+from typing import List, Optional, Annotated
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 import json
 
 from admin import GestorReseteo, NivelReseteo
+from presentation.api.rest.routers.auth import get_current_active_user
+from infrastructure.persistence.database import Usuario
 from Sistema_v6.infrastructure.persistence.expedientes_mysql import get_expedientes_repository
 from Sistema_v6.gestor_directorios.expedientes import GestorDirectoriosExpedientes
 
@@ -123,16 +125,27 @@ def get_gestor_reseteo() -> GestorReseteo:
     return GestorReseteo()
 
 
-def verify_superuser():
+async def verify_superuser(
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+) -> Usuario:
     """
     Verifica que el usuario tenga permisos de administrador.
 
-    TODO: Implementar validación real con sistema de autenticación.
-    Por ahora permite todas las peticiones en desarrollo.
+    Args:
+        current_user: Usuario autenticado actual
+
+    Returns:
+        Usuario si es superuser
+
+    Raises:
+        HTTPException: Si el usuario no es superuser
     """
-    # En producción, verificar token JWT y rol de administrador
-    # Por ahora permitimos en desarrollo
-    return True
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permisos de administrador para esta operación"
+        )
+    return current_user
 
 
 # ============================================================================
@@ -215,6 +228,14 @@ async def resetear_sistema(
             crear_backup=request.crear_backup,
             incluir_procesamiento_mysql=request.incluir_procesamiento_mysql
         )
+
+        # Warning si nivel COMPLETO/NUCLEAR sin limpiar MySQL
+        if nivel in (NivelReseteo.COMPLETO, NivelReseteo.NUCLEAR) and not request.incluir_procesamiento_mysql:
+            resultado.detalles.insert(0,
+                "⚠️ ADVERTENCIA: Los datos de MySQL NO fueron eliminados. "
+                "Puede haber inconsistencias entre archivos y base de datos."
+            )
+
         return ResultadoReseteoResponse(**resultado.to_dict())
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en reseteo: {str(e)}")
