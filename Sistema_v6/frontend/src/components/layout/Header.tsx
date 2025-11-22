@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import ThemeToggle from './ThemeToggle'
-import { LogOut, User, Shield, Settings, RotateCcw, Trash2, BarChart3, Database } from 'lucide-react'
+import { LogOut, User, Shield, Settings, RotateCcw, Trash2, BarChart3, Database, Server } from 'lucide-react'
+import { getMCPStatus } from '@/api/mcpApi'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +26,23 @@ export default function Header() {
   const [showStatsDialog, setShowStatsDialog] = useState(false)
   const [showResetDialog, setShowResetDialog] = useState(false)
   const [showSyncDialog, setShowSyncDialog] = useState(false)
+  const [mcpRunning, setMcpRunning] = useState<boolean | null>(null)
+
+  // Check MCP status on mount and periodically
+  useEffect(() => {
+    const checkMCPStatus = async () => {
+      try {
+        const status = await getMCPStatus()
+        setMcpRunning(status.running)
+      } catch {
+        setMcpRunning(null)
+      }
+    }
+
+    checkMCPStatus()
+    const interval = setInterval(checkMCPStatus, 30000) // Check every 30 seconds
+    return () => clearInterval(interval)
+  }, [])
 
   const handleLogout = () => {
     logout()
@@ -62,9 +80,25 @@ export default function Header() {
 
       {/* Right Side - User Info & Actions */}
       <div className="flex items-center gap-4">
-        {/* PJN Credentials Status */}
+        {/* Status Badges */}
         {user && (
           <div className="hidden sm:flex items-center gap-2">
+            {/* MCP Server Status */}
+            {mcpRunning !== null && (
+              mcpRunning ? (
+                <Badge variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20" title="Servidor MCP para Claude Code">
+                  <Server className="mr-1 h-3 w-3" />
+                  MCP
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="border-gray-400 text-gray-500" title="Servidor MCP detenido">
+                  <Server className="mr-1 h-3 w-3" />
+                  MCP Off
+                </Badge>
+              )
+            )}
+
+            {/* PJN Credentials Status */}
             {user.has_pjn_credentials ? (
               <Badge variant="default" className="bg-green-500 hover:bg-green-600">
                 <Shield className="mr-1 h-3 w-3" />

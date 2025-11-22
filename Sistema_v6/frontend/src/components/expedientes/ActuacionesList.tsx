@@ -7,6 +7,7 @@ import { es } from 'date-fns/locale'
 import { toast } from 'sonner'
 import type { Actuacion } from '@/types/expediente'
 import PDFViewer from './PDFViewer'
+import TextoActuacionPanel from './TextoActuacionPanel'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -170,27 +171,35 @@ export default function ActuacionesList({ actuaciones, expedienteNumero }: Actua
 
                 {/* Archivo adjunto */}
                 {actuacion.tiene_archivo && actuacion.nombre_archivo && (
-                  <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    <button
-                      className="flex items-center gap-1 px-3 py-1 text-sm text-blue-600 bg-blue-50 dark:bg-blue-900/20 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
-                      onClick={() => handleVisualizarPdf(actuacion)}
-                    >
-                      <Eye className="h-4 w-4" />
-                      Ver PDF
-                    </button>
-                    <button
-                      className="flex items-center gap-1 px-3 py-1 text-sm text-green-600 bg-green-50 dark:bg-green-900/20 rounded hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
-                      onClick={() => handleDescargarPdf(actuacion.indice, actuacion.nombre_archivo!)}
-                    >
-                      <Download className="h-4 w-4" />
-                      Descargar
-                    </button>
-                    {actuacion.descargado && (
-                      <Badge variant="secondary" className="text-xs">
-                        Descargado
-                      </Badge>
-                    )}
-                  </div>
+                  <>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <button
+                        className="flex items-center gap-1 px-3 py-1 text-sm text-blue-600 bg-blue-50 dark:bg-blue-900/20 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                        onClick={() => handleVisualizarPdf(actuacion)}
+                      >
+                        <Eye className="h-4 w-4" />
+                        Ver PDF
+                      </button>
+                      <button
+                        className="flex items-center gap-1 px-3 py-1 text-sm text-green-600 bg-green-50 dark:bg-green-900/20 rounded hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                        onClick={() => handleDescargarPdf(actuacion.indice, actuacion.nombre_archivo!)}
+                      >
+                        <Download className="h-4 w-4" />
+                        Descargar
+                      </button>
+                      {actuacion.descargado && (
+                        <Badge variant="secondary" className="text-xs">
+                          Descargado
+                        </Badge>
+                      )}
+                    </div>
+                    {/* Panel de texto extraido */}
+                    <TextoActuacionPanel
+                      expedienteNumero={expedienteNumero}
+                      actuacionIndice={actuacion.indice}
+                      nombreArchivo={actuacion.nombre_archivo}
+                    />
+                  </>
                 )}
 
                 {/* Marcadores */}

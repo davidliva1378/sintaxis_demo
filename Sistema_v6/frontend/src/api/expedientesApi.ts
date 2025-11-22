@@ -35,6 +35,31 @@ export interface TextoExtraidoResponse {
   }> | null
 }
 
+export interface ActuacionConAnalisisIA {
+  id: number
+  indice: number
+  tipo: string
+  detalle: string | null
+  fecha: string | null
+  tiene_texto_extraido: boolean
+  tipo_ia: string | null
+  confianza_ia: number | null
+  justificacion_ia: string | null
+  metodo_ia: string | null
+  fecha_clasificacion_ia: string | null
+  indexado_rag: boolean
+}
+
+export interface AnalisisIAExpedienteResponse {
+  expediente_numero: string
+  total_actuaciones: number
+  actuaciones_con_ia: number
+  actuaciones_indexadas: number
+  porcentaje_clasificado: number
+  porcentaje_indexado: number
+  actuaciones: ActuacionConAnalisisIA[]
+}
+
 // ============================================================================
 // API Functions
 // ============================================================================
@@ -83,4 +108,21 @@ export async function descargarPdfActuacion(
   }
 
   return response.blob()
+}
+
+/**
+ * Obtiene el analisis IA de todas las actuaciones de un expediente
+ */
+export async function obtenerAnalisisIA(
+  numeroExpediente: string
+): Promise<AnalisisIAExpedienteResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/expedientes/${encodeURIComponent(numeroExpediente)}/analisis-ia`
+  )
+
+  if (!response.ok) {
+    throw new Error(`Error ${response.status}: ${response.statusText}`)
+  }
+
+  return response.json()
 }

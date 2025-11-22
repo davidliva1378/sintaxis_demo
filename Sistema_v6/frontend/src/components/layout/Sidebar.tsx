@@ -10,6 +10,8 @@ import {
   PenTool,
   Star,
   Settings,
+  Brain,
+  MessageCircle,
 } from 'lucide-react'
 
 const navigation = [
@@ -55,6 +57,18 @@ const navigation = [
     name: 'Destacados',
     href: '/destacados',
     icon: Star,
+  },
+  {
+    name: 'IA',
+    href: '/ia',
+    icon: Brain,
+    badge: 'Beta',
+  },
+  {
+    name: 'Asistente IA',
+    href: '/asistente-ia',
+    icon: MessageCircle,
+    badge: 'Nuevo',
   },
   {
     name: 'Configuración',

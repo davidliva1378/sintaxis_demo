@@ -457,7 +457,7 @@ def fase_5_procesar_con_pdf(
         # Verificar si procesador_pdf está disponible
         try:
             from core.procesador_pdf import ClasificadorActuaciones
-            from core.flujo_inicial.procesamiento_expedientes import ProcesadorExpedientesInicial
+            from extractor_inicial.procesamiento_expedientes import ProcesadorExpedientesInicial
         except ImportError:
             logger.warning("⚠️  procesador_pdf no está disponible")
             logger.info("   Instale las dependencias: pip install -r Sistema_v5/procesador_pdf/requirements.txt")

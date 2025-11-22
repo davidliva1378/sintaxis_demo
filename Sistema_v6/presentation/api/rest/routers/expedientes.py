@@ -49,6 +49,35 @@ class TextoExtraidoResponse(BaseModel):
     texto_por_pagina: Optional[List[Dict[str, Any]]] = None
 
 
+class ActuacionConAnalisisIA(BaseModel):
+    """Actuación con campos de análisis IA."""
+    id: int
+    indice: int
+    tipo: str
+    detalle: Optional[str] = None
+    fecha: Optional[str] = None
+    tiene_texto_extraido: bool = False
+    # Campos de clasificación IA
+    tipo_ia: Optional[str] = None
+    confianza_ia: Optional[float] = None
+    justificacion_ia: Optional[str] = None
+    metodo_ia: Optional[str] = None
+    fecha_clasificacion_ia: Optional[str] = None
+    # Campo de indexación RAG
+    indexado_rag: bool = False
+
+
+class AnalisisIAExpedienteResponse(BaseModel):
+    """Respuesta completa del análisis IA de un expediente."""
+    expediente_numero: str
+    total_actuaciones: int
+    actuaciones_con_ia: int
+    actuaciones_indexadas: int
+    porcentaje_clasificado: float
+    porcentaje_indexado: float
+    actuaciones: List[ActuacionConAnalisisIA]
+
+
 def _get_db_connection():
     """Obtiene conexión a MySQL usando variables de entorno."""
     return mysql.connector.connect(
@@ -559,6 +588,7 @@ async def obtener_texto_actuacion(numero: str, indice: int):
         query = """
             SELECT
                 id,
+                detalle,
                 texto_json,
                 tiene_texto_extraido,
                 metodo_extraccion,
@@ -656,6 +686,130 @@ async def obtener_texto_actuacion(numero: str, indice: int):
 
     except Exception as e:
         logger.exception(f"Error al obtener texto de {numero}/{indice}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno: {str(e)}",
+        )
+
+
+@router.get("/{numero}/analisis-ia", response_model=AnalisisIAExpedienteResponse, status_code=status.HTTP_200_OK)
+async def obtener_analisis_ia(numero: str):
+    """Obtiene el análisis IA de todas las actuaciones de un expediente.
+
+    Incluye para cada actuación:
+    - Clasificación IA (tipo_ia, confianza_ia, justificacion_ia, metodo_ia)
+    - Estado de indexación RAG
+    - Resumen estadístico del expediente
+
+    Args:
+        numero: Número del expediente (normalizado o original)
+
+    Returns:
+        AnalisisIAExpedienteResponse con análisis completo
+
+    Raises:
+        HTTPException 404: Si el expediente no existe
+        HTTPException 500: Error interno
+    """
+    logger.info(f"GET /expedientes/{numero}/analisis-ia")
+
+    try:
+        conn = _get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        # Obtener actuaciones con campos IA
+        query = """
+            SELECT
+                id,
+                tipo,
+                detalle,
+                fecha,
+                tiene_texto_extraido,
+                tipo_ia,
+                confianza_ia,
+                justificacion_ia,
+                metodo_ia,
+                fecha_clasificacion_ia,
+                COALESCE(indexado_rag, 0) as indexado_rag
+            FROM actuaciones
+            WHERE expediente_numero = %s
+            ORDER BY id ASC
+        """
+        cursor.execute(query, (numero,))
+        rows = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        if not rows:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No se encontraron actuaciones para el expediente {numero}"
+            )
+
+        # Convertir a lista de ActuacionConAnalisisIA
+        actuaciones = []
+        actuaciones_con_ia = 0
+        actuaciones_indexadas = 0
+
+        for row in rows:
+            # Contar estadísticas
+            if row.get('tipo_ia'):
+                actuaciones_con_ia += 1
+            if row.get('indexado_rag'):
+                actuaciones_indexadas += 1
+
+            # Convertir fechas a string
+            fecha_str = None
+            if row.get('fecha'):
+                fecha_val = row['fecha']
+                if hasattr(fecha_val, 'strftime'):
+                    fecha_str = fecha_val.strftime('%Y-%m-%d')
+                else:
+                    fecha_str = str(fecha_val)
+
+            fecha_clas_str = None
+            if row.get('fecha_clasificacion_ia'):
+                fecha_clas_val = row['fecha_clasificacion_ia']
+                if hasattr(fecha_clas_val, 'strftime'):
+                    fecha_clas_str = fecha_clas_val.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    fecha_clas_str = str(fecha_clas_val)
+
+            actuaciones.append(ActuacionConAnalisisIA(
+                id=row['id'],
+                indice=row['id'],  # Usar id como indice
+                tipo=row['tipo'] or '',
+                detalle=row.get('detalle'),
+                fecha=fecha_str,
+                tiene_texto_extraido=bool(row.get('tiene_texto_extraido', False)),
+                tipo_ia=row.get('tipo_ia'),
+                confianza_ia=float(row['confianza_ia']) if row.get('confianza_ia') is not None else None,
+                justificacion_ia=row.get('justificacion_ia'),
+                metodo_ia=row.get('metodo_ia'),
+                fecha_clasificacion_ia=fecha_clas_str,
+                indexado_rag=bool(row.get('indexado_rag', False))
+            ))
+
+        total = len(actuaciones)
+        porcentaje_clasificado = (actuaciones_con_ia / total * 100) if total > 0 else 0.0
+        porcentaje_indexado = (actuaciones_indexadas / total * 100) if total > 0 else 0.0
+
+        return AnalisisIAExpedienteResponse(
+            expediente_numero=numero,
+            total_actuaciones=total,
+            actuaciones_con_ia=actuaciones_con_ia,
+            actuaciones_indexadas=actuaciones_indexadas,
+            porcentaje_clasificado=round(porcentaje_clasificado, 1),
+            porcentaje_indexado=round(porcentaje_indexado, 1),
+            actuaciones=actuaciones
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.exception(f"Error al obtener análisis IA de {numero}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error interno: {str(e)}",

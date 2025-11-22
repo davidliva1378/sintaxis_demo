@@ -32,7 +32,7 @@ connect_args = {"check_same_thread": False} if "sqlite" in SQLALCHEMY_DATABASE_U
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args=connect_args,
-    echo=settings.debug,  # Log SQL queries en modo debug
+    echo=False,  # Desactivado para no interferir con MCP stdio
 )
 
 # Crear SessionLocal class

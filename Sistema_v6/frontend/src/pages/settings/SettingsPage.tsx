@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react'
-import { Settings, User, Key, Lock, Sliders, Activity, Globe, Download, Cog, Code } from 'lucide-react'
+import { Settings, User, Key, Lock, Sliders, Activity, Globe, Download, Cog, Code, Server } from 'lucide-react'
 import PerfilUsuario from '@/components/settings/PerfilUsuario'
 import CredencialesPJN from '@/components/settings/CredencialesPJN'
 import CambiarPassword from '@/components/settings/CambiarPassword'
@@ -13,8 +13,9 @@ import ConfiguracionBrowser from '@/components/settings/ConfiguracionBrowser'
 import ConfiguracionScraping from '@/components/settings/ConfiguracionScraping'
 import ConfiguracionAvanzada from '@/components/settings/ConfiguracionAvanzada'
 import ConfiguracionEnDesarrollo from '@/components/settings/ConfiguracionEnDesarrollo'
+import { ConfiguracionMCP } from '@/components/settings/ConfiguracionMCP'
 
-type TabId = 'perfil' | 'credenciales' | 'password' | 'preferencias' | 'monitoreo' | 'browser' | 'scraping' | 'avanzado' | 'desarrollo'
+type TabId = 'perfil' | 'credenciales' | 'password' | 'preferencias' | 'monitoreo' | 'browser' | 'scraping' | 'mcp' | 'avanzado' | 'desarrollo'
 
 interface Tab {
   id: TabId
@@ -67,10 +68,16 @@ const tabs: Tab[] = [
     description: 'Timeouts y límites',
   },
   {
+    id: 'mcp',
+    label: 'Servidor MCP',
+    icon: Server,
+    description: 'Claude Code',
+  },
+  {
     id: 'avanzado',
     label: 'Avanzado',
     icon: Cog,
-    description: 'MCP, Storage y más',
+    description: 'Storage y más',
   },
   {
     id: 'desarrollo',
@@ -143,6 +150,7 @@ export default function SettingsPage() {
         {tabActiva === 'monitoreo' && <ConfiguracionMonitoreo />}
         {tabActiva === 'browser' && <ConfiguracionBrowser />}
         {tabActiva === 'scraping' && <ConfiguracionScraping />}
+        {tabActiva === 'mcp' && <ConfiguracionMCP />}
         {tabActiva === 'avanzado' && <ConfiguracionAvanzada />}
         {tabActiva === 'desarrollo' && <ConfiguracionEnDesarrollo />}
       </div>

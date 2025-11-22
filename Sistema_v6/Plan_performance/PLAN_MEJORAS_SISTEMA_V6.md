@@ -38,7 +38,44 @@ Este documento contiene el plan de mejoras identificadas durante la revisión ex
 | 1.1 | Unificar normalización de expedientes | ✅ Completado | 228a830 | Formato único con guiones (FPA-012332-2019) |
 | 1.2 | Implementar autenticación de admin | ✅ Completado | 228a830 | verify_superuser() valida is_superuser |
 | 1.3 | Agregar token JWT al cliente API | ✅ Completado | 228a830 | Interceptor en client.ts |
-| 1.4 | Eliminar dependencias de Sistema_v5 | ✅ Completado | - | Migrado a core/procesador_pdf y core/generador_documentos |
+| 1.4 | Eliminar dependencias de Sistema_v5 | ✅ Completado | ab407fc | Migrado a core/procesador_pdf y core/generador_documentos |
+
+### Fase 1.5: Consolidación Sistema_v6 (Autosuficiencia)
+
+> **Objetivo:** Hacer que Sistema_v6 sea completamente autosuficiente, eliminando todas las dependencias externas.
+
+#### 1.5.1 Correcciones Críticas (Funcionalidad Rota)
+
+| # | Tarea | Estado | Prioridad | Descripción |
+|---|-------|--------|-----------|-------------|
+| 1.5.1.1 | Migrar dependencia de Sistema_v4 | ⏳ Pendiente | Crítica | Copiar `expedientes_v4.py` a Sistema_v6/core/operaciones/ |
+| 1.5.1.2 | Actualizar config/sistema.json | ⏳ Pendiente | Crítica | Cambiar 11 rutas de Sistema_v5 a rutas relativas |
+| 1.5.1.3 | Migrar panel_pjn | ⏳ Pendiente | Alta | Copiar `gestion_actuaciones.py` a Sistema_v6/infrastructure/scrapers/ |
+| 1.5.1.4 | Migrar módulo core/ | ⏳ Pendiente | Alta | Copiar flujo_inicial/, gestion_expedientes/, modulos_monitor/ |
+
+#### 1.5.2 Consolidación de Documentación
+
+| # | Tarea | Estado | Prioridad | Descripción |
+|---|-------|--------|-----------|-------------|
+| 1.5.2.1 | Mover archivos .md de raíz | ⏳ Pendiente | Media | 31 archivos → Sistema_v6/docs/ |
+| 1.5.2.2 | Consolidar directorios docs | ⏳ Pendiente | Media | DOCUMENTACION_EXTRACCION_MASIVA/, docs/, Documentacion/ |
+| 1.5.2.3 | Mover config/ a Sistema_v6 | ⏳ Pendiente | Media | sistema.json, monitor.json |
+
+#### 1.5.3 Limpieza de Directorios Obsoletos
+
+| # | Tarea | Estado | Prioridad | Descripción |
+|---|-------|--------|-----------|-------------|
+| 1.5.3.1 | Eliminar versiones antiguas | ⏳ Pendiente | Baja | src/ (v1), Sistema_v3/, Sistema_v4/ (después de migrar) |
+| 1.5.3.2 | Eliminar código no usado | ⏳ Pendiente | Baja | tests/, notificaciones_v2/, ui/, V3/, data/ |
+| 1.5.3.3 | Eliminar archivos de raíz | ⏳ Pendiente | Baja | main.py, menu_main.py, urls_pjn.py, requirements.txt |
+| 1.5.3.4 | Manejar backup | ⏳ Pendiente | Baja | backup_reorganizacion.tar.gz (1 GB) |
+
+#### Resumen de Impacto
+
+- **Archivos Python fuera de Sistema_v6:** ~163 archivos
+- **Documentación dispersa:** ~40 archivos .md
+- **Imports rotos:** 8+ archivos con dependencias externas
+- **Rutas hardcoded:** 11 rutas a Sistema_v5
 
 ### Fase 2: Seguridad y Estabilidad
 
@@ -379,6 +416,7 @@ pytest tests/
 | 2025-11-22 | 1.5 | Integración de Plan_ia (Sistema IA ~65%, 8 casos de uso) |
 | 2025-11-22 | 1.6 | Integración de Plan_monitor (Monitor Universal ~49%, 5 fases) |
 | 2025-11-22 | 1.7 | Fase 1 completada - Migración procesador_pdf/generador_documentos, eliminación Sistema_v5 (~22 GB liberados) |
+| 2025-11-22 | 1.8 | Agregada Fase 1.5 - Plan de consolidación Sistema_v6 (autosuficiencia) |
 
 ---
 

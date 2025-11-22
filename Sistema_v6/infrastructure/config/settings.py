@@ -12,6 +12,9 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Ruta base del proyecto (Sistema_v6)
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+
 
 class AuthSettings(BaseSettings):
     """Configuración de autenticación del PJN.
@@ -106,7 +109,7 @@ class StorageSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="STORAGE_", case_sensitive=False)
 
-    base_path: Path = Field(default_factory=lambda: Path.cwd() / "data")
+    base_path: Path = Field(default_factory=lambda: PROJECT_ROOT / "data")
     json_base_file: str = "expedientes_base.json"
     json_sistema_file: str = "expedientes_sistema.json"
     workspaces_dir: str = "expedientes"
@@ -333,7 +336,7 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -355,6 +358,9 @@ class Settings(BaseSettings):
     # General settings
     environment: Literal["development", "production", "testing"] = "production"
     debug: bool = False
+
+    # Database URL (se puede configurar via DATABASE_URL env var)
+    database_url: str | None = None
 
 
 # Singleton instance

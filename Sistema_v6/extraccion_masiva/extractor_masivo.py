@@ -35,7 +35,7 @@ MOTIVOS_EXITOSOS = {
 # Delays progresivos para reintentos (segundos)
 DELAYS_REINTENTOS = [5, 10, 20]
 
-from Sistema_v4.operaciones.expedientes.expedientes_v4 import (
+from core.operaciones.expedientes_v4 import (
     extraer_expedientes_completos,
 )
 from .models import (
@@ -199,7 +199,7 @@ class ExtractorMasivo:
                             # Intentar obtener total esperado (solo en primer intento)
                             if sesion.intentos_realizados == 1:
                                 try:
-                                    from Sistema_v4.operaciones.expedientes.expedientes_v4 import _extraer_total_esperado, EXPEDIENTES_POR_PAGINA
+                                    from core.operaciones.expedientes_v4 import _extraer_total_esperado, EXPEDIENTES_POR_PAGINA
                                     total_esperado = await _extraer_total_esperado(page)
                                     if total_esperado and isinstance(total_esperado, int):
                                         # Calcular páginas esperadas (15 expedientes por página por defecto en PJN)

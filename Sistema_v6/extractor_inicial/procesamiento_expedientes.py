@@ -36,7 +36,7 @@ except ImportError:
 
 # Importar módulos de extracción de actuaciones
 try:
-    from panel_pjn.acciones_pjn.gestion_actuaciones import extraer_actuaciones_completas
+    from infrastructure.scrapers.gestion_actuaciones import extraer_actuaciones_completas
     EXTRACCION_DISPONIBLE = True
 except ImportError:
     EXTRACCION_DISPONIBLE = False

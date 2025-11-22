@@ -73,9 +73,11 @@ from .routers import (
     extraccion_masiva,
     health,
     ia,
+    mcp,
     monitoreo,
     procesamiento,
     tipos_entidad,
+    tools,
     workspaces,
 )
 
@@ -209,6 +211,8 @@ app.include_router(analisis.router, prefix="/api/v1", tags=["analisis"])
 app.include_router(agenda.router, prefix="/api/v1", tags=["agenda"])
 app.include_router(escritos.router, prefix="/api/v1", tags=["escritos"])
 app.include_router(ia.router, prefix="/api/v1", tags=["ia"])
+app.include_router(tools.router, prefix="/api/v1", tags=["tools"])
+app.include_router(mcp.router, prefix="/api/v1", tags=["mcp"])
 app.include_router(tipos_entidad.router, prefix="/api/v1", tags=["tipos_entidad"])
 
 

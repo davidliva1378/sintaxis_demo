@@ -14,6 +14,8 @@ import SettingsPage from './pages/settings/SettingsPage'
 import AgendaPage from './pages/agenda/AgendaPage'
 import EscritosPage from './pages/escritos/EscritosPage'
 import DestacadosPage from './pages/destacados/DestacadosPage'
+import IAPage from './pages/ia/IAPage'
+import AsistenteIAPage from './pages/ia/AsistenteIAPage'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import MainLayout from './components/layout/MainLayout'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
@@ -146,6 +148,26 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <DestacadosPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ia"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <IAPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/asistente-ia"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <AsistenteIAPage />
                 </MainLayout>
               </ProtectedRoute>
             }
