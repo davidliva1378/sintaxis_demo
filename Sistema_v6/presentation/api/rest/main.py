@@ -67,12 +67,15 @@ from .routers import (
     analisis,
     auth,
     config,
+    entidades,
     escritos,
     expedientes,
     extraccion_masiva,
     health,
+    ia,
     monitoreo,
     procesamiento,
+    tipos_entidad,
     workspaces,
 )
 
@@ -190,6 +193,8 @@ async def log_requests(request: Request, call_next):
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(expedientes.router, prefix="/api/v1/expedientes", tags=["expedientes"])
+app.include_router(entidades.router, prefix="/api/v1")
+app.include_router(entidades.actuacion_router, prefix="/api/v1")
 app.include_router(
     extraccion_masiva.router,
     prefix="/api/v1/extraccion-masiva",
@@ -203,6 +208,8 @@ app.include_router(admin.router, prefix="/api/v1", tags=["administracion"])
 app.include_router(analisis.router, prefix="/api/v1", tags=["analisis"])
 app.include_router(agenda.router, prefix="/api/v1", tags=["agenda"])
 app.include_router(escritos.router, prefix="/api/v1", tags=["escritos"])
+app.include_router(ia.router, prefix="/api/v1", tags=["ia"])
+app.include_router(tipos_entidad.router, prefix="/api/v1", tags=["tipos_entidad"])
 
 
 # === Root Endpoint ===
