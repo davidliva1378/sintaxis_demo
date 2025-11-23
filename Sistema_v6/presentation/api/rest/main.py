@@ -53,15 +53,16 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from .error_handlers import setup_error_handlers
+
 from infrastructure.config import get_settings
 from infrastructure.di_container import get_container
-from infrastructure.exceptions import PJNError
 from .rate_limiter import limiter
 
 from .routers import (
@@ -131,51 +132,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# === Middleware de Error Handling ===
-
-@app.exception_handler(PJNError)
-async def pjn_error_handler(request: Request, exc: PJNError) -> JSONResponse:
-    """Maneja excepciones del sistema PJN.
-
-    Args:
-        request: Request de FastAPI
-        exc: Excepción PJN
-
-    Returns:
-        JSONResponse con detalles del error
-    """
-    logger.error(f"PJNError en {request.url.path}: {exc}")
-    return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        content={
-            "success": False,
-            "error": str(exc),
-            "error_type": type(exc).__name__,
-        },
-    )
-
-
-@app.exception_handler(Exception)
-async def general_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Maneja excepciones generales no controladas.
-
-    Args:
-        request: Request de FastAPI
-        exc: Excepción general
-
-    Returns:
-        JSONResponse con error genérico
-    """
-    logger.exception(f"Error no controlado en {request.url.path}")
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "success": False,
-            "error": "Error interno del servidor",
-            "error_type": "InternalServerError",
-        },
-    )
+# Configurar Error Handlers centralizados
+setup_error_handlers(app)
 
 
 # === Middleware de Logging ===
