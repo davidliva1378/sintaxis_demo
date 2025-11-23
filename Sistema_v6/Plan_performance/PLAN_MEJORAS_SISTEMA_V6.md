@@ -442,6 +442,8 @@ pytest tests/
 | 2025-11-22 | 2.1 | Auditoría completa del plan - Actualización de 25+ tareas con estado real del código |
 | 2025-11-23 | 2.2 | Agregar APScheduler a requirements.txt, corregir estado SEC-003 (.env nunca commiteado) |
 | 2025-11-23 | 2.3 | SEC-002/004: Implementación revertida - causó error "Field required" en login |
+| 2025-11-23 | 2.4 | Fix login Python 3.13: remover future annotations, agregar has_pjn_credentials property |
+| 2025-11-23 | 2.5 | Implementar paginación real en GET /expedientes: query params pagina, por_pagina |
 
 ---
 
@@ -590,22 +592,24 @@ pytest tests/
 
 > Ver `Plan_expedientes/` para plan completo (4 fases)
 
-**Estado:** PARCIAL (~35% completado)
+**Estado:** PARCIAL (~55% completado)
 **Prioridad:** Alta (afecta rendimiento con 100+ expedientes)
 
-**Problema Crítico:** El backend ignora parámetros de paginación - siempre retorna todos los expedientes.
+**Problema Crítico:** ~~El backend ignora parámetros de paginación - siempre retorna todos los expedientes.~~ ✅ RESUELTO - Backend ahora soporta `pagina` y `por_pagina`.
 
 **Progreso por Fase:**
 
 | Fase | Descripción | Estado | Progreso |
 |------|-------------|--------|----------|
-| 1 | Backend Paginación | Parcial | 40% |
+| 1 | Backend Paginación | ✅ Completado | 100% |
 | 2 | Frontend Conexión | Parcial | 70% |
 | 3 | Filtros Avanzados | No iniciado | 10% |
 | 4 | Performance & UX | Parcial | 25% |
 
 **Implementado:**
 - Schema `ListarExpedientesResponse` con campos de paginación
+- **✅ Query params `pagina`, `por_pagina` en endpoint GET /expedientes**
+- **✅ Paginación real con slicing en backend (máx 100 items/página)**
 - Frontend conectado a API real
 - Componente `ExpedientesFiltros.tsx` (UI)
 - Hook `useSeleccionMasiva.ts` (no integrado)
@@ -615,8 +619,6 @@ pytest tests/
 
 | Tarea | Archivo | Estimación |
 |-------|---------|------------|
-| Query params `pagina`, `por_pagina` | `routers/expedientes.py` | 2h |
-| Método `obtener_paginado()` real | Repository | 2h |
 | Params de filtro en backend | `routers/expedientes.py` | 3h |
 | Hook `useDebounce` | `hooks/useDebounce.ts` | 1h |
 

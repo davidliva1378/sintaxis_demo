@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
-from fastapi import APIRouter, HTTPException, status, Request
+from fastapi import APIRouter, HTTPException, status, Request, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -225,31 +226,53 @@ async def filtrar_expedientes(request: Request, data: FiltrarExpedientesRequest)
 
 
 @router.get("", response_model=ListarExpedientesResponse, status_code=status.HTTP_200_OK)
-async def listar_expedientes(activos_solo: bool = False, dias: int = 30):
-    """Lista expedientes almacenados.
+async def listar_expedientes(
+    activos_solo: bool = False,
+    dias: int = 30,
+    pagina: int = Query(default=1, ge=1, description="Número de página"),
+    por_pagina: int = Query(default=20, ge=1, le=100, description="Elementos por página"),
+):
+    """Lista expedientes almacenados con paginación.
 
     Args:
         activos_solo: Si True, solo expedientes activos
         dias: Días para considerar activo
+        pagina: Número de página (comienza en 1)
+        por_pagina: Cantidad de expedientes por página (máx 100)
 
     Returns:
-        ListarExpedientesResponse con lista de expedientes
+        ListarExpedientesResponse con lista paginada de expedientes
 
     Raises:
         HTTPException: Si hay error al listar
     """
-    logger.info(f"GET /expedientes (activos_solo={activos_solo}, dias={dias})")
+    logger.info(f"GET /expedientes (activos_solo={activos_solo}, dias={dias}, pagina={pagina}, por_pagina={por_pagina})")
 
     try:
         # Obtener repositorio
         container = get_container()
         repo = container.expediente_repo
 
-        # Obtener expedientes
+        # Obtener todos los expedientes
         if activos_solo:
             expedientes = await repo.obtener_activos(dias=dias)
         else:
             expedientes = await repo.obtener_todos()
+
+        # Calcular paginación
+        total = len(expedientes)
+        total_paginas = math.ceil(total / por_pagina) if total > 0 else 1
+
+        # Validar página solicitada
+        if pagina > total_paginas and total > 0:
+            pagina = total_paginas
+
+        # Calcular índices de slice
+        inicio = (pagina - 1) * por_pagina
+        fin = inicio + por_pagina
+
+        # Obtener expedientes de la página actual
+        expedientes_pagina = expedientes[inicio:fin]
 
         # Convertir a response
         expedientes_response = [
@@ -260,16 +283,16 @@ async def listar_expedientes(activos_solo: bool = False, dias: int = 30):
                 situacion=exp.situacion,
                 ultima_actuacion=exp.ultima_actuacion,
             )
-            for exp in expedientes
+            for exp in expedientes_pagina
         ]
 
         return ListarExpedientesResponse(
             success=True,
-            total=len(expedientes_response),
+            total=total,
             expedientes=expedientes_response,
-            pagina=1,
-            por_pagina=len(expedientes_response),
-            total_paginas=1,
+            pagina=pagina,
+            por_pagina=por_pagina,
+            total_paginas=total_paginas,
         )
 
     except Exception as e:
@@ -279,7 +302,7 @@ async def listar_expedientes(activos_solo: bool = False, dias: int = 30):
             total=0,
             expedientes=[],
             pagina=1,
-            por_pagina=0,
+            por_pagina=por_pagina,
             total_paginas=0,
             error=str(e),
         )
