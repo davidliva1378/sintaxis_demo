@@ -12,10 +12,8 @@ from fastapi import APIRouter, HTTPException, status, Request, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-import mysql.connector
-import os
-
 from presentation.api.rest.rate_limiter import limiter
+from infrastructure.persistence.database import get_pooled_connection
 
 from application.dtos import (
     ExtraerExpedientesCommand,
@@ -82,14 +80,8 @@ class AnalisisIAExpedienteResponse(BaseModel):
 
 
 def _get_db_connection():
-    """Obtiene conexión a MySQL usando variables de entorno."""
-    return mysql.connector.connect(
-        host=os.getenv('MYSQL_HOST', 'localhost'),
-        port=int(os.getenv('MYSQL_PORT', '3306')),
-        database=os.getenv('MYSQL_DATABASE', 'sintaxis'),
-        user=os.getenv('MYSQL_USER', 'root'),
-        password=os.getenv('MYSQL_PASSWORD', '')
-    )
+    """Obtiene conexión a MySQL desde el pool centralizado."""
+    return get_pooled_connection()
 
 
 @router.post("/extraer", response_model=ExtraerExpedientesResponse, status_code=status.HTTP_200_OK)
