@@ -101,7 +101,6 @@ def get_mysql_pool_status() -> dict:
         "checked_in": pool.checkedin(),
         "checked_out": pool.checkedout(),
         "overflow": pool.overflow(),
-        "invalid": pool.invalidatedcount(),
     }
 
 
