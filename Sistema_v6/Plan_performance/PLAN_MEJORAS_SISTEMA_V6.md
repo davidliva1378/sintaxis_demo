@@ -48,26 +48,26 @@ Este documento contiene el plan de mejoras identificadas durante la revisión ex
 
 | # | Tarea | Estado | Prioridad | Descripción |
 |---|-------|--------|-----------|-------------|
-| 1.5.1.1 | Migrar dependencia de Sistema_v4 | ⏳ Pendiente | Crítica | Copiar `expedientes_v4.py` a Sistema_v6/core/operaciones/ |
-| 1.5.1.2 | Actualizar config/sistema.json | ⏳ Pendiente | Crítica | Cambiar 11 rutas de Sistema_v5 a rutas relativas |
-| 1.5.1.3 | Migrar panel_pjn | ⏳ Pendiente | Alta | Copiar `gestion_actuaciones.py` a Sistema_v6/infrastructure/scrapers/ |
-| 1.5.1.4 | Migrar módulo core/ | ⏳ Pendiente | Alta | Copiar flujo_inicial/, gestion_expedientes/, modulos_monitor/ |
+| 1.5.1.1 | Migrar dependencia de Sistema_v4 | ✅ Completado | Crítica | `expedientes_v4.py` en Sistema_v6/core/operaciones/ |
+| 1.5.1.2 | Actualizar config/sistema.json | ✅ Completado | Crítica | Rutas actualizadas a Sistema_v6/data/ |
+| 1.5.1.3 | Migrar panel_pjn | ✅ Completado | Alta | Módulo completo en Sistema_v6/infrastructure/scrapers/gestion_actuaciones/ |
+| 1.5.1.4 | Migrar módulo core/ | ⚠️ Parcial | Alta | gestion_expedientes/ migrado, faltan flujo_inicial/ y modulos_monitor/ |
 
 #### 1.5.2 Consolidación de Documentación
 
 | # | Tarea | Estado | Prioridad | Descripción |
 |---|-------|--------|-----------|-------------|
-| 1.5.2.1 | Mover archivos .md de raíz | ⏳ Pendiente | Media | 31 archivos → Sistema_v6/docs/ |
-| 1.5.2.2 | Consolidar directorios docs | ⏳ Pendiente | Media | DOCUMENTACION_EXTRACCION_MASIVA/, docs/, Documentacion/ |
-| 1.5.2.3 | Mover config/ a Sistema_v6 | ⏳ Pendiente | Media | sistema.json, monitor.json |
+| 1.5.2.1 | Mover archivos .md de raíz | ✅ Completado | Media | 51 archivos en Sistema_v6/docs/ |
+| 1.5.2.2 | Consolidar directorios docs | ✅ Completado | Media | Consolidado en docs/ con subdirs extraccion_masiva/, legacy/ |
+| 1.5.2.3 | Mover config/ a Sistema_v6 | ✅ Completado | Media | sistema.json, monitor.json, mcp_settings.json |
 
 #### 1.5.3 Limpieza de Directorios Obsoletos
 
 | # | Tarea | Estado | Prioridad | Descripción |
 |---|-------|--------|-----------|-------------|
-| 1.5.3.1 | Eliminar versiones antiguas | ⏳ Pendiente | Baja | src/ (v1), Sistema_v3/, Sistema_v4/ (después de migrar) |
-| 1.5.3.2 | Eliminar código no usado | ⏳ Pendiente | Baja | tests/, notificaciones_v2/, ui/, V3/, data/ |
-| 1.5.3.3 | Eliminar archivos de raíz | ⏳ Pendiente | Baja | main.py, menu_main.py, urls_pjn.py, requirements.txt |
+| 1.5.3.1 | Eliminar versiones antiguas | ✅ Completado | Baja | Sistema_v3/, Sistema_v4/ eliminados |
+| 1.5.3.2 | Eliminar código no usado | ✅ Completado | Baja | tests/, notificaciones_v2/, ui/, V3/, data/ eliminados |
+| 1.5.3.3 | Eliminar archivos de raíz | ✅ Completado | Baja | main.py, menu_main.py, urls_pjn.py eliminados |
 | 1.5.3.4 | Manejar backup | ⏳ Pendiente | Baja | backup_reorganizacion.tar.gz (1 GB) |
 
 #### Resumen de Impacto
@@ -439,6 +439,7 @@ pytest tests/
 | 2025-11-22 | 1.8 | Agregada Fase 1.5 - Plan de consolidación Sistema_v6 (autosuficiencia) |
 | 2025-11-22 | 1.9 | Fase 2.1 Rate Limiting parcial (auth), fixes críticos: escritos.py, LoginPage.tsx, normalización expedientes |
 | 2025-11-22 | 2.0 | Fase 2.1 Rate Limiting COMPLETADA - Todos endpoints críticos protegidos |
+| 2025-11-22 | 2.1 | Auditoría completa del plan - Actualización de 25+ tareas con estado real del código |
 
 ---
 
@@ -466,12 +467,12 @@ pytest tests/
 
 | ID | Tarea | Estado | Overlap |
 |----|-------|--------|---------|
-| SEC-001 | Configurar CORS con orígenes específicos | ⏳ Pendiente | - |
-| SEC-002 | JWT Secret Key obligatorio en producción | ⏳ Pendiente | - |
-| SEC-003 | Remover .env del repositorio | ⏳ Pendiente | - |
-| SEC-004 | Fernet Key obligatorio en producción | ⏳ Pendiente | - |
+| SEC-001 | Configurar CORS con orígenes específicos | ✅ Completado | 11 orígenes en settings.py |
+| SEC-002 | JWT Secret Key obligatorio en producción | ⚠️ Parcial | Tiene default, falta validación prod |
+| SEC-003 | Remover .env del repositorio | ❌ CRÍTICO | .env commiteado con contraseña MySQL |
+| SEC-004 | Fernet Key obligatorio en producción | ⚠️ Parcial | Tiene default, falta validación prod |
 | SEC-005 | Verificación permisos admin | ✅ Completado | Tarea 1.2 |
-| SEC-006 | Eliminar prints de secretos | ⏳ Pendiente | - |
+| SEC-006 | Eliminar prints de secretos | ✅ Completado | Solo prints informativos en scripts |
 | SEC-007 | Rate Limiting | ✅ Completado | Tarea 2.1 |
 | SEC-008 | Usar credenciales por usuario | ⏳ Pendiente | - |
 
@@ -712,10 +713,10 @@ pytest tests/
 
 **Correcciones Críticas (Alta Prioridad):**
 
-| Tarea | Archivo | Impacto |
-|-------|---------|---------|
-| Agregar APScheduler a requirements.txt | `requirements.txt` | App puede fallar al iniciar |
-| Integrar scheduler.stop() en lifespan | `main.py` | Shutdown incorrecto |
+| Tarea | Archivo | Impacto | Estado |
+|-------|---------|---------|--------|
+| Agregar APScheduler a requirements.txt | `requirements.txt` | ❌ CRÍTICO: App falla al importar | ⏳ Pendiente |
+| Integrar scheduler.stop() en lifespan | `main.py` | Shutdown incorrecto | ⏳ Pendiente |
 
 **Completar Fase 3 - Frontend (8+ TODOs):**
 - Reemplazar mock data con llamadas reales en `monitoreoStore.ts`
@@ -745,24 +746,30 @@ pytest tests/
 
 ## Próximos Pasos Recomendados
 
-### Fase 1 Completada ✅ | Fase 2.1 Completada ✅
+### Fase 1 Completada ✅ | Fase 1.5 ~90% ✅ | Fase 2.1 Completada ✅
 
-1. **Inmediato (Seguridad - Prioridad Alta):**
-   - **SEC-001:** Configurar CORS con orígenes específicos
-   - **SEC-002:** JWT Secret Key obligatorio en producción
-   - **SEC-003:** Remover .env del repositorio
+1. **CRÍTICO (Resolver Inmediatamente):**
+   - **SEC-003:** Remover .env del repositorio (contiene contraseña MySQL `Sulaco01`)
+     - `git rm --cached Sistema_v6/.env`
+     - Rotar credenciales comprometidas
+   - **APScheduler:** Agregar a requirements.txt (monitor_scheduler_service.py falla)
 
-2. **Corto plazo (Rendimiento):**
+2. **Alta Prioridad (Seguridad):**
+   - **SEC-002:** Validar JWT Secret Key en producción (no usar default)
+   - **SEC-004:** Validar Fernet Key en producción (no usar default)
+   - **SEC-008:** Implementar credenciales por usuario
+
+3. **Corto plazo (Rendimiento):**
    - **Tarea 2.2:** Connection Pooling de BD (SQLAlchemy QueuePool)
    - **Tarea 2.3:** Mejorar manejo de errores (exception handlers centralizados)
-   - **Tarea 2.4:** Centralizar logging (JSON formatter)
+   - **Paginación real:** Backend ignora query params en /expedientes
 
-3. **Medio plazo (UI/UX):**
-   - UI de procesamiento con pestañas (Plan_UI_PROCESAMIENTO)
-   - Completar paginación backend (Plan_expedientes - Fase 1)
-   - Integrar virtualización frontend
+4. **Medio plazo (UI/UX):**
+   - UI de procesamiento con pestañas
+   - Completar paginación backend real
+   - Integrar virtualización frontend (TablaVirtualizada.tsx)
 
-4. **Largo plazo:**
+5. **Largo plazo:**
    - Panel de analytics
    - Integración IA completa (Fase 8)
    - Sistema de notificaciones push
@@ -770,4 +777,4 @@ pytest tests/
 ---
 
 *Documento generado para seguimiento por agente IA - Sistema PJN v6*
-*Actualizado: 2025-11-22 - Fase 2.1 Rate Limiting COMPLETADA*
+*Actualizado: 2025-11-22 - Auditoría completa v2.1 - 2 issues CRÍTICOS identificados*
