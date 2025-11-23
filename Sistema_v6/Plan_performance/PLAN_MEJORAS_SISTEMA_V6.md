@@ -81,7 +81,7 @@ Este documento contiene el plan de mejoras identificadas durante la revisión ex
 
 | # | Tarea | Estado | Prioridad | Complejidad |
 |---|-------|--------|-----------|-------------|
-| 2.1 | Implementar Rate Limiting | 🔄 Parcial | Alta | Moderada |
+| 2.1 | Implementar Rate Limiting | ✅ Completado | Alta | Moderada |
 | 2.2 | Connection Pooling de BD | ⏳ Pendiente | Media | Moderada |
 | 2.3 | Mejorar manejo de errores | ⏳ Pendiente | Media | Moderada |
 | 2.4 | Centralizar logging | ⏳ Pendiente | Media | Moderada |
@@ -145,7 +145,7 @@ Este documento contiene el plan de mejoras identificadas durante la revisión ex
 - **Sistema_v5 eliminado:** ~22 GB liberados
 
 ### 5. Falta de Rate Limiting
-**Estado:** 🔄 PARCIAL
+**Estado:** ✅ COMPLETADO
 
 - **Problema:** API vulnerable a ataques de fuerza bruta
 - **Solución:** Implementar slowapi con limiter centralizado
@@ -153,7 +153,9 @@ Este documento contiene el plan de mejoras identificadas durante la revisión ex
   - `presentation/api/rest/rate_limiter.py` - Limiter centralizado
   - `presentation/api/rest/main.py` - Integración con app
   - `presentation/api/rest/routers/auth.py` - Login 10/min, Register 5/min
-- **Pendiente:** Extender a endpoints de extracción, procesamiento, escritos
+  - `presentation/api/rest/routers/expedientes.py` - Extraer 5/min, Filtrar 10/min
+  - `presentation/api/rest/routers/procesamiento.py` - Actuación 10/min, Expediente 5/min
+  - `presentation/api/rest/routers/escritos.py` - Plantillas 20/min, Escritos 20/min
 
 ### 6. Error en escritos.py - Database Settings
 **Estado:** ✅ RESUELTO
@@ -436,6 +438,7 @@ pytest tests/
 | 2025-11-22 | 1.7 | Fase 1 completada - Migración procesador_pdf/generador_documentos, eliminación Sistema_v5 (~22 GB liberados) |
 | 2025-11-22 | 1.8 | Agregada Fase 1.5 - Plan de consolidación Sistema_v6 (autosuficiencia) |
 | 2025-11-22 | 1.9 | Fase 2.1 Rate Limiting parcial (auth), fixes críticos: escritos.py, LoginPage.tsx, normalización expedientes |
+| 2025-11-22 | 2.0 | Fase 2.1 Rate Limiting COMPLETADA - Todos endpoints críticos protegidos |
 
 ---
 
@@ -469,7 +472,7 @@ pytest tests/
 | SEC-004 | Fernet Key obligatorio en producción | ⏳ Pendiente | - |
 | SEC-005 | Verificación permisos admin | ✅ Completado | Tarea 1.2 |
 | SEC-006 | Eliminar prints de secretos | ⏳ Pendiente | - |
-| SEC-007 | Rate Limiting | ⏳ Pendiente | Tarea 2.1 |
+| SEC-007 | Rate Limiting | ✅ Completado | Tarea 2.1 |
 | SEC-008 | Usar credenciales por usuario | ⏳ Pendiente | - |
 
 #### Rendimiento (Prioridad Media)
@@ -742,31 +745,29 @@ pytest tests/
 
 ## Próximos Pasos Recomendados
 
-### Fase 1 Completada ✅ | Fase 2.1 Parcial 🔄
+### Fase 1 Completada ✅ | Fase 2.1 Completada ✅
 
-1. **Inmediato (Completar Fase 2.1 - Rate Limiting):**
-   - **Tarea 2.1 (continuar):** Extender Rate Limiting a:
-     - Endpoints de extracción de expedientes (5/min)
-     - Endpoints de procesamiento (10/min)
-     - Endpoints de escritos (20/min)
-   - Documentar configuración de límites
-
-2. **Corto plazo (Seguridad):**
+1. **Inmediato (Seguridad - Prioridad Alta):**
    - **SEC-001:** Configurar CORS con orígenes específicos
    - **SEC-002:** JWT Secret Key obligatorio en producción
    - **SEC-003:** Remover .env del repositorio
 
-3. **Medio plazo:**
-   - **Tarea 2.2:** Connection Pooling de BD
-   - **Tarea 2.3:** Mejorar manejo de errores
-   - UI de procesamiento con pestañas
+2. **Corto plazo (Rendimiento):**
+   - **Tarea 2.2:** Connection Pooling de BD (SQLAlchemy QueuePool)
+   - **Tarea 2.3:** Mejorar manejo de errores (exception handlers centralizados)
+   - **Tarea 2.4:** Centralizar logging (JSON formatter)
+
+3. **Medio plazo (UI/UX):**
+   - UI de procesamiento con pestañas (Plan_UI_PROCESAMIENTO)
+   - Completar paginación backend (Plan_expedientes - Fase 1)
+   - Integrar virtualización frontend
 
 4. **Largo plazo:**
    - Panel de analytics
    - Integración IA completa (Fase 8)
-   - Chat con asistente IA
+   - Sistema de notificaciones push
 
 ---
 
 *Documento generado para seguimiento por agente IA - Sistema PJN v6*
-*Actualizado: 2025-11-22 - Fase 2.1 Rate Limiting parcial*
+*Actualizado: 2025-11-22 - Fase 2.1 Rate Limiting COMPLETADA*
