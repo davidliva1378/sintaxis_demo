@@ -63,6 +63,7 @@ from .error_handlers import setup_error_handlers
 
 from infrastructure.config import get_settings
 from infrastructure.di_container import get_container
+from infrastructure.logging import setup_logging
 from .rate_limiter import limiter
 
 from .routers import (
@@ -199,11 +200,8 @@ def start_server():
     """Función de entrada para el comando pjn-api."""
     import uvicorn
 
-    # Configurar logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
+    # Configurar logging centralizado
+    setup_logging()
 
     # Iniciar servidor
     uvicorn.run(
