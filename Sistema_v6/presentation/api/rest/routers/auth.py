@@ -3,8 +3,6 @@
 Este módulo define los endpoints para autenticación y gestión de usuarios.
 """
 
-from __future__ import annotations
-
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -140,8 +138,8 @@ def register_user(request: Request, user_data: UserRegister, db: Session = Depen
 @limiter.limit("10/minute")
 def login(
     request: Request,
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Session = Depends(get_db),
+    form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> dict:
     """Autentica un usuario y devuelve un token JWT.
 

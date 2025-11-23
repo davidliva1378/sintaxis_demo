@@ -441,6 +441,7 @@ pytest tests/
 | 2025-11-22 | 2.0 | Fase 2.1 Rate Limiting COMPLETADA - Todos endpoints críticos protegidos |
 | 2025-11-22 | 2.1 | Auditoría completa del plan - Actualización de 25+ tareas con estado real del código |
 | 2025-11-23 | 2.2 | Agregar APScheduler a requirements.txt, corregir estado SEC-003 (.env nunca commiteado) |
+| 2025-11-23 | 2.3 | SEC-002/004: Implementación revertida - causó error "Field required" en login |
 
 ---
 
@@ -469,9 +470,9 @@ pytest tests/
 | ID | Tarea | Estado | Overlap |
 |----|-------|--------|---------|
 | SEC-001 | Configurar CORS con orígenes específicos | ✅ Completado | 11 orígenes en settings.py |
-| SEC-002 | JWT Secret Key obligatorio en producción | ⚠️ Parcial | Tiene default, falta validación prod |
+| SEC-002 | JWT Secret Key obligatorio en producción | ⏳ Pendiente | Revertido - model_validator causó error de login |
 | SEC-003 | Proteger .env del repositorio | ✅ Completado | .env nunca fue commiteado (ya en .gitignore) |
-| SEC-004 | Fernet Key obligatorio en producción | ⚠️ Parcial | Tiene default, falta validación prod |
+| SEC-004 | Fernet Key obligatorio en producción | ⏳ Pendiente | Revertido - model_validator causó error de login |
 | SEC-005 | Verificación permisos admin | ✅ Completado | Tarea 1.2 |
 | SEC-006 | Eliminar prints de secretos | ✅ Completado | Solo prints informativos en scripts |
 | SEC-007 | Rate Limiting | ✅ Completado | Tarea 2.1 |
@@ -749,9 +750,7 @@ pytest tests/
 
 ### Fase 1 Completada ✅ | Fase 1.5 ~90% ✅ | Fase 2.1 Completada ✅
 
-1. **Alta Prioridad (Seguridad - Producción):**
-   - **SEC-002:** Validar JWT Secret Key en producción (no usar default)
-   - **SEC-004:** Validar Fernet Key en producción (no usar default)
+1. **Alta Prioridad (Seguridad):**
    - **SEC-008:** Implementar credenciales por usuario
    - **Recomendado:** Rotar contraseña MySQL periódicamente
 

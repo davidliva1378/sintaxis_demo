@@ -53,6 +53,11 @@ class Usuario(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     is_superuser = Column(Boolean, default=False, nullable=False)
 
+    @property
+    def has_pjn_credentials(self) -> bool:
+        """Indica si el usuario tiene credenciales PJN configuradas."""
+        return bool(self.pjn_usuario_encrypted and self.pjn_password_encrypted)
+
     def __repr__(self) -> str:
         """Representación string del usuario."""
         return f"<Usuario(id={self.id}, username='{self.username}', email='{self.email}')>"
