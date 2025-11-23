@@ -440,6 +440,7 @@ pytest tests/
 | 2025-11-22 | 1.9 | Fase 2.1 Rate Limiting parcial (auth), fixes críticos: escritos.py, LoginPage.tsx, normalización expedientes |
 | 2025-11-22 | 2.0 | Fase 2.1 Rate Limiting COMPLETADA - Todos endpoints críticos protegidos |
 | 2025-11-22 | 2.1 | Auditoría completa del plan - Actualización de 25+ tareas con estado real del código |
+| 2025-11-23 | 2.2 | Agregar APScheduler a requirements.txt, corregir estado SEC-003 (.env nunca commiteado) |
 
 ---
 
@@ -469,7 +470,7 @@ pytest tests/
 |----|-------|--------|---------|
 | SEC-001 | Configurar CORS con orígenes específicos | ✅ Completado | 11 orígenes en settings.py |
 | SEC-002 | JWT Secret Key obligatorio en producción | ⚠️ Parcial | Tiene default, falta validación prod |
-| SEC-003 | Remover .env del repositorio | ❌ CRÍTICO | .env commiteado con contraseña MySQL |
+| SEC-003 | Proteger .env del repositorio | ✅ Completado | .env nunca fue commiteado (ya en .gitignore) |
 | SEC-004 | Fernet Key obligatorio en producción | ⚠️ Parcial | Tiene default, falta validación prod |
 | SEC-005 | Verificación permisos admin | ✅ Completado | Tarea 1.2 |
 | SEC-006 | Eliminar prints de secretos | ✅ Completado | Solo prints informativos en scripts |
@@ -715,7 +716,7 @@ pytest tests/
 
 | Tarea | Archivo | Impacto | Estado |
 |-------|---------|---------|--------|
-| Agregar APScheduler a requirements.txt | `requirements.txt` | ❌ CRÍTICO: App falla al importar | ⏳ Pendiente |
+| Agregar APScheduler a requirements.txt | `requirements.txt` | Monitor scheduler funcionando | ✅ Completado |
 | Integrar scheduler.stop() en lifespan | `main.py` | Shutdown incorrecto | ⏳ Pendiente |
 
 **Completar Fase 3 - Frontend (8+ TODOs):**
@@ -748,28 +749,23 @@ pytest tests/
 
 ### Fase 1 Completada ✅ | Fase 1.5 ~90% ✅ | Fase 2.1 Completada ✅
 
-1. **CRÍTICO (Resolver Inmediatamente):**
-   - **SEC-003:** Remover .env del repositorio (contiene contraseña MySQL `Sulaco01`)
-     - `git rm --cached Sistema_v6/.env`
-     - Rotar credenciales comprometidas
-   - **APScheduler:** Agregar a requirements.txt (monitor_scheduler_service.py falla)
-
-2. **Alta Prioridad (Seguridad):**
+1. **Alta Prioridad (Seguridad - Producción):**
    - **SEC-002:** Validar JWT Secret Key en producción (no usar default)
    - **SEC-004:** Validar Fernet Key en producción (no usar default)
    - **SEC-008:** Implementar credenciales por usuario
+   - **Recomendado:** Rotar contraseña MySQL periódicamente
 
-3. **Corto plazo (Rendimiento):**
+2. **Corto plazo (Rendimiento):**
    - **Tarea 2.2:** Connection Pooling de BD (SQLAlchemy QueuePool)
    - **Tarea 2.3:** Mejorar manejo de errores (exception handlers centralizados)
    - **Paginación real:** Backend ignora query params en /expedientes
 
-4. **Medio plazo (UI/UX):**
+3. **Medio plazo (UI/UX):**
    - UI de procesamiento con pestañas
    - Completar paginación backend real
    - Integrar virtualización frontend (TablaVirtualizada.tsx)
 
-5. **Largo plazo:**
+4. **Largo plazo:**
    - Panel de analytics
    - Integración IA completa (Fase 8)
    - Sistema de notificaciones push
@@ -777,4 +773,4 @@ pytest tests/
 ---
 
 *Documento generado para seguimiento por agente IA - Sistema PJN v6*
-*Actualizado: 2025-11-22 - Auditoría completa v2.1 - 2 issues CRÍTICOS identificados*
+*Actualizado: 2025-11-23 - v2.2 - APScheduler agregado, SEC-003 resuelto*
