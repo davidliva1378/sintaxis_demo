@@ -2,6 +2,8 @@
 
 Este use case implementa el paso 4 del workflow:
 "Monitoreo para el mantenimiento actualizado del JSON 'sistema', con cada variación actualizar el workspace"
+
+Modificado para usar ExtractorMasivo en lugar de PlaywrightScraperAdapter.
 """
 
 from __future__ import annotations
@@ -20,8 +22,36 @@ if TYPE_CHECKING:
         IStoragePort,
         IWorkspacePort,
     )
+    from infrastructure.config import Settings
 
 logger = logging.getLogger(__name__)
+
+
+def normalizar_numero_expediente(numero: str) -> str:
+    """Normaliza el formato del número de expediente.
+
+    Convierte diferentes formatos a uno común:
+    - 'FRE 004379/2021' → 'FRE-004379-2021'
+    - 'FRE-004379-2021' → 'FRE-004379-2021'
+    - 'FRE004379/2021' → 'FRE-004379-2021'
+
+    Args:
+        numero: Número de expediente en cualquier formato
+
+    Returns:
+        Número normalizado con formato 'XXX-NNNNNN-YYYY'
+    """
+    import re
+    # Extraer componentes: prefijo (letras), número, año
+    # Patrones posibles:
+    # FRE-010171-2019, FRE 004379/2021, FRE004379/2021, FPA_005672_2014
+    match = re.match(r'([A-Z]+)[\s\-_]?(\d+)[\-/_](\d{4})', numero.strip().upper())
+    if match:
+        prefijo = match.group(1)
+        num = match.group(2).zfill(6)  # Pad con ceros a 6 dígitos
+        anio = match.group(3)
+        return f"{prefijo}-{num}-{anio}"
+    return numero  # Devolver original si no matchea
 
 
 class MonitorearExpedientesUseCase:
@@ -54,6 +84,7 @@ class MonitorearExpedientesUseCase:
         notificacion_port: INotificacionPort | None = None,
         detector_cambios: "DetectorCambios | None" = None,
         gestor_estados: "GestorEstadosExpedientes | None" = None,
+        settings: "Settings | None" = None,
     ):
         """Inicializa el use case con sus dependencias.
 
@@ -66,6 +97,7 @@ class MonitorearExpedientesUseCase:
             notificacion_port: Port para notificaciones (opcional)
             detector_cambios: Detector de cambios multi-campo (opcional)
             gestor_estados: Gestor de estados de expedientes (opcional)
+            settings: Configuración del sistema (para credenciales PJN)
         """
         self._scraper = scraper
         self._expediente_repo = expediente_repo
@@ -73,6 +105,7 @@ class MonitorearExpedientesUseCase:
         self._storage = storage
         self._workspace_port = workspace_port
         self._notificacion_port = notificacion_port
+        self._settings = settings
 
         # Nuevos componentes de Fase 1
         self._detector_cambios = detector_cambios
@@ -110,17 +143,123 @@ class MonitorearExpedientesUseCase:
             expedientes = [ExpedienteResumen.from_dict(data) for data in lista_sistema]
             logger.info(f"Expedientes a monitorear: {len(expedientes)}")
 
-            # 2. Extraer lista actualizada del PJN
-            logger.info("Extrayendo datos actualizados del PJN...")
-            expedientes_actualizados = await self._scraper.extraer_expedientes(
-                headless=True
+            # 2. Extraer lista actualizada del PJN usando ExtractorMasivo
+            logger.info("Extrayendo datos actualizados del PJN con ExtractorMasivo...")
+
+            # Obtener credenciales desde múltiples fuentes (en orden de prioridad)
+            import os
+            username = None
+            password = None
+
+            # Opción 1: desde la base de datos del usuario (credenciales encriptadas)
+            try:
+                from infrastructure.persistence.database import get_db, Usuario
+                from infrastructure.security import decrypt_credentials
+
+                # Obtener sesión de BD
+                db = next(get_db())
+                try:
+                    # Por ahora usar usuario_id=1 (igual que MonitoreoService)
+                    usuario = db.query(Usuario).filter(Usuario.id == 1).first()
+                    if usuario and usuario.pjn_usuario_encrypted and usuario.pjn_password_encrypted:
+                        username = decrypt_credentials(usuario.pjn_usuario_encrypted)
+                        password = decrypt_credentials(usuario.pjn_password_encrypted)
+                        if username and password:
+                            logger.debug("Usando credenciales desde base de datos (desencriptadas)")
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.debug(f"No se pudieron obtener credenciales de BD: {e}")
+
+            # Opción 2: desde settings
+            if not username and self._settings and self._settings.auth.usuario and self._settings.auth.password:
+                username = self._settings.auth.usuario
+                password = self._settings.auth.password
+                logger.debug("Usando credenciales desde settings")
+
+            # Opción 3: desde variables de entorno directamente (fallback)
+            if not username:
+                username = os.getenv("PJN_USER")
+                password = os.getenv("PJN_PASSWORD")
+                if username and password:
+                    logger.debug("Usando credenciales desde variables de entorno")
+                else:
+                    logger.warning("No se encontraron credenciales PJN - configure en Configuración > Credenciales PJN")
+
+            # Usar ExtractorMasivo para obtener el listado completo
+            from extraccion_masiva.extractor_masivo import ExtractorMasivo
+            from extraccion_masiva.models import ConfigExtraccionMasiva
+            import json
+
+            # Configurar extractor con headless según comando
+            config = ConfigExtraccionMasiva(headless=command.headless)
+            extractor = ExtractorMasivo(config=config)
+
+            # Ejecutar extracción
+            sesion = await extractor.extraer_listado_completo(
+                username=username,
+                password=password,
             )
+
+            # Cargar expedientes del JSON generado
+            expedientes_actualizados = []
+            print(f"DEBUG: Sesion listado_path: {sesion.listado_path}")
+            print(f"DEBUG: Sesion estado: {sesion.estado}")
+            logger.info(f"Sesion listado_path: {sesion.listado_path}")
+            logger.info(f"Sesion estado: {sesion.estado}")
+
+            if sesion.listado_path:
+                # El ExtractorMasivo genera la ruta relativa al CWD donde se ejecuta
+                # Usar directamente la ruta proporcionada
+                print(f"DEBUG: Intentando abrir archivo: {sesion.listado_path}")
+                logger.info(f"Intentando abrir archivo: {sesion.listado_path}")
+
+                try:
+                    with open(sesion.listado_path, 'r', encoding='utf-8') as f:
+                        datos = json.load(f)
+                        lista_exp = datos.get("expedientes", [])
+                        print(f"DEBUG: Archivo cargado correctamente, {len(lista_exp)} expedientes")
+                except Exception as e:
+                    print(f"DEBUG ERROR: Error al abrir archivo: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    lista_exp = []
+
+                # Convertir a ExpedienteResumen
+                for exp_data in lista_exp:
+                    exp_resumen = ExpedienteResumen(
+                        numero=exp_data.get("numero", ""),
+                        caratula=exp_data.get("caratula", ""),
+                        dependencia=exp_data.get("dependencia", ""),
+                        situacion=exp_data.get("situacion", ""),
+                        ultima_actuacion=exp_data.get("ultima_actuacion", ""),
+                    )
+                    expedientes_actualizados.append(exp_resumen)
+
+            print(f"DEBUG: Expedientes actualizados cargados: {len(expedientes_actualizados)}")
             logger.info(f"Datos actualizados obtenidos: {len(expedientes_actualizados)}")
 
-            # Crear diccionario para búsqueda rápida
+            # Crear diccionario para búsqueda rápida con números normalizados
             dict_actualizados = {
-                exp.numero: exp for exp in expedientes_actualizados
+                normalizar_numero_expediente(exp.numero): exp for exp in expedientes_actualizados
             }
+
+            # DEBUG: Mostrar información para comparación
+            print(f"DEBUG: Expedientes en sistema a monitorear: {len(expedientes)}")
+            if expedientes:
+                nums_sistema_norm = [normalizar_numero_expediente(e.numero) for e in expedientes[:3]]
+                print(f"DEBUG: Primeros 3 del sistema (normalizados): {nums_sistema_norm}")
+            if expedientes_actualizados:
+                nums_ext_norm = [normalizar_numero_expediente(e.numero) for e in expedientes_actualizados[:3]]
+                print(f"DEBUG: Primeros 3 del extractor (normalizados): {nums_ext_norm}")
+
+            # Verificar coincidencias con números normalizados
+            nums_sistema = {normalizar_numero_expediente(e.numero) for e in expedientes}
+            nums_actualizados = set(dict_actualizados.keys())
+            coincidencias = nums_sistema & nums_actualizados
+            print(f"DEBUG: Coincidencias encontradas: {len(coincidencias)}")
+            if coincidencias:
+                print(f"DEBUG: Ejemplos de coincidencias: {list(coincidencias)[:3]}")
 
             # 3. Filtrar expedientes por estado (si gestor disponible)
             expedientes_monitoreados = expedientes
@@ -146,9 +285,9 @@ class MonitorearExpedientesUseCase:
 
                 # Filtrar expedientes actualizados que estamos monitoreando
                 expedientes_actuales_filtrados = [
-                    dict_actualizados[exp.numero]
+                    dict_actualizados[normalizar_numero_expediente(exp.numero)]
                     for exp in expedientes_monitoreados
-                    if exp.numero in dict_actualizados
+                    if normalizar_numero_expediente(exp.numero) in dict_actualizados
                 ]
 
                 # Detectar cambios
@@ -177,6 +316,7 @@ class MonitorearExpedientesUseCase:
                         cambio_multi.expediente,
                         command.base_path,
                         command.descargar_nuevos_archivos,
+                        command.headless,
                     )
 
                     # Actualizar repositorio
@@ -193,8 +333,9 @@ class MonitorearExpedientesUseCase:
                         expedientes_verificados += 1
                         logger.debug(f"Verificando {expediente_anterior.numero}")
 
-                        # Buscar versión actualizada
-                        expediente_actual = dict_actualizados.get(expediente_anterior.numero)
+                        # Buscar versión actualizada (con número normalizado)
+                        num_normalizado = normalizar_numero_expediente(expediente_anterior.numero)
+                        expediente_actual = dict_actualizados.get(num_normalizado)
                         if not expediente_actual:
                             logger.warning(
                                 f"Expediente {expediente_anterior.numero} no encontrado en datos actualizados"
@@ -228,6 +369,7 @@ class MonitorearExpedientesUseCase:
                                 expediente_actual,
                                 command.base_path,
                                 command.descargar_nuevos_archivos,
+                                command.headless,
                             )
 
                             # Actualizar repositorio
@@ -244,9 +386,9 @@ class MonitorearExpedientesUseCase:
                     f"Actualizando JSON 'sistema' con {len(cambios_detectados)} cambios"
                 )
                 expedientes_actualizados_filtrados = [
-                    dict_actualizados[exp.numero]
+                    dict_actualizados[normalizar_numero_expediente(exp.numero)]
                     for exp in expedientes
-                    if exp.numero in dict_actualizados
+                    if normalizar_numero_expediente(exp.numero) in dict_actualizados
                 ]
                 datos_nuevos = [
                     exp.to_dict() for exp in expedientes_actualizados_filtrados
@@ -358,6 +500,7 @@ class MonitorearExpedientesUseCase:
         expediente: "ExpedienteResumen",
         base_path: "Path",
         descargar_archivos: bool,
+        headless: bool = True,
     ) -> None:
         """Actualiza el workspace de un expediente con nuevas actuaciones.
 
@@ -365,6 +508,7 @@ class MonitorearExpedientesUseCase:
             expediente: Expediente con datos actualizados
             base_path: Directorio base de workspaces
             descargar_archivos: Si True, descarga archivos nuevos
+            headless: Si True, ejecuta el navegador sin interfaz gráfica
         """
         from pathlib import Path
 
@@ -390,7 +534,7 @@ class MonitorearExpedientesUseCase:
 
             archivo_actuaciones = await self._scraper.extraer_actuaciones(
                 identificacion,
-                headless=True,
+                headless=headless,
             )
 
             # Guardar actuaciones actualizadas
