@@ -59,6 +59,13 @@ async def obtener_configuracion_sistema():
                 max_reintentos=settings.monitoreo.max_reintentos,
                 notificar_cambios=settings.monitoreo.notificar_cambios,
                 descargar_archivos=settings.monitoreo.descargar_archivos,
+                # Opciones de extracción
+                fecha_corte_dias=settings.monitoreo.fecha_corte_dias,
+                max_paginas_monitoreo=settings.monitoreo.max_paginas_monitoreo,
+                tiempo_maximo_extraccion=settings.monitoreo.tiempo_maximo_extraccion,
+                detener_en_duplicado=settings.monitoreo.detener_en_duplicado,
+                orden_extraccion=settings.monitoreo.orden_extraccion,
+                # Avanzado
                 intervalos_laboral_expedientes=settings.monitoreo.intervalos_laboral_expedientes,
                 intervalos_laboral_entradas=settings.monitoreo.intervalos_laboral_entradas,
                 intervalos_no_laboral_expedientes=settings.monitoreo.intervalos_no_laboral_expedientes,
@@ -204,6 +211,17 @@ async def actualizar_configuracion_sistema(config: SystemConfigUpdateRequest):
             env_updates["MONITOREO_NOTIFICAR_CAMBIOS"] = str(config.monitoreo.notificar_cambios).lower()
             env_updates["MONITOREO_DESCARGAR_ARCHIVOS"] = str(config.monitoreo.descargar_archivos).lower()
 
+            # Opciones de extracción
+            if config.monitoreo.fecha_corte_dias is not None:
+                env_updates["MONITOREO_FECHA_CORTE_DIAS"] = str(config.monitoreo.fecha_corte_dias)
+            if config.monitoreo.max_paginas_monitoreo is not None:
+                env_updates["MONITOREO_MAX_PAGINAS_MONITOREO"] = str(config.monitoreo.max_paginas_monitoreo)
+            if config.monitoreo.tiempo_maximo_extraccion is not None:
+                env_updates["MONITOREO_TIEMPO_MAXIMO_EXTRACCION"] = str(config.monitoreo.tiempo_maximo_extraccion)
+            env_updates["MONITOREO_DETENER_EN_DUPLICADO"] = str(config.monitoreo.detener_en_duplicado).lower()
+            env_updates["MONITOREO_ORDEN_EXTRACCION"] = config.monitoreo.orden_extraccion
+
+            # Avanzado
             if config.monitoreo.intervalos_laboral_expedientes is not None:
                 env_updates["MONITOREO_INTERVALOS_LABORAL_EXPEDIENTES"] = str(config.monitoreo.intervalos_laboral_expedientes)
             if config.monitoreo.intervalos_laboral_entradas is not None:

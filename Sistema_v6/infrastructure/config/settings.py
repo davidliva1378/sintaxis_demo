@@ -170,6 +170,13 @@ class MonitoreoSettings(BaseSettings):
     actualizar_actuaciones_auto: bool = False
     max_reintentos_actualizacion: int = 2
 
+    # Opciones de extracción (para ExtractorMasivo)
+    fecha_corte_dias: int | None = 30  # Solo expedientes con actividad en últimos N días
+    max_paginas_monitoreo: int | None = 50  # Límite de páginas a extraer
+    tiempo_maximo_extraccion: int | None = 600  # Timeout en segundos (10 min)
+    detener_en_duplicado: bool = True  # Detener al encontrar expediente repetido
+    orden_extraccion: str = "fecha"  # Orden: fecha, caratula, oficina, situacion
+
 
 class NotificacionesSettings(BaseSettings):
     """Configuración de notificaciones.
@@ -356,7 +363,7 @@ class Settings(BaseSettings):
     encryption: EncryptionSettings = Field(default_factory=EncryptionSettings)
 
     # General settings
-    environment: Literal["development", "production", "testing"] = "production"
+    environment: Literal["development", "production", "testing"] = "development"
     debug: bool = False
 
     # Database URL (se puede configurar via DATABASE_URL env var)

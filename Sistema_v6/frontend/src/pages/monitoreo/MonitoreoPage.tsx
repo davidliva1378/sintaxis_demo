@@ -3,12 +3,12 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Activity, Play, Pause, Plus, Bell, Clock, TrendingUp, AlertCircle } from 'lucide-react'
+import { Activity, Play, Pause, Plus, Bell, Clock, TrendingUp, AlertCircle, Settings } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useMonitoreoStore } from '@/stores/monitoreoStore'
-import ConfiguracionMonitoreo from '@/components/monitoreo/ConfiguracionMonitoreo'
 import MonitoreoCard from '@/components/monitoreo/MonitoreoCard'
 import LogsList from '@/components/monitoreo/LogsList'
 import { formatDistanceToNow } from 'date-fns'
@@ -28,7 +28,6 @@ export default function MonitoreoPage() {
     verificarExpediente,
   } = useMonitoreoStore()
 
-  const [showConfig, setShowConfig] = useState(false)
   const [showChanges, setShowChanges] = useState(false)
   const [selectedExpedienteId, setSelectedExpedienteId] = useState<number | undefined>()
 
@@ -100,10 +99,12 @@ export default function MonitoreoPage() {
         </div>
 
         <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setShowConfig(!showConfig)}>
-            <Activity className="h-4 w-4 mr-2" />
-            Configuración
-          </Button>
+          <Link to="/settings">
+            <Button variant="outline">
+              <Settings className="h-4 w-4 mr-2" />
+              Configuración
+            </Button>
+          </Link>
           {configuracion && (
             <Button
               onClick={handleToggleMonitoreo}
@@ -253,13 +254,6 @@ export default function MonitoreoPage() {
               </div>
             </div>
           </Card>
-        </div>
-      )}
-
-      {/* Configuración (colapsable) */}
-      {showConfig && (
-        <div className="animate-in slide-in-from-top duration-300">
-          <ConfiguracionMonitoreo />
         </div>
       )}
 

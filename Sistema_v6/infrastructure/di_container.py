@@ -250,6 +250,7 @@ class DIContainer:
             notificacion_port=self.notificacion,
             detector_cambios=self.detector_cambios,
             gestor_estados=self.gestor_estados,
+            settings=self.settings,
         )
 
     def extraccion_masiva_use_case(self) -> ExtraccionMasivaUseCase:

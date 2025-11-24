@@ -185,6 +185,13 @@ class MonitorSchedulerService:
                 base_path=self._workspaces_dir,
                 notificar_cambios=self._config.notificar_cambios,
                 descargar_nuevos_archivos=self._config.descargar_archivos,
+                headless=True,  # Scheduler siempre usa headless
+                # Opciones de extracción
+                fecha_corte_dias=self._config.fecha_corte_dias,
+                max_paginas=self._config.max_paginas_monitoreo,
+                tiempo_maximo_segundos=self._config.tiempo_maximo_extraccion,
+                detener_en_duplicado=self._config.detener_en_duplicado,
+                orden_extraccion=self._config.orden_extraccion,
             )
 
             # Ejecutar use case
@@ -319,15 +326,19 @@ class MonitorSchedulerService:
 
         return estado
 
-    async def ejecutar_verificacion_manual(self) -> dict:
+    async def ejecutar_verificacion_manual(self, headless: bool = True) -> dict:
         """Ejecuta una verificación manual inmediata.
 
         No afecta el scheduling automático.
 
+        Args:
+            headless: Si True, ejecuta el navegador sin interfaz gráfica.
+                      Si False, muestra el navegador para depuración visual.
+
         Returns:
             Resultado de la verificación
         """
-        logger.info("Ejecutando verificación manual...")
+        logger.info(f"Ejecutando verificación manual (headless={headless})...")
 
         # Crear comando
         from application.dtos import MonitorearExpedientesCommand
@@ -337,12 +348,19 @@ class MonitorSchedulerService:
             base_path=self._workspaces_dir,
             notificar_cambios=self._config.notificar_cambios,
             descargar_nuevos_archivos=self._config.descargar_archivos,
+            headless=headless,
+            # Opciones de extracción
+            fecha_corte_dias=self._config.fecha_corte_dias,
+            max_paginas=self._config.max_paginas_monitoreo,
+            tiempo_maximo_segundos=self._config.tiempo_maximo_extraccion,
+            detener_en_duplicado=self._config.detener_en_duplicado,
+            orden_extraccion=self._config.orden_extraccion,
         )
 
         # Ejecutar use case
         resultado = await self._use_case.execute(command)
 
-        if resultado.is_success:
+        if resultado.success:
             response = resultado.value
             return {
                 "exito": True,

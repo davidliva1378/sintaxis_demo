@@ -58,28 +58,21 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
   // Obtener configuración del monitoreo
   obtenerConfiguracion: async () => {
     try {
-      // Llamada real a la API del scheduler
-      const estadoScheduler = await monitoreoApi.obtenerEstadoMonitoreo()
+      const response = await monitoreoApi.obtenerConfiguracion()
 
-      // Mapear estado del scheduler a ConfiguracionMonitoreo
-      const frecuencia: FrecuenciaMonitoreo = estadoScheduler.intervalo_actual_minutos
-        ? estadoScheduler.intervalo_actual_minutos < 60
-          ? `${estadoScheduler.intervalo_actual_minutos}min`
-          : '1hora'
-        : '1hora'
-
+      // Mapear respuesta a ConfiguracionMonitoreo
       const config: ConfiguracionMonitoreo = {
-        id: 1,
-        usuario_id: 1,
-        activo: estadoScheduler.activo,
-        frecuencia,
-        notificar_email: true, // TODO: Obtener de configuración backend
-        notificar_sistema: true, // TODO: Obtener de configuración backend
-        hora_inicio: '08:00', // TODO: Obtener de configuración backend
-        hora_fin: '18:00', // TODO: Obtener de configuración backend
-        dias_semana: [1, 2, 3, 4, 5], // TODO: Obtener de configuración backend
-        created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date().toISOString(),
+        id: response.id,
+        usuario_id: response.usuario_id,
+        activo: response.activo,
+        frecuencia: response.frecuencia as FrecuenciaMonitoreo,
+        notificar_email: response.notificar_email,
+        notificar_sistema: response.notificar_sistema,
+        hora_inicio: response.hora_inicio || undefined,
+        hora_fin: response.hora_fin || undefined,
+        dias_semana: response.dias_semana || undefined,
+        created_at: response.created_at,
+        updated_at: response.updated_at,
       }
 
       set({ configuracion: config })
@@ -92,19 +85,24 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
   // Actualizar configuración
   actualizarConfiguracion: async (data: ActualizarMonitoreo) => {
     try {
-      // TODO: Reemplazar con llamada real a la API
-      // const response = await apiClient.put<ConfiguracionMonitoreo>('/api/v1/monitoreo/configuracion', data)
-      // set({ configuracion: response.data })
+      const response = await monitoreoApi.actualizarConfiguracion(data)
 
-      // Mock data por ahora
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Mapear respuesta a ConfiguracionMonitoreo
+      const config: ConfiguracionMonitoreo = {
+        id: response.id,
+        usuario_id: response.usuario_id,
+        activo: response.activo,
+        frecuencia: response.frecuencia as FrecuenciaMonitoreo,
+        notificar_email: response.notificar_email,
+        notificar_sistema: response.notificar_sistema,
+        hora_inicio: response.hora_inicio || undefined,
+        hora_fin: response.hora_fin || undefined,
+        dias_semana: response.dias_semana || undefined,
+        created_at: response.created_at,
+        updated_at: response.updated_at,
+      }
 
-      set(state => ({
-        configuracion: state.configuracion
-          ? { ...state.configuracion, ...data, updated_at: new Date().toISOString() }
-          : null,
-      }))
-
+      set({ configuracion: config })
       toast.success('Configuración actualizada correctamente')
     } catch (error: any) {
       console.error('Error al actualizar configuración:', error)
@@ -156,56 +154,27 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
     set({ isLoading: true })
 
     try {
-      // TODO: Reemplazar con llamada real a la API
-      // const response = await apiClient.get<ExpedienteMonitoreado[]>('/api/v1/monitoreo/expedientes')
-      // set({ expedientes: response.data })
+      const response = await monitoreoApi.listarExpedientes()
 
-      // Mock data por ahora
-      await new Promise(resolve => setTimeout(resolve, 700))
+      // Mapear respuesta al tipo del frontend
+      const expedientes: ExpedienteMonitoreado[] = response.expedientes.map(exp => ({
+        id: exp.id,
+        usuario_id: exp.usuario_id,
+        expediente_numero: exp.expediente_numero,
+        expediente_caratula: exp.expediente_caratula || '',
+        expediente_dependencia: exp.expediente_dependencia || undefined,
+        activo: exp.activo,
+        ultima_verificacion: exp.ultima_verificacion || undefined,
+        ultima_actuacion_fecha: exp.ultima_actuacion_fecha || undefined,
+        ultima_actuacion_id: exp.ultima_actuacion_id || undefined,
+        total_cambios_detectados: exp.total_cambios_detectados,
+        notas: exp.notas || undefined,
+        prioridad: exp.prioridad,
+        created_at: exp.created_at,
+        updated_at: exp.updated_at,
+      }))
 
-      const mockExpedientes: ExpedienteMonitoreado[] = [
-        {
-          id: 1,
-          usuario_id: 1,
-          expediente_numero: 'EXP-2024-123-CS',
-          expediente_caratula: 'PÉREZ JUAN C/ GARCÍA MARÍA S/ DAÑOS Y PERJUICIOS',
-          expediente_dependencia: 'Juzgado Civil 45 - Secretaría Única',
-          activo: true,
-          ultima_verificacion: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          ultima_actuacion_fecha: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          total_cambios_detectados: 5,
-          created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 2,
-          usuario_id: 1,
-          expediente_numero: 'EXP-2024-456-CF',
-          expediente_caratula: 'RODRÍGUEZ ANA C/ GÓMEZ PEDRO S/ DIVORCIO',
-          expediente_dependencia: 'Juzgado de Familia 12 - Secretaría 2',
-          activo: true,
-          ultima_verificacion: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-          ultima_actuacion_fecha: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-          total_cambios_detectados: 12,
-          created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 3,
-          usuario_id: 1,
-          expediente_numero: 'EXP-2024-789-CC',
-          expediente_caratula: 'LÓPEZ CARLOS S/ QUIEBRA',
-          expediente_dependencia: 'Juzgado Comercial 8 - Secretaría 1',
-          activo: false,
-          ultima_verificacion: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-          ultima_actuacion_fecha: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          total_cambios_detectados: 3,
-          created_at: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-        },
-      ]
-
-      set({ expedientes: mockExpedientes })
+      set({ expedientes })
     } catch (error: any) {
       console.error('Error al listar expedientes:', error)
       toast.error('Error al cargar expedientes monitoreados')
@@ -218,23 +187,23 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
   // Agregar expediente al monitoreo
   agregarExpediente: async (data: SolicitudMonitorear) => {
     try {
-      // TODO: Reemplazar con llamada real a la API
-      // const response = await apiClient.post<ExpedienteMonitoreado>('/api/v1/monitoreo/expedientes', data)
-      // set(state => ({ expedientes: [...state.expedientes, response.data] }))
+      const response = await monitoreoApi.agregarExpediente(data)
 
-      // Mock data por ahora
-      await new Promise(resolve => setTimeout(resolve, 500))
-
+      // Mapear respuesta al tipo del frontend
       const nuevoExpediente: ExpedienteMonitoreado = {
-        id: Date.now(),
-        usuario_id: 1,
-        expediente_numero: data.expediente_numero,
-        expediente_caratula: data.expediente_caratula || '',
-        expediente_dependencia: data.expediente_dependencia,
-        activo: true,
-        total_cambios_detectados: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        id: response.id,
+        usuario_id: response.usuario_id,
+        expediente_numero: response.expediente_numero,
+        expediente_caratula: response.expediente_caratula || '',
+        expediente_dependencia: response.expediente_dependencia || undefined,
+        activo: response.activo,
+        ultima_verificacion: response.ultima_verificacion || undefined,
+        ultima_actuacion_fecha: response.ultima_actuacion_fecha || undefined,
+        total_cambios_detectados: response.total_cambios_detectados,
+        notas: response.notas || undefined,
+        prioridad: response.prioridad,
+        created_at: response.created_at,
+        updated_at: response.updated_at,
       }
 
       set(state => ({
@@ -246,18 +215,21 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
       })
     } catch (error: any) {
       console.error('Error al agregar expediente:', error)
-      toast.error('Error al agregar expediente al monitoreo')
+      toast.error(error.message || 'Error al agregar expediente al monitoreo')
     }
   },
 
   // Remover expediente del monitoreo
   removerExpediente: async (id: number) => {
     try {
-      // TODO: Reemplazar con llamada real a la API
-      // await apiClient.delete(`/api/v1/monitoreo/expedientes/${id}`)
+      // Buscar el expediente por ID para obtener el número
+      const expediente = get().expedientes.find(e => e.id === id)
+      if (!expediente) {
+        toast.error('Expediente no encontrado')
+        return
+      }
 
-      // Mock data por ahora
-      await new Promise(resolve => setTimeout(resolve, 400))
+      await monitoreoApi.eliminarExpediente(expediente.expediente_numero)
 
       set(state => ({
         expedientes: state.expedientes.filter(e => e.id !== id),
@@ -266,29 +238,35 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
       toast.success('Expediente removido del monitoreo')
     } catch (error: any) {
       console.error('Error al remover expediente:', error)
-      toast.error('Error al remover expediente')
+      toast.error(error.message || 'Error al remover expediente')
     }
   },
 
   // Toggle expediente activo/pausado
   toggleExpediente: async (id: number, activo: boolean) => {
     try {
-      // TODO: Reemplazar con llamada real a la API
-      // await apiClient.patch(`/api/v1/monitoreo/expedientes/${id}/toggle`, { activo })
+      // Buscar el expediente por ID para obtener el número
+      const expediente = get().expedientes.find(e => e.id === id)
+      if (!expediente) {
+        toast.error('Expediente no encontrado')
+        return
+      }
 
-      // Mock data por ahora
-      await new Promise(resolve => setTimeout(resolve, 300))
+      // Usar pausar/reanudar según el estado deseado
+      const response = activo
+        ? await monitoreoApi.reanudarExpediente(expediente.expediente_numero)
+        : await monitoreoApi.pausarExpediente(expediente.expediente_numero)
 
       set(state => ({
         expedientes: state.expedientes.map(e =>
-          e.id === id ? { ...e, activo, updated_at: new Date().toISOString() } : e
+          e.id === id ? { ...e, activo: response.activo, updated_at: response.updated_at } : e
         ),
       }))
 
       toast.success(activo ? 'Monitoreo activado' : 'Monitoreo pausado')
     } catch (error: any) {
       console.error('Error al cambiar estado del expediente:', error)
-      toast.error('Error al cambiar el estado')
+      toast.error(error.message || 'Error al cambiar el estado')
     }
   },
 
@@ -344,73 +322,35 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
     set({ isLoading: true })
 
     try {
-      // TODO: Reemplazar con llamada real a la API
-      // const url = expedienteId
-      //   ? `/api/v1/monitoreo/cambios?expediente_id=${expedienteId}`
-      //   : '/api/v1/monitoreo/cambios'
-      // const response = await apiClient.get<CambioDetectado[]>(url)
-      // set({ cambios: response.data })
+      // Si hay expedienteId, buscar el número del expediente
+      let expedienteNumero: string | undefined
+      if (expedienteId) {
+        const expediente = get().expedientes.find(e => e.id === expedienteId)
+        expedienteNumero = expediente?.expediente_numero
+      }
 
-      // Mock data por ahora
-      await new Promise(resolve => setTimeout(resolve, 600))
+      const response = await monitoreoApi.listarCambios(
+        false, // solo_no_leidos
+        undefined, // tipo_cambio
+        expedienteNumero
+      )
 
-      const mockCambios: CambioDetectado[] = [
-        {
-          id: 1,
-          expediente_monitoreado_id: 1,
-          expediente_numero: 'EXP-2024-123-CS',
-          expediente_caratula: 'PÉREZ JUAN C/ GARCÍA MARÍA S/ DAÑOS Y PERJUICIOS',
-          tipo_cambio: 'nueva_actuacion',
-          descripcion: 'Nueva actuación: PRESENTACION',
-          detalles: {
-            oficina: 'Secretaría Única',
-            fecha: '12/01/2025',
-            tipo: 'PRESENTACION',
-          },
-          notificado: true,
-          leido: false,
-          fecha_deteccion: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 2,
-          expediente_monitoreado_id: 2,
-          expediente_numero: 'EXP-2024-456-CF',
-          expediente_caratula: 'RODRÍGUEZ ANA C/ GÓMEZ PEDRO S/ DIVORCIO',
-          tipo_cambio: 'nuevo_archivo',
-          descripcion: 'Nuevo archivo adjunto: Informe pericial',
-          detalles: {
-            nombre_archivo: 'informe_pericial.pdf',
-            tipo_archivo: 'Informe',
-          },
-          notificado: true,
-          leido: false,
-          fecha_deteccion: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-          created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 3,
-          expediente_monitoreado_id: 2,
-          expediente_numero: 'EXP-2024-456-CF',
-          expediente_caratula: 'RODRÍGUEZ ANA C/ GÓMEZ PEDRO S/ DIVORCIO',
-          tipo_cambio: 'cambio_estado',
-          descripcion: 'Cambio de situación: SENTENCIA',
-          detalles: {
-            estado_anterior: 'EN TRAMITE',
-            estado_nuevo: 'SENTENCIA',
-          },
-          notificado: true,
-          leido: true,
-          fecha_deteccion: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        },
-      ]
+      // Mapear respuesta al tipo del frontend
+      const cambios: CambioDetectado[] = response.cambios.map(cambio => ({
+        id: cambio.id,
+        expediente_monitoreado_id: cambio.expediente_monitoreado_id,
+        expediente_numero: cambio.expediente_numero,
+        expediente_caratula: cambio.expediente_caratula || undefined,
+        tipo_cambio: cambio.tipo_cambio,
+        descripcion: cambio.descripcion,
+        detalles: cambio.detalles || undefined,
+        notificado: cambio.notificado,
+        leido: cambio.leido,
+        fecha_deteccion: cambio.fecha_deteccion,
+        created_at: cambio.created_at,
+      }))
 
-      const cambiosFiltrados = expedienteId
-        ? mockCambios.filter(c => c.expediente_monitoreado_id === expedienteId)
-        : mockCambios
-
-      set({ cambios: cambiosFiltrados })
+      set({ cambios })
     } catch (error: any) {
       console.error('Error al listar cambios:', error)
       toast.error('Error al cargar cambios detectados')
@@ -423,11 +363,7 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
   // Marcar cambio como leído
   marcarComoLeido: async (id: number) => {
     try {
-      // TODO: Reemplazar con llamada real a la API
-      // await apiClient.patch(`/api/v1/monitoreo/cambios/${id}/leer`)
-
-      // Mock data por ahora
-      await new Promise(resolve => setTimeout(resolve, 200))
+      await monitoreoApi.marcarLeido(id)
 
       set(state => ({
         cambios: state.cambios.map(c =>
@@ -442,17 +378,13 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
   // Marcar todos como leídos
   marcarTodosLeidos: async () => {
     try {
-      // TODO: Reemplazar con llamada real a la API
-      // await apiClient.patch('/api/v1/monitoreo/cambios/leer-todos')
-
-      // Mock data por ahora
-      await new Promise(resolve => setTimeout(resolve, 300))
+      const response = await monitoreoApi.marcarTodosLeidos()
 
       set(state => ({
         cambios: state.cambios.map(c => ({ ...c, leido: true })),
       }))
 
-      toast.success('Todos los cambios marcados como leídos')
+      toast.success(`${response.cantidad_marcados} cambios marcados como leídos`)
     } catch (error: any) {
       console.error('Error al marcar todos como leídos:', error)
       toast.error('Error al marcar como leídos')
@@ -462,31 +394,23 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
   // Obtener estadísticas
   obtenerEstadisticas: async () => {
     try {
-      // Obtener estado real del scheduler
-      const estadoScheduler = await monitoreoApi.obtenerEstadoMonitoreo()
+      const response = await monitoreoApi.obtenerEstadisticas()
 
-      // Combinar con datos locales del store
       const estadisticas: EstadisticasMonitoreo = {
-        total_expedientes: get().expedientes.length,
-        expedientes_activos: get().expedientes.filter(e => e.activo).length,
-        expedientes_pausados: get().expedientes.filter(e => !e.activo).length,
-        cambios_hoy: 2, // TODO: Obtener del backend cuando esté disponible
-        cambios_semana: 8, // TODO: Obtener del backend cuando esté disponible
-        cambios_mes: 25, // TODO: Obtener del backend cuando esté disponible
-        cambios_sin_leer: get().cambios.filter(c => !c.leido).length,
-        ultima_ejecucion: estadoScheduler.proxima_ejecucion
-          ? new Date(
-              new Date(estadoScheduler.proxima_ejecucion).getTime() -
-                (estadoScheduler.intervalo_actual_minutos || 60) * 60 * 1000
-            ).toISOString()
-          : null,
-        proxima_ejecucion: estadoScheduler.proxima_ejecucion,
+        total_expedientes: response.total_expedientes,
+        expedientes_activos: response.expedientes_activos,
+        expedientes_pausados: response.expedientes_pausados,
+        cambios_hoy: response.cambios_hoy,
+        cambios_semana: response.cambios_semana,
+        cambios_mes: response.cambios_mes,
+        cambios_sin_leer: response.cambios_sin_leer,
+        ultima_ejecucion: response.ultima_ejecucion || null,
+        proxima_ejecucion: response.proxima_ejecucion || null,
       }
 
       set({ estadisticas })
     } catch (error: any) {
       console.error('Error al obtener estadísticas:', error)
-      // En caso de error, mantener datos locales
     }
   },
 

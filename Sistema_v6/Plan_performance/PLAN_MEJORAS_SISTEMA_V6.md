@@ -87,6 +87,471 @@ Este documento contiene el plan de mejoras identificadas durante la revisión ex
 | 2.4 | Centralizar logging | ⏳ Pendiente | Media | Moderada |
 | 2.5 | Health checks completos | ⏳ Pendiente | Media | Simple |
 
+### Fase 2.5: Mejoras del Sistema de Monitoreo
+
+> **Contexto:** El sistema de monitoreo actual usa ExtractorMasivo para verificar todos los expedientes (~80 segundos por extracción completa). Se identificaron mejoras para optimizar la UX y funcionalidad.
+
+#### 2.5.1 Problema Actual
+
+El botón "actualizar" en cada `MonitoreoCard` ejecuta `verificarManual()` que:
+- Extrae **todos los 2,047 expedientes** del PJN (137 páginas)
+- Tarda ~80 segundos
+- Verifica los 15 expedientes monitoreados contra el listado completo
+- El usuario espera verificación individual, no global
+
+#### 2.5.2 Tareas de Implementación
+
+| # | Tarea | Estado | Prioridad | Complejidad |
+|---|-------|--------|-----------|-------------|
+| 2.5.1 | Verificación individual por expediente | ⏳ Pendiente | Alta | Moderada |
+| 2.5.2 | Endpoint con parámetro opcional `numero_expediente` | ⏳ Pendiente | Alta | Simple |
+| 2.5.3 | Actualización inmediata de UI tras verificación | ⏳ Pendiente | Media | Simple |
+| 2.5.4 | Badge de cambios sin leer en Header/Sidebar | ⏳ Pendiente | Media | Simple |
+| 2.5.5 | Notificaciones en tiempo real (WebSockets) | ⏳ Pendiente | Baja | Compleja |
+
+#### 2.5.3 Propuesta de Solución
+
+**Backend - Endpoint modificado:**
+```python
+# presentation/api/rest/routers/monitoreo.py
+@router.post("/verificar")
+async def verificar_manual(
+    headless: bool = True,
+    numero_expediente: str | None = None,  # Nuevo parámetro opcional
+):
+    if numero_expediente:
+        # Verificación individual usando scraper directo
+        # Extrae solo actuaciones del expediente específico
+        resultado = await verificar_expediente_individual(numero_expediente, headless)
+    else:
+        # Verificación global con ExtractorMasivo (actual)
+        resultado = await verificar_todos_expedientes(headless)
+```
+
+**Frontend - API modificada:**
+```typescript
+// frontend/src/api/monitoreoApi.ts
+verificarManual: (numeroExpediente?: string) => {
+  const params = new URLSearchParams()
+  if (numeroExpediente) params.append('numero_expediente', numeroExpediente)
+  return api.post(`/api/v1/monitoreo/verificar?${params}`)
+}
+
+// frontend/src/stores/monitoreoStore.ts
+verificarExpediente: async (numero: string) => {
+  const response = await monitoreoApi.verificarManual(numero)  // Usa el número
+  // ...
+}
+```
+
+#### 2.5.4 Archivos Afectados
+
+**Backend:**
+- `presentation/api/rest/routers/monitoreo.py` - Añadir parámetro al endpoint
+- `application/use_cases/monitorear_expedientes_use_case.py` - Lógica de verificación individual
+- `presentation/api/rest/schemas/monitoreo_schemas.py` - Actualizar schemas si necesario
+
+**Frontend:**
+- `frontend/src/api/monitoreoApi.ts` - Pasar parámetro al endpoint
+- `frontend/src/stores/monitoreoStore.ts` - Usar número de expediente en verificación
+- `frontend/src/components/monitoreo/MonitoreoCard.tsx` - Pasar número al handler
+
+#### 2.5.5 Mejoras Adicionales de UX
+
+1. **Spinner en botón específico** - Mostrar loading solo en el card que se está verificando
+2. **Toast con resultado específico** - "Expediente FPA-012332-2019: sin cambios"
+3. **Actualización optimista** - Actualizar timestamp inmediatamente
+4. **Badge en Header** - Mostrar contador de cambios sin leer globalmente
+
+#### 2.5.6 Estimación de Impacto
+
+| Mejora | Tiempo actual | Tiempo estimado | Mejora |
+|--------|---------------|-----------------|--------|
+| Verificación global | ~80s | ~80s | Sin cambio |
+| Verificación individual | ~80s | ~5-10s | 8-16x más rápido |
+
+### Fase 2.6: Mejoras Completas del Frontend de Monitoreo
+
+> **Contexto:** Análisis profundo del módulo de Monitoreo reveló estado actual ~60% funcional con múltiples oportunidades de mejora en frontend, UX y funcionalidad.
+
+#### 2.6.1 Arquitectura Actual del Módulo
+
+**Frontend:**
+```
+Sistema_v6/frontend/src/
+├── types/monitoreo.ts                    (Tipos TypeScript)
+├── stores/monitoreoStore.ts              (State management con Zustand)
+├── api/monitoreoApi.ts                   (Cliente API - 22+ funciones)
+├── pages/monitoreo/
+│   └── MonitoreoPage.tsx                 (Página principal)
+├── components/monitoreo/
+│   ├── MonitoreoCard.tsx                 (Card de expediente monitoreado)
+│   └── LogsList.tsx                      (Lista de cambios detectados)
+└── components/settings/
+    └── ConfiguracionMonitoreo.tsx        (Configuración de monitoreo)
+```
+
+**Backend:**
+```
+Sistema_v6/
+├── presentation/api/rest/routers/monitoreo.py
+├── application/services/monitoreo_service.py
+├── infrastructure/persistence/monitoreo_repository.py
+└── presentation/api/rest/schemas/monitoreo_schemas.py
+```
+
+#### 2.6.2 Fixes Críticos (Prioridad Alta)
+
+| # | Tarea | Estado | Complejidad | Descripción |
+|---|-------|--------|-------------|-------------|
+| FIX-MON-01 | Mapeo de tipos de cambio | ⏳ Pendiente | Baja | Frontend usa [nueva_actuacion, cambio_estado, nuevo_archivo, modificacion, otro], Backend usa [cambio_situacion, cambio_dependencia, cambio_caratula] |
+| FIX-MON-02 | Sincronizar endpoints de configuración | ⏳ Pendiente | Media | ConfiguracionMonitoreo.tsx usa `/api/v1/config/sistema`, MonitoreoStore usa `/api/v1/monitoreo/configuracion` |
+| FIX-MON-03 | usuario_id hardcodeado | ⏳ Pendiente | Media | Backend usa `usuario_id=1` para todos los usuarios (línea 310) |
+
+**Detalle FIX-MON-01: Mapeo de tipos de cambio**
+
+**Problema:** Mismatch entre tipos frontend/backend causa que cambios no se muestren correctamente.
+
+**Archivos a modificar:**
+- `frontend/src/types/monitoreo.ts` - Actualizar `TipoCambio`
+- `frontend/src/stores/monitoreoStore.ts` - Mapear tipos del backend
+
+**Implementación:**
+```typescript
+// types/monitoreo.ts
+export type TipoCambio =
+  | 'nueva_actuacion'
+  | 'cambio_situacion'    // Antes: cambio_estado
+  | 'cambio_dependencia'  // Nuevo
+  | 'cambio_caratula'     // Nuevo
+  | 'nuevo_archivo'
+  | 'modificacion'
+  | 'otro'
+```
+
+---
+
+**Detalle FIX-MON-02: Sincronizar endpoints de configuración**
+
+**Problema:** Dos fuentes de verdad para configuración de monitoreo.
+
+**Archivos a modificar:**
+- `frontend/src/components/settings/ConfiguracionMonitoreo.tsx` - Usar endpoint de monitoreo
+
+**Implementación:**
+```typescript
+// ConfiguracionMonitoreo.tsx - Cambiar endpoint
+const cargarConfiguracion = async () => {
+  // Antes: fetch('/api/v1/config/sistema')
+  const response = await fetch('/api/v1/monitoreo/configuracion')
+  // ...
+}
+```
+
+---
+
+**Detalle FIX-MON-03: usuario_id hardcodeado**
+
+**Problema:** Todos los usuarios ven los mismos expedientes monitoreados.
+
+**Archivos a modificar:**
+- `presentation/api/rest/routers/monitoreo.py` - Obtener usuario del JWT
+
+**Implementación:**
+```python
+# routers/monitoreo.py
+from presentation.api.rest.dependencies import get_current_user
+
+@router.get("/expedientes")
+async def listar_expedientes(
+    current_user: Usuario = Depends(get_current_user)
+):
+    # Antes: usuario_id=1
+    usuario_id = current_user.id
+    return await monitoreo_service.listar_expedientes(usuario_id)
+```
+
+#### 2.6.3 Mejoras de UX (Prioridad Media)
+
+| # | Tarea | Estado | Complejidad | Descripción |
+|---|-------|--------|-------------|-------------|
+| UX-MON-01 | Búsqueda y filtrado avanzado | ⏳ Pendiente | Media | Filtrar expedientes por estado, prioridad, fecha. Buscar en cambios |
+| UX-MON-02 | Mejorar MonitoreoCard | ⏳ Pendiente | Baja | Mostrar prioridad, notas, tiempo estimado próxima verificación |
+| UX-MON-03 | Historial completo con exportación | ⏳ Pendiente | Baja | Exportar historial a CSV, filtrar por rango de fechas |
+| UX-MON-04 | Store con paginación | ⏳ Pendiente | Media | No cargar todo a memoria, paginar en store |
+| UX-MON-05 | Agregar expedientes en bulk | ⏳ Pendiente | Media | Importar desde CSV o selección múltiple |
+
+**Detalle UX-MON-01: Búsqueda y filtrado**
+
+**Archivos a crear/modificar:**
+- `frontend/src/components/monitoreo/MonitoreoFilters.tsx` - Nuevo componente de filtros
+- `frontend/src/pages/monitoreo/MonitoreoPage.tsx` - Integrar filtros
+- `frontend/src/stores/monitoreoStore.ts` - Estado de filtros
+
+**Implementación UI:**
+```typescript
+// MonitoreoFilters.tsx
+interface MonitoreoFiltersProps {
+  onFilter: (filters: MonitoreoFilterState) => void
+}
+
+interface MonitoreoFilterState {
+  busqueda: string
+  estado: 'todos' | 'activo' | 'pausado' | 'error'
+  prioridad: 'todos' | 'alta' | 'media' | 'baja'
+  conCambios: boolean
+  fechaDesde?: Date
+  fechaHasta?: Date
+}
+```
+
+---
+
+**Detalle UX-MON-02: Mejorar MonitoreoCard**
+
+**Archivos a modificar:**
+- `frontend/src/components/monitoreo/MonitoreoCard.tsx`
+
+**Campos adicionales a mostrar:**
+- Prioridad (alta/media/baja) con color
+- Notas del usuario
+- Tiempo estimado próxima verificación
+- Progreso si verificación en curso
+
+---
+
+**Detalle UX-MON-03: Historial con exportación**
+
+**Archivos a crear/modificar:**
+- `frontend/src/components/monitoreo/LogsList.tsx` - Agregar botón exportar
+- `frontend/src/api/monitoreoApi.ts` - Endpoint de exportación
+- `presentation/api/rest/routers/monitoreo.py` - Endpoint `/cambios/exportar`
+
+**Implementación backend:**
+```python
+@router.get("/cambios/exportar")
+async def exportar_cambios(
+    formato: Literal["csv", "json"] = "csv",
+    fecha_desde: date | None = None,
+    fecha_hasta: date | None = None
+):
+    cambios = await monitoreo_service.obtener_cambios(fecha_desde, fecha_hasta)
+    if formato == "csv":
+        return StreamingResponse(
+            generar_csv(cambios),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=cambios.csv"}
+        )
+    return cambios
+```
+
+---
+
+**Detalle UX-MON-05: Agregar expedientes en bulk**
+
+**Archivos a crear/modificar:**
+- `frontend/src/components/monitoreo/BulkImportDialog.tsx` - Modal de importación
+- `presentation/api/rest/routers/monitoreo.py` - Endpoint `/expedientes/bulk`
+
+**Implementación:**
+```python
+@router.post("/expedientes/bulk")
+async def agregar_expedientes_bulk(
+    expedientes: list[str]  # Lista de números de expediente
+):
+    resultados = []
+    for numero in expedientes:
+        try:
+            exp = await monitoreo_service.agregar_expediente(numero)
+            resultados.append({"numero": numero, "status": "ok", "id": exp.id})
+        except Exception as e:
+            resultados.append({"numero": numero, "status": "error", "error": str(e)})
+    return {"total": len(expedientes), "resultados": resultados}
+```
+
+#### 2.6.4 Tiempo Real (Prioridad Media-Alta)
+
+| # | Tarea | Estado | Complejidad | Descripción |
+|---|-------|--------|-------------|-------------|
+| RT-MON-01 | WebSocket para notificaciones | ⏳ Pendiente | Alta | Notificaciones inmediatas sin polling |
+| RT-MON-02 | Reemplazar polling 10s | ⏳ Pendiente | Media | Reducir carga en servidor y mejorar UX |
+
+**Detalle RT-MON-01: WebSocket**
+
+**Archivos a crear:**
+- `presentation/api/rest/websockets/monitoreo_ws.py` - WebSocket endpoint
+- `frontend/src/hooks/useMonitoreoWebSocket.ts` - Hook de conexión WS
+- `frontend/src/stores/monitoreoStore.ts` - Integrar WS con store
+
+**Implementación backend:**
+```python
+# presentation/api/rest/websockets/monitoreo_ws.py
+from fastapi import WebSocket, WebSocketDisconnect
+
+class MonitoreoConnectionManager:
+    def __init__(self):
+        self.active_connections: dict[int, list[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, usuario_id: int):
+        await websocket.accept()
+        if usuario_id not in self.active_connections:
+            self.active_connections[usuario_id] = []
+        self.active_connections[usuario_id].append(websocket)
+
+    async def broadcast_cambio(self, usuario_id: int, cambio: dict):
+        if usuario_id in self.active_connections:
+            for ws in self.active_connections[usuario_id]:
+                await ws.send_json(cambio)
+
+manager = MonitoreoConnectionManager()
+
+@router.websocket("/ws/{usuario_id}")
+async def websocket_endpoint(websocket: WebSocket, usuario_id: int):
+    await manager.connect(websocket, usuario_id)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Manejar mensajes del cliente (ej: ping)
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, usuario_id)
+```
+
+**Implementación frontend:**
+```typescript
+// hooks/useMonitoreoWebSocket.ts
+export function useMonitoreoWebSocket(usuarioId: number) {
+  const { agregarCambio } = useMonitoreoStore()
+
+  useEffect(() => {
+    const ws = new WebSocket(`ws://localhost:8000/api/v1/monitoreo/ws/${usuarioId}`)
+
+    ws.onmessage = (event) => {
+      const cambio = JSON.parse(event.data)
+      agregarCambio(cambio)
+      toast.success(`Nuevo cambio en ${cambio.expediente_numero}`)
+    }
+
+    return () => ws.close()
+  }, [usuarioId])
+}
+```
+
+#### 2.6.5 Integraciones (Prioridad Media)
+
+| # | Tarea | Estado | Complejidad | Descripción |
+|---|-------|--------|-------------|-------------|
+| INT-MON-01 | Dashboard widget | ⏳ Pendiente | Media | Mostrar cambios recientes en página principal |
+| INT-MON-02 | Botón "Monitorear" en Expediente | ⏳ Pendiente | Baja | Agregar botón en ExpedienteDetallePage |
+| INT-MON-03 | Integración con IA | ⏳ Pendiente | Alta | Análisis automático de cambios detectados |
+| INT-MON-04 | Reportes periódicos | ⏳ Pendiente | Media | Enviar resúmenes diarios/semanales |
+
+**Detalle INT-MON-01: Dashboard widget**
+
+**Archivos a crear/modificar:**
+- `frontend/src/components/dashboard/CambiosRecientesWidget.tsx` - Nuevo widget
+- `frontend/src/pages/DashboardPage.tsx` - Integrar widget
+
+**Implementación:**
+```typescript
+// CambiosRecientesWidget.tsx
+export function CambiosRecientesWidget() {
+  const { cambiosRecientes, isLoading } = useMonitoreoStore()
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Cambios Recientes</CardTitle>
+        <Link to="/monitoreo">Ver todos</Link>
+      </CardHeader>
+      <CardContent>
+        {cambiosRecientes.slice(0, 5).map(cambio => (
+          <CambioItem key={cambio.id} cambio={cambio} />
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+---
+
+**Detalle INT-MON-02: Botón "Monitorear"**
+
+**Archivos a modificar:**
+- `frontend/src/pages/expedientes/ExpedienteDetallePage.tsx`
+
+**Implementación:**
+```typescript
+// ExpedienteDetallePage.tsx
+const handleAgregarMonitoreo = async () => {
+  try {
+    await monitoreoApi.agregarExpediente(expediente.numero)
+    toast.success('Expediente agregado al monitoreo')
+  } catch (error) {
+    toast.error('Error al agregar al monitoreo')
+  }
+}
+
+// En el header del expediente
+<Button onClick={handleAgregarMonitoreo}>
+  <Eye className="h-4 w-4 mr-2" />
+  Monitorear
+</Button>
+```
+
+---
+
+**Detalle INT-MON-03: Integración con IA**
+
+**Archivos a crear:**
+- `application/services/ia/analizador_cambios.py` - Servicio de análisis
+- `presentation/api/rest/routers/monitoreo.py` - Endpoint `/cambios/{id}/analizar`
+
+**Funcionalidades:**
+- Resumir cambios detectados con LLM
+- Detectar patrones en cambios históricos
+- Sugerir acciones basadas en tipo de cambio
+- Clasificar urgencia del cambio
+
+**Implementación:**
+```python
+# application/services/ia/analizador_cambios.py
+class AnalizadorCambiosService:
+    async def analizar_cambio(self, cambio: CambioDetectado) -> AnalisisCambio:
+        prompt = f"""
+        Analiza el siguiente cambio en un expediente judicial:
+        - Tipo: {cambio.tipo_cambio}
+        - Fecha: {cambio.fecha_deteccion}
+        - Detalles: {json.dumps(cambio.detalles)}
+
+        Proporciona:
+        1. Resumen en una oración
+        2. Nivel de urgencia (alta/media/baja)
+        3. Acciones sugeridas
+        """
+        return await self.llm_service.generar(prompt)
+```
+
+#### 2.6.6 Resumen de Estimaciones
+
+| Categoría | Tareas | Tiempo Total Estimado |
+|-----------|--------|----------------------|
+| Fixes Críticos | 3 | 4-6 horas |
+| Mejoras UX | 5 | 12-16 horas |
+| Tiempo Real | 2 | 8-12 horas |
+| Integraciones | 4 | 10-14 horas |
+| **Total** | **14** | **34-48 horas** |
+
+#### 2.6.7 Orden de Implementación Recomendado
+
+1. **Semana 1:** Fixes Críticos (FIX-MON-01, 02, 03)
+2. **Semana 2:** Mejoras UX básicas (UX-MON-01, 02)
+3. **Semana 3:** WebSocket y tiempo real (RT-MON-01, 02)
+4. **Semana 4:** Integraciones (INT-MON-01, 02, 04)
+5. **Semana 5:** Mejoras avanzadas (UX-MON-03, 04, 05, INT-MON-03)
+
+---
+
 ### Fase 3: Nuevas Funcionalidades
 
 | # | Tarea | Estado | Prioridad | Complejidad |
@@ -444,6 +909,7 @@ pytest tests/
 | 2025-11-23 | 2.3 | SEC-002/004: Implementación revertida - causó error "Field required" en login |
 | 2025-11-23 | 2.4 | Fix login Python 3.13: remover future annotations, agregar has_pjn_credentials property |
 | 2025-11-23 | 2.5 | Implementar paginación real en GET /expedientes: query params pagina, por_pagina |
+| 2025-11-24 | 2.6 | Agregada Fase 2.6 - Mejoras Completas del Frontend de Monitoreo (14 tareas, ~34-48h estimadas) |
 
 ---
 
@@ -774,4 +1240,4 @@ pytest tests/
 ---
 
 *Documento generado para seguimiento por agente IA - Sistema PJN v6*
-*Actualizado: 2025-11-23 - v2.2 - APScheduler agregado, SEC-003 resuelto*
+*Actualizado: 2025-11-24 - v2.6 - Mejoras completas del Frontend de Monitoreo (14 tareas)*

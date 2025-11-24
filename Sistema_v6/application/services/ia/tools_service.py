@@ -14,6 +14,7 @@ from sqlalchemy import text
 from infrastructure.persistence.database import get_db, SessionLocal
 from infrastructure.adapters.repositories.json_expediente_repository import JsonExpedienteRepository
 from infrastructure.adapters.repositories.json_actuacion_repository import JsonActuacionRepository
+from application.services.monitoreo_service import MonitoreoService
 
 logger = logging.getLogger(__name__)
 
@@ -1149,6 +1150,274 @@ class ToolsService:
         return resumen
 
     # ============================================================
+    # CATEGORIA 7: MONITOREO (8 tools)
+    # ============================================================
+
+    def _get_monitoreo_service(self) -> MonitoreoService:
+        """Obtiene instancia del servicio de monitoreo."""
+        return MonitoreoService()
+
+    def estado_monitoreo(self) -> Dict[str, Any]:
+        """
+        Obtiene el estado actual del sistema de monitoreo.
+
+        Returns:
+            Dict con estado del monitoreo (activo, ejecutando, etc)
+        """
+        service = self._get_monitoreo_service()
+        usuario_id = 1  # Usuario por defecto
+
+        config = service.obtener_configuracion(usuario_id)
+        stats = service.obtener_estadisticas(usuario_id)
+
+        return {
+            "activo": config.get('activo', False),
+            "frecuencia": config.get('frecuencia', 'desconocida'),
+            "notificar_email": config.get('notificar_email', False),
+            "notificar_sistema": config.get('notificar_sistema', True),
+            "total_expedientes_monitoreados": stats.get('total_expedientes', 0),
+            "expedientes_activos": stats.get('expedientes_activos', 0),
+            "cambios_sin_leer": stats.get('cambios_sin_leer', 0),
+            "ultima_ejecucion": stats.get('ultima_ejecucion'),
+            "proxima_ejecucion": stats.get('proxima_ejecucion')
+        }
+
+    def listar_expedientes_monitoreados(
+        self,
+        solo_activos: bool = False,
+        limite: int = 50
+    ) -> List[Dict[str, Any]]:
+        """
+        Lista los expedientes que están siendo monitoreados.
+
+        Args:
+            solo_activos: Solo mostrar expedientes con monitoreo activo
+            limite: Máximo de resultados
+
+        Returns:
+            Lista de expedientes monitoreados
+        """
+        service = self._get_monitoreo_service()
+        usuario_id = 1
+
+        resultado = service.listar_expedientes(
+            usuario_id=usuario_id,
+            solo_activos=solo_activos,
+            pagina=1,
+            por_pagina=limite
+        )
+
+        return resultado.get('expedientes', [])
+
+    def listar_cambios_monitoreo(
+        self,
+        solo_no_leidos: bool = False,
+        tipo_cambio: Optional[str] = None,
+        expediente_numero: Optional[str] = None,
+        limite: int = 50
+    ) -> Dict[str, Any]:
+        """
+        Lista los cambios detectados por el monitoreo.
+
+        Args:
+            solo_no_leidos: Solo cambios no leídos
+            tipo_cambio: Filtrar por tipo (nueva_actuacion, cambio_estado, etc)
+            expediente_numero: Filtrar por expediente específico
+            limite: Máximo de resultados
+
+        Returns:
+            Dict con cambios y total no leídos
+        """
+        service = self._get_monitoreo_service()
+        usuario_id = 1
+
+        resultado = service.listar_cambios(
+            usuario_id=usuario_id,
+            solo_no_leidos=solo_no_leidos,
+            tipo_cambio=tipo_cambio,
+            expediente_numero=expediente_numero,
+            pagina=1,
+            por_pagina=limite
+        )
+
+        return {
+            "cambios": resultado.get('cambios', []),
+            "total_no_leidos": resultado.get('total_no_leidos', 0)
+        }
+
+    def estadisticas_monitoreo(self) -> Dict[str, Any]:
+        """
+        Obtiene estadísticas del sistema de monitoreo.
+
+        Returns:
+            Dict con métricas de monitoreo
+        """
+        service = self._get_monitoreo_service()
+        usuario_id = 1
+
+        return service.obtener_estadisticas(usuario_id)
+
+    def sincronizar_expedientes_monitoreo(self) -> Dict[str, Any]:
+        """
+        Sincroniza expedientes del sistema principal al monitoreo.
+
+        Returns:
+            Dict con resultado de la sincronización
+        """
+        service = self._get_monitoreo_service()
+        usuario_id = 1
+
+        # Obtener expedientes del sistema principal
+        try:
+            from infrastructure.adapters.repositories.json_expediente_repository import JsonExpedienteRepository
+            repo = JsonExpedienteRepository()
+            expedientes_sistema = repo.obtener_todos()
+        except Exception as e:
+            return {
+                "success": False,
+                "mensaje": f"Error obteniendo expedientes del sistema: {str(e)}",
+                "total_sistema": 0,
+                "nuevos_monitoreados": 0,
+                "ya_monitoreados": 0
+            }
+
+        if not expedientes_sistema:
+            return {
+                "success": True,
+                "mensaje": "No hay expedientes en el sistema para sincronizar",
+                "total_sistema": 0,
+                "nuevos_monitoreados": 0,
+                "ya_monitoreados": 0
+            }
+
+        nuevos = 0
+        ya_existentes = 0
+        errores = []
+
+        for exp in expedientes_sistema:
+            try:
+                service.agregar_expediente(
+                    usuario_id=usuario_id,
+                    expediente_numero=exp.numero,
+                    expediente_caratula=exp.caratula,
+                    expediente_dependencia=exp.dependencia,
+                    prioridad='media'
+                )
+                nuevos += 1
+            except ValueError as e:
+                if "ya está siendo monitoreado" in str(e):
+                    ya_existentes += 1
+                else:
+                    errores.append(f"{exp.numero}: {str(e)}")
+            except Exception as e:
+                errores.append(f"{exp.numero}: {str(e)}")
+
+        resultado = {
+            "success": True,
+            "mensaje": f"Sincronización completada: {nuevos} nuevos, {ya_existentes} ya monitoreados",
+            "total_sistema": len(expedientes_sistema),
+            "nuevos_monitoreados": nuevos,
+            "ya_monitoreados": ya_existentes
+        }
+
+        if errores:
+            resultado["errores"] = errores[:10]
+
+        return resultado
+
+    def agregar_expediente_monitoreo(
+        self,
+        expediente_numero: str,
+        prioridad: str = "media",
+        notas: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Agrega un expediente al sistema de monitoreo.
+
+        Args:
+            expediente_numero: Número del expediente a monitorear
+            prioridad: Prioridad del monitoreo (baja, media, alta)
+            notas: Notas adicionales
+
+        Returns:
+            Dict con expediente agregado
+        """
+        service = self._get_monitoreo_service()
+        usuario_id = 1
+
+        try:
+            resultado = service.agregar_expediente(
+                usuario_id=usuario_id,
+                expediente_numero=expediente_numero,
+                prioridad=prioridad,
+                notas=notas
+            )
+            return {
+                "success": True,
+                "mensaje": f"Expediente {expediente_numero} agregado al monitoreo",
+                "expediente": resultado
+            }
+        except ValueError as e:
+            return {
+                "success": False,
+                "mensaje": str(e)
+            }
+
+    def pausar_expediente_monitoreo(self, expediente_numero: str) -> Dict[str, Any]:
+        """
+        Pausa el monitoreo de un expediente.
+
+        Args:
+            expediente_numero: Número del expediente
+
+        Returns:
+            Dict con resultado
+        """
+        service = self._get_monitoreo_service()
+        usuario_id = 1
+
+        resultado = service.pausar_expediente(usuario_id, expediente_numero)
+
+        if resultado:
+            return {
+                "success": True,
+                "mensaje": f"Monitoreo de {expediente_numero} pausado",
+                "expediente": resultado
+            }
+        else:
+            return {
+                "success": False,
+                "mensaje": f"Expediente {expediente_numero} no encontrado en monitoreo"
+            }
+
+    def reanudar_expediente_monitoreo(self, expediente_numero: str) -> Dict[str, Any]:
+        """
+        Reanuda el monitoreo de un expediente pausado.
+
+        Args:
+            expediente_numero: Número del expediente
+
+        Returns:
+            Dict con resultado
+        """
+        service = self._get_monitoreo_service()
+        usuario_id = 1
+
+        resultado = service.reanudar_expediente(usuario_id, expediente_numero)
+
+        if resultado:
+            return {
+                "success": True,
+                "mensaje": f"Monitoreo de {expediente_numero} reanudado",
+                "expediente": resultado
+            }
+        else:
+            return {
+                "success": False,
+                "mensaje": f"Expediente {expediente_numero} no encontrado en monitoreo"
+            }
+
+    # ============================================================
     # UTILIDADES
     # ============================================================
 
@@ -1414,6 +1683,15 @@ class ToolsService:
             "clasificacion_ia": self.clasificacion_ia,
             "actuaciones_importantes": self.actuaciones_importantes,
             "resumen_expediente": self.resumen_expediente,
+            # Monitoreo
+            "estado_monitoreo": self.estado_monitoreo,
+            "listar_expedientes_monitoreados": self.listar_expedientes_monitoreados,
+            "listar_cambios_monitoreo": self.listar_cambios_monitoreo,
+            "estadisticas_monitoreo": self.estadisticas_monitoreo,
+            "sincronizar_expedientes_monitoreo": self.sincronizar_expedientes_monitoreo,
+            "agregar_expediente_monitoreo": self.agregar_expediente_monitoreo,
+            "pausar_expediente_monitoreo": self.pausar_expediente_monitoreo,
+            "reanudar_expediente_monitoreo": self.reanudar_expediente_monitoreo,
         }
 
         if tool_name not in tool_map:

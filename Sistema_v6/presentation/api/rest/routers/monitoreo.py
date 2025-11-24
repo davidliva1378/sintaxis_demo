@@ -13,13 +13,24 @@ from infrastructure.di_container import get_container
 from infrastructure.exceptions import PJNError
 
 from ..schemas.monitoreo_schemas import (
+    ActualizarConfiguracionRequest,
+    ActualizarExpedienteRequest,
+    AgregarExpedienteRequest,
     CambioDetectadoResponse,
+    ConfiguracionMonitoreoResponse,
+    EstadisticasMonitoreoResponse,
     EstadoMonitoreoResponse,
+    ExpedienteMonitoreado,
     IniciarMonitoreoRequest,
+    ListaCambiosResponse,
+    ListaExpedientesResponse,
+    MarcarLeidoResponse,
     MonitoreoResponse,
     StartSchedulerResponse,
     StopSchedulerResponse,
 )
+
+from application.services.monitoreo_service import MonitoreoService
 
 logger = logging.getLogger(__name__)
 
@@ -232,10 +243,14 @@ async def obtener_estado_monitoreo():
 
 
 @router.post("/verificar", response_model=MonitoreoResponse, status_code=status.HTTP_200_OK)
-async def verificar_manual():
+async def verificar_manual(headless: bool = True):
     """Ejecuta una verificación manual inmediata (sin afectar el scheduler).
 
     Útil para verificar cambios manualmente sin esperar al próximo ciclo programado.
+
+    Args:
+        headless: Si True (default), ejecuta el navegador sin interfaz gráfica.
+                  Si False, muestra el navegador para depuración visual.
 
     Returns:
         MonitoreoResponse con cambios detectados
@@ -243,14 +258,14 @@ async def verificar_manual():
     Raises:
         HTTPException: Si hay error en la verificación
     """
-    logger.info("POST /monitoreo/verificar")
+    logger.info(f"POST /monitoreo/verificar (headless={headless})")
 
     try:
         container = get_container()
         scheduler = container.monitor_scheduler
 
         # Ejecutar verificación manual
-        resultado = await scheduler.ejecutar_verificacion_manual()
+        resultado = await scheduler.ejecutar_verificacion_manual(headless=headless)
 
         if resultado["exito"]:
             # Convertir cambios a response
@@ -285,3 +300,337 @@ async def verificar_manual():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error interno: {str(e)}",
         )
+
+
+# ============================================================================
+# NUEVOS ENDPOINTS CRUD PARA MONITOREO
+# ============================================================================
+
+# TODO: Obtener usuario_id de JWT auth. Por ahora hardcodeado para testing.
+def _get_usuario_id() -> int:
+    return 1
+
+
+def _get_service() -> MonitoreoService:
+    return MonitoreoService()
+
+
+# --- CONFIGURACION ---
+
+@router.get("/configuracion", response_model=ConfiguracionMonitoreoResponse)
+async def obtener_configuracion():
+    """Obtiene la configuración de monitoreo del usuario."""
+    logger.info("GET /monitoreo/configuracion")
+    try:
+        service = _get_service()
+        config = service.obtener_configuracion(_get_usuario_id())
+        return ConfiguracionMonitoreoResponse(**config)
+    except Exception as e:
+        logger.exception("Error obteniendo configuración")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/configuracion", response_model=ConfiguracionMonitoreoResponse)
+async def actualizar_configuracion(request: ActualizarConfiguracionRequest):
+    """Actualiza la configuración de monitoreo del usuario."""
+    logger.info("PUT /monitoreo/configuracion")
+    try:
+        service = _get_service()
+        config = service.actualizar_configuracion(
+            usuario_id=_get_usuario_id(),
+            activo=request.activo,
+            frecuencia=request.frecuencia,
+            notificar_email=request.notificar_email,
+            notificar_sistema=request.notificar_sistema,
+            hora_inicio=request.hora_inicio,
+            hora_fin=request.hora_fin,
+            dias_semana=request.dias_semana
+        )
+        return ConfiguracionMonitoreoResponse(**config)
+    except Exception as e:
+        logger.exception("Error actualizando configuración")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- EXPEDIENTES MONITOREADOS ---
+
+@router.get("/expedientes", response_model=ListaExpedientesResponse)
+async def listar_expedientes(
+    solo_activos: bool = False,
+    pagina: int = 1,
+    por_pagina: int = 50
+):
+    """Lista los expedientes monitoreados del usuario."""
+    logger.info(f"GET /monitoreo/expedientes?solo_activos={solo_activos}")
+    try:
+        service = _get_service()
+        resultado = service.listar_expedientes(
+            usuario_id=_get_usuario_id(),
+            solo_activos=solo_activos,
+            pagina=pagina,
+            por_pagina=por_pagina
+        )
+        return ListaExpedientesResponse(
+            expedientes=[ExpedienteMonitoreado(**exp) for exp in resultado['expedientes']],
+            total=resultado['total'],
+            pagina=resultado['pagina'],
+            por_pagina=resultado['por_pagina'],
+            total_paginas=resultado['total_paginas']
+        )
+    except Exception as e:
+        logger.exception("Error listando expedientes")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/expedientes", response_model=ExpedienteMonitoreado, status_code=201)
+async def agregar_expediente(request: AgregarExpedienteRequest):
+    """Agrega un expediente al monitoreo."""
+    logger.info(f"POST /monitoreo/expedientes - {request.expediente_numero}")
+    try:
+        service = _get_service()
+        exp = service.agregar_expediente(
+            usuario_id=_get_usuario_id(),
+            expediente_numero=request.expediente_numero,
+            expediente_caratula=request.expediente_caratula,
+            expediente_dependencia=request.expediente_dependencia,
+            prioridad=request.prioridad,
+            notas=request.notas
+        )
+        return ExpedienteMonitoreado(**exp)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        logger.exception("Error agregando expediente")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/expedientes/{expediente_numero}", response_model=ExpedienteMonitoreado)
+async def obtener_expediente(expediente_numero: str):
+    """Obtiene un expediente monitoreado específico."""
+    logger.info(f"GET /monitoreo/expedientes/{expediente_numero}")
+    try:
+        service = _get_service()
+        exp = service.obtener_expediente(_get_usuario_id(), expediente_numero)
+        if not exp:
+            raise HTTPException(status_code=404, detail="Expediente no encontrado")
+        return ExpedienteMonitoreado(**exp)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error obteniendo expediente")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/expedientes/{expediente_numero}", response_model=ExpedienteMonitoreado)
+async def actualizar_expediente(expediente_numero: str, request: ActualizarExpedienteRequest):
+    """Actualiza un expediente monitoreado."""
+    logger.info(f"PUT /monitoreo/expedientes/{expediente_numero}")
+    try:
+        service = _get_service()
+        exp = service.actualizar_expediente(
+            usuario_id=_get_usuario_id(),
+            expediente_numero=expediente_numero,
+            activo=request.activo,
+            prioridad=request.prioridad,
+            notas=request.notas
+        )
+        if not exp:
+            raise HTTPException(status_code=404, detail="Expediente no encontrado")
+        return ExpedienteMonitoreado(**exp)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error actualizando expediente")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/expedientes/{expediente_numero}")
+async def eliminar_expediente(expediente_numero: str):
+    """Elimina un expediente del monitoreo."""
+    logger.info(f"DELETE /monitoreo/expedientes/{expediente_numero}")
+    try:
+        service = _get_service()
+        deleted = service.eliminar_expediente(_get_usuario_id(), expediente_numero)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Expediente no encontrado")
+        return {"success": True, "mensaje": f"Expediente {expediente_numero} eliminado"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error eliminando expediente")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/expedientes/{expediente_numero}/pausar", response_model=ExpedienteMonitoreado)
+async def pausar_expediente(expediente_numero: str):
+    """Pausa el monitoreo de un expediente."""
+    logger.info(f"POST /monitoreo/expedientes/{expediente_numero}/pausar")
+    try:
+        service = _get_service()
+        exp = service.pausar_expediente(_get_usuario_id(), expediente_numero)
+        if not exp:
+            raise HTTPException(status_code=404, detail="Expediente no encontrado")
+        return ExpedienteMonitoreado(**exp)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error pausando expediente")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/expedientes/{expediente_numero}/reanudar", response_model=ExpedienteMonitoreado)
+async def reanudar_expediente(expediente_numero: str):
+    """Reanuda el monitoreo de un expediente."""
+    logger.info(f"POST /monitoreo/expedientes/{expediente_numero}/reanudar")
+    try:
+        service = _get_service()
+        exp = service.reanudar_expediente(_get_usuario_id(), expediente_numero)
+        if not exp:
+            raise HTTPException(status_code=404, detail="Expediente no encontrado")
+        return ExpedienteMonitoreado(**exp)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error reanudando expediente")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sincronizar")
+async def sincronizar_expedientes():
+    """Sincroniza todos los expedientes del sistema principal con el monitoreo.
+
+    Este endpoint registra automáticamente todos los expedientes que están
+    en el sistema principal pero no están siendo monitoreados.
+
+    Returns:
+        dict con cantidad de expedientes sincronizados
+    """
+    logger.info("POST /monitoreo/sincronizar")
+    try:
+        # Obtener expedientes del sistema principal
+        container = get_container()
+        expediente_repo = container.expediente_repo
+        expedientes_sistema = await expediente_repo.obtener_todos()
+
+        if not expedientes_sistema:
+            return {
+                "success": True,
+                "mensaje": "No hay expedientes en el sistema para sincronizar",
+                "total_sistema": 0,
+                "nuevos_monitoreados": 0,
+                "ya_monitoreados": 0
+            }
+
+        # Obtener servicio de monitoreo
+        service = _get_service()
+        usuario_id = _get_usuario_id()
+
+        nuevos = 0
+        ya_existentes = 0
+        errores = []
+
+        for exp in expedientes_sistema:
+            try:
+                # Intentar agregar al monitoreo
+                service.agregar_expediente(
+                    usuario_id=usuario_id,
+                    expediente_numero=exp.numero,
+                    expediente_caratula=exp.caratula,
+                    expediente_dependencia=exp.dependencia,
+                    prioridad='media'
+                )
+                nuevos += 1
+            except ValueError as e:
+                # Ya existe en monitoreo
+                if "ya está siendo monitoreado" in str(e):
+                    ya_existentes += 1
+                else:
+                    errores.append(f"{exp.numero}: {str(e)}")
+            except Exception as e:
+                errores.append(f"{exp.numero}: {str(e)}")
+
+        resultado = {
+            "success": True,
+            "mensaje": f"Sincronización completada: {nuevos} nuevos, {ya_existentes} ya monitoreados",
+            "total_sistema": len(expedientes_sistema),
+            "nuevos_monitoreados": nuevos,
+            "ya_monitoreados": ya_existentes
+        }
+
+        if errores:
+            resultado["errores"] = errores[:10]  # Limitar a 10 errores
+
+        return resultado
+
+    except Exception as e:
+        logger.exception("Error sincronizando expedientes")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- CAMBIOS DETECTADOS ---
+
+@router.get("/cambios", response_model=ListaCambiosResponse)
+async def listar_cambios(
+    solo_no_leidos: bool = False,
+    tipo_cambio: str | None = None,
+    expediente_numero: str | None = None,
+    pagina: int = 1,
+    por_pagina: int = 50
+):
+    """Lista los cambios detectados."""
+    logger.info(f"GET /monitoreo/cambios?solo_no_leidos={solo_no_leidos}")
+    try:
+        service = _get_service()
+        resultado = service.listar_cambios(
+            usuario_id=_get_usuario_id(),
+            solo_no_leidos=solo_no_leidos,
+            tipo_cambio=tipo_cambio,
+            expediente_numero=expediente_numero,
+            pagina=pagina,
+            por_pagina=por_pagina
+        )
+        return ListaCambiosResponse(**resultado)
+    except Exception as e:
+        logger.exception("Error listando cambios")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/cambios/{cambio_id}/marcar-leido", response_model=MarcarLeidoResponse)
+async def marcar_cambio_leido(cambio_id: int):
+    """Marca un cambio como leído."""
+    logger.info(f"POST /monitoreo/cambios/{cambio_id}/marcar-leido")
+    try:
+        service = _get_service()
+        marcado = service.marcar_leido(cambio_id)
+        return MarcarLeidoResponse(success=marcado, cantidad_marcados=1 if marcado else 0)
+    except Exception as e:
+        logger.exception("Error marcando cambio leído")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/cambios/marcar-todos-leidos", response_model=MarcarLeidoResponse)
+async def marcar_todos_leidos():
+    """Marca todos los cambios como leídos."""
+    logger.info("POST /monitoreo/cambios/marcar-todos-leidos")
+    try:
+        service = _get_service()
+        cantidad = service.marcar_todos_leidos(_get_usuario_id())
+        return MarcarLeidoResponse(success=True, cantidad_marcados=cantidad)
+    except Exception as e:
+        logger.exception("Error marcando todos leídos")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- ESTADISTICAS ---
+
+@router.get("/estadisticas", response_model=EstadisticasMonitoreoResponse)
+async def obtener_estadisticas():
+    """Obtiene estadísticas del monitoreo."""
+    logger.info("GET /monitoreo/estadisticas")
+    try:
+        service = _get_service()
+        stats = service.obtener_estadisticas(_get_usuario_id())
+        return EstadisticasMonitoreoResponse(**stats)
+    except Exception as e:
+        logger.exception("Error obteniendo estadísticas")
+        raise HTTPException(status_code=500, detail=str(e))

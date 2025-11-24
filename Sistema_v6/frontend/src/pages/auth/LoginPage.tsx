@@ -32,9 +32,17 @@ export default function LoginPage() {
       await login(data.username, data.password)
       navigate('/dashboard')
     } catch (error: any) {
-      setError('root', {
-        message: error.response?.data?.detail || 'Error al iniciar sesión',
-      })
+      const detail = error.response?.data?.detail
+      let message = 'Error al iniciar sesión'
+
+      if (typeof detail === 'string') {
+        message = detail
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        // FastAPI validation error format: [{type, loc, msg, input}]
+        message = detail.map((err: any) => err.msg).join(', ')
+      }
+
+      setError('root', { message })
     }
   }
 

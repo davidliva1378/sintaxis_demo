@@ -140,6 +140,7 @@ class MonitorearExpedientesCommand:
         intervalo_segundos: Intervalo entre verificaciones (0 = ejecutar una vez)
         notificar_cambios: Si True, envía notificaciones cuando hay cambios
         descargar_nuevos_archivos: Si True, descarga archivos nuevos automáticamente
+        headless: Si True, ejecuta el navegador sin interfaz gráfica
     """
 
     json_sistema: Path
@@ -147,6 +148,13 @@ class MonitorearExpedientesCommand:
     intervalo_segundos: int = 0
     notificar_cambios: bool = True
     descargar_nuevos_archivos: bool = True
+    headless: bool = True
+    # Opciones de extracción (para ExtractorMasivo)
+    fecha_corte_dias: int | None = 30
+    max_paginas: int | None = None
+    tiempo_maximo_segundos: int | None = None
+    detener_en_duplicado: bool = True
+    orden_extraccion: str = "fecha"
 
 
 @dataclass(frozen=True)

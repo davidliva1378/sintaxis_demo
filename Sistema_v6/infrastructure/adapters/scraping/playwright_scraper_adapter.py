@@ -168,9 +168,12 @@ class PlaywrightScraperAdapter(IScraperPort):
                 login_url=self._login_url,
                 settings=self._settings,
             ) as page:
-                # Después del login, ya estamos en la página correcta
-                # No es necesario navegar a otra URL
-                await page.wait_for_load_state("domcontentloaded")
+                # Navegar al listado de expedientes (igual que extracción masiva)
+                # El session manager deja la page en la URL de login, debemos navegar al SCW
+                url_consultas = "https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam"
+                logger.debug(f"Navegando al listado de expedientes: {url_consultas}")
+                await page.goto(url_consultas, timeout=60000)
+                await page.wait_for_load_state("domcontentloaded", timeout=30000)
 
                 # Esperar a que aparezca la tabla de expedientes
                 tabla = page.locator(SEL_EXPEDIENTES.TABLA_RESULTADOS)

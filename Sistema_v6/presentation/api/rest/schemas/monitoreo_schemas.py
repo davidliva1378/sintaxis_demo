@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Optional, Any
 from pydantic import BaseModel, Field
 
 
@@ -94,3 +95,131 @@ class StopSchedulerResponse(BaseModel):
             "example": {"success": True, "mensaje": "Scheduler detenido correctamente"}
         }
     }
+
+
+# ============================================================================
+# NUEVOS SCHEMAS PARA CRUD DE MONITOREO
+# ============================================================================
+
+
+class ConfiguracionMonitoreoResponse(BaseModel):
+    """Response con la configuración de monitoreo."""
+
+    id: int
+    usuario_id: int
+    activo: bool
+    frecuencia: str
+    notificar_email: bool
+    notificar_sistema: bool
+    hora_inicio: str | None = None
+    hora_fin: str | None = None
+    dias_semana: list[int] | None = None
+    ultima_ejecucion: str | None = None
+    proxima_ejecucion: str | None = None
+    created_at: str
+    updated_at: str
+
+
+class ActualizarConfiguracionRequest(BaseModel):
+    """Request para actualizar configuración de monitoreo."""
+
+    activo: bool | None = None
+    frecuencia: str | None = Field(None, description="5min, 15min, 30min, 1hora, etc.")
+    notificar_email: bool | None = None
+    notificar_sistema: bool | None = None
+    hora_inicio: str | None = Field(None, description="HH:MM formato")
+    hora_fin: str | None = Field(None, description="HH:MM formato")
+    dias_semana: list[int] | None = Field(None, description="Lista de días 0-6")
+
+
+class ExpedienteMonitoreado(BaseModel):
+    """Datos de un expediente monitoreado."""
+
+    id: int
+    usuario_id: int
+    expediente_numero: str
+    expediente_caratula: str | None = None
+    expediente_dependencia: str | None = None
+    activo: bool
+    ultima_verificacion: str | None = None
+    ultima_actuacion_fecha: str | None = None
+    ultima_actuacion_id: int | None = None
+    total_cambios_detectados: int
+    notas: str | None = None
+    prioridad: str
+    created_at: str
+    updated_at: str
+
+
+class AgregarExpedienteRequest(BaseModel):
+    """Request para agregar expediente al monitoreo."""
+
+    expediente_numero: str = Field(..., description="Número del expediente")
+    expediente_caratula: str | None = None
+    expediente_dependencia: str | None = None
+    prioridad: str = Field("media", description="baja, media, alta")
+    notas: str | None = None
+
+
+class ActualizarExpedienteRequest(BaseModel):
+    """Request para actualizar expediente monitoreado."""
+
+    activo: bool | None = None
+    prioridad: str | None = None
+    notas: str | None = None
+
+
+class ListaExpedientesResponse(BaseModel):
+    """Response con lista paginada de expedientes monitoreados."""
+
+    expedientes: list[ExpedienteMonitoreado]
+    total: int
+    pagina: int
+    por_pagina: int
+    total_paginas: int
+
+
+class CambioDetectadoCompleto(BaseModel):
+    """Cambio detectado con información completa."""
+
+    id: int
+    expediente_monitoreado_id: int
+    expediente_numero: str
+    expediente_caratula: str | None = None
+    tipo_cambio: str
+    descripcion: str
+    detalles: dict[str, Any] | None = None
+    notificado: bool
+    leido: bool
+    fecha_deteccion: str
+    created_at: str
+
+
+class ListaCambiosResponse(BaseModel):
+    """Response con lista de cambios detectados."""
+
+    cambios: list[CambioDetectadoCompleto]
+    total_no_leidos: int
+    pagina: int
+    por_pagina: int
+
+
+class EstadisticasMonitoreoResponse(BaseModel):
+    """Response con estadísticas de monitoreo."""
+
+    total_expedientes: int
+    expedientes_activos: int
+    expedientes_pausados: int
+    cambios_hoy: int
+    cambios_semana: int
+    cambios_mes: int
+    cambios_sin_leer: int
+    ultima_ejecucion: str | None = None
+    proxima_ejecucion: str | None = None
+
+
+class MarcarLeidoResponse(BaseModel):
+    """Response al marcar cambios como leídos."""
+
+    success: bool
+    cantidad_marcados: int = 0

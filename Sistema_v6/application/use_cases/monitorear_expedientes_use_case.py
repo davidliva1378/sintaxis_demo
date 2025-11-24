@@ -9,6 +9,7 @@ Modificado para usar ExtractorMasivo en lugar de PlaywrightScraperAdapter.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -191,38 +192,40 @@ class MonitorearExpedientesUseCase:
             from extraccion_masiva.models import ConfigExtraccionMasiva
             import json
 
-            # Configurar extractor con headless según comando
-            config = ConfigExtraccionMasiva(headless=command.headless)
+            # Calcular fecha_corte desde días
+            fecha_corte = None
+            if command.fecha_corte_dias:
+                fecha_corte = (datetime.now() - timedelta(days=command.fecha_corte_dias)).strftime("%Y-%m-%d")
+                logger.info(f"Usando fecha de corte: {fecha_corte} ({command.fecha_corte_dias} días atrás)")
+
+            # Configurar extractor con todas las opciones
+            config = ConfigExtraccionMasiva(
+                headless=command.headless,
+                max_paginas=command.max_paginas,
+                tiempo_maximo_segundos=command.tiempo_maximo_segundos,
+                detener_en_duplicado=command.detener_en_duplicado,
+            )
             extractor = ExtractorMasivo(config=config)
 
-            # Ejecutar extracción
+            # Ejecutar extracción con fecha_corte y orden
             sesion = await extractor.extraer_listado_completo(
                 username=username,
                 password=password,
+                fecha_corte=fecha_corte,
             )
 
             # Cargar expedientes del JSON generado
             expedientes_actualizados = []
-            print(f"DEBUG: Sesion listado_path: {sesion.listado_path}")
-            print(f"DEBUG: Sesion estado: {sesion.estado}")
-            logger.info(f"Sesion listado_path: {sesion.listado_path}")
-            logger.info(f"Sesion estado: {sesion.estado}")
+            logger.info(f"Sesion listado_path: {sesion.listado_path}, estado: {sesion.estado}")
 
             if sesion.listado_path:
-                # El ExtractorMasivo genera la ruta relativa al CWD donde se ejecuta
-                # Usar directamente la ruta proporcionada
-                print(f"DEBUG: Intentando abrir archivo: {sesion.listado_path}")
-                logger.info(f"Intentando abrir archivo: {sesion.listado_path}")
-
                 try:
                     with open(sesion.listado_path, 'r', encoding='utf-8') as f:
                         datos = json.load(f)
                         lista_exp = datos.get("expedientes", [])
-                        print(f"DEBUG: Archivo cargado correctamente, {len(lista_exp)} expedientes")
+                        logger.info(f"Archivo cargado: {len(lista_exp)} expedientes")
                 except Exception as e:
-                    print(f"DEBUG ERROR: Error al abrir archivo: {e}")
-                    import traceback
-                    traceback.print_exc()
+                    logger.error(f"Error al abrir archivo {sesion.listado_path}: {e}")
                     lista_exp = []
 
                 # Convertir a ExpedienteResumen
@@ -236,30 +239,18 @@ class MonitorearExpedientesUseCase:
                     )
                     expedientes_actualizados.append(exp_resumen)
 
-            print(f"DEBUG: Expedientes actualizados cargados: {len(expedientes_actualizados)}")
-            logger.info(f"Datos actualizados obtenidos: {len(expedientes_actualizados)}")
+            logger.info(f"Datos actualizados obtenidos: {len(expedientes_actualizados)} expedientes")
 
             # Crear diccionario para búsqueda rápida con números normalizados
             dict_actualizados = {
                 normalizar_numero_expediente(exp.numero): exp for exp in expedientes_actualizados
             }
 
-            # DEBUG: Mostrar información para comparación
-            print(f"DEBUG: Expedientes en sistema a monitorear: {len(expedientes)}")
-            if expedientes:
-                nums_sistema_norm = [normalizar_numero_expediente(e.numero) for e in expedientes[:3]]
-                print(f"DEBUG: Primeros 3 del sistema (normalizados): {nums_sistema_norm}")
-            if expedientes_actualizados:
-                nums_ext_norm = [normalizar_numero_expediente(e.numero) for e in expedientes_actualizados[:3]]
-                print(f"DEBUG: Primeros 3 del extractor (normalizados): {nums_ext_norm}")
-
             # Verificar coincidencias con números normalizados
             nums_sistema = {normalizar_numero_expediente(e.numero) for e in expedientes}
             nums_actualizados = set(dict_actualizados.keys())
             coincidencias = nums_sistema & nums_actualizados
-            print(f"DEBUG: Coincidencias encontradas: {len(coincidencias)}")
-            if coincidencias:
-                print(f"DEBUG: Ejemplos de coincidencias: {list(coincidencias)[:3]}")
+            logger.debug(f"Coincidencias encontradas: {len(coincidencias)} de {len(expedientes)} expedientes monitoreados")
 
             # 3. Filtrar expedientes por estado (si gestor disponible)
             expedientes_monitoreados = expedientes

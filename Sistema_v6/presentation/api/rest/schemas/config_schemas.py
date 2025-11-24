@@ -51,6 +51,13 @@ class MonitoreoConfigSchema(BaseModel):
     notificar_cambios: bool
     descargar_archivos: bool
 
+    # Opciones de extracción
+    fecha_corte_dias: int | None = None
+    max_paginas_monitoreo: int | None = None
+    tiempo_maximo_extraccion: int | None = None
+    detener_en_duplicado: bool = True
+    orden_extraccion: str = "fecha"
+
     # Avanzado (opcional)
     intervalos_laboral_expedientes: int | None = None
     intervalos_laboral_entradas: int | None = None

@@ -6,7 +6,20 @@
  * - POST /api/v1/monitoreo/start - Iniciar scheduler
  * - POST /api/v1/monitoreo/stop - Detener scheduler
  * - POST /api/v1/monitoreo/verificar - Verificación manual
+ * - GET/PUT /api/v1/monitoreo/configuracion - Configuración
+ * - GET/POST/PUT/DELETE /api/v1/monitoreo/expedientes - Expedientes
+ * - GET /api/v1/monitoreo/cambios - Cambios detectados
+ * - GET /api/v1/monitoreo/estadisticas - Estadísticas
  */
+
+import type {
+  ConfiguracionMonitoreo,
+  ExpedienteMonitoreado,
+  CambioDetectado,
+  EstadisticasMonitoreo,
+  SolicitudMonitorear,
+  ActualizarMonitoreo,
+} from '../types/monitoreo'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -176,4 +189,309 @@ export function obtenerDescripcionIntervalo(minutos: number | null): string {
 
   const horas = Math.floor(minutos / 60)
   return `Cada ${horas} hora${horas > 1 ? 's' : ''}`
+}
+
+// ============================================================================
+// NUEVAS FUNCIONES DE API CRUD
+// ============================================================================
+
+// --- CONFIGURACION ---
+
+/**
+ * Obtiene la configuración de monitoreo del usuario
+ */
+export async function obtenerConfiguracion(): Promise<ConfiguracionMonitoreo> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/monitoreo/configuracion`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Actualiza la configuración de monitoreo
+ */
+export async function actualizarConfiguracion(config: ActualizarMonitoreo): Promise<ConfiguracionMonitoreo> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/monitoreo/configuracion`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+// --- EXPEDIENTES MONITOREADOS ---
+
+export interface ListaExpedientesResponse {
+  expedientes: ExpedienteMonitoreado[]
+  total: number
+  pagina: number
+  por_pagina: number
+  total_paginas: number
+}
+
+/**
+ * Lista los expedientes monitoreados
+ */
+export async function listarExpedientes(
+  soloActivos = false,
+  pagina = 1,
+  porPagina = 50
+): Promise<ListaExpedientesResponse> {
+  const params = new URLSearchParams({
+    solo_activos: String(soloActivos),
+    pagina: String(pagina),
+    por_pagina: String(porPagina),
+  })
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/monitoreo/expedientes?${params}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Agrega un expediente al monitoreo
+ */
+export async function agregarExpediente(solicitud: SolicitudMonitorear): Promise<ExpedienteMonitoreado> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/monitoreo/expedientes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(solicitud),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Obtiene un expediente monitoreado específico
+ */
+export async function obtenerExpediente(expedienteNumero: string): Promise<ExpedienteMonitoreado> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/monitoreo/expedientes/${encodeURIComponent(expedienteNumero)}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Actualiza un expediente monitoreado
+ */
+export async function actualizarExpediente(
+  expedienteNumero: string,
+  datos: { activo?: boolean; prioridad?: string; notas?: string }
+): Promise<ExpedienteMonitoreado> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/monitoreo/expedientes/${encodeURIComponent(expedienteNumero)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Elimina un expediente del monitoreo
+ */
+export async function eliminarExpediente(expedienteNumero: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/monitoreo/expedientes/${encodeURIComponent(expedienteNumero)}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+}
+
+/**
+ * Pausa el monitoreo de un expediente
+ */
+export async function pausarExpediente(expedienteNumero: string): Promise<ExpedienteMonitoreado> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/monitoreo/expedientes/${encodeURIComponent(expedienteNumero)}/pausar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Reanuda el monitoreo de un expediente
+ */
+export async function reanudarExpediente(expedienteNumero: string): Promise<ExpedienteMonitoreado> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/monitoreo/expedientes/${encodeURIComponent(expedienteNumero)}/reanudar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+// --- CAMBIOS DETECTADOS ---
+
+export interface ListaCambiosResponse {
+  cambios: CambioDetectado[]
+  total_no_leidos: number
+  pagina: number
+  por_pagina: number
+}
+
+/**
+ * Lista los cambios detectados
+ */
+export async function listarCambios(
+  soloNoLeidos = false,
+  tipoCambio?: string,
+  expedienteNumero?: string,
+  pagina = 1,
+  porPagina = 50
+): Promise<ListaCambiosResponse> {
+  const params = new URLSearchParams({
+    solo_no_leidos: String(soloNoLeidos),
+    pagina: String(pagina),
+    por_pagina: String(porPagina),
+  })
+
+  if (tipoCambio) params.set('tipo_cambio', tipoCambio)
+  if (expedienteNumero) params.set('expediente_numero', expedienteNumero)
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/monitoreo/cambios?${params}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Marca un cambio como leído
+ */
+export async function marcarLeido(cambioId: number): Promise<{ success: boolean; cantidad_marcados: number }> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/monitoreo/cambios/${cambioId}/marcar-leido`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Marca todos los cambios como leídos
+ */
+export async function marcarTodosLeidos(): Promise<{ success: boolean; cantidad_marcados: number }> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/monitoreo/cambios/marcar-todos-leidos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+// --- ESTADISTICAS ---
+
+/**
+ * Obtiene estadísticas del monitoreo
+ */
+export async function obtenerEstadisticas(): Promise<EstadisticasMonitoreo> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/monitoreo/estadisticas`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+// --- SINCRONIZACION ---
+
+export interface SincronizarResponse {
+  success: boolean
+  mensaje: string
+  total_sistema: number
+  nuevos_monitoreados: number
+  ya_monitoreados: number
+  errores?: string[]
+}
+
+/**
+ * Sincroniza todos los expedientes del sistema principal con el monitoreo
+ */
+export async function sincronizarExpedientes(): Promise<SincronizarResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/monitoreo/sincronizar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  return response.json()
 }
