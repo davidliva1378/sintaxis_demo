@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Optional, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class IniciarMonitoreoRequest(BaseModel):
@@ -130,6 +130,68 @@ class ActualizarConfiguracionRequest(BaseModel):
     hora_inicio: str | None = Field(None, description="HH:MM formato")
     hora_fin: str | None = Field(None, description="HH:MM formato")
     dias_semana: list[int] | None = Field(None, description="Lista de días 0-6")
+
+    @field_validator('frecuencia')
+    @classmethod
+    def validar_frecuencia(cls, v: str | None) -> str | None:
+        """Valida que la frecuencia sea válida."""
+        if v is None:
+            return v
+        frecuencias_validas = ['5min', '15min', '30min', '1hora', '2horas', '3horas', '4horas', '6horas', '12horas', '24horas']
+        if v not in frecuencias_validas:
+            raise ValueError(f'Frecuencia debe ser una de: {", ".join(frecuencias_validas)}')
+        return v
+
+    @field_validator('hora_inicio', 'hora_fin')
+    @classmethod
+    def validar_formato_hora(cls, v: str | None) -> str | None:
+        """Valida que las horas tengan formato HH:MM."""
+        if v is None:
+            return v
+        import re
+        if not re.match(r'^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$', v):
+            raise ValueError('Hora debe tener formato HH:MM (ej: 08:00, 18:30)')
+        return v
+
+    @field_validator('dias_semana')
+    @classmethod
+    def validar_dias_semana(cls, v: list[int] | None) -> list[int] | None:
+        """Valida que los días de la semana sean válidos (0-6)."""
+        if v is None:
+            return v
+        if not all(0 <= dia <= 6 for dia in v):
+            raise ValueError('Los días de la semana deben estar entre 0 (domingo) y 6 (sábado)')
+        if len(v) == 0:
+            raise ValueError('Debe seleccionar al menos un día')
+        return v
+
+    @model_validator(mode='after')
+    def validar_consistencia_horarios(self) -> 'ActualizarConfiguracionRequest':
+        """Valida que hora_inicio y hora_fin no sean idénticas.
+
+        Nota: Permite hora_inicio > hora_fin para soportar horarios que cruzan medianoche.
+        Ejemplos válidos:
+        - 08:00 - 18:00 (horario normal de 10 horas)
+        - 22:00 - 06:00 (horario nocturno de 8 horas, cruza medianoche)
+        - 06:00 - 05:59 (monitoreo casi 24 horas, cruza medianoche)
+
+        Ejemplo inválido:
+        - 10:00 - 10:00 (0 horas, sin sentido)
+        """
+        # Solo validar si ambos campos están presentes
+        if self.hora_inicio is not None and self.hora_fin is not None:
+            # Convertir a minutos para comparar
+            inicio_partes = self.hora_inicio.split(':')
+            fin_partes = self.hora_fin.split(':')
+
+            minutos_inicio = int(inicio_partes[0]) * 60 + int(inicio_partes[1])
+            minutos_fin = int(fin_partes[0]) * 60 + int(fin_partes[1])
+
+            # Solo rechazar si son exactamente iguales (0 horas de monitoreo)
+            if minutos_inicio == minutos_fin:
+                raise ValueError('Las horas de inicio y fin no pueden ser idénticas')
+
+        return self
 
 
 class ExpedienteMonitoreado(BaseModel):

@@ -25,6 +25,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 if TYPE_CHECKING:
     from application.dtos import MonitorearExpedientesCommand
     from application.use_cases import MonitorearExpedientesUseCase
+    from application.services.monitoreo_service import MonitoreoService
     from infrastructure.config import MonitoreoSettings
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ class MonitorSchedulerService:
         config: MonitoreoSettings,
         json_sistema_path: Path,
         workspaces_dir: Path,
+        monitoreo_service: "MonitoreoService | None" = None,
     ):
         """Inicializa el servicio de scheduler.
 
@@ -62,11 +64,13 @@ class MonitorSchedulerService:
             config: Configuración de monitoreo
             json_sistema_path: Ruta al JSON sistema
             workspaces_dir: Directorio base de workspaces
+            monitoreo_service: Servicio de monitoreo para registrar cambios (opcional)
         """
         self._use_case = monitorear_use_case
         self._config = config
         self._json_sistema_path = json_sistema_path
         self._workspaces_dir = workspaces_dir
+        self._monitoreo_service = monitoreo_service
 
         # Scheduler
         self.scheduler = AsyncIOScheduler()
@@ -207,6 +211,51 @@ class MonitorSchedulerService:
                     f"{response.total_cambios} cambios detectados, "
                     f"{response.expedientes_verificados} expedientes verificados"
                 )
+
+                # Registrar cambios en la base de datos si hay servicio disponible
+                if self._monitoreo_service and response.cambios_detectados:
+                    logger.info(f"Registrando {len(response.cambios_detectados)} cambios en la base de datos")
+                    for cambio in response.cambios_detectados:
+                        try:
+                            detalles = cambio.datos_adicionales if hasattr(cambio, 'datos_adicionales') else {}
+
+                            # Verificar si el expediente existe en monitoreo, si no, crearlo
+                            try:
+                                self._monitoreo_service.registrar_cambio(
+                                    usuario_id=1,
+                                    expediente_numero=cambio.numero_expediente,
+                                    tipo_cambio=cambio.tipo,
+                                    descripcion=cambio.descripcion,
+                                    detalles=detalles,
+                                )
+                            except ValueError as ve:
+                                # El expediente no existe en monitoreo, crearlo automáticamente
+                                if "no está siendo monitoreado" in str(ve):
+                                    logger.info(f"Creando expediente {cambio.numero_expediente} en monitoreo automáticamente")
+                                    caratula = getattr(cambio, 'caratula', '') or detalles.get('caratula', '')
+                                    dependencia = getattr(cambio, 'dependencia', '') or detalles.get('dependencia', '')
+
+                                    self._monitoreo_service.agregar_expediente(
+                                        usuario_id=1,
+                                        expediente_numero=cambio.numero_expediente,
+                                        expediente_caratula=caratula,
+                                        expediente_dependencia=dependencia,
+                                    )
+
+                                    # Ahora sí registrar el cambio
+                                    self._monitoreo_service.registrar_cambio(
+                                        usuario_id=1,
+                                        expediente_numero=cambio.numero_expediente,
+                                        tipo_cambio=cambio.tipo,
+                                        descripcion=cambio.descripcion,
+                                        detalles=detalles,
+                                    )
+                                else:
+                                    raise
+
+                            logger.debug(f"Cambio registrado: {cambio.numero_expediente} - {cambio.tipo}")
+                        except Exception as e:
+                            logger.error(f"Error al registrar cambio {cambio.numero_expediente}: {e}")
             else:
                 logger.error(
                     f"Error en verificación (duración: {duracion:.2f}s): "
@@ -292,7 +341,16 @@ class MonitorSchedulerService:
             hora_fin = time.fromisoformat(self._config.hora_fin)
             hora_actual = ahora.time()
 
-            return hora_inicio <= hora_actual <= hora_fin
+            # Detectar si el horario cruza la medianoche
+            if hora_inicio <= hora_fin:
+                # Horario normal en el mismo día (ej: 08:00 - 18:00)
+                return hora_inicio <= hora_actual <= hora_fin
+            else:
+                # Cruce de medianoche (ej: 22:00 - 06:00, o 06:00 - 05:59 para casi 24h)
+                # En este caso, es horario laboral si:
+                # - La hora actual es >= hora_inicio (después de las 22:00)
+                # - O la hora actual es <= hora_fin (antes de las 06:00)
+                return hora_actual >= hora_inicio or hora_actual <= hora_fin
 
         except ValueError as e:
             logger.error(f"Error al parsear horas de configuración: {e}")
@@ -362,6 +420,53 @@ class MonitorSchedulerService:
 
         if resultado.success:
             response = resultado.value
+
+            # Registrar cambios en la base de datos si hay servicio disponible
+            if self._monitoreo_service and response.cambios_detectados:
+                logger.info(f"Registrando {len(response.cambios_detectados)} cambios en la base de datos")
+                for cambio in response.cambios_detectados:
+                    try:
+                        # Preparar detalles JSON
+                        detalles = cambio.datos_adicionales if hasattr(cambio, 'datos_adicionales') else {}
+
+                        # Verificar si el expediente existe en monitoreo, si no, crearlo
+                        try:
+                            self._monitoreo_service.registrar_cambio(
+                                usuario_id=1,
+                                expediente_numero=cambio.numero_expediente,
+                                tipo_cambio=cambio.tipo,
+                                descripcion=cambio.descripcion,
+                                detalles=detalles,
+                            )
+                        except ValueError as ve:
+                            # El expediente no existe en monitoreo, crearlo automáticamente
+                            if "no está siendo monitoreado" in str(ve):
+                                logger.info(f"Creando expediente {cambio.numero_expediente} en monitoreo automáticamente")
+                                caratula = getattr(cambio, 'caratula', '') or detalles.get('caratula', '')
+                                dependencia = getattr(cambio, 'dependencia', '') or detalles.get('dependencia', '')
+
+                                self._monitoreo_service.agregar_expediente(
+                                    usuario_id=1,
+                                    expediente_numero=cambio.numero_expediente,
+                                    expediente_caratula=caratula,
+                                    expediente_dependencia=dependencia,
+                                )
+
+                                # Ahora sí registrar el cambio
+                                self._monitoreo_service.registrar_cambio(
+                                    usuario_id=1,
+                                    expediente_numero=cambio.numero_expediente,
+                                    tipo_cambio=cambio.tipo,
+                                    descripcion=cambio.descripcion,
+                                    detalles=detalles,
+                                )
+                            else:
+                                raise
+
+                        logger.debug(f"Cambio registrado: {cambio.numero_expediente} - {cambio.tipo}")
+                    except Exception as e:
+                        logger.error(f"Error al registrar cambio {cambio.numero_expediente}: {e}")
+
             return {
                 "exito": True,
                 "cambios_detectados": response.total_cambios,
