@@ -5,12 +5,15 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from application.dtos import MonitorearExpedientesCommand
 from infrastructure.di_container import get_container
 from infrastructure.exceptions import PJNError
+from infrastructure.persistence.database import Usuario
+from .auth import get_current_active_user, oauth2_scheme
 
 from ..schemas.monitoreo_schemas import (
     ActualizarConfiguracionRequest,
@@ -306,46 +309,185 @@ async def verificar_manual(headless: bool = True):
 # NUEVOS ENDPOINTS CRUD PARA MONITOREO
 # ============================================================================
 
-# TODO: Obtener usuario_id de JWT auth. Por ahora hardcodeado para testing.
-def _get_usuario_id() -> int:
+def _get_service() -> MonitoreoService:
+    return MonitoreoService()
+
+
+# Dependencia opcional para autenticación (fallback a usuario_id=1 para desarrollo)
+async def get_optional_current_user(
+    token: Annotated[Optional[str], Depends(oauth2_scheme)] = None
+) -> Optional[Usuario]:
+    """Obtiene el usuario actual si está autenticado, None si no."""
+    if token is None:
+        return None
+    try:
+        from .auth import get_current_user
+        from sqlalchemy.orm import Session
+        from infrastructure.persistence.database import get_db
+
+        # Crear sesión para validar token
+        db = next(get_db())
+        try:
+            return await get_current_user(token, db)
+        finally:
+            db.close()
+    except Exception:
+        return None
+
+
+def _get_usuario_id_from_user(user: Optional[Usuario]) -> int:
+    """Obtiene el usuario_id del usuario o fallback a 1 para desarrollo."""
+    if user is not None:
+        return user.id
+    # Fallback para desarrollo sin autenticación
     return 1
 
 
-def _get_service() -> MonitoreoService:
-    return MonitoreoService()
+def _get_usuario_id() -> int:
+    """Fallback a usuario_id=1 para desarrollo.
+
+    NOTA: Esta función es temporal mientras no se implementa
+    autenticación completa en todos los endpoints.
+    """
+    return 1
 
 
 # --- CONFIGURACION ---
 
 @router.get("/configuracion", response_model=ConfiguracionMonitoreoResponse)
-async def obtener_configuracion():
-    """Obtiene la configuración de monitoreo del usuario."""
+async def obtener_configuracion(
+    current_user: Annotated[Optional[Usuario], Depends(get_optional_current_user)] = None
+):
+    """Obtiene la configuración de monitoreo del usuario.
+
+    Si no existe configuración, se crea automáticamente con valores por defecto.
+
+    Returns:
+        ConfiguracionMonitoreoResponse: Configuración del usuario
+
+    Raises:
+        HTTPException 500: Si hay error en BD o no se puede crear configuración
+    """
     logger.info("GET /monitoreo/configuracion")
     try:
         service = _get_service()
-        config = service.obtener_configuracion(_get_usuario_id())
+        usuario_id = _get_usuario_id_from_user(current_user)
+
+        logger.debug(f"Obteniendo configuracion para usuario_id={usuario_id}")
+
+        config = service.obtener_configuracion(usuario_id)
+
+        # Validar que config no sea None (no deberia serlo tras los fixes)
+        if not config:
+            logger.error(f"obtener_configuracion() devolvio None para usuario_id={usuario_id}")
+            raise HTTPException(
+                status_code=500,
+                detail="No se pudo obtener o crear configuracion para el usuario. Contacte al administrador."
+            )
+
+        logger.debug(f"Configuracion obtenida: usuario_id={usuario_id}, config_id={config.get('id')}")
+
         return ConfiguracionMonitoreoResponse(**config)
+
+    except HTTPException:
+        # Re-raise HTTPException sin modificar
+        raise
+    except RuntimeError as e:
+        # Error especifico del repository
+        logger.error(f"RuntimeError obteniendo configuracion: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creando configuracion: {str(e)}"
+        )
     except Exception as e:
-        logger.exception("Error obteniendo configuración")
-        raise HTTPException(status_code=500, detail=str(e))
+        # Error inesperado
+        logger.exception(f"Error inesperado obteniendo configuracion: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error del servidor: {str(e)}"
+        )
 
 
 @router.put("/configuracion", response_model=ConfiguracionMonitoreoResponse)
-async def actualizar_configuracion(request: ActualizarConfiguracionRequest):
+async def actualizar_configuracion(
+    request: ActualizarConfiguracionRequest,
+    current_user: Annotated[Optional[Usuario], Depends(get_optional_current_user)] = None
+):
     """Actualiza la configuración de monitoreo del usuario."""
     logger.info("PUT /monitoreo/configuracion")
     try:
         service = _get_service()
+        usuario_id = _get_usuario_id_from_user(current_user)
+
+        logger.info(f"Actualizando configuración para usuario_id={usuario_id}")
+        logger.debug(f"Datos recibidos: activo={request.activo}, frecuencia={request.frecuencia}, "
+                    f"hora_inicio={request.hora_inicio}, hora_fin={request.hora_fin}, "
+                    f"dias_semana={request.dias_semana}")
+
         config = service.actualizar_configuracion(
-            usuario_id=_get_usuario_id(),
+            usuario_id=usuario_id,
             activo=request.activo,
             frecuencia=request.frecuencia,
             notificar_email=request.notificar_email,
             notificar_sistema=request.notificar_sistema,
             hora_inicio=request.hora_inicio,
             hora_fin=request.hora_fin,
-            dias_semana=request.dias_semana
+            dias_semana=request.dias_semana,
+            # Opciones de extracción
+            fecha_corte_dias=request.fecha_corte_dias,
+            max_paginas_monitoreo=request.max_paginas_monitoreo,
+            tiempo_maximo_extraccion=request.tiempo_maximo_extraccion,
+            detener_en_duplicado=request.detener_en_duplicado,
+            orden_extraccion=request.orden_extraccion,
+            mostrar_navegador_monitoreo=request.mostrar_navegador_monitoreo
         )
+
+        logger.info(f"Configuración actualizada exitosamente: config_id={config.get('id')}")
+
+        # Gestionar estado del scheduler según lo solicitado por el usuario
+        try:
+            container = get_container()
+            scheduler = container.monitor_scheduler
+            estado_actual = scheduler.obtener_estado()
+            activo_actual = estado_actual.get("activo")
+            activo_deseado = request.activo
+
+            # Caso 1: Usuario quiere ACTIVAR y NO está activo
+            if activo_deseado and not activo_actual:
+                logger.info("Activando scheduler con nueva configuración...")
+                await scheduler.start()
+                logger.info("✓ Scheduler activado exitosamente")
+
+            # Caso 2: Usuario quiere DESACTIVAR y está activo
+            elif not activo_deseado and activo_actual:
+                logger.info("Desactivando scheduler...")
+                await scheduler.stop()
+                logger.info("✓ Scheduler detenido exitosamente")
+
+            # Caso 3: Usuario quiere ACTIVAR y YA está activo (cambio de config)
+            elif activo_deseado and activo_actual:
+                logger.info("Reiniciando scheduler con nueva configuración...")
+                await scheduler.stop()
+                await scheduler.start()
+                nuevo_estado = scheduler.obtener_estado()
+                logger.info(
+                    f"✓ Scheduler reiniciado: "
+                    f"intervalo={nuevo_estado.get('intervalo_actual_minutos')}min, "
+                    f"frecuencia={request.frecuencia}"
+                )
+
+            # Caso 4: Usuario quiere DESACTIVAR y YA está detenido (no hacer nada)
+            else:
+                logger.debug("Scheduler ya está en el estado deseado, no se requiere acción")
+
+        except RuntimeError as e:
+            # Error esperado de start() si ya está activo
+            logger.error(f"Error al gestionar scheduler: {e}")
+            logger.warning("La configuración se guardó pero el scheduler no se pudo gestionar")
+        except Exception as e:
+            logger.error(f"Error inesperado al gestionar scheduler: {e}")
+            logger.warning("La configuración se guardó pero el scheduler no se pudo gestionar")
+
         return ConfiguracionMonitoreoResponse(**config)
     except Exception as e:
         logger.exception("Error actualizando configuración")
