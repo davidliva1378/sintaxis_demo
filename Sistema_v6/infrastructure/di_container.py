@@ -76,6 +76,7 @@ class DIContainer:
         self._detector_cambios = None
         self._gestor_estados = None
         self._monitor_scheduler = None
+        self._monitoreo_service = None
 
     # === Adapters ===
 
@@ -190,6 +191,16 @@ class DIContainer:
         return self._gestor_estados
 
     @property
+    def monitoreo_service(self):
+        """Obtiene el servicio de monitoreo para MySQL."""
+        if self._monitoreo_service is None:
+            from application.services.monitoreo_service import MonitoreoService
+
+            self._monitoreo_service = MonitoreoService()
+            logger.debug("MonitoreoService inicializado")
+        return self._monitoreo_service
+
+    @property
     def monitor_scheduler(self):
         """Obtiene el servicio de scheduler de monitoreo."""
         if self._monitor_scheduler is None:
@@ -209,6 +220,7 @@ class DIContainer:
                 config=self.settings.monitoreo,
                 json_sistema_path=json_sistema_path,
                 workspaces_dir=workspaces_dir,
+                monitoreo_service=self.monitoreo_service,
             )
             logger.debug("MonitorSchedulerService inicializado")
         return self._monitor_scheduler

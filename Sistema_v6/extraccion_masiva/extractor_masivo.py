@@ -64,7 +64,7 @@ class ExtractorMasivo:
     def __init__(
         self,
         config: Optional[ConfigExtraccionMasiva] = None,
-        data_dir: str = "./Sistema_v6/data/extraccion_masiva/listados"
+        data_dir: str = "./data/extraccion_masiva/listados"
     ):
         """
         Args:

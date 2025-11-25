@@ -10,7 +10,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from infrastructure.config import get_settings
+from infrastructure.config import get_settings, reload_settings
+from infrastructure.config.settings import PROJECT_ROOT
 from presentation.api.rest.schemas import (
     BrowserConfigSchema,
     ConfigUpdateResponse,
@@ -265,14 +266,19 @@ async def actualizar_configuracion_sistema(config: SystemConfigUpdateRequest):
             env_updates["STORAGE_ENSURE_ASCII"] = str(config.storage.ensure_ascii).lower()
 
         # 3. Actualizar archivo .env
-        env_path = Path(".env")
+        env_path = PROJECT_ROOT / ".env"
+        logger.info(f"Actualizando archivo .env en: {env_path}")
         _actualizar_env_file(env_path, env_updates)
+
+        # 4. Recargar configuración del singleton para aplicar cambios inmediatamente
+        reload_settings()
+        logger.info("Configuración recargada exitosamente")
 
         logger.info(f"Configuración actualizada: {len(env_updates)} variables modificadas")
 
         return ConfigUpdateResponse(
             success=True,
-            message="Configuración actualizada correctamente. Reinicia el servidor para aplicar cambios.",
+            message="Configuración actualizada correctamente. Los cambios se han aplicado.",
             updates=env_updates
         )
 

@@ -16,6 +16,16 @@ from .settings import (
     get_settings,
     reload_settings,
 )
+from .hardware_profiles import (
+    HardwareProfile,
+    HardwareProfileType,
+    HARDWARE_PROFILES,
+    get_hardware_profile,
+    get_active_profile,
+    set_active_profile,
+    get_device,
+    get_profile_info,
+)
 
 __all__ = [
     "Settings",
@@ -29,4 +39,13 @@ __all__ = [
     "MCPSettings",
     "get_settings",
     "reload_settings",
+    # Hardware profiles
+    "HardwareProfile",
+    "HardwareProfileType",
+    "HARDWARE_PROFILES",
+    "get_hardware_profile",
+    "get_active_profile",
+    "set_active_profile",
+    "get_device",
+    "get_profile_info",
 ]

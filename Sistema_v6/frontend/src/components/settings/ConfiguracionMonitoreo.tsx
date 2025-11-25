@@ -1,8 +1,8 @@
 /**
  * ConfiguracionMonitoreo - Configuración de monitoreo automático
- * Sistema híbrido:
- * - Monitoreo (MySQL): /api/v1/monitoreo/configuracion
- * - Extracción (.env): /api/v1/config/sistema
+ * Sistema unificado en MySQL:
+ * - Monitoreo + Extracción: /api/v1/monitoreo/configuracion (MySQL)
+ * - Solo "Mostrar navegador" usa .env: /api/v1/config/sistema
  */
 
 import { useState, useEffect } from 'react'
@@ -136,19 +136,15 @@ export default function ConfiguracionMonitoreo() {
           dias_semana: configMonitoreo.dias_semana || [1, 2, 3, 4, 5],
         })
 
-        // Cargar configuración de extracción (.env)
-        const respExtraccion = await apiClient.get('/api/v1/config/sistema')
-        if (respExtraccion.data) {
-          const data = respExtraccion.data
-          setExtraccionData({
-            fecha_corte_dias: data.monitoreo.fecha_corte_dias ?? 30,
-            max_paginas_monitoreo: data.monitoreo.max_paginas_monitoreo ?? 50,
-            tiempo_maximo_extraccion: data.monitoreo.tiempo_maximo_extraccion ?? 600,
-            detener_en_duplicado: data.monitoreo.detener_en_duplicado ?? true,
-            orden_extraccion: data.monitoreo.orden_extraccion ?? 'fecha',
-            mostrar_navegador: !data.browser.headless,
-          })
-        }
+        // Cargar opciones de extracción desde MySQL (incluyendo mostrar_navegador)
+        setExtraccionData({
+          fecha_corte_dias: configMonitoreo.fecha_corte_dias ?? 30,
+          max_paginas_monitoreo: configMonitoreo.max_paginas_monitoreo ?? 50,
+          tiempo_maximo_extraccion: configMonitoreo.tiempo_maximo_extraccion ?? 600,
+          detener_en_duplicado: configMonitoreo.detener_en_duplicado ?? true,
+          orden_extraccion: configMonitoreo.orden_extraccion ?? 'fecha',
+          mostrar_navegador: configMonitoreo.mostrar_navegador_monitoreo ?? false,
+        })
 
         setIsLoading(false)
       } catch (error: any) {
@@ -184,14 +180,15 @@ export default function ConfiguracionMonitoreo() {
     }
   }
 
-  // Guardar ambas configuraciones
+  // Guardar configuración unificada
   const onSubmit = async (monitoreoData: MonitoreoForm) => {
     setIsSubmitting(true)
 
     try {
-      // 1. Guardar configuración de monitoreo (MySQL)
-      if (formState.isDirty) {
+      // 1. Guardar configuración completa en MySQL (monitoreo + extracción)
+      if (formState.isDirty || extraccionDirty) {
         await monitoreoApi.actualizarConfiguracion({
+          // Configuración de monitoreo
           activo: monitoreoData.activo,
           frecuencia: monitoreoData.frecuencia,
           notificar_email: monitoreoData.notificar_email,
@@ -199,43 +196,32 @@ export default function ConfiguracionMonitoreo() {
           hora_inicio: monitoreoData.hora_inicio,
           hora_fin: monitoreoData.hora_fin,
           dias_semana: monitoreoData.dias_semana,
+          // Opciones de extracción (todo en MySQL, incluyendo mostrar_navegador)
+          fecha_corte_dias: extraccionData.fecha_corte_dias,
+          max_paginas_monitoreo: extraccionData.max_paginas_monitoreo,
+          tiempo_maximo_extraccion: extraccionData.tiempo_maximo_extraccion,
+          detener_en_duplicado: extraccionData.detener_en_duplicado,
+          orden_extraccion: extraccionData.orden_extraccion,
+          mostrar_navegador_monitoreo: extraccionData.mostrar_navegador,
         })
       }
 
-      // 2. Guardar configuración de extracción (.env)
-      if (extraccionDirty) {
-        await apiClient.put('/api/v1/config/sistema', {
-          browser: {
-            headless: !extraccionData.mostrar_navegador,
-            timeout_ms: 30000,
-            navigation_timeout_ms: 60000,
-          },
-          monitoreo: {
-            intervalo_segundos: 1800, // Se mantiene el valor existente
-            dias_actividad: 30,
-            max_reintentos: 3,
-            notificar_cambios: true,
-            descargar_archivos: true,
-            fecha_corte_dias: extraccionData.fecha_corte_dias,
-            max_paginas_monitoreo: extraccionData.max_paginas_monitoreo,
-            tiempo_maximo_extraccion: extraccionData.tiempo_maximo_extraccion,
-            detener_en_duplicado: extraccionData.detener_en_duplicado,
-            orden_extraccion: extraccionData.orden_extraccion,
-            intervalos_laboral_expedientes: null,
-            intervalos_laboral_entradas: null,
-            intervalos_no_laboral_expedientes: null,
-            intervalos_no_laboral_entradas: null,
-            dias_laborales: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'],
-            hora_inicio: '08:00',
-            hora_fin: '18:00',
-          },
-        })
+      // 2. Recargar configuración actualizada desde MySQL
+      const configActualizada = await monitoreoApi.obtenerConfiguracion()
+      if (configActualizada) {
+        setExtraccionData(prev => ({
+          ...prev,
+          fecha_corte_dias: configActualizada.fecha_corte_dias ?? 30,
+          max_paginas_monitoreo: configActualizada.max_paginas_monitoreo ?? 50,
+          tiempo_maximo_extraccion: configActualizada.tiempo_maximo_extraccion ?? 600,
+          detener_en_duplicado: configActualizada.detener_en_duplicado ?? true,
+          orden_extraccion: configActualizada.orden_extraccion ?? 'fecha',
+          mostrar_navegador: configActualizada.mostrar_navegador_monitoreo ?? false,
+        }))
       }
 
       toast.success('Configuración actualizada', {
-        description: extraccionDirty
-          ? 'Cambios aplicados. Reinicia el servidor para aplicar cambios de extracción.'
-          : 'Los cambios se aplicaron correctamente',
+        description: 'Los cambios se aplicaron correctamente.',
       })
 
       reset(monitoreoData)
@@ -457,7 +443,7 @@ export default function ConfiguracionMonitoreo() {
                 Opciones de Extracción
               </h3>
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Configura cómo se extraen los expedientes del PJN
+                Configura cómo se extraen los expedientes del PJN (configuración por usuario)
               </p>
             </div>
           </div>
@@ -570,11 +556,11 @@ export default function ConfiguracionMonitoreo() {
           </label>
 
           {extraccionDirty && (
-            <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
               <div className="flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5" />
-                <p className="text-xs text-amber-800 dark:text-amber-300">
-                  Los cambios de extracción requieren reiniciar el servidor para aplicarse.
+                <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                <p className="text-xs text-blue-800 dark:text-blue-300">
+                  Los cambios se aplican automáticamente. El próximo monitoreo usará la nueva configuración.
                 </p>
               </div>
             </div>

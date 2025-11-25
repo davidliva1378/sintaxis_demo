@@ -208,6 +208,7 @@ class LLMService:
         options = {
             "temperature": temperature,
             "num_predict": max_tokens,
+            "num_ctx": 4096,  # Limitar contexto para evitar uso excesivo de memoria
         }
 
         if stop:
@@ -264,6 +265,7 @@ class LLMService:
         options = {
             "temperature": temperature,
             "num_predict": max_tokens,
+            "num_ctx": 4096,  # Limitar contexto para evitar uso excesivo de memoria
         }
 
         try:
@@ -302,7 +304,10 @@ class LLMService:
         """
         client = self._lazy_load_client()
 
-        options = {"temperature": temperature}
+        options = {
+            "temperature": temperature,
+            "num_ctx": 4096,  # Limitar contexto para evitar uso excesivo de memoria
+        }
 
         try:
             if system:

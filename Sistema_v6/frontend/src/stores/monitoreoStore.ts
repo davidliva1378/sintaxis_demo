@@ -14,6 +14,7 @@ import type {
   FrecuenciaMonitoreo,
 } from '@/types/monitoreo'
 import * as monitoreoApi from '@/api/monitoreoApi'
+import type { EstadoMonitoreoResponse } from '@/api/monitoreoApi'
 
 interface MonitoreoState {
   // Estado
@@ -21,6 +22,7 @@ interface MonitoreoState {
   expedientes: ExpedienteMonitoreado[]
   cambios: CambioDetectado[]
   estadisticas: EstadisticasMonitoreo | null
+  estadoScheduler: EstadoMonitoreoResponse | null
   isLoading: boolean
 
   // Acciones - Configuración
@@ -42,6 +44,7 @@ interface MonitoreoState {
 
   // Acciones - Estadísticas
   obtenerEstadisticas: () => Promise<void>
+  obtenerEstadoScheduler: () => Promise<void>
 
   // Utilidades
   limpiar: () => void
@@ -53,6 +56,7 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
   expedientes: [],
   cambios: [],
   estadisticas: null,
+  estadoScheduler: null,
   isLoading: false,
 
   // Obtener configuración del monitoreo
@@ -286,14 +290,8 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
       if (response.success) {
         const cambiosDetectados = response.cambios_detectados || 0
 
-        // Actualizar última verificación
-        set(state => ({
-          expedientes: state.expedientes.map(e =>
-            e.id === id
-              ? { ...e, ultima_verificacion: new Date().toISOString() }
-              : e
-          ),
-        }))
+        // Recargar expedientes desde el servidor para obtener la última verificación actualizada
+        await get().listarExpedientes()
 
         // Toast de éxito con detalles
         toast.success('Verificación completada', {
@@ -411,6 +409,16 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
       set({ estadisticas })
     } catch (error: any) {
       console.error('Error al obtener estadísticas:', error)
+    }
+  },
+
+  // Obtener estado del scheduler (activo, ejecutando, etc.)
+  obtenerEstadoScheduler: async () => {
+    try {
+      const response = await monitoreoApi.obtenerEstadoMonitoreo()
+      set({ estadoScheduler: response })
+    } catch (error: any) {
+      console.error('Error al obtener estado del scheduler:', error)
     }
   },
 

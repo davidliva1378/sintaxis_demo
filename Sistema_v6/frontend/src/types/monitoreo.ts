@@ -9,12 +9,16 @@ export type EstadoMonitoreo = 'activo' | 'pausado' | 'detenido' | 'error'
 
 /**
  * TipoCambio - Tipo de cambio detectado en expediente
+ * Sincronizado con backend (detector_cambios.py)
  */
 export type TipoCambio =
   | 'nueva_actuacion'
-  | 'cambio_estado'
+  | 'cambio_situacion'    // Antes: cambio_estado
+  | 'cambio_dependencia'  // Nuevo
+  | 'cambio_caratula'     // Nuevo
   | 'nuevo_archivo'
   | 'modificacion'
+  | 'multiples_cambios'   // Nuevo
   | 'otro'
 
 /**
@@ -43,6 +47,13 @@ export interface ConfiguracionMonitoreo {
   hora_inicio?: string // HH:mm formato 24h
   hora_fin?: string    // HH:mm formato 24h
   dias_semana?: number[] // 0-6 (domingo a sábado)
+  // Opciones de extracción
+  fecha_corte_dias?: number
+  max_paginas_monitoreo?: number
+  tiempo_maximo_extraccion?: number
+  detener_en_duplicado?: boolean
+  orden_extraccion?: string
+  mostrar_navegador_monitoreo?: boolean
   created_at: string
   updated_at: string
 }
@@ -57,6 +68,8 @@ export interface ExpedienteMonitoreado {
   expediente_caratula: string
   expediente_dependencia?: string
   activo: boolean
+  prioridad?: string
+  notas?: string
   ultima_verificacion?: string
   ultima_actuacion_fecha?: string
   ultima_actuacion_id?: number
@@ -152,6 +165,7 @@ export const DIAS_SEMANA = [
 
 /**
  * Tipos de cambio con etiquetas
+ * Sincronizado con backend (detector_cambios.py)
  */
 export const TIPOS_CAMBIO: Record<TipoCambio, { label: string; color: string; icon: string }> = {
   nueva_actuacion: {
@@ -159,10 +173,20 @@ export const TIPOS_CAMBIO: Record<TipoCambio, { label: string; color: string; ic
     color: 'blue',
     icon: 'file-plus',
   },
-  cambio_estado: {
-    label: 'Cambio de Estado',
+  cambio_situacion: {
+    label: 'Cambio de Situación',
     color: 'purple',
     icon: 'refresh-cw',
+  },
+  cambio_dependencia: {
+    label: 'Cambio de Dependencia',
+    color: 'amber',
+    icon: 'building',
+  },
+  cambio_caratula: {
+    label: 'Cambio de Carátula',
+    color: 'indigo',
+    icon: 'file-text',
   },
   nuevo_archivo: {
     label: 'Nuevo Archivo',
@@ -178,5 +202,10 @@ export const TIPOS_CAMBIO: Record<TipoCambio, { label: string; color: string; ic
     label: 'Otro',
     color: 'gray',
     icon: 'info',
+  },
+  multiples_cambios: {
+    label: 'Múltiples Cambios',
+    color: 'red',
+    icon: 'layers',
   },
 }

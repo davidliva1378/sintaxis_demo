@@ -36,6 +36,13 @@ try:
 except ImportError:
     IExpedienteRepository = None  # type: ignore
 
+# Importar hook de indexación RAG
+try:
+    from infrastructure.rag.integration.actuaciones_hook import obtener_hook
+    _rag_hook_disponible = True
+except ImportError:
+    _rag_hook_disponible = False
+
 
 class GestorBatch:
     """
@@ -418,19 +425,46 @@ class GestorBatch:
                     # Obtener última actuación del JSON si existe
                     ultima_actuacion = None
                     try:
-                        if ruta_json and resultado.get("ruta_actuaciones"):
-                            import json
-                            from pathlib import Path
-                            ruta_act = Path(resultado["ruta_actuaciones"])
+                        import json
+                        from pathlib import Path
+
+                        # Intentar obtener ruta del JSON de actuaciones
+                        ruta_act_str = resultado.get("ruta_actuaciones")
+                        if not ruta_act_str and ruta_json:
+                            ruta_act_str = str(ruta_json)
+
+                        if ruta_act_str:
+                            ruta_act = Path(ruta_act_str)
                             if ruta_act.exists():
                                 with open(ruta_act, 'r', encoding='utf-8') as f:
                                     act_data = json.load(f)
+
+                                    # Buscar en actuaciones_actuales primero
                                     actuaciones = act_data.get("actuaciones_actuales", [])
+
+                                    # Si no hay actuales, buscar en históricas
+                                    if not actuaciones:
+                                        actuaciones = act_data.get("actuaciones_historicas", [])
+
+                                    # También buscar en formato alternativo "Actuaciones"
+                                    if not actuaciones:
+                                        actuaciones = act_data.get("Actuaciones", [])
+
                                     if actuaciones and len(actuaciones) > 0:
                                         # Última actuación es la primera en la lista
-                                        ultima_actuacion = actuaciones[0].get("fecha")
+                                        ultima_actuacion = actuaciones[0].get("Fecha")
+
+                        # Si aún no tenemos fecha, usar la fecha actual
+                        if not ultima_actuacion:
+                            from datetime import datetime
+                            ultima_actuacion = datetime.now().strftime("%Y-%m-%d")
+                            print(f"⚠️ No se encontró fecha de última actuación, usando fecha actual: {ultima_actuacion}")
+
                     except Exception as e_act:
                         print(f"⚠️ No se pudo obtener última actuación: {e_act}")
+                        # Usar fecha actual como fallback
+                        from datetime import datetime
+                        ultima_actuacion = datetime.now().strftime("%Y-%m-%d")
 
                     # Validar que los datos sean válidos antes de guardar
                     dependencia = datos_expediente.get("dependencia", "")
@@ -459,9 +493,9 @@ class GestorBatch:
                     print(f"⚠️ Error guardando en repositorio (no crítico): {e}")
 
             # ==================================================================
-            # RETORNAR RESULTADO
+            # PASO 6: Indexar en RAG (si está disponible)
             # ==================================================================
-            return {
+            resultado_final = {
                 "success": True,
                 "numero": numero_expediente,
                 "data": {
@@ -474,6 +508,19 @@ class GestorBatch:
                     "actuaciones_clasificadas": len(actuaciones_clasificadas) if actuaciones_clasificadas else 0
                 }
             }
+
+            # Ejecutar hook de indexación RAG si está disponible
+            if _rag_hook_disponible:
+                try:
+                    hook = obtener_hook()
+                    hook.on_expediente_procesado(numero_expediente, resultado_final)
+                except Exception as e:
+                    print(f"⚠️ Error en hook RAG (no crítico): {e}")
+
+            # ==================================================================
+            # RETORNAR RESULTADO
+            # ==================================================================
+            return resultado_final
 
         except Exception as e:
             print(f"❌ Error procesando expediente {numero_expediente}: {e}")

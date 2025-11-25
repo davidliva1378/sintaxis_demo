@@ -54,6 +54,9 @@ class MonitoreoRepository:
                     notificar_email, notificar_sistema,
                     hora_inicio, hora_fin, dias_semana,
                     ultima_ejecucion, proxima_ejecucion,
+                    fecha_corte_dias, max_paginas_monitoreo,
+                    tiempo_maximo_extraccion, detener_en_duplicado,
+                    orden_extraccion, mostrar_navegador_monitoreo,
                     created_at, updated_at
                 FROM monitoreo_configuracion
                 WHERE usuario_id = %s
@@ -79,12 +82,18 @@ class MonitoreoRepository:
         self,
         usuario_id: int,
         activo: bool = True,
-        frecuencia: str = '1hora',
+        frecuencia: str = '30min',
         notificar_email: bool = False,
         notificar_sistema: bool = True,
-        hora_inicio: Optional[str] = None,
-        hora_fin: Optional[str] = None,
-        dias_semana: Optional[List[int]] = None
+        hora_inicio: Optional[str] = '08:00',
+        hora_fin: Optional[str] = '18:00',
+        dias_semana: Optional[List[int]] = None,
+        fecha_corte_dias: Optional[int] = 30,
+        max_paginas_monitoreo: Optional[int] = 50,
+        tiempo_maximo_extraccion: Optional[int] = 600,
+        detener_en_duplicado: bool = True,
+        orden_extraccion: str = 'fecha',
+        mostrar_navegador_monitoreo: bool = False
     ) -> int:
         """
         Crea la configuracion de monitoreo para un usuario.
@@ -92,16 +101,25 @@ class MonitoreoRepository:
         Args:
             usuario_id: ID del usuario
             activo: Si el monitoreo esta activo
-            frecuencia: Frecuencia de verificacion
+            frecuencia: Frecuencia de verificacion (default: 30min)
             notificar_email: Notificar por email
             notificar_sistema: Notificar en sistema
-            hora_inicio: Hora inicio ventana (HH:MM)
-            hora_fin: Hora fin ventana (HH:MM)
-            dias_semana: Lista de dias [0-6]
+            hora_inicio: Hora inicio ventana (HH:MM, default: 08:00)
+            hora_fin: Hora fin ventana (HH:MM, default: 18:00)
+            dias_semana: Lista de dias [0-6] (default: lunes a viernes)
+            fecha_corte_dias: Dias hacia atras para buscar actuaciones
+            max_paginas_monitoreo: Maximo numero de paginas a procesar
+            tiempo_maximo_extraccion: Tiempo maximo en segundos
+            detener_en_duplicado: Detener al encontrar duplicado
+            orden_extraccion: Orden de extraccion ('fecha' o 'caratula')
 
         Returns:
             ID de la configuracion creada
         """
+        # Establecer valores por defecto si no se proporcionan
+        if dias_semana is None:
+            dias_semana = [1, 2, 3, 4, 5]  # Lunes a viernes por defecto
+
         conn = None
         try:
             conn = get_pooled_connection()
@@ -111,8 +129,11 @@ class MonitoreoRepository:
                 INSERT INTO monitoreo_configuracion (
                     usuario_id, activo, frecuencia,
                     notificar_email, notificar_sistema,
-                    hora_inicio, hora_fin, dias_semana
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    hora_inicio, hora_fin, dias_semana,
+                    fecha_corte_dias, max_paginas_monitoreo,
+                    tiempo_maximo_extraccion, detener_en_duplicado,
+                    orden_extraccion, mostrar_navegador_monitoreo
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
 
             dias_json = json.dumps(dias_semana) if dias_semana else None
@@ -120,7 +141,10 @@ class MonitoreoRepository:
             cursor.execute(query, (
                 usuario_id, activo, frecuencia,
                 notificar_email, notificar_sistema,
-                hora_inicio, hora_fin, dias_json
+                hora_inicio, hora_fin, dias_json,
+                fecha_corte_dias, max_paginas_monitoreo,
+                tiempo_maximo_extraccion, detener_en_duplicado,
+                orden_extraccion, mostrar_navegador_monitoreo
             ))
             conn.commit()
             config_id = cursor.lastrowid
@@ -204,11 +228,43 @@ class MonitoreoRepository:
 
         Returns:
             Configuracion del usuario
+
+        Raises:
+            RuntimeError: Si no puede crear/obtener configuracion
         """
         config = self.obtener_configuracion(usuario_id)
         if not config:
-            self.crear_configuracion(usuario_id)
-            config = self.obtener_configuracion(usuario_id)
+            try:
+                logger.info(f"Creando configuracion por defecto para usuario {usuario_id}")
+
+                # Crear con valores por defecto completos
+                config_id = self.crear_configuracion(
+                    usuario_id=usuario_id,
+                    hora_inicio='08:00',
+                    hora_fin='18:00',
+                    dias_semana=[1, 2, 3, 4, 5]
+                )
+
+                if not config_id:
+                    raise RuntimeError(f"crear_configuracion() devolvio ID invalido: {config_id}")
+
+                # Verificar que se creo correctamente
+                config = self.obtener_configuracion(usuario_id)
+                if not config:
+                    raise RuntimeError(
+                        f"No se pudo crear configuracion para usuario {usuario_id}. "
+                        f"Verificar permisos de BD y constraints."
+                    )
+
+                logger.info(f"Configuracion creada exitosamente: usuario_id={usuario_id}, config_id={config_id}")
+
+            except MySQLError as e:
+                logger.error(f"Error MySQL creando configuracion: {e}", exc_info=True)
+                raise RuntimeError(f"Error en base de datos: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error inesperado creando configuracion: {e}", exc_info=True)
+                raise RuntimeError(f"Error creando configuracion: {str(e)}")
+
         return config
 
     # =========================================================================

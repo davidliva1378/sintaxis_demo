@@ -136,12 +136,13 @@ class ConfigExtraccionMasiva:
     procesar_con_pdf: bool = False
     incluir_historicas: bool = True
     min_utilidad: str = "MEDIA"
-    directorio_base: str = "./Sistema_v6/data/expedientes"
+    directorio_base: str = "./data/expedientes"
     # Opciones avanzadas de extracción
     detener_en_duplicado: bool = True
     omitir_duplicados: bool = True
     max_paginas: int | None = None
     tiempo_maximo_segundos: int | None = None
+    orden_extraccion: str = "fecha"
 
     def __post_init__(self):
         """Valida los campos opcionales después de la inicialización."""
@@ -163,7 +164,8 @@ class ConfigExtraccionMasiva:
             "detener_en_duplicado": self.detener_en_duplicado,
             "omitir_duplicados": self.omitir_duplicados,
             "max_paginas": self.max_paginas,
-            "tiempo_maximo_segundos": self.tiempo_maximo_segundos
+            "tiempo_maximo_segundos": self.tiempo_maximo_segundos,
+            "orden_extraccion": self.orden_extraccion
         }
 
 

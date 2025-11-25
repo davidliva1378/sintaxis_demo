@@ -15,7 +15,6 @@ import AgendaPage from './pages/agenda/AgendaPage'
 import EscritosPage from './pages/escritos/EscritosPage'
 import DestacadosPage from './pages/destacados/DestacadosPage'
 import IAPage from './pages/ia/IAPage'
-import AsistenteIAPage from './pages/ia/AsistenteIAPage'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import MainLayout from './components/layout/MainLayout'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
@@ -162,16 +161,9 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/asistente-ia"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <AsistenteIAPage />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
+          {/* Redirects de rutas obsoletas a /ia */}
+          <Route path="/asistente-ia" element={<Navigate to="/ia" replace />} />
+          <Route path="/rag" element={<Navigate to="/ia" replace />} />
 
           {/* Redirect root to dashboard */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

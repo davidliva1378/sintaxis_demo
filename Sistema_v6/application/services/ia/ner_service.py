@@ -3,10 +3,17 @@ Servicio de NER (Named Entity Recognition) para textos jurídicos.
 
 Utiliza GLiNER para extracción de entidades sin necesidad de
 entrenamiento específico (zero-shot).
+
+Mejoras con LLM:
+- Fallback para entidades de baja confianza
+- Extracción de entidades faltantes
+- Validación y corrección de etiquetas
 """
 
 import logging
 from typing import List, Dict, Any, Optional
+
+from infrastructure.config.hardware_profiles import get_active_profile, HardwareProfile
 
 logger = logging.getLogger(__name__)
 
@@ -68,26 +75,46 @@ class NERService:
 
     Utiliza GLiNER (Generalist and Lightweight model for Named Entity Recognition)
     que permite definir entidades en runtime sin entrenamiento.
+
+    Incluye fallback con LLM para mejorar entidades de baja confianza.
     """
 
     def __init__(
         self,
         model_name: str = "urchade/gliner_medium-v2.1",
-        device: str = "cuda",
-        threshold: float = 0.5
+        device: Optional[str] = None,
+        threshold: float = 0.5,
+        profile: Optional[HardwareProfile] = None
     ):
         """
         Inicializa el servicio NER.
 
         Args:
             model_name: Nombre del modelo GLiNER
-            device: Dispositivo ('cuda', 'cpu')
+            device: Dispositivo ('cuda', 'cpu'). Si es None, usa el perfil de hardware.
             threshold: Umbral de confianza para aceptar entidades
+            profile: Perfil de hardware opcional
         """
+        self.profile = profile or get_active_profile()
         self.model_name = model_name
-        self.device = device
+        self.device = device or self.profile.ner_device
         self.threshold = threshold
         self._model = None
+        self._llm_fallback = None
+
+    @property
+    def llm_fallback(self):
+        """Lazy loading del servicio LLM fallback"""
+        if self._llm_fallback is None:
+            try:
+                from application.services.ia.ner_llm_fallback import NERLLMFallbackService
+                self._llm_fallback = NERLLMFallbackService(
+                    threshold=self.profile.ner_llm_threshold,
+                    profile=self.profile
+                )
+            except Exception as e:
+                logger.warning(f"LLM fallback no disponible: {e}")
+        return self._llm_fallback
 
     def _lazy_load_model(self):
         """Carga el modelo solo cuando se necesita."""
@@ -340,5 +367,103 @@ class NERService:
             "device": self.device,
             "threshold": self.threshold,
             "labels_default": ENTIDADES_JURIDICAS,
-            "loaded": self._model is not None
+            "loaded": self._model is not None,
+            "llm_fallback_enabled": self.profile.ner_llm_enabled,
+            "llm_fallback_threshold": self.profile.ner_llm_threshold,
+            "llm_fallback_available": self.llm_fallback is not None,
         }
+
+    def extract_enhanced(
+        self,
+        text: str,
+        labels: Optional[List[str]] = None,
+        threshold: Optional[float] = None,
+        use_llm_fallback: Optional[bool] = None,
+        extract_missing: bool = True
+    ) -> List[Dict[str, Any]]:
+        """
+        Extrae entidades con mejora LLM para entidades de baja confianza.
+
+        Este método primero usa GLiNER para extracción rápida, luego
+        opcionalmente usa LLM para:
+        1. Validar/corregir entidades de baja confianza
+        2. Extraer entidades que GLiNER no detectó
+
+        Args:
+            text: Texto a analizar
+            labels: Lista de etiquetas de entidades a buscar
+            threshold: Umbral de confianza para GLiNER
+            use_llm_fallback: Si usar LLM para mejorar resultados (usa config si None)
+            extract_missing: Si extraer entidades faltantes con LLM
+
+        Returns:
+            Lista de entidades mejoradas con campos adicionales:
+            - source: "gliner", "llm", o "llm_corrected"
+            - original_label: Si fue corregida por LLM
+        """
+        # 1. Extracción base con GLiNER
+        gliner_entities = self.extract(text, labels=labels, threshold=threshold)
+
+        # Determinar si usar LLM fallback
+        should_use_llm = use_llm_fallback if use_llm_fallback is not None else self.profile.ner_llm_enabled
+
+        if not should_use_llm or not self.llm_fallback:
+            # Sin LLM, agregar source a resultados existentes
+            for entity in gliner_entities:
+                entity["source"] = "gliner"
+                entity["original_label"] = None
+            return gliner_entities
+
+        # 2. Mejorar con LLM
+        try:
+            enhanced = self.llm_fallback.process_full(
+                text=text,
+                gliner_entities=gliner_entities,
+                threshold=self.profile.ner_llm_threshold,
+                extract_missing=extract_missing
+            )
+
+            # Convertir a dict list
+            return self.llm_fallback.to_dict_list(enhanced)
+
+        except Exception as e:
+            logger.warning(f"Error en LLM fallback: {e}. Usando solo GLiNER.")
+            for entity in gliner_entities:
+                entity["source"] = "gliner"
+                entity["original_label"] = None
+            return gliner_entities
+
+    def extract_juridico_enhanced(self, text: str) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Extrae entidades jurídicas con mejora LLM, agrupadas por tipo.
+
+        Args:
+            text: Texto a analizar
+
+        Returns:
+            Dict con listas de entidades por tipo, incluyendo metadata de source
+        """
+        entities = self.extract_enhanced(
+            text,
+            labels=ENTIDADES_JURIDICAS,
+            use_llm_fallback=True
+        )
+
+        # Agrupar por tipo
+        result: Dict[str, List[Dict[str, Any]]] = {label: [] for label in ENTIDADES_JURIDICAS}
+
+        for entity in entities:
+            label = entity["label"]
+            if label in result:
+                # Evitar duplicados
+                existing_texts = [e["text"] for e in result[label]]
+                if entity["text"] not in existing_texts:
+                    result[label].append({
+                        "text": entity["text"],
+                        "score": entity["score"],
+                        "source": entity.get("source", "gliner"),
+                        "original_label": entity.get("original_label"),
+                    })
+
+        # Limpiar tipos vacíos
+        return {k: v for k, v in result.items() if v}

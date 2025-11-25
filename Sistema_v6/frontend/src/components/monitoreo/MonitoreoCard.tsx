@@ -21,10 +21,12 @@ import {
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import type { ExpedienteMonitoreado } from '@/types/monitoreo'
 
 interface MonitoreoCardProps {
   expediente: ExpedienteMonitoreado
+  ejecutando?: boolean
   onToggle: (id: number, activo: boolean) => void
   onRemove: (id: number) => void
   onVerify: (id: number) => void
@@ -33,6 +35,7 @@ interface MonitoreoCardProps {
 
 export default function MonitoreoCard({
   expediente,
+  ejecutando = false,
   onToggle,
   onRemove,
   onVerify,
@@ -92,16 +95,17 @@ export default function MonitoreoCard({
       <div className="absolute top-4 right-4 flex items-center gap-2">
         <Badge
           variant={expediente.activo ? 'default' : 'outline'}
-          className={
+          className={cn(
             expediente.activo
               ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-              : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-          }
+              : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+            expediente.activo && ejecutando && 'animate-heartbeat-glow'
+          )}
         >
           {expediente.activo ? (
             <>
               <Activity className="h-3 w-3 mr-1" />
-              Activo
+              {ejecutando ? 'Verificando...' : 'Activo'}
             </>
           ) : (
             <>

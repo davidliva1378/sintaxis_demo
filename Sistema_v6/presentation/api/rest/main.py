@@ -81,6 +81,7 @@ from .routers import (
     mcp,
     monitoreo,
     procesamiento,
+    rag,
     tipos_entidad,
     tools,
     workspaces,
@@ -101,11 +102,47 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info(f"API configurada en: {settings.api.host}:{settings.api.port}")
     logger.info(f"Base path: {settings.storage.base_path}")
 
+    # Iniciar scheduler de monitoreo automáticamente si está activo en MySQL
+    container = get_container()
+    scheduler = container.monitor_scheduler
+
+    try:
+        logger.info("Verificando configuración de monitoreo...")
+        monitoreo_service = container.monitoreo_service
+        config_db = monitoreo_service.repository.obtener_configuracion(usuario_id=1)
+
+        if config_db and config_db.get('activo'):
+            logger.info("Configuración de monitoreo activa en MySQL, iniciando scheduler...")
+            await scheduler.start()
+            estado = scheduler.obtener_estado()
+            logger.info(
+                f"✓ MonitorSchedulerService iniciado: "
+                f"intervalo={estado.get('intervalo_actual_minutos')}min, "
+                f"horario_laboral={estado.get('es_horario_laboral')}, "
+                f"próxima_ejecución={estado.get('proxima_ejecucion')}"
+            )
+        else:
+            logger.info("Monitoreo no activo en MySQL, scheduler no iniciado")
+            logger.info("Para activar el monitoreo, use POST /api/v1/monitoreo/start")
+    except Exception as e:
+        logger.error(f"Error al iniciar scheduler automáticamente: {e}")
+        logger.info("El scheduler se puede iniciar manualmente via POST /api/v1/monitoreo/start")
+
     yield
 
     # Shutdown
     logger.info("Cerrando Sistema PJN API v6...")
-    container = get_container()
+
+    # Detener scheduler si está activo
+    try:
+        estado = scheduler.obtener_estado()
+        if estado.get("activo"):
+            logger.info("Deteniendo scheduler de monitoreo...")
+            await scheduler.stop()
+            logger.info("✓ Scheduler detenido correctamente")
+    except Exception as e:
+        logger.error(f"Error al detener scheduler: {e}")
+
     container.cleanup()
 
 
@@ -180,6 +217,7 @@ app.include_router(ia.router, prefix="/api/v1", tags=["ia"])
 app.include_router(tools.router, prefix="/api/v1", tags=["tools"])
 app.include_router(mcp.router, prefix="/api/v1", tags=["mcp"])
 app.include_router(tipos_entidad.router, prefix="/api/v1", tags=["tipos_entidad"])
+app.include_router(rag.router, tags=["rag"])
 
 
 # === Root Endpoint ===

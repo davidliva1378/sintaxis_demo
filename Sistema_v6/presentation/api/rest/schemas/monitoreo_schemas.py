@@ -116,6 +116,13 @@ class ConfiguracionMonitoreoResponse(BaseModel):
     dias_semana: list[int] | None = None
     ultima_ejecucion: str | None = None
     proxima_ejecucion: str | None = None
+    # Opciones de extracción
+    fecha_corte_dias: int | None = None
+    max_paginas_monitoreo: int | None = None
+    tiempo_maximo_extraccion: int | None = None
+    detener_en_duplicado: bool = True
+    orden_extraccion: str = 'fecha'
+    mostrar_navegador_monitoreo: bool = False
     created_at: str
     updated_at: str
 
@@ -130,6 +137,13 @@ class ActualizarConfiguracionRequest(BaseModel):
     hora_inicio: str | None = Field(None, description="HH:MM formato")
     hora_fin: str | None = Field(None, description="HH:MM formato")
     dias_semana: list[int] | None = Field(None, description="Lista de días 0-6")
+    # Opciones de extracción
+    fecha_corte_dias: int | None = Field(None, description="Días hacia atrás para buscar actuaciones")
+    max_paginas_monitoreo: int | None = Field(None, description="Máximo número de páginas a procesar")
+    tiempo_maximo_extraccion: int | None = Field(None, description="Tiempo máximo en segundos")
+    detener_en_duplicado: bool | None = None
+    orden_extraccion: str | None = Field(None, description="Orden: 'fecha' o 'caratula'")
+    mostrar_navegador_monitoreo: bool | None = Field(None, description="Mostrar navegador durante monitoreo")
 
     @field_validator('frecuencia')
     @classmethod
@@ -163,6 +177,38 @@ class ActualizarConfiguracionRequest(BaseModel):
             raise ValueError('Los días de la semana deben estar entre 0 (domingo) y 6 (sábado)')
         if len(v) == 0:
             raise ValueError('Debe seleccionar al menos un día')
+        return v
+
+    @field_validator('fecha_corte_dias')
+    @classmethod
+    def validar_fecha_corte_dias(cls, v: int | None) -> int | None:
+        """Valida que fecha_corte_dias sea positivo."""
+        if v is not None and v < 1:
+            raise ValueError('fecha_corte_dias debe ser al menos 1')
+        return v
+
+    @field_validator('max_paginas_monitoreo')
+    @classmethod
+    def validar_max_paginas(cls, v: int | None) -> int | None:
+        """Valida que max_paginas_monitoreo sea positivo."""
+        if v is not None and v < 1:
+            raise ValueError('max_paginas_monitoreo debe ser al menos 1')
+        return v
+
+    @field_validator('tiempo_maximo_extraccion')
+    @classmethod
+    def validar_tiempo_maximo(cls, v: int | None) -> int | None:
+        """Valida que tiempo_maximo_extraccion sea positivo."""
+        if v is not None and v < 1:
+            raise ValueError('tiempo_maximo_extraccion debe ser al menos 1 segundo')
+        return v
+
+    @field_validator('orden_extraccion')
+    @classmethod
+    def validar_orden_extraccion(cls, v: str | None) -> str | None:
+        """Valida que orden_extraccion sea válido."""
+        if v is not None and v not in ['fecha', 'caratula']:
+            raise ValueError('orden_extraccion debe ser "fecha" o "caratula"')
         return v
 
     @model_validator(mode='after')

@@ -12,7 +12,7 @@ import logging
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +149,8 @@ class ChatRequest(BaseModel):
     expediente_numero: Optional[str] = None
     historial: List[MensajeChat] = []
     n_contextos: int = 5
+    model: Optional[str] = Field(None, description="Modelo LLM a usar")
+    temperature: Optional[float] = Field(None, description="Temperature (0.0-1.0)", ge=0.0, le=1.0)
 
 
 class ChatResponse(BaseModel):
@@ -500,6 +502,13 @@ async def chat_stream(request: ChatRequest):
             rag = get_rag()
             llm = get_llm()
 
+            # Aplicar modelo si se especificó en el request
+            if request.model:
+                llm.model = request.model
+
+            # Usar temperature del request o default
+            use_temp = request.temperature if request.temperature is not None else 0.3
+
             # Obtener estadísticas del sistema
             system_stats = _get_system_stats()
 
@@ -574,7 +583,7 @@ PREGUNTA DEL USUARIO: {request.mensaje}
 RESPUESTA:"""
 
             # Stream de la respuesta
-            for chunk in llm.stream(user_prompt, system=system_prompt):
+            for chunk in llm.stream(user_prompt, system=system_prompt, temperature=use_temp):
                 yield f"data: {json.dumps({'type': 'token', 'data': chunk})}\n\n"
 
             # Indicar fin del stream
@@ -859,4 +868,272 @@ async def get_current_model():
 
     except Exception as e:
         logger.error(f"Error obteniendo modelo actual: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# === Nuevos Endpoints: NER Mejorado con LLM ===
+
+class NEREnhancedRequest(BaseModel):
+    texto: str
+    labels: Optional[List[str]] = None
+    use_llm_fallback: Optional[bool] = None
+    extract_missing: bool = True
+
+
+class NEREnhancedResponse(BaseModel):
+    entidades: List[dict]
+    stats: Optional[dict] = None
+
+
+@router.post("/ner/extraer-enhanced", response_model=NEREnhancedResponse)
+async def extraer_entidades_enhanced(request: NEREnhancedRequest):
+    """
+    Extrae entidades con mejora LLM para entidades de baja confianza.
+
+    Utiliza GLiNER para extracción rápida y opcionalmente LLM para:
+    - Validar/corregir entidades de baja confianza
+    - Extraer entidades que GLiNER no detectó
+
+    Cada entidad incluye:
+    - source: "gliner", "llm", o "llm_corrected"
+    - original_label: Si fue corregida por LLM
+    """
+    try:
+        ner = get_ner()
+        entidades = ner.extract_enhanced(
+            text=request.texto,
+            labels=request.labels,
+            use_llm_fallback=request.use_llm_fallback,
+            extract_missing=request.extract_missing
+        )
+
+        # Calcular stats
+        stats = {
+            "total": len(entidades),
+            "from_gliner": sum(1 for e in entidades if e.get("source") == "gliner"),
+            "from_llm": sum(1 for e in entidades if e.get("source") == "llm"),
+            "corrected_by_llm": sum(1 for e in entidades if e.get("source") == "llm_corrected"),
+        }
+
+        return NEREnhancedResponse(entidades=entidades, stats=stats)
+
+    except Exception as e:
+        logger.error(f"Error en NER enhanced: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ner/juridico-enhanced")
+async def extraer_entidades_juridicas_enhanced(request: NERRequest):
+    """
+    Extrae entidades jurídicas con mejora LLM, agrupadas por tipo.
+
+    Incluye metadata de source para cada entidad.
+    """
+    try:
+        ner = get_ner()
+        resultado = ner.extract_juridico_enhanced(request.texto)
+        return {"entidades": resultado}
+
+    except Exception as e:
+        logger.error(f"Error en NER jurídico enhanced: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/ner/info")
+async def get_ner_info():
+    """
+    Obtiene información del servicio NER y configuración de LLM fallback.
+    """
+    try:
+        ner = get_ner()
+        return ner.get_model_info()
+
+    except Exception as e:
+        logger.error(f"Error obteniendo info NER: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# === Nuevos Endpoints: Extracción de Relaciones ===
+
+class RelationExtractionRequest(BaseModel):
+    texto: str
+    entidades: Optional[List[dict]] = None
+    extract_entities: bool = True
+
+
+class RelationExtractionResponse(BaseModel):
+    entidades: List[dict]
+    relaciones: List[dict]
+    graph_data: Optional[dict] = None
+
+
+_relation_service = None
+
+
+def get_relation_service():
+    global _relation_service
+    if _relation_service is None:
+        from application.services.ia.relation_extraction_service import RelationExtractionService
+        _relation_service = RelationExtractionService()
+    return _relation_service
+
+
+@router.post("/relaciones/extraer", response_model=RelationExtractionResponse)
+async def extraer_relaciones(request: RelationExtractionRequest):
+    """
+    Extrae relaciones entre entidades de un texto jurídico.
+
+    Si no se proporcionan entidades, las extrae automáticamente usando NER.
+
+    Tipos de relaciones detectadas:
+    - DEMANDA: Actor demanda a demandado
+    - REPRESENTA: Abogado representa a parte
+    - JUZGA: Juez/tribunal interviene
+    - CITA: Documento cita norma
+    - Y más...
+
+    Retorna también datos de grafo para visualización.
+    """
+    try:
+        relation_service = get_relation_service()
+
+        # Si no hay entidades, extraerlas primero
+        entidades = request.entidades
+        if not entidades and request.extract_entities:
+            ner = get_ner()
+            entidades = ner.extract_enhanced(
+                text=request.texto,
+                use_llm_fallback=True
+            )
+
+        if not entidades:
+            return RelationExtractionResponse(
+                entidades=[],
+                relaciones=[],
+                graph_data=None
+            )
+
+        # Extraer relaciones
+        result = relation_service.extract_relations(
+            text=request.texto,
+            entities=entidades
+        )
+
+        # Convertir a respuesta
+        return RelationExtractionResponse(
+            entidades=result.entities,
+            relaciones=[
+                {
+                    "source_entity": r.source_entity,
+                    "source_label": r.source_label,
+                    "target_entity": r.target_entity,
+                    "target_label": r.target_label,
+                    "relation_type": r.relation_type,
+                    "confidence": r.confidence,
+                    "context": r.context
+                }
+                for r in result.relations
+            ],
+            graph_data=result.graph_data
+        )
+
+    except Exception as e:
+        logger.error(f"Error extrayendo relaciones: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/relaciones/partes-procesales")
+async def extraer_partes_procesales(request: RelationExtractionRequest):
+    """
+    Extrae partes procesales basándose en relaciones entre entidades.
+
+    Identifica:
+    - Parte actora
+    - Parte demandada
+    - Representantes de cada parte
+    - Juez/tribunal interviniente
+    """
+    try:
+        relation_service = get_relation_service()
+
+        # Si no hay entidades, extraerlas primero
+        entidades = request.entidades
+        if not entidades and request.extract_entities:
+            ner = get_ner()
+            entidades = ner.extract_enhanced(
+                text=request.texto,
+                use_llm_fallback=True
+            )
+
+        if not entidades:
+            return {"partes": {}}
+
+        partes = relation_service.extract_partes_procesales(
+            text=request.texto,
+            entities=entidades
+        )
+
+        return {"partes": partes}
+
+    except Exception as e:
+        logger.error(f"Error extrayendo partes procesales: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/relaciones/tipos")
+async def get_tipos_relaciones():
+    """
+    Lista los tipos de relaciones que se pueden detectar.
+    """
+    try:
+        from application.services.ia.relation_extraction_service import RelationExtractionService
+        return {"tipos": RelationExtractionService.RELATION_TYPES}
+
+    except Exception as e:
+        logger.error(f"Error obteniendo tipos de relaciones: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# === Endpoint de Hardware Profile ===
+
+@router.get("/hardware/profile")
+async def get_hardware_profile():
+    """
+    Obtiene información del perfil de hardware activo para IA.
+    """
+    try:
+        from infrastructure.config.hardware_profiles import get_profile_info
+        return get_profile_info()
+
+    except Exception as e:
+        logger.error(f"Error obteniendo perfil de hardware: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class SetHardwareProfileRequest(BaseModel):
+    profile: str = Field(..., description="Nombre del perfil: development, production, production_max")
+
+
+@router.post("/hardware/profile")
+async def set_hardware_profile(request: SetHardwareProfileRequest):
+    """
+    Cambia el perfil de hardware activo.
+
+    Perfiles disponibles:
+    - development: Mac/CPU-only
+    - production: Intel i7 + RTX 3060
+    - production_max: Hardware de alta gama
+    """
+    try:
+        from infrastructure.config.hardware_profiles import set_active_profile, get_profile_info
+
+        set_active_profile(request.profile)
+
+        return {
+            "success": True,
+            "profile": get_profile_info()
+        }
+
+    except Exception as e:
+        logger.error(f"Error cambiando perfil de hardware: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -8,8 +8,37 @@ Detecta cambios en 4 campos clave de expedientes.
 from dataclasses import dataclass
 from typing import Protocol
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+
+def _normalizar_numero(numero: str) -> str:
+    """Normaliza el formato del número de expediente para comparación.
+
+    Convierte diferentes formatos a uno común, preservando sufijos de incidentes:
+    - 'FPA_005672_2014' → 'FPA-005672-2014'
+    - 'FRE-010171-2019' → 'FRE-010171-2019'
+    - 'FRE 004379/2021' → 'FRE-004379-2021'
+    - 'FRE 004379/2021/1' → 'FRE-004379-2021-1' (incidente)
+    - 'FRE 004379/2021/I' → 'FRE-004379-2021-I' (incidente)
+
+    Args:
+        numero: Número de expediente en cualquier formato
+
+    Returns:
+        Número normalizado con formato 'XXX-NNNNNN-YYYY' o 'XXX-NNNNNN-YYYY-SUFIJO'
+    """
+    if not numero:
+        return ""
+    # Extraer componentes: prefijo (letras), número, año, y opcionalmente sufijo de incidente
+    match = re.match(r'([A-Z]+)[\s\-_]?(\d+)[\-/_](\d{4})(?:[\s\-/_](.+))?', numero.strip().upper())
+    if match:
+        prefijo, num, anio, sufijo = match.groups()
+        base = f"{prefijo}-{num}-{anio}"
+        # Si hay sufijo (incidente), agregarlo al identificador
+        return f"{base}-{sufijo}" if sufijo else base
+    return numero.strip().upper()
 
 
 class ExpedienteResumen(Protocol):
@@ -106,8 +135,9 @@ class DetectorCambios:
             'nueva_actuacion'
         """
         # Crear mapa de expedientes anteriores para búsqueda eficiente
+        # Usar números normalizados como claves para comparación consistente
         mapa_anterior = {
-            exp.numero: {
+            _normalizar_numero(exp.numero): {
                 "ultima_actuacion": exp.ultima_actuacion,
                 "situacion": exp.situacion,
                 "dependencia": exp.dependencia,
@@ -116,15 +146,20 @@ class DetectorCambios:
             for exp in anteriores
         }
 
+        logger.debug(f"Mapa anterior creado con {len(mapa_anterior)} expedientes")
         cambios: list[CambioExpediente] = []
+        no_encontrados = 0
 
         # Comparar cada expediente actual con su versión anterior
         for exp in actuales:
-            if exp.numero not in mapa_anterior:
+            num_normalizado = _normalizar_numero(exp.numero)
+            if num_normalizado not in mapa_anterior:
                 # Expediente nuevo, no hay cambios (se detecta en otro lugar)
+                no_encontrados += 1
+                logger.debug(f"Expediente {exp.numero} (normalizado: {num_normalizado}) no encontrado en anteriores")
                 continue
 
-            anterior = mapa_anterior[exp.numero]
+            anterior = mapa_anterior[num_normalizado]
             campos_cambiados: list[str] = []
 
             # Comparar cada campo monitoreado
@@ -174,7 +209,9 @@ class DetectorCambios:
                     f"{tipo_cambio} ({len(campos_cambiados)} campo(s))"
                 )
 
-        logger.info(f"Total de cambios detectados: {len(cambios)}")
+        if no_encontrados > 0:
+            logger.warning(f"Expedientes no encontrados en anteriores: {no_encontrados}")
+        logger.info(f"Total de cambios detectados: {len(cambios)} de {len(actuales)} expedientes comparados")
         return cambios
 
     def _campo_cambio(self, actual: str | None, anterior: str | None) -> bool:

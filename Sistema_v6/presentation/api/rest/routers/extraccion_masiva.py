@@ -39,7 +39,7 @@ class ConfigExtraccionRequest(BaseModel):
     procesar_con_pdf: bool = False
     incluir_historicas: bool = True
     min_utilidad: str = "MEDIA"
-    directorio_base: str = "./Sistema_v6/data/expedientes"
+    directorio_base: str = "./data/expedientes"
     # Opciones avanzadas de extracción
     detener_en_duplicado: bool = True
     omitir_duplicados: bool = True

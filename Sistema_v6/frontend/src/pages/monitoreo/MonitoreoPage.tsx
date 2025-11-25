@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Activity, Play, Pause, Plus, Bell, Clock, TrendingUp, AlertCircle, Settings } from 'lucide-react'
+import { Activity, Play, Pause, Plus, Bell, Clock, TrendingUp, AlertCircle, Settings, RefreshCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -13,42 +13,52 @@ import MonitoreoCard from '@/components/monitoreo/MonitoreoCard'
 import LogsList from '@/components/monitoreo/LogsList'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { toast } from 'sonner'
+import * as monitoreoApi from '@/api/monitoreoApi'
 
 export default function MonitoreoPage() {
   const {
     configuracion,
     expedientes,
     estadisticas,
+    estadoScheduler,
     isLoading,
     listarExpedientes,
     obtenerEstadisticas,
+    obtenerEstadoScheduler,
     toggleMonitoreo,
     toggleExpediente,
     removerExpediente,
     verificarExpediente,
+    listarCambios,
   } = useMonitoreoStore()
 
   const [showChanges, setShowChanges] = useState(false)
   const [selectedExpedienteId, setSelectedExpedienteId] = useState<number | undefined>()
+  const [isVerifyingGlobal, setIsVerifyingGlobal] = useState(false)
 
   useEffect(() => {
     listarExpedientes()
     obtenerEstadisticas()
-  }, [listarExpedientes, obtenerEstadisticas])
+    listarCambios() // Cargar cambios globales al iniciar
+  }, [listarExpedientes, obtenerEstadisticas, listarCambios])
 
   // Polling: actualizar estado del scheduler cada 10 segundos
   useEffect(() => {
     // Actualizar inmediatamente
     obtenerEstadisticas()
+    obtenerEstadoScheduler()
 
     // Configurar polling
     const interval = setInterval(() => {
       obtenerEstadisticas()
+      obtenerEstadoScheduler()
+      listarExpedientes() // Recargar expedientes para actualizar "última verificación"
     }, 10000) // 10 segundos
 
     // Cleanup al desmontar
     return () => clearInterval(interval)
-  }, [obtenerEstadisticas])
+  }, [obtenerEstadisticas, obtenerEstadoScheduler, listarExpedientes])
 
   const handleToggleMonitoreo = async () => {
     if (configuracion) {
@@ -69,6 +79,40 @@ export default function MonitoreoPage() {
 
   const handleVerificarExpediente = async (id: number) => {
     await verificarExpediente(id)
+  }
+
+  const handleVerificarGlobal = async () => {
+    setIsVerifyingGlobal(true)
+    toast.info('Verificando expedientes...', {
+      id: 'global-verify',
+      description: 'Conectando con PJN...'
+    })
+
+    try {
+      const response = await monitoreoApi.verificarManual()
+      toast.dismiss('global-verify')
+
+      if (response.success) {
+        toast.success('Verificación completada', {
+          description: `${response.cambios_detectados} cambio(s) detectado(s) en ${response.total_expedientes} expediente(s)`
+        })
+        // Actualizar datos
+        await obtenerEstadisticas()
+        await listarCambios()
+        await listarExpedientes() // Recargar expedientes para actualizar "última verificación"
+      } else {
+        toast.error('Error en verificación', {
+          description: response.error || 'Error desconocido'
+        })
+      }
+    } catch (error: any) {
+      toast.dismiss('global-verify')
+      toast.error('Error al verificar', {
+        description: error.message || 'Error de conexión'
+      })
+    } finally {
+      setIsVerifyingGlobal(false)
+    }
   }
 
   const handleViewChanges = (id: number) => {
@@ -99,6 +143,14 @@ export default function MonitoreoPage() {
         </div>
 
         <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={handleVerificarGlobal}
+            disabled={isVerifyingGlobal || expedientes.length === 0}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isVerifyingGlobal ? 'animate-spin' : ''}`} />
+            {isVerifyingGlobal ? 'Verificando...' : 'Verificar Ahora'}
+          </Button>
           <Link to="/settings">
             <Button variant="outline">
               <Settings className="h-4 w-4 mr-2" />
@@ -316,6 +368,7 @@ export default function MonitoreoPage() {
               <MonitoreoCard
                 key={expediente.id}
                 expediente={expediente}
+                ejecutando={estadoScheduler?.ejecutando || false}
                 onToggle={handleToggleExpediente}
                 onRemove={handleRemoverExpediente}
                 onVerify={handleVerificarExpediente}

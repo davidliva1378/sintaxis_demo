@@ -82,6 +82,8 @@ export interface ChatRequest {
   expediente_numero?: string
   historial?: MensajeChat[]
   n_contextos?: number
+  model?: string
+  temperature?: number
 }
 
 export interface ChatResponse {

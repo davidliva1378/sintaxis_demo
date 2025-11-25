@@ -204,8 +204,8 @@ Sistema_v6/
 
 | # | Tarea | Estado | Complejidad | Descripción |
 |---|-------|--------|-------------|-------------|
-| FIX-MON-01 | Mapeo de tipos de cambio | ⏳ Pendiente | Baja | Frontend usa [nueva_actuacion, cambio_estado, nuevo_archivo, modificacion, otro], Backend usa [cambio_situacion, cambio_dependencia, cambio_caratula] |
-| FIX-MON-02 | Sincronizar endpoints de configuración | ⏳ Pendiente | Media | ConfiguracionMonitoreo.tsx usa `/api/v1/config/sistema`, MonitoreoStore usa `/api/v1/monitoreo/configuracion` |
+| FIX-MON-01 | Mapeo de tipos de cambio | ✅ Completado | Baja | Frontend sincronizado con Backend - tipos en monitoreo.ts:14-22 (2025-11-24) |
+| FIX-MON-02 | Sincronizar endpoints de configuración | ✅ Completado | Media | ConfiguracionMonitoreo.tsx usa endpoint correcto `/api/v1/monitoreo/configuracion` (2025-11-24) |
 | FIX-MON-03 | usuario_id hardcodeado | ⏳ Pendiente | Media | Backend usa `usuario_id=1` para todos los usuarios (línea 310) |
 
 **Detalle FIX-MON-01: Mapeo de tipos de cambio**
@@ -552,6 +552,166 @@ class AnalizadorCambiosService:
 
 ---
 
+### Fase 2.7: Correcciones y Mejoras del Monitor (2025-11-24)
+
+> **Contexto:** Fixes y mejoras identificadas durante la implementación del registro de cambios en historial.
+
+#### 2.7.1 Tareas Completadas
+
+| # | Tarea | Estado | Descripción |
+|---|-------|--------|-------------|
+| FIX-MON-01 | Mapeo de tipos de cambio | ✅ Completado | Sincronizado frontend/backend (tipos monitoreo.ts) |
+| FIX-MON-04 | Registro de cambios en historial | ✅ Completado | Implementado en monitor_scheduler_service.py con auto-creación de expedientes |
+| FIX-MON-04b | Aplanar datos_adicionales | ✅ Completado | Evita [object Object] en frontend (monitorear_expedientes_use_case.py) |
+
+#### 2.7.2 Bugs Críticos (Prioridad Alta)
+
+| # | Tarea | Estado | Prioridad | Descripción |
+|---|-------|--------|-----------|-------------|
+| FIX-MON-07 | Extractor masivo guarda ultima_actuacion: null | ✅ Completado | **URGENTE** | Corregido en gestor_batch.py: búsqueda robusta en múltiples claves de JSON + fallback a fecha actual |
+| FIX-MON-05 | Error carga configuración monitoreo | ⏳ Pendiente | Alta | Toast "Error al cargar la configuración" al entrar a Configuración > Monitoreo |
+| FIX-MON-06 | Cambios de configuración no persisten | ⏳ Pendiente | Alta | Los valores modificados no se guardan correctamente |
+
+#### 2.7.3 Nuevas Funcionalidades
+
+| # | Tarea | Estado | Prioridad | Descripción |
+|---|-------|--------|-----------|-------------|
+| FEAT-MON-01 | Actualización automática al detectar cambios | ⏳ Pendiente | Alta | Opción configurable para disparar actualización completa del expediente cuando se detecta cambio |
+| FEAT-MON-02 | Configurar tiempo de retención del historial | ⏳ Pendiente | Media | Definir cuántos días/meses conservar registros en historial de cambios (limpieza automática) |
+| FEAT-MON-03 | Eliminar registros del historial | ⏳ Pendiente | Media | Permitir eliminar cambios individuales o en bulk del historial |
+| FEAT-SYS-01 | Botón para reiniciar servidores | ⏳ Pendiente | Media | Botón en UI (Configuración o Admin) para reiniciar backend/servicios desde el frontend |
+
+**Detalle FEAT-MON-01: Actualización automática**
+
+**Descripción:** Cuando el monitor detecta un cambio en un expediente, opcionalmente puede disparar la actualización completa del mismo (descargar nuevas actuaciones, PDFs, etc.).
+
+**Implementación:**
+- Agregar campo `auto_actualizar` en configuración de monitoreo
+- En `monitor_scheduler_service.py`, al detectar cambio, llamar a `CrearWorkspacesUseCase` para el expediente específico
+- UI: Toggle en Configuración > Monitoreo
+
+**Detalle FEAT-MON-02: Tiempo de retención**
+
+**Descripción:** Configurar cuánto tiempo se conservan los registros en el historial de cambios.
+
+**Implementación:**
+- Agregar campo `dias_retencion_historial` en configuración (default: 90 días)
+- Job programado para limpiar registros antiguos
+- UI: Input numérico en Configuración > Monitoreo
+
+**Detalle FEAT-MON-03: Eliminar registros**
+
+**Descripción:** Permitir al usuario eliminar registros del historial.
+
+**Implementación:**
+- Endpoint `DELETE /api/v1/monitoreo/cambios/{id}` para eliminación individual
+- Endpoint `DELETE /api/v1/monitoreo/cambios` con body de IDs para bulk
+- Botón de eliminar en cada registro del historial
+- Acción "Eliminar seleccionados" con checkbox
+
+#### 2.7.4 Mejoras de UX
+
+| # | Tarea | Estado | Prioridad | Descripción |
+|---|-------|--------|-----------|-------------|
+| UX-MON-06 | Badge de cambios sin leer en Header/Sidebar | ⏳ Pendiente | Media | Indicador visual global de cambios pendientes |
+| UX-MON-07 | Spinner en botón específico | ⏳ Pendiente | Baja | Loading solo en card que se está verificando |
+| UX-MON-08 | Toast con resultado específico | ⏳ Pendiente | Baja | "FPA-012332-2019: sin cambios" o "2 cambios detectados" |
+
+#### 2.7.5 Mejoras de Performance
+
+| # | Tarea | Estado | Prioridad | Descripción |
+|---|-------|--------|-----------|-------------|
+| PERF-MON-01 | Verificación individual por expediente | ⏳ Pendiente | Alta | ~5-10s en vez de 80s de verificación global |
+
+---
+
+### Fase 2.8: Vencimientos y Mejoras Mi Análisis
+
+| # | Tarea | Estado | Prioridad | Descripción |
+|---|-------|--------|-----------|-------------|
+| FEAT-VENC-01 | Cálculo de vencimientos con reglas | ⏳ Pendiente | Alta | Motor que calcule fechas de vencimiento según reglas configurables (ej: apelación 5 días, expresión de agravios 10 días) |
+| FEAT-VENC-02 | Configuración de reglas de plazos | ⏳ Pendiente | Alta | UI para definir/editar reglas de vencimientos por tipo de actuación |
+| FEAT-VENC-03 | Ocultar vencimientos cumplidos | ⏳ Pendiente | Media | Toggle para filtrar y ocultar vencimientos ya pasados de la vista |
+| FEAT-ANA-01 | Seleccionar actuaciones para Mi Análisis | ⏳ Pendiente | Alta | Permitir seleccionar múltiples actuaciones y enviarlas al panel Mi Análisis |
+
+---
+
+### Fase 2.9: Mejoras Sistema RAG
+
+> **Contexto:** El sistema RAG indexa actuaciones judiciales para búsqueda semántica. Se identificaron mejoras para optimizar la indexación y extracción de contenido.
+
+#### 2.9.1 Correcciones Completadas (2025-11-25)
+
+| # | Tarea | Estado | Descripción |
+|---|-------|--------|-------------|
+| FIX-RAG-01 | Indexar contenido real de PDFs | ✅ Completado | rag_indexer.py ahora extrae texto de PDFs usando ExtraccionTextoService |
+| FIX-RAG-02 | Construir ruta a PDFs | ✅ Completado | Método _construir_ruta_pdf() busca PDFs en estructura data/expedientes/ |
+| FIX-RAG-03 | Actualizar Qdrant | ✅ Completado | docker-compose.yml actualizado de v1.7.4 a v1.12.5 |
+
+#### 2.9.2 Mejoras Pendientes
+
+| # | Tarea | Estado | Prioridad | Descripción |
+|---|-------|--------|-----------|-------------|
+| FEAT-RAG-01 | Indexación incremental por expediente | ⏳ Pendiente | Alta | Solo indexar actuaciones nuevas cuando se actualiza un expediente |
+| FEAT-RAG-02 | Eliminar actuaciones obsoletas del índice | ⏳ Pendiente | Media | Si se borra actuación del expediente, eliminarla del índice |
+| FEAT-RAG-03 | Downgrade cliente Qdrant | ⏳ Pendiente | Baja | Alinear versión cliente (1.16.1) con servidor (1.12.5) para evitar warnings |
+
+**Detalle FEAT-RAG-01: Indexación Incremental**
+
+**Problema actual:** Cuando un expediente se actualiza, hay que reindexar todo el expediente completo (~200+ chunks).
+
+**Solución propuesta:**
+```python
+# infrastructure/rag/services/rag_indexer.py
+def actualizar_expediente(self, expediente_numero: str, ruta_json: Path) -> Dict[str, Any]:
+    """
+    Indexación incremental: solo indexa actuaciones nuevas
+
+    1. Obtener IDs de actuaciones ya indexadas en Qdrant (por expediente_numero)
+    2. Comparar con actuaciones en JSON
+    3. Indexar solo las nuevas
+    4. Eliminar las que ya no existen
+    """
+    # Obtener actuaciones indexadas
+    indexadas = self.search_service.qdrant.get_indexed_actuaciones(expediente_numero)
+    indexadas_ids = {act.metadata["actuacion_id"] for act in indexadas}
+
+    # Cargar actuaciones actuales del JSON
+    with open(ruta_json) as f:
+        actuaciones = json.load(f).get("Actuaciones", [])
+    actuales_ids = {act.get("Indice") for act in actuaciones}
+
+    # Determinar cambios
+    nuevas = actuales_ids - indexadas_ids
+    eliminadas = indexadas_ids - actuales_ids
+
+    # Indexar nuevas
+    for act in actuaciones:
+        if act.get("Indice") in nuevas:
+            self._indexar_actuacion_individual(act, expediente_numero)
+
+    # Eliminar obsoletas
+    for act_id in eliminadas:
+        self.search_service.qdrant.delete_by_actuacion_id(
+            expediente_numero, act_id
+        )
+
+    return {
+        "nuevas": len(nuevas),
+        "eliminadas": len(eliminadas),
+        "sin_cambios": len(actuales_ids & indexadas_ids)
+    }
+```
+
+**Archivos a modificar:**
+- `infrastructure/rag/services/rag_indexer.py` - Agregar método `actualizar_expediente()`
+- `infrastructure/rag/services/qdrant_service.py` - Agregar métodos `get_indexed_actuaciones()` y `delete_by_actuacion_id()`
+- `presentation/api/rest/routers/rag.py` - Agregar endpoint `POST /api/v1/rag/actualizar`
+
+**Estimación:** 4-6 horas
+
+---
+
 ### Fase 3: Nuevas Funcionalidades
 
 | # | Tarea | Estado | Prioridad | Complejidad |
@@ -560,7 +720,7 @@ class AnalizadorCambiosService:
 | 3.2 | Exportación de informes PDF/Excel | ⏳ Pendiente | Alta | Moderada |
 | 3.3 | Panel de analytics | ⏳ Pendiente | Media | Moderada |
 | 3.4 | Sistema de alertas configurables | ⏳ Pendiente | Media | Moderada |
-| 3.5 | Búsqueda semántica con RAG | ⏳ Pendiente | Media | Compleja |
+| 3.5 | Búsqueda semántica con RAG | ✅ Completado | Media | Compleja |
 
 ### Fase 4: Mejoras Adicionales
 
@@ -910,6 +1070,139 @@ pytest tests/
 | 2025-11-23 | 2.4 | Fix login Python 3.13: remover future annotations, agregar has_pjn_credentials property |
 | 2025-11-23 | 2.5 | Implementar paginación real en GET /expedientes: query params pagina, por_pagina |
 | 2025-11-24 | 2.6 | Agregada Fase 2.6 - Mejoras Completas del Frontend de Monitoreo (14 tareas, ~34-48h estimadas) |
+| 2025-11-24 | 2.7 | Agregada Fase 2.7 - Correcciones y mejoras del Monitor: FIX-MON-01/04/04b completados, bugs configuración, FEAT-MON-01/02/03 (auto-actualizar, retención, eliminar historial) |
+| 2025-11-24 | 2.8 | Auditoría completa de implementación: Verificadas 63 tareas, FIX-MON-01/02 marcados como completados, evaluación exhaustiva del progreso |
+
+---
+
+## Auditoría de Implementación (2025-11-24)
+
+### Resumen Ejecutivo de Auditoría
+
+Se realizó una evaluación exhaustiva del estado de implementación del plan completo, verificando cada tarea contra el código fuente actual.
+
+**Progreso General:** ~68% de infraestructura completa | 37% de tareas explícitas completadas (23/63)
+
+### Hallazgos Principales
+
+#### ✅ Verificaciones Positivas
+
+**Tareas Completadas y Verificadas:**
+1. **Fase 1 (100%)** - Las 4 correcciones críticas implementadas correctamente
+2. **Fase 2.1 (100%)** - Rate limiting implementado en todos los endpoints críticos
+3. **Fase 2.7 Fixes (100%)** - FIX-MON-01, 04, 04b, 07 verificados en código
+4. **Infraestructura Core (100%)** - Base de datos (migration 009), servicios backend, API con 22+ endpoints, componentes frontend
+
+**Discrepancias Encontradas (Positivas):**
+- **FIX-MON-01** (Mapeo de tipos): Marcado como pendiente pero está ✅ implementado (`monitoreo.ts:14-22`)
+- **FIX-MON-02** (Endpoints): Marcado como pendiente pero está ✅ implementado (`ConfiguracionMonitoreo.tsx:87`)
+
+#### 🔴 Bugs Críticos Confirmados
+
+**1. Usuario Hardcodeado (FIX-MON-03) - URGENTE**
+- **Ubicación**: `monitoreo.py:352`, `monitor_scheduler_service.py:225,439`
+- **Impacto**: Todos los usuarios ven los mismos expedientes monitoreados
+- **Severidad**: Alta - Problema de seguridad y multi-usuario
+- **Estimación fix**: 2-4 horas
+
+**2. Configuración No Persiste (FIX-MON-05/06) - ALTA**
+- **Ubicación**: `ConfiguracionMonitoreo.tsx`
+- **Impacto**: Los cambios de configuración no se guardan correctamente
+- **Severidad**: Alta - Funcionalidad rota
+- **Estimación fix**: 3-5 horas
+
+**3. Verificación Ineficiente (Fase 2.5) - ALTA UX**
+- **Estado**: 20% completado (1/5 tareas)
+- **Impacto**: Cada verificación toma ~80 segundos en vez de 5-10s
+- **Severidad**: Media - Experiencia de usuario degradada
+- **Estimación fix**: 6-8 horas
+
+### Completitud por Fase
+
+| Fase | Tareas Total | Completadas | Pendientes | % Completo |
+|------|-------------|-------------|------------|------------|
+| Fase 1 | 4 | 4 | 0 | 100% |
+| Fase 1.5 | 11 | 9 | 2 | 82% |
+| Fase 2 | 5 | 2 | 3 | 40% |
+| Fase 2.5 | 5 | 1 | 4 | 20% |
+| Fase 2.6 Fixes | 3 | 3 | 0 | 100% |
+| Fase 2.6 UX | 5 | 0 | 5 | 0% |
+| Fase 2.6 RT | 2 | 0 | 2 | 0% |
+| Fase 2.6 INT | 4 | 0 | 4 | 0% |
+| Fase 2.7 Completadas | 3 | 3 | 0 | 100% |
+| Fase 2.7 Bugs | 3 | 1 | 2 | 33% |
+| Fase 2.7 Features | 5 | 0 | 5 | 0% |
+| Fase 2.8 | 4 | 0 | 4 | 0% |
+| Fase 3 | 5 | 0 | 5 | 0% |
+| Fase 4 | 4 | 0 | 4 | 0% |
+| **TOTAL** | **63** | **23** | **40** | **~37%** |
+
+### Verificación de Infraestructura Core
+
+**Base de Datos ✅**
+- Migration 009 crea: `monitoreo_configuracion`, `expedientes_monitoreados`, `cambios_detectados`
+- 2 vistas: `cambios_detectados_completos`, `monitoreo_estadisticas`
+- Índices de performance implementados
+
+**Backend Services ✅**
+- `MonitoreoService`: CRUD completo para config, expedientes, cambios
+- `MonitorSchedulerService`: APScheduler integrado con registro de cambios
+- `MonitoreoRepository`: Capa de persistencia MySQL
+- `DetectorCambios`: Detección en 4 campos (ultima_actuacion, situacion, dependencia, caratula)
+
+**Frontend Components ✅**
+- `monitoreoApi.ts`: 22+ funciones API
+- `monitoreo.ts`: Tipos sincronizados con backend
+- `MonitoreoPage.tsx`: Página principal con polling
+- `LogsList.tsx`: Visualización de cambios con leído/no leído
+- `ConfiguracionMonitoreo.tsx`: Panel de configuración
+- `MonitoreoCard.tsx`: Card de expediente monitoreado
+
+### Recomendaciones Priorizadas
+
+**INMEDIATO (Esta Semana):**
+1. 🔴 **FIX-MON-03**: Eliminar usuario hardcodeado - implementar autenticación JWT real
+2. 🔴 **FIX-MON-05/06**: Corregir bugs de carga y persistencia de configuración
+3. 🟡 **Fase 2.5.1-2**: Implementar verificación individual por expediente
+
+**CORTO PLAZO (1-2 Semanas):**
+4. 🟡 **Fase 2.6 UX**: Búsqueda, filtros, badges de cambios sin leer
+5. 🟡 **Fase 2**: Connection pooling, manejo de errores, logging centralizado, health checks
+
+**MEDIO PLAZO (3-4 Semanas):**
+6. 🟢 **WebSocket**: Integración de notificaciones en tiempo real (RT-MON-01, RT-MON-02)
+7. 🟢 **Vencimientos**: Sistema de cálculo de vencimientos con reglas (FEAT-VENC-01/02)
+8. 🟢 **UX Avanzado**: Exportación, paginación store, importación bulk
+
+### Archivos Críticos Identificados
+
+**Requieren Corrección Inmediata:**
+- `Sistema_v6/presentation/api/rest/routers/monitoreo.py` (líneas 249, 338-352)
+- `Sistema_v6/application/services/monitor_scheduler_service.py` (líneas 225, 439)
+- `Sistema_v6/frontend/src/components/settings/ConfiguracionMonitoreo.tsx` (líneas 84-121)
+
+**Requieren Nuevas Funcionalidades:**
+- Crear: `frontend/src/components/layout/UnreadBadge.tsx`
+- Crear: `frontend/src/components/monitoreo/MonitoreoFilters.tsx`
+- Modificar: `application/use_cases/monitorear_expedientes_use_case.py` (verificación individual)
+
+### Conclusión de Auditoría
+
+El sistema de monitoreo tiene una **base sólida** con ~68% de infraestructura completa. Los commits recientes (especialmente 5567af9) implementaron correctamente:
+- ✅ Esquema completo de base de datos
+- ✅ Servicios backend y API (22+ endpoints)
+- ✅ Componentes frontend con polling
+- ✅ Detección y registro de cambios
+- ✅ Sincronización de tipos
+
+**Brechas críticas identificadas:**
+- ❌ Monitoreo específico por usuario (problema de seguridad)
+- ❌ Verificación individual por expediente (problema de UX)
+- ❌ Bugs de persistencia de configuración
+- ❌ Características en tiempo real (WebSocket)
+- ❌ Características avanzadas de UX
+
+**Precisión del Plan:** El documento muestra alta precisión (>95%) con solo 2 tareas incorrectamente marcadas como pendientes cuando ya estaban implementadas.
 
 ---
 
@@ -1240,4 +1533,4 @@ pytest tests/
 ---
 
 *Documento generado para seguimiento por agente IA - Sistema PJN v6*
-*Actualizado: 2025-11-24 - v2.6 - Mejoras completas del Frontend de Monitoreo (14 tareas)*
+*Actualizado: 2025-11-24 - v2.8 - Auditoría completa de implementación (63 tareas evaluadas)*

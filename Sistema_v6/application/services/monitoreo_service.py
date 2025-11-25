@@ -36,6 +36,16 @@ class MonitoreoService:
         """
         self._repo = repository or MonitoreoRepository()
 
+    @property
+    def repository(self) -> MonitoreoRepository:
+        """
+        Expone el repositorio para casos donde se necesita acceso directo.
+
+        Returns:
+            Repositorio de monitoreo
+        """
+        return self._repo
+
     # =========================================================================
     # CONFIGURACION
     # =========================================================================
@@ -63,7 +73,14 @@ class MonitoreoService:
         notificar_sistema: Optional[bool] = None,
         hora_inicio: Optional[str] = None,
         hora_fin: Optional[str] = None,
-        dias_semana: Optional[List[int]] = None
+        dias_semana: Optional[List[int]] = None,
+        # Opciones de extracción
+        fecha_corte_dias: Optional[int] = None,
+        max_paginas_monitoreo: Optional[int] = None,
+        tiempo_maximo_extraccion: Optional[int] = None,
+        detener_en_duplicado: Optional[bool] = None,
+        orden_extraccion: Optional[str] = None,
+        mostrar_navegador_monitoreo: Optional[bool] = None
     ) -> Dict[str, Any]:
         """
         Actualiza la configuración de monitoreo.
@@ -94,6 +111,19 @@ class MonitoreoService:
             kwargs['hora_fin'] = hora_fin
         if dias_semana is not None:
             kwargs['dias_semana'] = dias_semana
+        # Opciones de extracción
+        if fecha_corte_dias is not None:
+            kwargs['fecha_corte_dias'] = fecha_corte_dias
+        if max_paginas_monitoreo is not None:
+            kwargs['max_paginas_monitoreo'] = max_paginas_monitoreo
+        if tiempo_maximo_extraccion is not None:
+            kwargs['tiempo_maximo_extraccion'] = tiempo_maximo_extraccion
+        if detener_en_duplicado is not None:
+            kwargs['detener_en_duplicado'] = detener_en_duplicado
+        if orden_extraccion is not None:
+            kwargs['orden_extraccion'] = orden_extraccion
+        if mostrar_navegador_monitoreo is not None:
+            kwargs['mostrar_navegador_monitoreo'] = mostrar_navegador_monitoreo
 
         if kwargs:
             self._repo.actualizar_configuracion(usuario_id, **kwargs)

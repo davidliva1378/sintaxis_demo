@@ -112,6 +112,8 @@ class GestorReseteo:
         self.logs_dir = self.data_dir / "logs"
         self.db_path = self.data_dir / "sistema.db"
         self.vector_store_dir = self.data_dir / "vector_store"
+        self.bm25_index_dir = self.data_dir / "bm25_index"
+        self.qdrant_dir = self.data_dir / "qdrant"
 
     def get_estadisticas_sistema(self) -> EstadisticasSistema:
         """
@@ -449,6 +451,8 @@ class GestorReseteo:
                 self.cache_dir,
                 self.logs_dir,
                 self.vector_store_dir,
+                self.bm25_index_dir,
+                self.qdrant_dir,
                 self.data_dir / "expedientes_sistema.json"
             ])
 
@@ -460,6 +464,8 @@ class GestorReseteo:
                 self.cache_dir,
                 self.logs_dir,
                 self.vector_store_dir,
+                self.bm25_index_dir,
+                self.qdrant_dir,
                 self.data_dir / "expedientes_sistema.json",
                 self.db_path
             ])
@@ -546,6 +552,7 @@ class GestorReseteo:
 
         Para COMPLETO:
         - duplicados_detectados, vencimientos, actuaciones, procesamiento_estadisticas, entidades_extraidas, expedientes
+        - MONITOREO: cambios_detectados, expedientes_monitoreados, monitoreo_configuracion
 
         Para NUCLEAR (reset absoluto):
         - Todo lo anterior + tablas de usuario (notas, agenda, escritos, plantillas)
@@ -556,7 +563,7 @@ class GestorReseteo:
         Returns:
             Dict con resultado de la operación
         """
-        # Tablas base de procesamiento (orden por dependencias FK)
+        # Tablas base de procesamiento + monitoreo (orden por dependencias FK)
         tablas = [
             "duplicados_detectados",
             "vencimientos",
@@ -565,6 +572,10 @@ class GestorReseteo:
             "procesamiento_estadisticas",
             "entidades_extraidas",  # Entidades NER (FK a expedientes)
             "expedientes",
+            # Tablas de monitoreo (orden: cambios → expedientes_monitoreados → configuracion)
+            "cambios_detectados",  # FK a expedientes_monitoreados
+            "expedientes_monitoreados",  # FK a usuario (no configurado, pero depende lógicamente)
+            "monitoreo_configuracion",  # FK a usuario (no configurado, pero depende lógicamente)
         ]
 
         # Para NUCLEAR, agregar tablas de usuario
@@ -639,7 +650,7 @@ class GestorReseteo:
         Returns:
             Dict con preview de la operación
         """
-        # Tablas base de procesamiento
+        # Tablas base de procesamiento + monitoreo
         tablas = [
             "duplicados_detectados",
             "vencimientos",
@@ -648,6 +659,10 @@ class GestorReseteo:
             "procesamiento_estadisticas",
             "entidades_extraidas",  # Entidades NER (FK a expedientes)
             "expedientes",
+            # Tablas de monitoreo (orden: cambios → expedientes_monitoreados → configuracion)
+            "cambios_detectados",  # FK a expedientes_monitoreados
+            "expedientes_monitoreados",  # FK a usuario (no configurado, pero depende lógicamente)
+            "monitoreo_configuracion",  # FK a usuario (no configurado, pero depende lógicamente)
         ]
 
         # Para NUCLEAR, agregar tablas de usuario

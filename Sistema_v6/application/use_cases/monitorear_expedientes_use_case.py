@@ -31,27 +31,33 @@ logger = logging.getLogger(__name__)
 def normalizar_numero_expediente(numero: str) -> str:
     """Normaliza el formato del número de expediente.
 
-    Convierte diferentes formatos a uno común:
+    Convierte diferentes formatos a uno común, preservando sufijos de incidentes:
     - 'FRE 004379/2021' → 'FRE-004379-2021'
     - 'FRE-004379-2021' → 'FRE-004379-2021'
     - 'FRE004379/2021' → 'FRE-004379-2021'
+    - 'FRE 004379/2021/1' → 'FRE-004379-2021-1' (incidente)
+    - 'FRE 004379/2021/I' → 'FRE-004379-2021-I' (incidente)
 
     Args:
         numero: Número de expediente en cualquier formato
 
     Returns:
-        Número normalizado con formato 'XXX-NNNNNN-YYYY'
+        Número normalizado con formato 'XXX-NNNNNN-YYYY' o 'XXX-NNNNNN-YYYY-SUFIJO'
     """
     import re
-    # Extraer componentes: prefijo (letras), número, año
+    # Extraer componentes: prefijo (letras), número, año, y opcionalmente sufijo de incidente
     # Patrones posibles:
     # FRE-010171-2019, FRE 004379/2021, FRE004379/2021, FPA_005672_2014
-    match = re.match(r'([A-Z]+)[\s\-_]?(\d+)[\-/_](\d{4})', numero.strip().upper())
+    # FRE 004379/2021/1, FRE_004379_2021_1 (con sufijos de incidentes)
+    match = re.match(r'([A-Z]+)[\s\-_]?(\d+)[\-/_](\d{4})(?:[\s\-/_](.+))?', numero.strip().upper())
     if match:
         prefijo = match.group(1)
         num = match.group(2).zfill(6)  # Pad con ceros a 6 dígitos
         anio = match.group(3)
-        return f"{prefijo}-{num}-{anio}"
+        sufijo = match.group(4)  # Sufijo de incidente (si existe)
+        base = f"{prefijo}-{num}-{anio}"
+        # Si hay sufijo (incidente), agregarlo al identificador
+        return f"{base}-{sufijo}" if sufijo else base
     return numero  # Devolver original si no matchea
 
 
@@ -204,6 +210,7 @@ class MonitorearExpedientesUseCase:
                 max_paginas=command.max_paginas,
                 tiempo_maximo_segundos=command.tiempo_maximo_segundos,
                 detener_en_duplicado=command.detener_en_duplicado,
+                orden_extraccion=command.orden_extraccion,
             )
             extractor = ExtractorMasivo(config=config)
 
@@ -291,14 +298,19 @@ class MonitorearExpedientesUseCase:
 
                 # Convertir a CambioDetectado para compatibilidad
                 for cambio_multi in cambios_multi:
+                    # Aplanar datos_adicionales para evitar [object Object] en frontend
+                    datos_adicionales = {
+                        "campos_cambiados": ", ".join(cambio_multi.campos_cambiados),
+                    }
+                    # Agregar valores anteriores como campos individuales
+                    for campo, valor in cambio_multi.valores_anteriores.items():
+                        datos_adicionales[f"{campo}_anterior"] = str(valor) if valor else ""
+
                     cambio = CambioDetectado(
                         numero_expediente=cambio_multi.expediente.numero,
                         tipo=cambio_multi.tipo_cambio,
                         descripcion=self._generar_descripcion_cambio(cambio_multi),
-                        datos_adicionales={
-                            "campos_cambiados": cambio_multi.campos_cambiados,
-                            "valores_anteriores": cambio_multi.valores_anteriores,
-                        },
+                        datos_adicionales=datos_adicionales,
                     )
                     cambios_detectados.append(cambio)
 

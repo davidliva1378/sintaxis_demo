@@ -194,6 +194,38 @@
     animation: bounce 1.4s infinite;
     animation-delay: 0.4s;
   }
+
+  /* Animación de latido cardíaco - Pulso doble con glow */
+  @keyframes heartbeatGlow {
+    0% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+    }
+    14% {
+      transform: scale(1.1);
+      box-shadow: 0 0 8px 2px rgba(34, 197, 94, 0.6);
+    }
+    28% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+    }
+    42% {
+      transform: scale(1.1);
+      box-shadow: 0 0 8px 2px rgba(34, 197, 94, 0.6);
+    }
+    70% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+    }
+  }
+
+  .animate-heartbeat-glow {
+    animation: heartbeatGlow 2s ease-in-out infinite;
+  }
 }
 
 /* Mejoras de accesibilidad y UX */

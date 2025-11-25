@@ -16,6 +16,8 @@ import {
   FileText,
   CheckCircle2,
   Circle,
+  Building,
+  Layers,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -26,10 +28,13 @@ import { TIPOS_CAMBIO, type TipoCambio } from '@/types/monitoreo'
 // Mapeo de iconos para cada tipo de cambio
 const ICON_MAP: Record<TipoCambio, React.ComponentType<{ className?: string }>> = {
   nueva_actuacion: FilePlus,
-  cambio_estado: RefreshCw,
+  cambio_situacion: RefreshCw,
+  cambio_dependencia: Building,
+  cambio_caratula: FileText,
   nuevo_archivo: Paperclip,
   modificacion: Edit,
   otro: Info,
+  multiples_cambios: Layers,
 }
 
 // Mapeo de colores para badges
@@ -38,7 +43,10 @@ const COLOR_MAP: Record<string, string> = {
   purple: 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400',
   green: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400',
   orange: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400',
+  amber: 'bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400',
+  indigo: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400',
   gray: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400',
+  red: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
 }
 
 interface LogsListProps {

@@ -18,6 +18,7 @@ import json
 from admin import GestorReseteo, NivelReseteo
 from presentation.api.rest.routers.auth import get_current_active_user
 from infrastructure.persistence.database import Usuario
+from infrastructure.di_container import get_container
 from Sistema_v6.infrastructure.persistence.expedientes_mysql import get_expedientes_repository
 from Sistema_v6.gestor_directorios.expedientes import GestorDirectoriosExpedientes
 
@@ -235,6 +236,15 @@ async def resetear_sistema(
                 "⚠️ ADVERTENCIA: Los datos de MySQL NO fueron eliminados. "
                 "Puede haber inconsistencias entre archivos y base de datos."
             )
+
+        # Recargar caché del repositorio después del reset COMPLETO o NUCLEAR
+        if not request.dry_run and nivel in (NivelReseteo.COMPLETO, NivelReseteo.NUCLEAR):
+            try:
+                container = get_container()
+                await container.expediente_repo.recargar()
+                resultado.detalles.append("✓ Caché del repositorio recargada")
+            except Exception as e:
+                resultado.detalles.append(f"⚠ No se pudo recargar caché: {e}")
 
         return ResultadoReseteoResponse(**resultado.to_dict())
     except Exception as e:
