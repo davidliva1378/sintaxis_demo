@@ -1107,6 +1107,11 @@ async def aviso_si_tarda(idx, segundos):
     await asyncio.sleep(segundos)
     logger.warning("⏳ Descarga en curso para actuación %d... lleva más de %d segundos.", idx, segundos)
 
+
+# Timeout máximo para descargas (en milisegundos)
+DOWNLOAD_TIMEOUT_MS = 120_000  # 2 minutos
+SAVE_TIMEOUT_SECONDS = 90  # 90 segundos para guardar archivo
+
 async def descargar_archivos_actuaciones_modelos(
     page: Page,
     actuaciones: list[Actuacion],
@@ -1168,7 +1173,8 @@ async def descargar_archivos_actuaciones_modelos(
         for intento in range(3):
             advertencia = None
             try:
-                async with page.expect_download() as download_info:
+                # Usar timeout explícito para expect_download (evita congelamientos)
+                async with page.expect_download(timeout=DOWNLOAD_TIMEOUT_MS) as download_info:
                     await page.evaluate("""
                         (url) => {
                             const a = document.createElement('a');
@@ -1181,7 +1187,12 @@ async def descargar_archivos_actuaciones_modelos(
 
                 download = await download_info.value
                 advertencia = asyncio.create_task(aviso_si_tarda(idx, 30))
-                await download.save_as(ruta_archivo)
+
+                # Usar asyncio.wait_for para timeout en save_as
+                await asyncio.wait_for(
+                    download.save_as(ruta_archivo),
+                    timeout=SAVE_TIMEOUT_SECONDS
+                )
 
                 logger.info("✅ Archivo descargado: %s", nombre_archivo)
                 act.descargado = True
@@ -1190,10 +1201,10 @@ async def descargar_archivos_actuaciones_modelos(
             except (PlaywrightTimeout, asyncio.TimeoutError) as e:
                 ultimo_error = e
                 if intento == 2:
-                    logger.error("❌ Timeout en descarga tras 3 intentos para actuación %d", idx)
+                    logger.error("❌ Timeout en descarga tras 3 intentos para actuación %d (archivo: %s)", idx, nombre_archivo)
                 else:
                     logger.warning("⚠️ Timeout en actuación %d, reintentando (%d/3)...", idx, intento + 1)
-                    await asyncio.sleep(4)
+                    await asyncio.sleep(5)  # Aumentado de 4 a 5 segundos
             except (OSError, IOError) as e:
                 logger.error("❌ Error de I/O al guardar archivo %s: %s", nombre_archivo, e)
                 ultimo_error = e
@@ -1204,7 +1215,7 @@ async def descargar_archivos_actuaciones_modelos(
                     logger.error("❌ Error inesperado tras 3 intentos para actuación %d: %s", idx, e)
                 else:
                     logger.warning("⚠️ Error en actuación %d, reintentando (%d/3)...", idx, intento + 1)
-                    await asyncio.sleep(4)
+                    await asyncio.sleep(5)  # Aumentado de 4 a 5 segundos
             finally:
                 if advertencia is not None:
                     advertencia.cancel()
@@ -1213,6 +1224,7 @@ async def descargar_archivos_actuaciones_modelos(
 
         if not descarga_exitosa:
             act.descargado = False
+            logger.warning("⚠️ Descarga fallida para actuación %d, continuando con siguiente...", idx)
 
     return actuaciones_actualizadas
 
@@ -1312,7 +1324,8 @@ async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_
         for intento in range(3):
             advertencia = None
             try:
-                async with page.expect_download() as download_info:
+                # Usar timeout explícito para expect_download (evita congelamientos)
+                async with page.expect_download(timeout=DOWNLOAD_TIMEOUT_MS) as download_info:
                     await page.evaluate("""
                         (url) => {
                             const a = document.createElement('a');
@@ -1327,17 +1340,21 @@ async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_
 
                 # Aviso si tarda
                 advertencia = asyncio.create_task(aviso_si_tarda(idx, 30))
-                await download.save_as(ruta_archivo)
+                # Usar asyncio.wait_for para timeout en save_as
+                await asyncio.wait_for(
+                    download.save_as(ruta_archivo),
+                    timeout=SAVE_TIMEOUT_SECONDS
+                )
 
                 logger.info("✅ Archivo descargado: %s", nombre_archivo)
                 break  # éxito
             except (PlaywrightTimeout, asyncio.TimeoutError) as e:
                 ultimo_error = e
                 if intento == 2:
-                    logger.error("❌ Timeout en descarga tras 3 intentos para actuación %d", idx)
+                    logger.error("❌ Timeout en descarga tras 3 intentos para actuación %d: %s", idx, e)
                 else:
                     logger.warning("⚠️ Timeout en actuación %d, reintentando (%d/3)...", idx, intento + 1)
-                    await asyncio.sleep(4)
+                    await asyncio.sleep(5)
             except (OSError, IOError) as e:
                 # Errores de I/O no deben reintentar
                 logger.error("❌ Error de I/O al guardar archivo %s: %s", nombre_archivo, e)
@@ -1349,7 +1366,7 @@ async def descargar_archivos_actuaciones(page: Page, actuaciones: list, carpeta_
                     logger.error("❌ Error inesperado tras 3 intentos para actuación %d: %s", idx, e)
                 else:
                     logger.warning("⚠️ Error en actuación %d, reintentando (%d/3)...", idx, intento + 1)
-                    await asyncio.sleep(4)
+                    await asyncio.sleep(5)
             finally:
                 if advertencia is not None:
                     advertencia.cancel()

@@ -241,7 +241,7 @@ class GestorBatch:
 
             # Parsear número usando la función que maneja todos los formatos
             # Soporta: "FPA 001234/2024", "FRE 001234/2024/I", "001234/2024/1", etc.
-            _, numero_limpio, anio_limpio = descomponer_numero_expediente(numero_expediente)
+            _, numero_limpio, anio_limpio, incidente = descomponer_numero_expediente(numero_expediente)
 
             if not numero_limpio:
                 print(f"❌ No se pudo parsear el número de expediente: {numero_expediente}")
@@ -293,15 +293,63 @@ class GestorBatch:
                 }
 
             # Selección de expediente cuando hay múltiples resultados
+            fila_seleccionada = filas[0]
             if len(filas) > 1:
-                print(
-                    f"⚠️ Múltiples expedientes encontrados ({len(filas)}) para {numero_expediente}. "
-                    f"Usando el primero de la lista."
-                )
+                if incidente:
+                    # Buscar la fila que coincida con el incidente
+                    print(
+                        f"🔍 Múltiples expedientes ({len(filas)}) encontrados. "
+                        f"Buscando incidente: '{incidente}'..."
+                    )
+                    fila_encontrada = None
+                    for fila in filas:
+                        texto_fila = await fila.inner_text()
+                        # El incidente aparece como sufijo en el número de expediente
+                        # Ej: "FPA 21002641/2010/I" o "FPA 21002641/2010/CA1"
+                        if f"/{incidente}" in texto_fila.upper() or f"-{incidente}" in texto_fila.upper():
+                            fila_encontrada = fila
+                            print(f"✅ Incidente '{incidente}' encontrado en fila")
+                            break
+
+                    if fila_encontrada:
+                        fila_seleccionada = fila_encontrada
+                    else:
+                        print(
+                            f"⚠️ Incidente '{incidente}' no encontrado entre {len(filas)} filas. "
+                            f"Usando el primero de la lista."
+                        )
+                else:
+                    # Sin incidente especificado, buscar el expediente principal
+                    # (el que NO tiene sufijo de incidente)
+                    print(
+                        f"🔍 Múltiples expedientes ({len(filas)}) encontrados. "
+                        f"Buscando expediente principal (sin incidente)..."
+                    )
+                    fila_principal = None
+                    for fila in filas:
+                        texto_fila = await fila.inner_text()
+                        # El principal es el que tiene formato NNNN/YYYY sin sufijo
+                        # Verificar que no tenga /I, /CA1, /1, etc. después del año
+                        import re
+                        # Buscar patrón: número/año que NO esté seguido de /sufijo
+                        if numero_limpio and anio_limpio:
+                            patron_principal = rf'{numero_limpio}\s*/\s*{anio_limpio}(?!\s*/)'
+                            if re.search(patron_principal, texto_fila):
+                                fila_principal = fila
+                                print(f"✅ Expediente principal encontrado")
+                                break
+
+                    if fila_principal:
+                        fila_seleccionada = fila_principal
+                    else:
+                        print(
+                            f"⚠️ No se pudo identificar expediente principal. "
+                            f"Usando el primero de la lista."
+                        )
 
             # Navegar al expediente seleccionado
             try:
-                enlace_expediente = await filas[0].query_selector("a")
+                enlace_expediente = await fila_seleccionada.query_selector("a")
                 if not enlace_expediente:
                     print(f"❌ No se encontró enlace en fila del expediente {numero_expediente}")
                     return {

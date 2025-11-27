@@ -528,7 +528,7 @@ class MonitorearExpedientesUseCase:
                 return
 
             # Extraer actuaciones actualizadas
-            _, numero, anio = descomponer_numero_expediente(expediente.numero)
+            _, numero, anio, _ = descomponer_numero_expediente(expediente.numero)
             if not (numero and anio):
                 logger.warning(f"No se pudo descomponer número: {expediente.numero}")
                 return

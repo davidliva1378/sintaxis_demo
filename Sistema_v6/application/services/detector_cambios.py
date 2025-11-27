@@ -8,37 +8,10 @@ Detecta cambios en 4 campos clave de expedientes.
 from dataclasses import dataclass
 from typing import Protocol
 import logging
-import re
+
+from core.domain.utils.text import normalizar_numero_completo as _normalizar_numero
 
 logger = logging.getLogger(__name__)
-
-
-def _normalizar_numero(numero: str) -> str:
-    """Normaliza el formato del número de expediente para comparación.
-
-    Convierte diferentes formatos a uno común, preservando sufijos de incidentes:
-    - 'FPA_005672_2014' → 'FPA-005672-2014'
-    - 'FRE-010171-2019' → 'FRE-010171-2019'
-    - 'FRE 004379/2021' → 'FRE-004379-2021'
-    - 'FRE 004379/2021/1' → 'FRE-004379-2021-1' (incidente)
-    - 'FRE 004379/2021/I' → 'FRE-004379-2021-I' (incidente)
-
-    Args:
-        numero: Número de expediente en cualquier formato
-
-    Returns:
-        Número normalizado con formato 'XXX-NNNNNN-YYYY' o 'XXX-NNNNNN-YYYY-SUFIJO'
-    """
-    if not numero:
-        return ""
-    # Extraer componentes: prefijo (letras), número, año, y opcionalmente sufijo de incidente
-    match = re.match(r'([A-Z]+)[\s\-_]?(\d+)[\-/_](\d{4})(?:[\s\-/_](.+))?', numero.strip().upper())
-    if match:
-        prefijo, num, anio, sufijo = match.groups()
-        base = f"{prefijo}-{num}-{anio}"
-        # Si hay sufijo (incidente), agregarlo al identificador
-        return f"{base}-{sufijo}" if sufijo else base
-    return numero.strip().upper()
 
 
 class ExpedienteResumen(Protocol):

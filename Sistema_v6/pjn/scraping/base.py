@@ -24,6 +24,12 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import AsyncIterator, Iterable, Sequence
 
+# Importar funciones centralizadas de text.py para re-exportar
+from core.domain.utils.text import (
+    descomponer_numero_expediente,
+    normalizar_numero_completo,
+)
+
 from playwright.async_api import (
     Browser,
     BrowserContext,
@@ -137,91 +143,6 @@ def normalizar_numero_expediente(
             numero = valor_por_defecto
 
     return re.sub(r"[^\w-]", "_", numero)
-
-
-def _expandir_anio(anio: str | None) -> str | None:
-    """Convierte un componente de año de 1 a 3 dígitos en un año de 4 dígitos."""
-
-    if not anio:
-        return None
-
-    digitos = re.sub(r"\D", "", anio)
-    if not digitos:
-        return None
-
-    if len(digitos) >= 4:
-        return digitos[-4:]
-
-    sufijo = digitos
-    sufijo_len = len(sufijo)
-    actual = datetime.now().year
-    sufijo_normalizado = sufijo.zfill(sufijo_len)
-
-    for year in range(actual + 1, 1899, -1):
-        if str(year).endswith(sufijo_normalizado):
-            return f"{year:04d}"
-
-    return sufijo.zfill(4)[-4:]
-
-
-def descomponer_numero_expediente(
-    valor: str | None,
-) -> tuple[str | None, str | None, str | None]:
-    """Obtiene jurisdicción, número y año desde una cadena de expediente.
-
-    Soporta formatos con prefijos alfabéticos y sufijos de incidentes, por
-    ejemplo ``"FPA 21002641/2010"``, ``"3-21002641-23"`` o
-    ``"21002641/2010/I"``. Los incidentes (``/I``, ``/CA1``, ``/1``) se ignoran y
-    los años de dos o tres dígitos se expanden a cuatro cuando es posible.
-    """
-
-    if not valor:
-        return None, None, None
-
-    texto = limpiar_texto(str(valor))
-    if not texto:
-        return None, None, None
-
-    texto = re.sub(r"^[^0-9]+", "", texto)
-    if not texto:
-        return None, None, None
-
-    texto = re.sub(r"\s+", "", texto)
-
-    def _remover_incidentes(cadena: str) -> str:
-        while True:
-            match = re.search(r"/(?:[A-Za-z]+[A-Za-z0-9]*|\d+)$", cadena)
-            if not match:
-                break
-
-            if cadena[: match.start()].count("/") == 0:
-                break
-
-            cadena = cadena[: match.start()]
-
-        return re.sub(r"(?:[-][A-Za-z]+[A-Za-z0-9]*)+$", "", cadena)
-
-    texto = _remover_incidentes(texto)
-
-    bloques = re.findall(r"\d+", texto)
-    if not bloques:
-        return None, None, None
-
-    jurisdiccion: str | None = None
-    numero: str | None = None
-    anio: str | None = None
-
-    if len(bloques) >= 3:
-        jurisdiccion, numero, anio = bloques[-3], bloques[-2], bloques[-1]
-    elif len(bloques) == 2:
-        numero, anio = bloques
-    elif len(bloques) == 1:
-        numero = bloques[0]
-
-    numero = numero or None
-    anio = _expandir_anio(anio) if anio else None
-
-    return jurisdiccion, numero, anio
 
 
 # === Gestión de sesiones de Playwright ===

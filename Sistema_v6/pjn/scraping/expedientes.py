@@ -1024,7 +1024,7 @@ async def buscar_expedientes(
     anio_original = anio
 
     if numero and not anio:
-        _, numero, anio = descomponer_numero_expediente(numero)
+        _, numero, anio, _ = descomponer_numero_expediente(numero)
         if numero and anio:
             logger.debug(
                 "Normalizado número de expediente sin año explícito: %s/%s",
@@ -1041,7 +1041,7 @@ async def buscar_expedientes(
             return []
 
     if anio and numero:
-        _, numero, anio = descomponer_numero_expediente(f"{numero}/{anio}")
+        _, numero, anio, _ = descomponer_numero_expediente(f"{numero}/{anio}")
 
     if anio and not numero:
         logger.error("❌ Para buscar por año debe indicar también el número del expediente.")

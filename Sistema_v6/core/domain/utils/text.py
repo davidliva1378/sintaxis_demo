@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+import warnings
 
 
 def limpiar_texto(texto: str | None) -> str:
@@ -74,6 +75,68 @@ def normalizar_texto(texto: str | None) -> str:
     )
 
 
+def normalizar_numero_completo(numero: str) -> str:
+    """Normaliza número de expediente PRESERVANDO sufijos de incidentes.
+
+    Esta función es la forma preferida de normalizar números de expediente
+    cuando se necesita mantener la identidad completa incluyendo incidentes.
+
+    Args:
+        numero: Número en cualquier formato
+
+    Returns:
+        Formato normalizado: 'XXX-NNNNNN-YYYY' o 'XXX-NNNNNN-YYYY-SUFIJO'
+
+    Examples:
+        >>> normalizar_numero_completo('FRE 004379/2021')
+        'FRE-004379-2021'
+        >>> normalizar_numero_completo('FRE 004379/2021/1')
+        'FRE-004379-2021-1'
+        >>> normalizar_numero_completo('FRE 004379/2021/CA1')
+        'FRE-004379-2021-CA1'
+        >>> normalizar_numero_completo('FRE 004379/2021/I')
+        'FRE-004379-2021-I'
+    """
+    if not numero:
+        return ""
+    match = re.match(
+        r'([A-Z]+)[\s\-_]?(\d+)[\-/_](\d{4})(?:[\s\-/_](.+))?',
+        numero.strip().upper()
+    )
+    if match:
+        prefijo, num, anio, sufijo = match.groups()
+        base = f"{prefijo}-{num}-{anio}"
+        return f"{base}-{sufijo}" if sufijo else base
+    return numero.strip().upper()
+
+
+def _extraer_incidente(cadena: str) -> str | None:
+    """Extrae el sufijo de incidente de un número de expediente.
+
+    Los incidentes son sufijos como /I, /CA1, /1, etc. que indican incidentes
+    o actuaciones derivadas del expediente principal.
+
+    Args:
+        cadena: Número de expediente que puede contener incidente
+
+    Returns:
+        Sufijo del incidente o None si no hay
+
+    Examples:
+        >>> _extraer_incidente("FPA 21002641/2010/I")
+        'I'
+        >>> _extraer_incidente("FPA 21002641/2010/CA1")
+        'CA1'
+        >>> _extraer_incidente("FPA 21002641/2010")
+        None
+    """
+    # Patrón: número/año/SUFIJO donde SUFIJO es letras o números
+    match = re.search(r'/(\d{4})[\s\-/_]([A-Za-z0-9]+)$', cadena)
+    if match:
+        return match.group(2).upper()
+    return None
+
+
 def normalizar_numero_expediente(
     valor: object,
     *,
@@ -115,57 +178,64 @@ def normalizar_numero_expediente(
 
 def descomponer_numero_expediente(
     valor: str | None,
-) -> tuple[str | None, str | None, str | None]:
-    """Obtiene jurisdicción, número y año desde una cadena de expediente.
+) -> tuple[str | None, str | None, str | None, str | None]:
+    """Obtiene jurisdicción, número, año e incidente desde una cadena de expediente.
 
     Soporta múltiples formatos comunes del PJN:
     - Con prefijos alfabéticos: "FPA 21002641/2010"
     - Con jurisdicción: "3-21002641-23"
-    - Con incidentes: "21002641/2010/I" (los incidentes se ignoran)
+    - Con incidentes: "21002641/2010/I" -> preserva el incidente
 
-    Los incidentes (sufijos como /I, /CA1, /1) se ignoran. Los años de dos o
-    tres dígitos se expanden a cuatro cuando es posible.
+    IMPORTANTE: Esta función ahora PRESERVA los incidentes como cuarto valor.
+    Los años de dos o tres dígitos se expanden a cuatro cuando es posible.
 
     Args:
         valor: Número de expediente completo (puede ser None)
 
     Returns:
-        Tupla (jurisdiccion, numero, anio) donde cada componente puede ser None
+        Tupla (jurisdiccion, numero, anio, incidente) donde cada componente puede ser None
 
     Example:
         >>> descomponer_numero_expediente("FPA 21002641/2010")
-        (None, '21002641', '2010')
+        (None, '21002641', '2010', None)
         >>> descomponer_numero_expediente("3-21002641-23")
-        ('3', '21002641', '2023')
+        ('3', '21002641', '2023', None)
         >>> descomponer_numero_expediente("21002641/2010/I")
-        (None, '21002641', '2010')
+        (None, '21002641', '2010', 'I')
+        >>> descomponer_numero_expediente("FRE 004379/2021/CA1")
+        (None, '004379', '2021', 'CA1')
         >>> descomponer_numero_expediente("123/24")
-        (None, '123', '2024')
+        (None, '123', '2024', None)
         >>> descomponer_numero_expediente(None)
-        (None, None, None)
+        (None, None, None, None)
     """
     if not valor:
-        return None, None, None
+        return None, None, None, None
 
     texto = limpiar_texto(str(valor))
     if not texto:
-        return None, None, None
+        return None, None, None, None
+
+    # Extraer incidente ANTES de procesar (para preservarlo)
+    incidente = _extraer_incidente(texto)
+
+    # Si hay incidente, removerlo temporalmente para extraer numero/año
+    texto_sin_incidente = texto
+    if incidente:
+        texto_sin_incidente = re.sub(r'[\s\-/_]' + re.escape(incidente) + r'$', '', texto, flags=re.IGNORECASE)
 
     # Remover prefijo alfabético si existe
-    texto = re.sub(r"^[^0-9]+", "", texto)
-    if not texto:
-        return None, None, None
+    texto_sin_incidente = re.sub(r"^[^0-9]+", "", texto_sin_incidente)
+    if not texto_sin_incidente:
+        return None, None, None, incidente
 
     # Remover espacios
-    texto = re.sub(r"\s+", "", texto)
-
-    # Remover incidentes (sufijos como /I, /CA1, /1, etc.)
-    texto = _remover_incidentes(texto)
+    texto_sin_incidente = re.sub(r"\s+", "", texto_sin_incidente)
 
     # Extraer todos los bloques numéricos
-    bloques = re.findall(r"\d+", texto)
+    bloques = re.findall(r"\d+", texto_sin_incidente)
     if not bloques:
-        return None, None, None
+        return None, None, None, incidente
 
     jurisdiccion: str | None = None
     numero: str | None = None
@@ -185,11 +255,16 @@ def descomponer_numero_expediente(
     numero = numero or None
     anio = _expandir_anio(anio) if anio else None
 
-    return jurisdiccion, numero, anio
+    return jurisdiccion, numero, anio, incidente
 
 
 def _remover_incidentes(cadena: str) -> str:
-    """Remueve sufijos de incidentes de un número de expediente.
+    """DEPRECATED: Remueve sufijos de incidentes de un número de expediente.
+
+    ADVERTENCIA: Esta función está deprecated porque elimina información
+    importante de incidentes. Usar normalizar_numero_completo() para preservar
+    incidentes, o descomponer_numero_expediente() que ahora retorna el incidente
+    como cuarto valor.
 
     Los incidentes son sufijos como /I, /CA1, /1, etc. que indican incidentes
     o actuaciones derivadas del expediente principal.
@@ -208,6 +283,12 @@ def _remover_incidentes(cadena: str) -> str:
         >>> _remover_incidentes("21002641/2010/I/2")
         '21002641/2010'
     """
+    warnings.warn(
+        "_remover_incidentes está deprecated. Usar normalizar_numero_completo() "
+        "o descomponer_numero_expediente() que ahora preserva incidentes.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     while True:
         # Buscar sufijo /XXX al final (letras o números)
         match = re.search(r"/(?:[A-Za-z]+[A-Za-z0-9]*|\d+)$", cadena)
