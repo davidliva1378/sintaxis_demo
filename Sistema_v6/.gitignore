@@ -262,6 +262,9 @@ presentation/web/frontend/.next/
 data/vector_store/chroma.sqlite3
 data/vector_store/*/
 
+# ===== Qdrant Data =====
+data/qdrant/
+
 # ===== Cache =====
 .cache/
 *.cache

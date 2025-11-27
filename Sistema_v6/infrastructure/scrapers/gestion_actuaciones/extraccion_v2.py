@@ -7,7 +7,7 @@ from datetime import datetime, date
 from urllib.parse import urlparse, parse_qs
 import hashlib
 from playwright.async_api import TimeoutError
-from panel_pjn.acciones_pjn.gestion_actuaciones.utilidades import limpiar_texto, normalizar_fecha, generar_hash_archivo
+from .utilidades import limpiar_texto, normalizar_fecha, generar_hash_archivo
 
 
 async def extraer_actuaciones_pagina(page_expediente, expediente_datos, indice_inicial=1):

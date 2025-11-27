@@ -19,8 +19,8 @@ from admin import GestorReseteo, NivelReseteo
 from presentation.api.rest.routers.auth import get_current_active_user
 from infrastructure.persistence.database import Usuario
 from infrastructure.di_container import get_container
-from Sistema_v6.infrastructure.persistence.expedientes_mysql import get_expedientes_repository
-from Sistema_v6.gestor_directorios.expedientes import GestorDirectoriosExpedientes
+from infrastructure.persistence.expedientes_mysql import get_expedientes_repository
+from gestor_directorios.expedientes import GestorDirectoriosExpedientes
 
 
 # ============================================================================

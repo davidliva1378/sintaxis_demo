@@ -7,9 +7,9 @@ La configuración se puede cargar desde variables de entorno o archivo .env.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Union, List
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Ruta base del proyecto (Sistema_v6)
@@ -159,9 +159,22 @@ class MonitoreoSettings(BaseSettings):
     intervalos_laboral_entradas: int | None = None
     intervalos_no_laboral_expedientes: int | None = None
     intervalos_no_laboral_entradas: int | None = None
-    dias_laborales: list[str] = Field(
+    dias_laborales: Union[str, List[str]] = Field(
         default_factory=lambda: ["lunes", "martes", "miercoles", "jueves", "viernes"]
     )
+
+    @field_validator("dias_laborales", mode="before")
+    @classmethod
+    def parse_dias_laborales(cls, v):
+        if isinstance(v, str):
+            if not v.strip():
+                return ["lunes", "martes", "miercoles", "jueves", "viernes"]
+            try:
+                import json
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return [d.strip() for d in v.split(",") if d.strip()]
+        return v
     hora_inicio: str = "08:00"
     hora_fin: str = "18:00"
     verificar_expedientes: bool = True
@@ -254,7 +267,7 @@ class APISettings(BaseSettings):
     port: int = 8000
     reload: bool = False
     workers: int = 1
-    cors_origins: list[str] = Field(
+    cors_origins: Union[str, List[str]] = Field(
         default_factory=lambda: [
             "http://localhost:3000",
             "http://localhost:3001",
@@ -269,6 +282,31 @@ class APISettings(BaseSettings):
             "http://127.0.0.1:8080"
         ]
     )
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            if not v.strip():
+                return [
+                    "http://localhost:3000",
+                    "http://localhost:3001",
+                    "http://localhost:3002",
+                    "http://localhost:5173",
+                    "http://localhost:5174",
+                    "http://localhost:8080",
+                    "http://127.0.0.1:3000",
+                    "http://127.0.0.1:3001",
+                    "http://127.0.0.1:5173",
+                    "http://127.0.0.1:5174",
+                    "http://127.0.0.1:8080"
+                ]
+            try:
+                import json
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return [d.strip() for d in v.split(",") if d.strip()]
+        return v
     api_prefix: str = "/api/v1"
 
 

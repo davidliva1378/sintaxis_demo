@@ -1,8 +1,8 @@
 import json
 import os
 from datetime import datetime
-from Sistema_v6.gestion_expedientes.comparar_expedientes import comparar_con_base
-from Sistema_v6.gestion_expedientes.guardar_comparacion import guardar_comparacion_json
+from gestion_expedientes.comparar_expedientes import comparar_con_base
+from gestion_expedientes.guardar_comparacion import guardar_comparacion_json
 
 
 def comparar_expedientes_monitor(json_actual_path: str, base_json_path: str, carpeta_salida: str):

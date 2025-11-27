@@ -9,6 +9,7 @@ import type {
   PaginacionResult,
   ConfigExtraccion,
   ComparacionDetallada,
+  Actuacion,
 } from '@/types/expediente'
 
 interface ProgresoExtraccion {
@@ -40,7 +41,7 @@ interface ExtraccionMasivaState {
   estado: 'inactivo' | 'iniciando' | 'extrayendo' | 'pausado' | 'filtrado' | 'completado' | 'error' | 'cancelado' | 'error_agotado'
   progreso: ProgresoExtraccion
   websocket: WebSocket | null
-  pollInterval: NodeJS.Timeout | null
+  pollInterval: any | null
   paginas_procesadas: number
   archivos_descargados: number
   comparacion: ComparacionDetallada | null
@@ -262,6 +263,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
         actuaciones: [],
         total_actuaciones: 0,
         fecha_extraccion: new Date().toISOString(),
+        fecha_inicio: '', // Mock value
       }
 
       set({ expedienteActual: mockExpediente })

@@ -5,13 +5,13 @@ import os
 import json
 import logging
 
-from Sistema_v6.pjn.auto_login import reutilizar_sesion_async
-from Sistema_v6.pjn.monitor.extraer_expedientes import extraer_expedientes
-from Sistema_v6.configuracion.urls import URL_CONSULTAS
+from pjn.auto_login import reutilizar_sesion_async
+from pjn.monitor.extraer_expedientes import extraer_expedientes
+from configuracion.urls import URL_CONSULTAS
 
 # Importar procesamiento de expedientes (opcional)
 try:
-    from Sistema_v6.extractor_inicial.procesamiento_expedientes import (
+    from extractor_inicial.procesamiento_expedientes import (
         ProcesadorExpedientesInicial,
         clasificar_actuaciones_desde_json,
         PROCESADOR_DISPONIBLE

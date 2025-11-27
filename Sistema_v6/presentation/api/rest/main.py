@@ -50,6 +50,12 @@ Endpoints:
 from __future__ import annotations
 
 import logging
+from dotenv import load_dotenv
+import os
+
+# Cargar variables de entorno explícitamente para asegurar que
+# módulos que usan os.getenv() (como mysql_pool.py) funcionen correctamente
+load_dotenv()
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -86,6 +92,7 @@ from .routers import (
     tipos_entidad,
     tools,
     workspaces,
+    logs,
 )
 
 logger = logging.getLogger(__name__)
@@ -217,6 +224,7 @@ app.include_router(escritos.router, prefix="/api/v1", tags=["escritos"])
 app.include_router(ia.router, prefix="/api/v1", tags=["ia"])
 app.include_router(tools.router, prefix="/api/v1", tags=["tools"])
 app.include_router(mcp.router, prefix="/api/v1", tags=["mcp"])
+app.include_router(logs.router, prefix="/api/v1", tags=["logs"])
 app.include_router(tipos_entidad.router, prefix="/api/v1", tags=["tipos_entidad"])
 app.include_router(rag.router, tags=["rag"])
 app.include_router(dashboard.router, prefix="/api/v1", tags=["dashboard"])

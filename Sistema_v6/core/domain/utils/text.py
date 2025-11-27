@@ -130,8 +130,8 @@ def _extraer_incidente(cadena: str) -> str | None:
         >>> _extraer_incidente("FPA 21002641/2010")
         None
     """
-    # Patrón: número/año/SUFIJO donde SUFIJO es letras o números
-    match = re.search(r'/(\d{4})[\s\-/_]([A-Za-z0-9]+)$', cadena)
+    # Patrón: número/año/SUFIJO donde SUFIJO es cualquier cosa (letras, números, barras)
+    match = re.search(r'/(\d{4})[\s\-/_](.+)$', cadena)
     if match:
         return match.group(2).upper()
     return None

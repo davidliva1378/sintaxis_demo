@@ -228,8 +228,16 @@ def procesar_expediente(
     # Procesar cada actuación
     for actuacion in actuaciones:
         act_id = actuacion.get("id") or actuacion.get("Indice")
+        
+        # Robust lookup for ruta_pdf
         ruta_pdf = rutas_pdf.get(act_id)
-
+        if not ruta_pdf and act_id is not None:
+            # Try casting to int/str if direct lookup failed
+            try:
+                ruta_pdf = rutas_pdf.get(int(act_id)) or rutas_pdf.get(str(act_id))
+            except (ValueError, TypeError):
+                pass
+        
         resultado = procesar_actuacion(
             actuacion=actuacion,
             ruta_pdf=ruta_pdf,

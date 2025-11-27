@@ -957,9 +957,51 @@ async def buscar_expediente_por_numero(
 
         await page.click("a[href='#collapseOne']")
         await page.wait_for_selector("#collapseOne.collapse.in", timeout=5_000)
+        
+        # ⚠️ Espera explícita para asegurar que la animación terminó y los campos son interactivos
+        await page.wait_for_timeout(1000)
+        
+        # Esperar a que el campo número sea visible y editable
+        sel_numero = "#j_idt83\\:consultaExpediente\\:j_idt116\\:numero"
+        sel_anio = "#j_idt83\\:consultaExpediente\\:j_idt118\\:anio"
+        
+        await page.wait_for_selector(sel_numero, state="visible", timeout=5_000)
 
-        await page.fill("#j_idt83\\:consultaExpediente\\:j_idt116\\:numero", numero)
-        await page.fill("#j_idt83\\:consultaExpediente\\:j_idt118\\:anio", anio)
+        # Estrategia de llenado robusta: Llenar y verificar
+        max_intentos_llenado = 3
+        llenado_exitoso = False
+        
+        for intento in range(max_intentos_llenado):
+            # Llenar número
+            await page.click(sel_numero)
+            await page.fill(sel_numero, numero)
+            
+            # Llenar año
+            await page.click(sel_anio)
+            await page.fill(sel_anio, anio)
+            
+            # Pequeña pausa para dejar que JS procese
+            await page.wait_for_timeout(300)
+            
+            # Verificar valores
+            val_numero = await page.input_value(sel_numero)
+            val_anio = await page.input_value(sel_anio)
+            
+            if val_numero == numero and val_anio == anio:
+                llenado_exitoso = True
+                if intento > 0:
+                    logger.info(f"✅ Formulario llenado correctamente en intento {intento + 1}")
+                break
+            else:
+                logger.warning(
+                    f"⚠️ Intento {intento + 1}: Valores no coinciden (Esperado: {numero}/{anio}, "
+                    f"Actual: {val_numero}/{val_anio}). Reintentando..."
+                )
+                await page.wait_for_timeout(1000)
+        
+        if not llenado_exitoso:
+            logger.error(f"❌ No se pudo llenar el formulario correctamente tras {max_intentos_llenado} intentos.")
+            # Intentamos buscar igual, tal vez es un error de lectura, pero logueamos el error.
 
         await page.click("#j_idt83\\:consultaExpediente\\:consultaFiltroSearchButtonSAU")
 

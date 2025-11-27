@@ -5,10 +5,10 @@ Este módulo proporciona funciones para hashear y verificar contraseñas usando 
 
 from __future__ import annotations
 
-from passlib.context import CryptContext
+import bcrypt
 
 # Configurar el contexto de password hashing con bcrypt
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -20,15 +20,22 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
     Returns:
         True si la contraseña es correcta, False en caso contrario
-
-    Example:
-        >>> hashed = get_password_hash("mi_password")
-        >>> verify_password("mi_password", hashed)
-        True
-        >>> verify_password("password_incorrecta", hashed)
-        False
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        # bcrypt requiere bytes
+        if isinstance(plain_password, str):
+            plain_password_bytes = plain_password.encode('utf-8')
+        else:
+            plain_password_bytes = plain_password
+
+        if isinstance(hashed_password, str):
+            hashed_password_bytes = hashed_password.encode('utf-8')
+        else:
+            hashed_password_bytes = hashed_password
+
+        return bcrypt.checkpw(plain_password_bytes, hashed_password_bytes)
+    except Exception:
+        return False
 
 
 def get_password_hash(password: str) -> str:
@@ -39,10 +46,12 @@ def get_password_hash(password: str) -> str:
 
     Returns:
         Hash de la contraseña (bcrypt)
-
-    Example:
-        >>> hashed = get_password_hash("mi_password")
-        >>> print(hashed)
-        $2b$12$...
     """
-    return pwd_context.hash(password)
+    if isinstance(password, str):
+        password_bytes = password.encode('utf-8')
+    else:
+        password_bytes = password
+
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')

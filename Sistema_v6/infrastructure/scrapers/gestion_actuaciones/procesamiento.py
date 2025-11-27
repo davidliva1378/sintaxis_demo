@@ -21,18 +21,14 @@ from datetime import datetime
 from pathlib import Path
 
 # Importar módulos de procesador_pdf
-try:
-    from Sistema_v5.procesador_pdf import (
-        ClasificadorActuaciones,
-        DetectorDuplicados,
-        AnalizadorVencimientos,
-        ExtractorTexto,
-        UtilidadJuridica
-    )
-    PROCESADOR_DISPONIBLE = True
-except ImportError as e:
-    logging.warning(f"No se pudo importar procesador_pdf: {e}")
-    PROCESADOR_DISPONIBLE = False
+from core.procesador_pdf import (
+    ClasificadorActuaciones,
+    DetectorDuplicados,
+    AnalizadorVencimientos,
+    ExtractorTexto,
+    UtilidadJuridica
+)
+PROCESADOR_DISPONIBLE = True
 
 
 logger = logging.getLogger(__name__)

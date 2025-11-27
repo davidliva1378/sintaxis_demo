@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import ThemeToggle from './ThemeToggle'
-import { LogOut, User, Shield, Settings, RotateCcw, Trash2, BarChart3, Database, Server } from 'lucide-react'
+import { LogOut, User, Shield, Settings, RotateCcw, Trash2, BarChart3, Database, Server, Terminal } from 'lucide-react'
+import { LogViewer } from '@/components/common/LogViewer'
 import { getMCPStatus } from '@/api/mcpApi'
 import {
   DropdownMenu,
@@ -26,6 +27,7 @@ export default function Header() {
   const [showStatsDialog, setShowStatsDialog] = useState(false)
   const [showResetDialog, setShowResetDialog] = useState(false)
   const [showSyncDialog, setShowSyncDialog] = useState(false)
+  const [showLogs, setShowLogs] = useState(false)
   const [mcpRunning, setMcpRunning] = useState<boolean | null>(null)
 
   // Check MCP status on mount and periodically
@@ -113,6 +115,16 @@ export default function Header() {
           </div>
         )}
 
+        {/* Logs Toggle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setShowLogs(true)}
+          title="Ver Logs del Sistema"
+        >
+          <Terminal className="h-5 w-5" />
+        </Button>
+
         {/* Theme Toggle */}
         <ThemeToggle />
 
@@ -188,6 +200,7 @@ export default function Header() {
       <SystemStatsDialog open={showStatsDialog} onOpenChange={setShowStatsDialog} />
       <ResetSystemDialog open={showResetDialog} onOpenChange={setShowResetDialog} />
       <SincronizacionDialog open={showSyncDialog} onOpenChange={setShowSyncDialog} />
+      <LogViewer isOpen={showLogs} onClose={() => setShowLogs(false)} />
     </header>
   )
 }

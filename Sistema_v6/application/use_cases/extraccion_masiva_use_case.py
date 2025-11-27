@@ -186,7 +186,7 @@ class ExtraccionMasivaUseCase:
         """
         try:
             # Importar módulos necesarios
-            from Sistema_v6.extraccion_masiva import (
+            from extraccion_masiva import (
                 ExtractorMasivo,
                 exportar_excel,
                 exportar_json,

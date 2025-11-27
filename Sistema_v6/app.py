@@ -7,7 +7,7 @@ Este módulo crea la aplicación FastAPI y registra los routers necesarios.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from Sistema_v6.presentation import extraccion_masiva_router
+from presentation import extraccion_masiva_router
 
 
 def create_app() -> FastAPI:

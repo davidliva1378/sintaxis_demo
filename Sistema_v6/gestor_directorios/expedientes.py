@@ -21,14 +21,14 @@ from typing import Any, TYPE_CHECKING
 try:  # Compatibilidad con imports absolutos y relativos
     from ..pjn.scraping.base import normalizar_numero_expediente
 except ImportError:  # pragma: no cover - fallback cuando se ejecuta fuera del paquete
-    from Sistema_v6.pjn.scraping.base import normalizar_numero_expediente  # type: ignore
+    from pjn.scraping.base import normalizar_numero_expediente  # type: ignore
 
 if TYPE_CHECKING:  # pragma: no cover - solo para hints
-    from Sistema_v6.infrastructure.config.settings import Settings as SystemConfig
+    from infrastructure.config.settings import Settings as SystemConfig
 
 # Importar repositorio MySQL para sincronización
 try:
-    from Sistema_v6.infrastructure.persistence.expedientes_mysql import get_expedientes_repository
+    from infrastructure.persistence.expedientes_mysql import get_expedientes_repository
     _mysql_available = True
 except ImportError:
     _mysql_available = False
@@ -116,7 +116,7 @@ class GestorDirectoriosExpedientes:
         """
 
         if config is None:
-            from Sistema_v6.infrastructure.config.settings import Settings as _SystemConfig, get_settings
+            from infrastructure.config.settings import Settings as _SystemConfig, get_settings
 
             config = get_settings()
 

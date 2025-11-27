@@ -6,6 +6,7 @@ después del filtrado y selección.
 """
 
 import asyncio
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional, Callable
@@ -21,14 +22,14 @@ from .models import (
 )
 
 # Importar funciones de procesamiento de v5/v6
-from Sistema_v6.pjn.scraping.expedientes import (
+from pjn.scraping.expedientes import (
     buscar_expediente_por_numero,
     buscar_expedientes,
     extraer_datos_expediente
 )
-from Sistema_v6.pjn.scraping import descomponer_numero_expediente
-from Sistema_v6.pjn.services.actuaciones import procesar_actuaciones_expediente
-from Sistema_v6.pjn.persistence.actuaciones import cargar_actuaciones_json
+from pjn.scraping import descomponer_numero_expediente
+from pjn.services.actuaciones import procesar_actuaciones_expediente
+from pjn.persistence.actuaciones import cargar_actuaciones_json
 
 # Importar tipos de aplicación para type hints
 try:
@@ -43,6 +44,7 @@ try:
 except ImportError:
     _rag_hook_disponible = False
 
+logger = logging.getLogger(__name__)
 
 class GestorBatch:
     """
@@ -183,6 +185,7 @@ class GestorBatch:
                 "numero": "GLOBAL",
                 "error": f"Error crítico: {str(e)}",
             })
+            logger.error(f"Error crítico en batch: {e}", exc_info=True)
             raise
 
         finally:
@@ -237,29 +240,29 @@ class GestorBatch:
             # ==================================================================
             # PASO 1: Buscar expediente en PJN
             # ==================================================================
-            print(f"🔍 Buscando expediente: {numero_expediente}")
+            logger.info(f"🔍 Buscando expediente: {numero_expediente}")
 
             # Parsear número usando la función que maneja todos los formatos
             # Soporta: "FPA 001234/2024", "FRE 001234/2024/I", "001234/2024/1", etc.
             _, numero_limpio, anio_limpio, incidente = descomponer_numero_expediente(numero_expediente)
 
             if not numero_limpio:
-                print(f"❌ No se pudo parsear el número de expediente: {numero_expediente}")
+                logger.error(f"❌ No se pudo parsear el número de expediente: {numero_expediente}")
                 return {
                     "success": False,
                     "numero": numero_expediente,
                     "error": "Formato de número inválido"
                 }
 
-            print(f"🔢 Número parseado: {numero_limpio}/{anio_limpio or 'sin año'}")
+            logger.debug(f"🔢 Número parseado: {numero_limpio}/{anio_limpio or 'sin año'}")
 
             # Navegar a la página de búsqueda de expedientes
-            print("🔍 Navegando a página de búsqueda de expedientes...")
+            logger.debug("🔍 Navegando a página de búsqueda de expedientes...")
             await page.goto("https://scw.pjn.gov.ar/scw/consultaListaRelacionados.seam")
             await page.wait_for_load_state("domcontentloaded")
 
             # Buscar expediente con filtrado por carátula
-            print(f"🔍 Buscando expediente: {numero_limpio}/{anio_limpio}" +
+            logger.info(f"🔍 Buscando expediente: {numero_limpio}/{anio_limpio}" +
                   (f" con carátula: '{caratula_esperada}'" if caratula_esperada else ""))
 
             # Usar buscar_expedientes con carátula
@@ -272,7 +275,7 @@ class GestorBatch:
 
             # Fallback: Reintentar sin carátula si no hay coincidencias
             if not filas and caratula_esperada:
-                print(
+                logger.warning(
                     f"⚠️ No se hallaron coincidencias para carátula '{caratula_esperada}'. "
                     f"Reintentando sin filtro para expediente {numero_expediente}..."
                 )
@@ -285,7 +288,7 @@ class GestorBatch:
 
             # Verificar si se encontró el expediente
             if not filas:
-                print(f"❌ No se encontró expediente {numero_expediente}")
+                logger.warning(f"❌ No se encontró expediente {numero_expediente}")
                 return {
                     "success": False,
                     "error": "Expediente no encontrado",
@@ -295,63 +298,95 @@ class GestorBatch:
             # Selección de expediente cuando hay múltiples resultados
             fila_seleccionada = filas[0]
             if len(filas) > 1:
-                if incidente:
-                    # Buscar la fila que coincida con el incidente
-                    print(
-                        f"🔍 Múltiples expedientes ({len(filas)}) encontrados. "
-                        f"Buscando incidente: '{incidente}'..."
-                    )
-                    fila_encontrada = None
-                    for fila in filas:
-                        texto_fila = await fila.inner_text()
+                logger.info(f"🔍 Múltiples expedientes ({len(filas)}) encontrados. Analizando candidatos...")
+                
+                # Importar normalización para comparar carátulas
+                from core.domain.utils.text import normalizar_texto
+                
+                candidatos = []
+                
+                for fila in filas:
+                    texto_fila = await fila.inner_text()
+                    texto_fila_upper = texto_fila.upper()
+                    es_candidato = False
+                    
+                    if incidente:
                         # El incidente aparece como sufijo en el número de expediente
                         # Ej: "FPA 21002641/2010/I" o "FPA 21002641/2010/CA1"
-                        if f"/{incidente}" in texto_fila.upper() or f"-{incidente}" in texto_fila.upper():
-                            fila_encontrada = fila
-                            print(f"✅ Incidente '{incidente}' encontrado en fila")
-                            break
-
-                    if fila_encontrada:
-                        fila_seleccionada = fila_encontrada
+                        # Usar regex estricta para evitar coincidencias parciales (ej: /1 coincidiendo con /1/2)
+                        import re
+                        if anio_limpio:
+                            # Busca: AÑO + separador + INCIDENTE + (fin o separador no numérico)
+                            # (?![0-9/]) asegura que no siga otro número o barra (ej: /1 no matchea /1/2)
+                            patron_incidente = rf'{anio_limpio}\s*[\/-]\s*{re.escape(incidente)}(?![0-9\/])'
+                            if re.search(patron_incidente, texto_fila_upper):
+                                es_candidato = True
+                        else:
+                            # Fallback si no hay año (raro): busca /INCIDENTE al final o seguido de espacio
+                            if f"/{incidente}" in texto_fila_upper or f"-{incidente}" in texto_fila_upper:
+                                es_candidato = True
                     else:
-                        print(
-                            f"⚠️ Incidente '{incidente}' no encontrado entre {len(filas)} filas. "
-                            f"Usando el primero de la lista."
-                        )
-                else:
-                    # Sin incidente especificado, buscar el expediente principal
-                    # (el que NO tiene sufijo de incidente)
-                    print(
-                        f"🔍 Múltiples expedientes ({len(filas)}) encontrados. "
-                        f"Buscando expediente principal (sin incidente)..."
-                    )
-                    fila_principal = None
-                    for fila in filas:
-                        texto_fila = await fila.inner_text()
                         # El principal es el que tiene formato NNNN/YYYY sin sufijo
                         # Verificar que no tenga /I, /CA1, /1, etc. después del año
                         import re
-                        # Buscar patrón: número/año que NO esté seguido de /sufijo
                         if numero_limpio and anio_limpio:
+                            # Buscar patrón: número/año que NO esté seguido de /sufijo
                             patron_principal = rf'{numero_limpio}\s*/\s*{anio_limpio}(?!\s*/)'
                             if re.search(patron_principal, texto_fila):
-                                fila_principal = fila
-                                print(f"✅ Expediente principal encontrado")
-                                break
+                                es_candidato = True
+                    
+                    if es_candidato:
+                        candidatos.append(fila)
 
-                    if fila_principal:
-                        fila_seleccionada = fila_principal
+                if not candidatos:
+                    logger.warning(f"⚠️ Ninguna fila cumple con el criterio exacto (Incidente: {incidente or 'No'}). Usando la primera fila.")
+                    fila_seleccionada = filas[0]
+                elif len(candidatos) == 1:
+                    logger.info(f"✅ Un único candidato válido encontrado.")
+                    fila_seleccionada = candidatos[0]
+                else:
+                    # Múltiples candidatos válidos (ej: misma numeración en distintas jurisdicciones)
+                    logger.info(f"⚠️ {len(candidatos)} candidatos válidos encontrados. Intentando desempatar por carátula...")
+                    
+                    if caratula_esperada:
+                        mejor_candidato = None
+                        mejor_score = 0
+                        caratula_norm = normalizar_texto(caratula_esperada)
+                        
+                        for cand in candidatos:
+                            # Extraer texto de la columna de carátula (usualmente la 3ra columna)
+                            try:
+                                columnas = await cand.query_selector_all("td")
+                                if len(columnas) >= 3:
+                                    texto_caratula = await columnas[2].inner_text()
+                                    texto_caratula_norm = normalizar_texto(texto_caratula)
+                                    
+                                    # Score simple: conteo de palabras coincidentes
+                                    palabras_esperadas = set(caratula_norm.split())
+                                    palabras_encontradas = set(texto_caratula_norm.split())
+                                    coincidencias = len(palabras_esperadas.intersection(palabras_encontradas))
+                                    
+                                    if coincidencias > mejor_score:
+                                        mejor_score = coincidencias
+                                        mejor_candidato = cand
+                            except Exception:
+                                pass
+                        
+                        if mejor_candidato and mejor_score > 0:
+                            logger.info(f"✅ Candidato seleccionado por coincidencia de carátula (Score: {mejor_score})")
+                            fila_seleccionada = mejor_candidato
+                        else:
+                            logger.warning("⚠️ No se pudo desempatar por carátula. Usando el primer candidato.")
+                            fila_seleccionada = candidatos[0]
                     else:
-                        print(
-                            f"⚠️ No se pudo identificar expediente principal. "
-                            f"Usando el primero de la lista."
-                        )
+                        logger.warning("⚠️ Sin carátula esperada para desempatar. Usando el primer candidato.")
+                        fila_seleccionada = candidatos[0]
 
             # Navegar al expediente seleccionado
             try:
                 enlace_expediente = await fila_seleccionada.query_selector("a")
                 if not enlace_expediente:
-                    print(f"❌ No se encontró enlace en fila del expediente {numero_expediente}")
+                    logger.error(f"❌ No se encontró enlace en fila del expediente {numero_expediente}")
                     return {
                         "success": False,
                         "error": "Enlace de expediente no encontrado",
@@ -360,10 +395,10 @@ class GestorBatch:
 
                 await enlace_expediente.click()
                 await page.wait_for_load_state("domcontentloaded")
-                print(f"✅ Navegado a expediente {numero_expediente}")
+                logger.info(f"✅ Navegado a expediente {numero_expediente}")
 
             except Exception as e:
-                print(f"❌ Error al navegar a expediente {numero_expediente}: {str(e)}")
+                logger.error(f"❌ Error al navegar a expediente {numero_expediente}: {str(e)}")
                 return {
                     "success": False,
                     "error": f"Error al navegar: {str(e)}",
@@ -376,37 +411,61 @@ class GestorBatch:
             datos_expediente = await extraer_datos_expediente(page)
 
             if not datos_expediente:
-                print(f"❌ No se pudieron extraer datos: {numero_expediente}")
+                logger.error(f"❌ No se pudieron extraer datos: {numero_expediente}")
                 return {
                     "success": False,
                     "numero": numero_expediente,
                     "error": "No se pudieron extraer datos del expediente"
                 }
 
-            print(f"📋 Metadata extraída: {datos_expediente.get('caratula', '')[:50]}...")
+            logger.info(f"📋 Metadata extraída: {datos_expediente.get('caratula', '')[:50]}...")
 
             # ==================================================================
-            # PASO 3: Procesar actuaciones con servicio coordinador
+            # PASO 3: Procesar actuaciones con servicio coordinador (con reintentos)
             # ==================================================================
-            print(f"📥 Extrayendo actuaciones de {numero_expediente}...")
+            logger.info(f"📥 Extrayendo actuaciones de {numero_expediente}...")
 
             # Agregar directorio_base y page a datos_expediente
             datos_expediente["directorio_base"] = self.config.directorio_base
             datos_expediente["page"] = page
 
-            ruta_json, resultado = await procesar_actuaciones_expediente(
-                datos_expediente,
-                descargar_adjuntos=self.config.procesar_con_pdf
-            )
+            ruta_json = None
+            resultado = {}
+            error_final = None
 
-            # Verificar si hubo error
-            error_msg = resultado.get("error")
-            if error_msg:
-                print(f"❌ Error procesando actuaciones: {error_msg}")
+            # Bucle de reintentos
+            intentos_maximos = self.config.max_reintentos if self.config.max_reintentos > 0 else 1
+            
+            for intento in range(intentos_maximos):
+                try:
+                    if intento > 0:
+                        logger.info(f"🔄 Reintento {intento + 1}/{intentos_maximos} para {numero_expediente}...")
+                        await asyncio.sleep(2) # Espera breve entre reintentos
+
+                    ruta_json, resultado = await procesar_actuaciones_expediente(
+                        datos_expediente,
+                        descargar_adjuntos=self.config.procesar_con_pdf
+                    )
+                    
+                    # Si no hay error en el resultado, salimos del bucle
+                    if not resultado.get("error"):
+                        error_final = None
+                        break
+                    else:
+                        error_final = resultado.get("error")
+                        logger.warning(f"⚠️ Intento {intento + 1} fallido: {error_final}")
+
+                except Exception as e:
+                    error_final = str(e)
+                    logger.warning(f"⚠️ Excepción en intento {intento + 1}: {e}")
+            
+            # Verificar si hubo error después de todos los intentos
+            if error_final:
+                logger.error(f"❌ Error procesando actuaciones tras {intentos_maximos} intentos: {error_final}")
                 return {
                     "success": False,
                     "numero": numero_expediente,
-                    "error": f"Error en actuaciones: {error_msg}"
+                    "error": f"Error en actuaciones: {error_final}"
                 }
 
             # Calcular total de actuaciones
@@ -414,7 +473,7 @@ class GestorBatch:
                 resultado.get("actuaciones_actuales", 0) +
                 resultado.get("actuaciones_historicas", 0)
             )
-            print(f"✅ Actuaciones extraídas: {total_actuaciones}")
+            logger.info(f"✅ Actuaciones extraídas: {total_actuaciones}")
 
             # Contar archivos descargados si se ejecutaron descargas
             archivos_descargados = 0
@@ -427,7 +486,7 @@ class GestorBatch:
                 except Exception:
                     pass
             if self.config.procesar_con_pdf:
-                print(f"📎 Archivos descargados: {archivos_descargados}")
+                logger.info(f"📎 Archivos descargados: {archivos_descargados}")
 
             # ==================================================================
             # PASO 4: Clasificación inteligente (opcional)
@@ -439,7 +498,7 @@ class GestorBatch:
                         FiltroContenidoInteligente
                     )
 
-                    print(f"🧠 Clasificando actuaciones por utilidad jurídica...")
+                    logger.info(f"🧠 Clasificando actuaciones por utilidad jurídica...")
 
                     # Cargar actuaciones desde JSON
                     datos_actuaciones = cargar_actuaciones_json(str(ruta_json))
@@ -457,10 +516,10 @@ class GestorBatch:
                         incluir_estadisticas=True
                     )
 
-                    print(f"📊 Clasificación completada: {len(actuaciones_clasificadas)} actuaciones relevantes")
+                    logger.info(f"📊 Clasificación completada: {len(actuaciones_clasificadas)} actuaciones relevantes")
 
                 except Exception as e:
-                    print(f"⚠️ Error en clasificación (no crítico): {e}")
+                    logger.warning(f"⚠️ Error en clasificación (no crítico): {e}")
 
             # ==================================================================
             # PASO 5: Guardar en repositorio (si está disponible)
@@ -506,10 +565,10 @@ class GestorBatch:
                         if not ultima_actuacion:
                             from datetime import datetime
                             ultima_actuacion = datetime.now().strftime("%Y-%m-%d")
-                            print(f"⚠️ No se encontró fecha de última actuación, usando fecha actual: {ultima_actuacion}")
+                            logger.warning(f"⚠️ No se encontró fecha de última actuación, usando fecha actual: {ultima_actuacion}")
 
                     except Exception as e_act:
-                        print(f"⚠️ No se pudo obtener última actuación: {e_act}")
+                        logger.warning(f"⚠️ No se pudo obtener última actuación: {e_act}")
                         # Usar fecha actual como fallback
                         from datetime import datetime
                         ultima_actuacion = datetime.now().strftime("%Y-%m-%d")
@@ -533,12 +592,12 @@ class GestorBatch:
 
                         # Guardar en repositorio
                         await self.expediente_repository.save(expediente_dominio)
-                        print(f"💾 Expediente guardado en repositorio: {numero_expediente}")
+                        logger.info(f"💾 Expediente guardado en repositorio: {numero_expediente}")
                     else:
-                        print(f"⚠️ Expediente {numero_expediente} no guardado: datos inválidos o incompletos")
+                        logger.warning(f"⚠️ Expediente {numero_expediente} no guardado: datos inválidos o incompletos")
 
                 except Exception as e:
-                    print(f"⚠️ Error guardando en repositorio (no crítico): {e}")
+                    logger.warning(f"⚠️ Error guardando en repositorio (no crítico): {e}")
 
             # ==================================================================
             # PASO 6: Indexar en RAG (si está disponible)
@@ -563,7 +622,7 @@ class GestorBatch:
                     hook = obtener_hook()
                     hook.on_expediente_procesado(numero_expediente, resultado_final)
                 except Exception as e:
-                    print(f"⚠️ Error en hook RAG (no crítico): {e}")
+                    logger.warning(f"⚠️ Error en hook RAG (no crítico): {e}")
 
             # ==================================================================
             # RETORNAR RESULTADO
@@ -571,9 +630,7 @@ class GestorBatch:
             return resultado_final
 
         except Exception as e:
-            print(f"❌ Error procesando expediente {numero_expediente}: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"❌ Error procesando expediente {numero_expediente}: {e}", exc_info=True)
             return {
                 "success": False,
                 "numero": numero_expediente,
@@ -595,10 +652,11 @@ class GestorBatch:
 
         # Esperar confirmación de login exitoso
         await page.wait_for_selector("text='Menú'", timeout=60000)
-        print("✅ Login exitoso en PJN")
+        logger.info("✅ Login exitoso en PJN")
 
     def _reportar_progreso(self, actual: int, total: int, mensaje: str):
         """Reporta progreso a través del callback si está configurado."""
+        logger.info(f"[{actual}/{total}] {mensaje}")
         if self.on_progress:
             self.on_progress(actual, total, mensaje)
 

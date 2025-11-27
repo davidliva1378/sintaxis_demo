@@ -1,12 +1,12 @@
 import os
 import json
 import logging
-from panel_pjn.acciones_pjn.gestion_actuaciones.extraccion_v2 import obtener_actuaciones_todas_paginas_async #ref
-from panel_pjn.acciones_pjn.gestion_actuaciones.bk.historicas import extraer_actuaciones_historicas #ref
+from .extraccion_v2 import obtener_actuaciones_todas_paginas_async
+from .bk.historicas import extraer_actuaciones_historicas
 
 # Importar procesamiento inteligente (opcional)
 try:
-    from panel_pjn.acciones_pjn.gestion_actuaciones.procesamiento import ProcesadorActuacionesExtraccion
+    from .procesamiento import ProcesadorActuacionesExtraccion
     PROCESAMIENTO_DISPONIBLE = True
 except ImportError as e:
     logging.warning(f"Procesamiento inteligente no disponible: {e}")

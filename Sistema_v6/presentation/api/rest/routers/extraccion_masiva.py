@@ -259,7 +259,9 @@ async def _ejecutar_procesamiento_background(
         import json
 
         caratulas_expedientes = {}
-        listado_base_path = Path(config.directorio_base) / "expedientes_base.json"
+        # El listado base se guarda en data/extraccion_masiva/listados/listado_base.json
+        # No en config.directorio_base (que es para los expedientes individuales)
+        listado_base_path = Path("./data/extraccion_masiva/listados/listado_base.json")
 
         if listado_base_path.exists():
             try:

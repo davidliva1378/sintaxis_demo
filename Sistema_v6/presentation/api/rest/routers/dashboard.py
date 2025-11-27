@@ -85,10 +85,17 @@ router = APIRouter(
 )
 
 
+from contextlib import contextmanager
+
+@contextmanager
 def _get_db_connection():
-    """Obtiene conexión MySQL desde el pool."""
-    from infrastructure.persistence.database import get_mysql_connection
-    return get_mysql_connection()
+    """Obtiene conexión MySQL desde el pool nativo (con soporte cursor)."""
+    from infrastructure.persistence.database import get_pooled_connection
+    conn = get_pooled_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 @router.get("/stats", response_model=DashboardStatsResponse)
@@ -106,78 +113,78 @@ async def obtener_estadisticas_dashboard():
         DashboardStatsResponse con todos los KPIs
     """
     try:
-        conn = _get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        with _get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
 
-        # 1. Total expedientes (desde workspaces)
-        cursor.execute("""
-            SELECT COUNT(DISTINCT expediente_numero) as total
-            FROM workspaces
-            WHERE expediente_numero IS NOT NULL
-        """)
-        result = cursor.fetchone()
-        total_expedientes = result['total'] if result else 0
+            # 1. Total expedientes (desde workspaces)
+            cursor.execute("""
+                SELECT COUNT(DISTINCT expediente_numero) as total
+                FROM workspaces
+                WHERE expediente_numero IS NOT NULL
+            """)
+            result = cursor.fetchone()
+            total_expedientes = result['total'] if result else 0
 
-        # 2. Expedientes esta semana
-        cursor.execute("""
-            SELECT COUNT(DISTINCT expediente_numero) as total
-            FROM workspaces
-            WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-        """)
-        result = cursor.fetchone()
-        expedientes_semana = result['total'] if result else 0
+            # 2. Expedientes esta semana
+            cursor.execute("""
+                SELECT COUNT(DISTINCT expediente_numero) as total
+                FROM workspaces
+                WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            """)
+            result = cursor.fetchone()
+            expedientes_semana = result['total'] if result else 0
 
-        # 3. Vencimientos urgentes (próximos 7 días)
-        cursor.execute("""
-            SELECT COUNT(*) as total
-            FROM vencimientos
-            WHERE fecha_vencimiento BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
-        """)
-        result = cursor.fetchone()
-        vencimientos_urgentes = result['total'] if result else 0
+            # 3. Vencimientos urgentes (próximos 7 días)
+            cursor.execute("""
+                SELECT COUNT(*) as total
+                FROM vencimientos
+                WHERE fecha_vencimiento BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+            """)
+            result = cursor.fetchone()
+            vencimientos_urgentes = result['total'] if result else 0
 
-        # 4. Vencimientos vencidos (fecha pasada)
-        cursor.execute("""
-            SELECT COUNT(*) as total
-            FROM vencimientos
-            WHERE fecha_vencimiento < CURDATE()
-        """)
-        result = cursor.fetchone()
-        vencimientos_vencidos = result['total'] if result else 0
+            # 4. Vencimientos vencidos (fecha pasada)
+            cursor.execute("""
+                SELECT COUNT(*) as total
+                FROM vencimientos
+                WHERE fecha_vencimiento < CURDATE()
+            """)
+            result = cursor.fetchone()
+            vencimientos_vencidos = result['total'] if result else 0
 
-        # 5. Expedientes monitoreados activos
-        cursor.execute("""
-            SELECT COUNT(*) as total
-            FROM expedientes_monitoreo
-            WHERE activo = 1
-        """)
-        result = cursor.fetchone()
-        expedientes_monitoreados = result['total'] if result else 0
+            # 5. Expedientes monitoreados activos
+            cursor.execute("""
+                SELECT COUNT(*) as total
+                FROM expedientes_monitoreo
+                WHERE activo = 1
+            """)
+            result = cursor.fetchone()
+            expedientes_monitoreados = result['total'] if result else 0
 
-        # 6. Total actuaciones y % procesadas con IA
-        cursor.execute("""
-            SELECT
-                COUNT(*) as total,
-                SUM(CASE WHEN tipo_ia IS NOT NULL THEN 1 ELSE 0 END) as con_ia
-            FROM actuaciones
-        """)
-        result = cursor.fetchone()
-        total_actuaciones = result['total'] if result else 0
-        con_ia = result['con_ia'] if result else 0
-        porcentaje_ia = (con_ia / total_actuaciones * 100) if total_actuaciones > 0 else 0
+            # 6. Total actuaciones y % procesadas con IA
+            cursor.execute("""
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN tipo_ia IS NOT NULL THEN 1 ELSE 0 END) as con_ia
+                FROM actuaciones
+            """)
+            result = cursor.fetchone()
+            total_actuaciones = result['total'] if result else 0
+            con_ia = result['con_ia'] if result else 0
+            porcentaje_ia = (con_ia / total_actuaciones * 100) if total_actuaciones > 0 else 0
 
-        # 7. Documentos RAG indexados
-        documentos_rag = 0
-        try:
-            container = get_container()
-            if hasattr(container, 'rag_service') and container.rag_service:
-                stats = container.rag_service.get_stats()
-                documentos_rag = stats.get('total_documents', 0)
-        except Exception as e:
-            logger.warning(f"No se pudo obtener stats RAG: {e}")
+            # 7. Documentos RAG indexados
+            documentos_rag = 0
+            try:
+                container = get_container()
+                if hasattr(container, 'rag_service') and container.rag_service:
+                    stats = container.rag_service.get_stats()
+                    documentos_rag = stats.get('total_documents', 0)
+            except Exception as e:
+                logger.warning(f"No se pudo obtener stats RAG: {e}")
 
-        cursor.close()
-        conn.close()
+            cursor.close()
+            # conn is closed by context manager
 
         return DashboardStatsResponse(
             total_expedientes=total_expedientes,
@@ -348,72 +355,72 @@ async def obtener_ultimos_movimientos(limite: int = 10):
         Lista de movimientos recientes ordenados por fecha
     """
     try:
-        conn = _get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        with _get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
 
-        movimientos = []
+            movimientos = []
 
-        # 1. Logs de monitoreo recientes
-        cursor.execute("""
-            SELECT
-                id,
-                'monitoreo' as tipo,
-                CONCAT(
-                    'Monitoreo: ',
-                    COALESCE(expedientes_revisados, 0), ' revisados, ',
-                    COALESCE(con_cambios, 0), ' con cambios'
-                ) as descripcion,
-                NULL as expediente_numero,
-                fecha_inicio as fecha,
-                'refresh-cw' as icono
-            FROM monitoreo_logs
-            ORDER BY fecha_inicio DESC
-            LIMIT %s
-        """, (limite,))
+            # 1. Logs de monitoreo recientes
+            cursor.execute("""
+                SELECT
+                    id,
+                    'monitoreo' as tipo,
+                    CONCAT(
+                        'Monitoreo: ',
+                        COALESCE(expedientes_revisados, 0), ' revisados, ',
+                        COALESCE(con_cambios, 0), ' con cambios'
+                    ) as descripcion,
+                    NULL as expediente_numero,
+                    fecha_inicio as fecha,
+                    'refresh-cw' as icono
+                FROM monitoreo_logs
+                ORDER BY fecha_inicio DESC
+                LIMIT %s
+            """, (limite,))
 
-        for row in cursor.fetchall():
-            movimientos.append(MovimientoReciente(**row))
-
-        # 2. Actuaciones recientes (últimas extraídas/procesadas)
-        cursor.execute("""
-            SELECT
-                a.id,
-                'extraccion' as tipo,
-                CONCAT(a.tipo, ' - ', LEFT(a.detalle, 50), '...') as descripcion,
-                a.expediente_numero,
-                a.fecha_creacion as fecha,
-                'download' as icono
-            FROM actuaciones a
-            WHERE a.fecha_creacion >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-            ORDER BY a.fecha_creacion DESC
-            LIMIT %s
-        """, (limite,))
-
-        for row in cursor.fetchall():
-            if row['fecha']:
+            for row in cursor.fetchall():
                 movimientos.append(MovimientoReciente(**row))
 
-        # 3. Vencimientos próximos (alertas)
-        cursor.execute("""
-            SELECT
-                v.id,
-                'alerta' as tipo,
-                CONCAT('Vencimiento: ', v.tipo, ' - ', v.descripcion) as descripcion,
-                v.expediente_numero,
-                v.fecha_vencimiento as fecha,
-                'alert-triangle' as icono
-            FROM vencimientos v
-            WHERE v.fecha_vencimiento BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 3 DAY)
-            ORDER BY v.fecha_vencimiento ASC
-            LIMIT %s
-        """, (limite,))
+            # 2. Actuaciones recientes (últimas extraídas/procesadas)
+            cursor.execute("""
+                SELECT
+                    a.id,
+                    'extraccion' as tipo,
+                    CONCAT(a.tipo, ' - ', LEFT(a.detalle, 50), '...') as descripcion,
+                    a.expediente_numero,
+                    a.fecha_creacion as fecha,
+                    'download' as icono
+                FROM actuaciones a
+                WHERE a.fecha_creacion >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                ORDER BY a.fecha_creacion DESC
+                LIMIT %s
+            """, (limite,))
 
-        for row in cursor.fetchall():
-            if row['fecha']:
-                movimientos.append(MovimientoReciente(**row))
+            for row in cursor.fetchall():
+                if row['fecha']:
+                    movimientos.append(MovimientoReciente(**row))
 
-        cursor.close()
-        conn.close()
+            # 3. Vencimientos próximos (alertas)
+            cursor.execute("""
+                SELECT
+                    v.id,
+                    'alerta' as tipo,
+                    CONCAT('Vencimiento: ', v.tipo, ' - ', v.descripcion) as descripcion,
+                    v.expediente_numero,
+                    v.fecha_vencimiento as fecha,
+                    'alert-triangle' as icono
+                FROM vencimientos v
+                WHERE v.fecha_vencimiento BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 3 DAY)
+                ORDER BY v.fecha_vencimiento ASC
+                LIMIT %s
+            """, (limite,))
+
+            for row in cursor.fetchall():
+                if row['fecha']:
+                    movimientos.append(MovimientoReciente(**row))
+
+            cursor.close()
+            # conn is closed by context manager
 
         # Ordenar por fecha y limitar
         movimientos.sort(key=lambda x: x.fecha, reverse=True)
@@ -444,33 +451,33 @@ async def obtener_vencimientos_dashboard(limite: int = 5):
         Lista de vencimientos urgentes con nivel de urgencia
     """
     try:
-        conn = _get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        with _get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
 
-        cursor.execute("""
-            SELECT
-                v.id,
-                v.expediente_numero,
-                v.tipo,
-                v.descripcion,
-                v.fecha_vencimiento,
-                DATEDIFF(v.fecha_vencimiento, CURDATE()) as dias_restantes,
-                CASE
-                    WHEN DATEDIFF(v.fecha_vencimiento, CURDATE()) < 0 THEN 'vencido'
-                    WHEN DATEDIFF(v.fecha_vencimiento, CURDATE()) <= 1 THEN 'critico'
-                    WHEN DATEDIFF(v.fecha_vencimiento, CURDATE()) <= 3 THEN 'urgente'
-                    ELSE 'proximo'
-                END as nivel_urgencia
-            FROM vencimientos v
-            WHERE v.fecha_vencimiento >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-            ORDER BY v.fecha_vencimiento ASC
-            LIMIT %s
-        """, (limite,))
+            cursor.execute("""
+                SELECT
+                    v.id,
+                    v.expediente_numero,
+                    v.tipo,
+                    v.descripcion,
+                    v.fecha_vencimiento,
+                    DATEDIFF(v.fecha_vencimiento, CURDATE()) as dias_restantes,
+                    CASE
+                        WHEN DATEDIFF(v.fecha_vencimiento, CURDATE()) < 0 THEN 'vencido'
+                        WHEN DATEDIFF(v.fecha_vencimiento, CURDATE()) <= 1 THEN 'critico'
+                        WHEN DATEDIFF(v.fecha_vencimiento, CURDATE()) <= 3 THEN 'urgente'
+                        ELSE 'proximo'
+                    END as nivel_urgencia
+                FROM vencimientos v
+                WHERE v.fecha_vencimiento >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                ORDER BY v.fecha_vencimiento ASC
+                LIMIT %s
+            """, (limite,))
 
-        vencimientos = cursor.fetchall()
+            vencimientos = cursor.fetchall()
 
-        cursor.close()
-        conn.close()
+            cursor.close()
+            # conn is closed by context manager
 
         return {
             "vencimientos": vencimientos,

@@ -39,19 +39,19 @@ import mysql.connector
 from mysql.connector import Error as MySQLError
 
 # Importar servicio de extracción de texto estructurado
-from Sistema_v6.application.services.extraccion_texto_service import ExtraccionTextoService
-from Sistema_v6.core.domain.expediente_utils import normalizar_numero_expediente
+from application.services.extraccion_texto_service import ExtraccionTextoService
+from core.domain.expediente_utils import normalizar_numero_expediente
 
 # Importar repositorio de expedientes para obtener expediente_id
 try:
-    from Sistema_v6.infrastructure.persistence.expedientes_mysql import get_expedientes_repository
+    from infrastructure.persistence.expedientes_mysql import get_expedientes_repository
     _expedientes_repo_available = True
 except ImportError:
     _expedientes_repo_available = False
 
 # Importar servicio de integración IA
 try:
-    from Sistema_v6.application.services.ia.ia_integration_service import get_ia_integration_service
+    from application.services.ia.ia_integration_service import get_ia_integration_service
     _ia_integration_available = True
 except ImportError:
     _ia_integration_available = False
@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 
 # Importar servicios de NER y normalización de entidades
 try:
-    from Sistema_v6.application.services.ia import EntityNormalizer, NERChunker
+    from application.services.ia import EntityNormalizer, NERChunker
     _ner_services_available = True
 except ImportError:
     _ner_services_available = False
@@ -698,7 +698,104 @@ class ProcesadorActuacionesService:
         import time
         inicio = time.time()
 
-        logger.info(f"Procesando expediente {numero_expediente} ({len(actuaciones)} actuaciones)")
+        logger.info(f"Procesando expediente {numero_expediente}. Actuaciones: {len(actuaciones)}. Rutas PDF: {len(rutas_pdf) if rutas_pdf else 0}")
+        
+        # Normalizar número de expediente (necesario para búsquedas posteriores)
+        numero_normalizado = normalizar_numero_expediente(numero_expediente)
+
+        # Auto-descubrimiento de PDFs si no se proporcionan
+        if not rutas_pdf:
+            logger.info("rutas_pdf vacio, iniciando auto-descubrimiento...")
+            try:
+                from gestor_directorios.expedientes import GestorDirectoriosExpedientes
+                gestor = GestorDirectoriosExpedientes.desde_config()
+                # Obtener ruta del expediente (crea estructura si no existe, pero es idempotente)
+                path_expediente, _ = gestor.crear_para_expediente(numero_expediente)
+                path_actuaciones = path_expediente / "actuaciones"
+                
+                if path_actuaciones.exists():
+                    rutas_pdf = {}
+                    # Estrategia 1: Usar NombreArchivo si viene en los datos de la actuación
+                    for act in actuaciones:
+                        act_id = act.get('id') or act.get('Indice')
+                        if not act_id:
+                            continue
+                            
+                        # Intentar obtener nombre de archivo de varias claves posibles
+                        nombre_archivo = (
+                            act.get('NombreArchivo') or 
+                            act.get('nombre_archivo') or 
+                            act.get('archivo')
+                        )
+                        
+                        if nombre_archivo and isinstance(nombre_archivo, str) and not nombre_archivo.startswith('http'):
+                            # Si es una ruta relativa o solo nombre
+                            posible_path = path_actuaciones / nombre_archivo
+                            if posible_path.exists():
+                                rutas_pdf[act_id] = str(posible_path)
+                                continue
+
+                    # Estrategia 2: Si falló la 1, intentar mapeo por JSON (fallback)
+                    if not rutas_pdf:
+                        logger.info("Estrategia 1 falló, intentando leer JSON de actuaciones para mapeo...")
+                        path_json_dir = path_expediente / "json"
+                        if path_json_dir.exists():
+                            # Buscar el archivo json más reciente o el que coincida
+                            json_files = list(path_json_dir.glob("actuaciones-*.json"))
+                            if json_files:
+                                import json
+                                # Usar el primero encontrado (usualmente solo hay uno por exp)
+                                json_path = json_files[0]
+                                try:
+                                    with open(json_path, 'r', encoding='utf-8') as f:
+                                        data = json.load(f)
+                                        actuaciones_json = data.get('Actuaciones', [])
+                                        
+                                        # Crear mapa hash/fecha+tipo -> nombre_archivo
+                                        mapa_archivos = {}
+                                        for aj in actuaciones_json:
+                                            if aj.get('NombreArchivo'):
+                                                # Clave compuesta para matching
+                                                clave = f"{aj.get('Fecha')}_{aj.get('Tipo')}" # Corregido TipoActuacion -> Tipo
+                                                mapa_archivos[clave] = aj.get('NombreArchivo')
+                                                # También por descripción si es única
+                                                if aj.get('Detalle'): # Corregido Descripcion -> Detalle
+                                                    mapa_archivos[aj.get('Detalle')] = aj.get('NombreArchivo')
+
+                                        # Intentar matchear con las actuaciones recibidas
+                                        for act in actuaciones:
+                                            act_id = act.get('id') or act.get('Indice')
+                                            if act_id and act_id not in rutas_pdf:
+                                                # Normalizar claves para matching
+                                                fecha = act.get('fecha') or act.get('Fecha')
+                                                tipo = act.get('tipo') or act.get('Tipo')
+                                                detalle = act.get('detalle') or act.get('Detalle') or act.get('descripcion')
+                                                
+                                                clave = f"{fecha}_{tipo}"
+                                                nombre = mapa_archivos.get(clave)
+                                                if not nombre and detalle:
+                                                    nombre = mapa_archivos.get(detalle)
+                                                
+                                                if nombre:
+                                                    p = path_actuaciones / nombre
+                                                    if p.exists():
+                                                        rutas_pdf[act_id] = str(p)
+                                except Exception as e:
+                                    logger.warning(f"Error leyendo JSON de actuaciones: {e}")
+
+                    if rutas_pdf:
+                        logger.info(f"Auto-descubiertos {len(rutas_pdf)} PDFs en {path_actuaciones}")
+                        # DEBUG: Imprimir algunas rutas encontradas
+                        for k, v in list(rutas_pdf.items())[:3]:
+                            logger.info(f"  ID {k} -> {v}")
+                    else:
+                        logger.warning(f"No se encontraron PDFs coincidentes en {path_actuaciones}")
+                        logger.warning(f"  - Estrategia 1 probada con {len(actuaciones)} actuaciones")
+                        logger.warning(f"  - Estrategia 2 probada con JSON en {path_json_dir if 'path_json_dir' in locals() else 'N/A'}")
+            except Exception as e:
+                logger.error(f"Falló el auto-descubrimiento de PDFs: {e}", exc_info=True)
+
+        logger.info(f"Llamando a procesar_expediente con {len(rutas_pdf) if rutas_pdf else 0} rutas de PDF")
 
         # Procesar con procesador_pdf
         resultado_procesamiento = procesar_expediente(
@@ -720,7 +817,7 @@ class ProcesadorActuacionesService:
             expediente_id = None
             if _expedientes_repo_available:
                 try:
-                    numero_normalizado = normalizar_numero_expediente(numero_expediente)
+                    # numero_normalizado ya se obtiene al inicio del método
                     repo_expedientes = get_expedientes_repository()
                     expediente_id = repo_expedientes.obtener_id(numero_normalizado)
                     if expediente_id:
