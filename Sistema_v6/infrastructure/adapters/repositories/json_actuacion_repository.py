@@ -57,21 +57,35 @@ class JsonActuacionRepository(IActuacionRepository):
         # Los directorios usan guiones bajos, no guiones
         nombre_busqueda = nombre_normalizado.replace('-', '_')
 
+        logger.info(f"Buscando actuaciones para: '{numero_expediente}' -> normalizado: '{nombre_busqueda}'")
+        logger.info(f"Workspaces base: {self._workspaces_base} (existe: {self._workspaces_base.exists()})")
+
         # Buscar el directorio que contenga el número normalizado
         # Los directorios tienen formato: {numero}_{nombre_normalizado}
         if self._workspaces_base.exists():
-            for dir_path in self._workspaces_base.iterdir():
-                if dir_path.is_dir() and nombre_busqueda in dir_path.name:
+            # Usar glob para búsqueda más flexible
+            pattern = f"*{nombre_busqueda}*"
+            for dir_path in self._workspaces_base.glob(pattern):
+                if dir_path.is_dir():
+                    logger.info(f"Directorio encontrado: {dir_path.name}")
                     # Intentar encontrar el archivo de actuaciones
                     # Formato: {dir}/json/actuaciones-{nombre}.json
                     json_dir = dir_path / "json"
                     if json_dir.exists():
                         # Buscar cualquier archivo que comience con "actuaciones-"
                         for archivo in json_dir.glob("actuaciones-*.json"):
+                            logger.info(f"Archivo JSON encontrado: {archivo}")
                             return archivo
+                        logger.warning(f"Directorio json existe pero no hay archivos actuaciones-*.json en {json_dir}")
+                    else:
+                        logger.warning(f"No existe directorio json en {dir_path}")
+        else:
+            logger.error(f"El directorio workspaces_base no existe: {self._workspaces_base}")
 
         # Fallback al path original si no se encuentra
-        return self._workspaces_base / nombre_normalizado / "json" / f"actuaciones-{nombre_normalizado}.json"
+        fallback = self._workspaces_base / nombre_normalizado / "json" / f"actuaciones-{nombre_normalizado}.json"
+        logger.warning(f"No se encontró archivo, usando fallback: {fallback}")
+        return fallback
 
     async def guardar_archivo(
         self, numero_expediente: str, archivo: ActuacionesArchivo

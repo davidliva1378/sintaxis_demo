@@ -15,8 +15,7 @@ import {
   BarChart3,
   ListTodo,
   StickyNote,
-  Brain,
-  Tag,
+  Sparkles,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -28,8 +27,7 @@ import ActuacionesClasificadasList from '@/components/expedientes/ActuacionesCla
 import VencimientosExpedientePanel from '@/components/expedientes/VencimientosExpedientePanel'
 import ProcesamientoStatusBadge from '@/components/expedientes/ProcesamientoStatusBadge'
 import MiAnalisisList from '@/components/expedientes/MiAnalisisList'
-import AnalisisIAPanel from '@/components/expedientes/AnalisisIAPanel'
-import EntidadesPanel from '@/components/expedientes/EntidadesPanel'
+import InteligenciaPanel from '@/components/expedientes/InteligenciaPanel'
 import {
   obtenerEstadisticasExpediente,
   procesarExpediente,
@@ -298,7 +296,7 @@ export default function ExpedienteDetallePage() {
 
       {/* Tabs */}
       <Tabs defaultValue="actuaciones" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="actuaciones" className="flex items-center gap-2">
             <ListTodo className="h-4 w-4" />
             Actuaciones ({expedienteActual.actuaciones.length})
@@ -325,13 +323,9 @@ export default function ExpedienteDetallePage() {
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="analisis-ia" className="flex items-center gap-2">
-            <Brain className="h-4 w-4" />
-            Analisis IA
-          </TabsTrigger>
-          <TabsTrigger value="entidades" className="flex items-center gap-2">
-            <Tag className="h-4 w-4" />
-            Entidades
+          <TabsTrigger value="inteligencia" className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Inteligencia
           </TabsTrigger>
         </TabsList>
 
@@ -400,12 +394,8 @@ export default function ExpedienteDetallePage() {
           />
         </TabsContent>
 
-        <TabsContent value="analisis-ia" className="mt-6">
-          <AnalisisIAPanel numeroExpediente={expedienteActual.numero} />
-        </TabsContent>
-
-        <TabsContent value="entidades" className="mt-6">
-          <EntidadesPanel numeroExpediente={expedienteActual.numero} />
+        <TabsContent value="inteligencia" className="mt-6">
+          <InteligenciaPanel numeroExpediente={expedienteActual.numero} />
         </TabsContent>
       </Tabs>
     </div>

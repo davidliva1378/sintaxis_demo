@@ -126,3 +126,64 @@ export async function obtenerAnalisisIA(
 
   return response.json()
 }
+
+// ============================================================================
+// Inteligencia Types (nuevo endpoint consolidado)
+// ============================================================================
+
+export interface EntidadNormalizadaDTO {
+  original: string
+  normalized: string
+  label: string
+  score: number
+  normalization_type?: string
+}
+
+export interface ParteProcesalDTO {
+  nombre: string
+  rol: string  // ACTOR, DEMANDADO, JUEZ, ABOGADO, PERITO
+  abogado?: string
+}
+
+export interface AnalisisActuacionDTO {
+  id: number
+  tipo: string
+  tipo_ia?: string
+  confianza_ia?: number
+  fecha?: string
+  entidades: EntidadNormalizadaDTO[]
+  indexado_rag: boolean
+}
+
+export interface InteligenciaExpedienteResponse {
+  expediente_numero: string
+  resumen_ejecutivo?: string
+  partes_procesales: Record<string, ParteProcesalDTO[]>
+  entidades_normalizadas: Record<string, EntidadNormalizadaDTO[]>
+  analisis_actuaciones: AnalisisActuacionDTO[]
+  total_actuaciones: number
+  total_entidades: number
+  actuaciones_con_ia: number
+  actuaciones_indexadas: number
+}
+
+/**
+ * Obtiene toda la inteligencia consolidada de un expediente
+ * (partes procesales, entidades normalizadas, analisis IA)
+ * @param signal - AbortSignal opcional para cancelar la request (timeout)
+ */
+export async function obtenerInteligenciaExpediente(
+  numeroExpediente: string,
+  signal?: AbortSignal
+): Promise<InteligenciaExpedienteResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/expedientes/${encodeURIComponent(numeroExpediente)}/inteligencia`,
+    { signal }
+  )
+
+  if (!response.ok) {
+    throw new Error(`Error ${response.status}: ${response.statusText}`)
+  }
+
+  return response.json()
+}

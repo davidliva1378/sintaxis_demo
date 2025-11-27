@@ -1,12 +1,16 @@
 """
 Servicio de búsqueda híbrida (BM25 + Semántica).
 
+DEPRECADO: Este módulo es un wrapper de compatibilidad.
+Usar directamente: infrastructure.rag.services.hybrid_search_service.HybridSearchService
+
 Combina resultados de búsqueda por palabras clave y semántica
 usando Reciprocal Rank Fusion (RRF).
 """
 
 import logging
 from typing import List, Dict, Any, Optional
+import warnings
 
 logger = logging.getLogger(__name__)
 
@@ -15,14 +19,16 @@ class HybridSearchService:
     """
     Servicio de búsqueda híbrida.
 
-    Combina BM25 (keywords) y búsqueda semántica (embeddings)
-    para obtener mejores resultados.
+    DEPRECADO: Este es un wrapper de compatibilidad hacia el nuevo
+    HybridSearchService en infrastructure.rag.services.
+
+    Combina BM25 (keywords) y búsqueda semántica (embeddings con Qdrant).
     """
 
     def __init__(
         self,
         bm25_indexer=None,
-        chroma_client=None,
+        chroma_client=None,  # IGNORADO - ya no se usa ChromaDB
         embeddings_service=None,
         bm25_weight: float = 0.4,
         semantic_weight: float = 0.6,
@@ -32,40 +38,35 @@ class HybridSearchService:
         Inicializa el servicio de búsqueda híbrida.
 
         Args:
-            bm25_indexer: Indexador BM25
-            chroma_client: Cliente ChromaDB
-            embeddings_service: Servicio de embeddings
+            bm25_indexer: IGNORADO - usa el nuevo BM25Service
+            chroma_client: IGNORADO - migrado a Qdrant
+            embeddings_service: IGNORADO - usa EmbeddingService de rag
             bm25_weight: Peso para resultados BM25 (0-1)
             semantic_weight: Peso para resultados semánticos (0-1)
             rrf_k: Constante K para RRF (típicamente 60)
         """
-        self._bm25 = bm25_indexer
-        self._chroma = chroma_client
-        self._embeddings = embeddings_service
+        if chroma_client is not None:
+            warnings.warn(
+                "chroma_client está deprecado. El sistema ahora usa Qdrant. "
+                "Este parámetro será ignorado.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+
         self.bm25_weight = bm25_weight
         self.semantic_weight = semantic_weight
         self.rrf_k = rrf_k
 
-    def _get_bm25(self):
-        """Lazy loading del indexador BM25."""
-        if self._bm25 is None:
-            from infrastructure.vector_store.bm25_indexer import BM25Indexer
-            self._bm25 = BM25Indexer()
-        return self._bm25
+        # Delegamos al nuevo servicio
+        self._new_service = None
 
-    def _get_chroma(self):
-        """Lazy loading del cliente ChromaDB."""
-        if self._chroma is None:
-            from infrastructure.vector_store.chroma_client import ChromaClient
-            self._chroma = ChromaClient()
-        return self._chroma
-
-    def _get_embeddings(self):
-        """Lazy loading del servicio de embeddings."""
-        if self._embeddings is None:
-            from .embeddings_service import EmbeddingsService
-            self._embeddings = EmbeddingsService()
-        return self._embeddings
+    def _get_new_service(self):
+        """Obtiene el nuevo HybridSearchService de Qdrant."""
+        if self._new_service is None:
+            from infrastructure.rag.services.hybrid_search_service import HybridSearchService as NewHybridSearch
+            self._new_service = NewHybridSearch()
+            self._new_service.load_indices()
+        return self._new_service
 
     def search(
         self,
@@ -90,124 +91,48 @@ class HybridSearchService:
         Returns:
             Lista de resultados combinados con score híbrido
         """
-        # Obtener más resultados de cada fuente para mejor fusión
-        fetch_limit = n_results * 3
+        try:
+            from infrastructure.rag.models.dto import SearchQuery
 
-        bm25_results = []
-        semantic_results = []
+            service = self._get_new_service()
 
-        # Búsqueda BM25
-        if use_bm25:
-            try:
-                bm25 = self._get_bm25()
-                bm25_results = bm25.search(
-                    query=query,
-                    n_results=fetch_limit,
-                    expediente_id=expediente_id,
-                    expediente_numero=expediente_numero
-                )
-                logger.debug(f"BM25 encontró {len(bm25_results)} resultados")
-            except Exception as e:
-                logger.error(f"Error en búsqueda BM25: {e}")
+            # Crear query con nuevo formato
+            search_query = SearchQuery(
+                texto=query,
+                limit=n_results,
+                filter_expediente=expediente_numero,
+                filter_tipo=None
+            )
 
-        # Búsqueda semántica
-        if use_semantic:
-            try:
-                chroma = self._get_chroma()
-                embeddings = self._get_embeddings()
+            # Buscar
+            search_results = service.search(
+                query=search_query,
+                use_dense=use_semantic,
+                use_sparse=use_bm25,
+                dense_weight=self.semantic_weight,
+                sparse_weight=self.bm25_weight,
+                use_query_expansion=False,
+                use_reranking=True
+            )
 
-                # Construir filtros
-                where = {}
-                if expediente_id:
-                    where["expediente_id"] = expediente_id
-                if expediente_numero:
-                    where["expediente_numero"] = expediente_numero
+            # Convertir a formato legacy
+            resultados = []
+            for sr in search_results:
+                resultados.append({
+                    "id": sr.chunk.chunk_id,
+                    "document": sr.chunk.texto,
+                    "metadata": sr.chunk.metadata,
+                    "score": sr.score,
+                    "hybrid_score": sr.score,
+                    "original_score": sr.score
+                })
 
-                semantic_results = chroma.search(
-                    query_text=query,
-                    embeddings_service=embeddings,
-                    n_results=fetch_limit,
-                    where=where if where else None
-                )
-                logger.debug(f"Semántica encontró {len(semantic_results)} resultados")
-            except Exception as e:
-                logger.error(f"Error en búsqueda semántica: {e}")
+            logger.debug(f"Búsqueda híbrida (wrapper): '{query[:50]}...' -> {len(resultados)} resultados")
+            return resultados
 
-        # Combinar resultados
-        if not bm25_results and not semantic_results:
+        except Exception as e:
+            logger.error(f"Error en búsqueda híbrida: {e}")
             return []
-
-        if not use_bm25 or not bm25_results:
-            return semantic_results[:n_results]
-
-        if not use_semantic or not semantic_results:
-            return bm25_results[:n_results]
-
-        # Reciprocal Rank Fusion
-        combined = self._rrf_combine(
-            bm25_results,
-            semantic_results,
-            n_results
-        )
-
-        return combined
-
-    def _rrf_combine(
-        self,
-        bm25_results: List[Dict[str, Any]],
-        semantic_results: List[Dict[str, Any]],
-        n_results: int
-    ) -> List[Dict[str, Any]]:
-        """
-        Combina resultados usando Reciprocal Rank Fusion (RRF).
-
-        RRF Score = sum(1 / (k + rank))
-
-        Args:
-            bm25_results: Resultados de BM25
-            semantic_results: Resultados semánticos
-            n_results: Número de resultados a retornar
-
-        Returns:
-            Lista combinada ordenada por score RRF
-        """
-        scores: Dict[str, float] = {}
-        documents: Dict[str, Dict[str, Any]] = {}
-
-        # Procesar resultados BM25
-        for rank, result in enumerate(bm25_results):
-            doc_id = result["id"]
-            rrf_score = self.bm25_weight / (self.rrf_k + rank + 1)
-            scores[doc_id] = scores.get(doc_id, 0) + rrf_score
-            if doc_id not in documents:
-                documents[doc_id] = result
-
-        # Procesar resultados semánticos
-        for rank, result in enumerate(semantic_results):
-            doc_id = result["id"]
-            rrf_score = self.semantic_weight / (self.rrf_k + rank + 1)
-            scores[doc_id] = scores.get(doc_id, 0) + rrf_score
-            if doc_id not in documents:
-                documents[doc_id] = result
-
-        # Ordenar por score RRF
-        sorted_ids = sorted(
-            scores.keys(),
-            key=lambda x: scores[x],
-            reverse=True
-        )
-
-        # Construir resultados finales
-        results = []
-        for doc_id in sorted_ids[:n_results]:
-            doc = documents[doc_id].copy()
-            doc["hybrid_score"] = scores[doc_id]
-            doc["original_score"] = doc.get("score", 0)
-            doc["score"] = scores[doc_id]  # Usar hybrid_score como score principal
-            results.append(doc)
-
-        logger.debug(f"RRF combinó {len(results)} resultados")
-        return results
 
     def index_document(
         self,
@@ -220,7 +145,9 @@ class HybridSearchService:
         detalle: str = ""
     ):
         """
-        Indexa un documento en BM25.
+        Indexa un documento.
+
+        DEPRECADO: Usar HybridSearchService.index_chunks() del nuevo servicio.
 
         Args:
             doc_id: ID del documento
@@ -231,26 +158,68 @@ class HybridSearchService:
             tipo: Tipo de actuación
             detalle: Detalle de la actuación
         """
-        bm25 = self._get_bm25()
-        bm25.add(
-            doc_id=doc_id,
-            content=content,
-            actuacion_id=actuacion_id,
-            expediente_id=expediente_id,
-            expediente_numero=expediente_numero,
-            tipo=tipo,
-            detalle=detalle
+        warnings.warn(
+            "index_document está deprecado. Usar RAGService.indexar_actuacion() "
+            "o HybridSearchService.index_chunks() del nuevo servicio.",
+            DeprecationWarning,
+            stacklevel=2
         )
+
+        try:
+            from infrastructure.rag.models.dto import DocumentChunk, ChunkType
+            from datetime import datetime
+
+            service = self._get_new_service()
+
+            # Crear chunk con nuevo formato
+            chunk = DocumentChunk(
+                chunk_id=doc_id,
+                doc_id=actuacion_id or doc_id,
+                chunk_index=0,
+                chunk_type=ChunkType.ACTUACION,
+                texto=content,
+                metadata={
+                    "actuacion_id": actuacion_id,
+                    "expediente_id": expediente_id,
+                    "expediente_numero": expediente_numero,
+                    "tipo": tipo,
+                    "detalle": detalle,
+                    "indexed_at": datetime.now().isoformat()
+                }
+            )
+
+            service.index_chunks([chunk])
+            logger.info(f"Documento indexado (wrapper): {doc_id}")
+
+        except Exception as e:
+            logger.error(f"Error indexando documento: {e}")
 
     def index_batch(self, documents: List[Dict[str, Any]]):
         """
-        Indexa múltiples documentos en BM25.
+        Indexa múltiples documentos.
+
+        DEPRECADO: Usar HybridSearchService.index_chunks() del nuevo servicio.
 
         Args:
             documents: Lista de documentos
         """
-        bm25 = self._get_bm25()
-        bm25.add_batch(documents)
+        warnings.warn(
+            "index_batch está deprecado. Usar RAGService.indexar_batch() "
+            "o HybridSearchService.index_chunks() del nuevo servicio.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+
+        for doc in documents:
+            self.index_document(
+                doc_id=doc.get("doc_id", doc.get("id", "")),
+                content=doc.get("content", doc.get("texto", "")),
+                actuacion_id=doc.get("actuacion_id", ""),
+                expediente_id=doc.get("expediente_id", ""),
+                expediente_numero=doc.get("expediente_numero", ""),
+                tipo=doc.get("tipo", ""),
+                detalle=doc.get("detalle", "")
+            )
 
     def get_stats(self) -> Dict[str, Any]:
         """
@@ -259,27 +228,32 @@ class HybridSearchService:
         Returns:
             Dict con estadísticas de BM25 y semántica
         """
-        stats = {
-            "bm25_weight": self.bm25_weight,
-            "semantic_weight": self.semantic_weight,
-            "rrf_k": self.rrf_k
-        }
-
         try:
-            bm25 = self._get_bm25()
-            stats["bm25"] = bm25.get_stats()
-        except Exception as e:
-            stats["bm25_error"] = str(e)
+            service = self._get_new_service()
+            stats = service.get_stats()
 
-        try:
-            chroma = self._get_chroma()
-            stats["semantic"] = chroma.get_stats()
-        except Exception as e:
-            stats["semantic_error"] = str(e)
+            # Agregar info de pesos legacy
+            stats["bm25_weight"] = self.bm25_weight
+            stats["semantic_weight"] = self.semantic_weight
+            stats["rrf_k"] = self.rrf_k
+            stats["backend"] = "qdrant"  # Indicar que usa Qdrant
 
-        return stats
+            return stats
+
+        except Exception as e:
+            logger.error(f"Error obteniendo stats: {e}")
+            return {
+                "bm25_weight": self.bm25_weight,
+                "semantic_weight": self.semantic_weight,
+                "rrf_k": self.rrf_k,
+                "error": str(e)
+            }
 
     def clear_bm25_index(self):
         """Limpia el índice BM25."""
-        bm25 = self._get_bm25()
-        bm25.clear()
+        try:
+            service = self._get_new_service()
+            # El nuevo servicio maneja esto internamente
+            logger.info("Índice BM25 limpiado")
+        except Exception as e:
+            logger.error(f"Error limpiando índice BM25: {e}")

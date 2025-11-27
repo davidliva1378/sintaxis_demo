@@ -72,6 +72,7 @@ from .routers import (
     analisis,
     auth,
     config,
+    dashboard,
     entidades,
     escritos,
     expedientes,
@@ -218,6 +219,7 @@ app.include_router(tools.router, prefix="/api/v1", tags=["tools"])
 app.include_router(mcp.router, prefix="/api/v1", tags=["mcp"])
 app.include_router(tipos_entidad.router, prefix="/api/v1", tags=["tipos_entidad"])
 app.include_router(rag.router, tags=["rag"])
+app.include_router(dashboard.router, prefix="/api/v1", tags=["dashboard"])
 
 
 # === Root Endpoint ===

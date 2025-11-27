@@ -3,14 +3,14 @@ Servicio RAG (Retrieval Augmented Generation) para actuaciones.
 
 Permite indexar actuaciones y realizar búsquedas semánticas
 para encontrar información relevante en el expediente.
+
+MIGRADO A QDRANT - Usa exclusivamente los servicios de infrastructure/rag/
 """
 
 import logging
 import hashlib
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
-
-from .hybrid_search import HybridSearchService
 
 logger = logging.getLogger(__name__)
 
@@ -19,30 +19,31 @@ class RAGService:
     """
     Servicio para búsqueda semántica y generación aumentada.
 
-    Combina ChromaDB para búsqueda vectorial con LLM para
-    generar respuestas contextualizadas.
+    Usa Qdrant para búsqueda vectorial + BM25 para búsqueda híbrida.
     """
 
     def __init__(
         self,
         embeddings_service=None,
-        chroma_client=None,
+        qdrant_service=None,
         llm_service=None,
+        hybrid_search_service=None,
         collection_name: str = "actuaciones"
     ):
         """
         Inicializa el servicio RAG.
 
         Args:
-            embeddings_service: Servicio de embeddings
-            chroma_client: Cliente de ChromaDB
+            embeddings_service: Servicio de embeddings (usa EmbeddingService de rag si None)
+            qdrant_service: Servicio Qdrant (crea uno nuevo si None)
             llm_service: Servicio LLM
+            hybrid_search_service: Servicio de búsqueda híbrida
             collection_name: Nombre de la colección
         """
         self._embeddings = embeddings_service
-        self._chroma = chroma_client
+        self._qdrant = qdrant_service
         self._llm = llm_service
-        self._hybrid_search = None
+        self._hybrid_search = hybrid_search_service
         self.collection_name = collection_name
 
         # Cache para consultas frecuentes (TTL: 1 hora)
@@ -52,16 +53,23 @@ class RAGService:
     def _get_embeddings(self):
         """Obtiene servicio de embeddings (lazy loading)."""
         if self._embeddings is None:
-            from .embeddings_service import EmbeddingsService
-            self._embeddings = EmbeddingsService()
+            try:
+                from infrastructure.rag.services.embedding_service import EmbeddingService
+                self._embeddings = EmbeddingService()
+            except Exception as e:
+                logger.warning(f"No se pudo cargar EmbeddingService de rag, usando legacy: {e}")
+                from .embeddings_service import EmbeddingsService
+                self._embeddings = EmbeddingsService()
         return self._embeddings
 
-    def _get_chroma(self):
-        """Obtiene cliente ChromaDB (lazy loading)."""
-        if self._chroma is None:
-            from infrastructure.vector_store import ChromaClient
-            self._chroma = ChromaClient()
-        return self._chroma
+    def _get_qdrant(self):
+        """Obtiene servicio Qdrant (lazy loading)."""
+        if self._qdrant is None:
+            from infrastructure.rag.services.qdrant_service import QdrantService
+            self._qdrant = QdrantService()
+            self._qdrant.connect()
+            self._qdrant.ensure_collection_exists()
+        return self._qdrant
 
     def _get_llm(self):
         """Obtiene servicio LLM (lazy loading)."""
@@ -73,10 +81,9 @@ class RAGService:
     def _get_hybrid_search(self):
         """Obtiene servicio de búsqueda híbrida (lazy loading)."""
         if self._hybrid_search is None:
-            self._hybrid_search = HybridSearchService(
-                chroma_client=self._get_chroma(),
-                embeddings_service=self._get_embeddings()
-            )
+            from infrastructure.rag.services.hybrid_search_service import HybridSearchService
+            self._hybrid_search = HybridSearchService()
+            self._hybrid_search.load_indices()
         return self._hybrid_search
 
     def _cache_key(self, query: str, n_results: int, expediente_id: str = None, expediente_numero: str = None) -> str:
@@ -92,7 +99,6 @@ class RAGService:
                 logger.debug(f"Cache hit: {key[:8]}...")
                 return cached['results']
             else:
-                # Expirado, eliminar
                 del self._cache[key]
         return None
 
@@ -102,7 +108,6 @@ class RAGService:
             'results': results,
             'timestamp': datetime.now()
         }
-        # Limpiar cache si es muy grande (max 100 entradas)
         if len(self._cache) > 100:
             self._cache_cleanup()
 
@@ -128,7 +133,7 @@ class RAGService:
         metadata: Optional[Dict[str, Any]] = None
     ):
         """
-        Indexa una actuación individual.
+        Indexa una actuación individual en Qdrant + BM25.
 
         Args:
             id_actuacion: ID único de la actuación
@@ -139,69 +144,71 @@ class RAGService:
             logger.warning(f"Texto muy corto para indexar: {id_actuacion}")
             return
 
-        embeddings_service = self._get_embeddings()
-        chroma = self._get_chroma()
-
-        # Generar chunks si el texto es largo
-        # Usando chunks más grandes (1000 chars) con mayor overlap (150 chars)
-        # para mejor contexto en documentos legales argentinos
-        chunks = embeddings_service.chunk_text(texto, chunk_size=1000, overlap=150)
-
-        ids = []
-        embeddings = []
-        documents = []
-        metadatas = []
-
-        for i, chunk in enumerate(chunks):
-            chunk_id = f"{id_actuacion}_chunk_{i}"
-            embedding = embeddings_service.encode(chunk)
-
-            ids.append(chunk_id)
-            embeddings.append(embedding)
-            documents.append(chunk)
-
-            chunk_metadata = {
-                "actuacion_id": id_actuacion,
-                "chunk_index": i,
-                "total_chunks": len(chunks),
-                "indexed_at": datetime.now().isoformat()
-            }
-
-            if metadata:
-                chunk_metadata.update(metadata)
-
-            metadatas.append(chunk_metadata)
-
-        # Agregar a ChromaDB
-        chroma.add(
-            ids=ids,
-            embeddings=embeddings,
-            documents=documents,
-            metadatas=metadatas,
-            collection_name=self.collection_name
-        )
-
-        # Indexar en BM25 para búsqueda híbrida
         try:
-            hybrid = self._get_hybrid_search()
-            for i, chunk in enumerate(chunks):
-                chunk_id = f"{id_actuacion}_chunk_{i}"
-                hybrid.index_document(
-                    doc_id=chunk_id,
-                    content=chunk,
-                    actuacion_id=id_actuacion,
-                    expediente_id=metadata.get("expediente_id", "") if metadata else "",
-                    expediente_numero=metadata.get("expediente_numero", "") if metadata else "",
-                    tipo=metadata.get("tipo", "") if metadata else "",
-                    detalle=metadata.get("detalle", "") if metadata else ""
-                )
-        except Exception as e:
-            logger.warning(f"Error indexando en BM25: {e}")
+            from infrastructure.rag.models.dto import DocumentChunk, ChunkType
 
-        logger.info(
-            f"Indexada actuación {id_actuacion}: "
-            f"{len(chunks)} chunks (ChromaDB + BM25)"
-        )
+            embeddings_service = self._get_embeddings()
+            hybrid = self._get_hybrid_search()
+
+            # Generar chunks si el texto es largo
+            chunk_size = 1000
+            overlap = 150
+            chunks_texto = self._chunk_text(texto, chunk_size, overlap)
+
+            chunks = []
+            for i, chunk_text in enumerate(chunks_texto):
+                chunk_id = f"{id_actuacion}_chunk_{i}"
+
+                chunk = DocumentChunk(
+                    chunk_id=chunk_id,
+                    doc_id=id_actuacion,
+                    chunk_index=i,
+                    chunk_type=ChunkType.ACTUACION,
+                    texto=chunk_text,
+                    metadata={
+                        "actuacion_id": id_actuacion,
+                        "chunk_index": i,
+                        "total_chunks": len(chunks_texto),
+                        "indexed_at": datetime.now().isoformat(),
+                        **(metadata or {})
+                    }
+                )
+                chunks.append(chunk)
+
+            # Indexar usando HybridSearchService (maneja Qdrant + BM25)
+            hybrid.index_chunks(chunks)
+
+            logger.info(
+                f"Indexada actuación {id_actuacion}: "
+                f"{len(chunks)} chunks (Qdrant + BM25)"
+            )
+
+        except Exception as e:
+            logger.error(f"Error indexando actuación {id_actuacion}: {e}")
+            raise
+
+    def _chunk_text(self, texto: str, chunk_size: int = 1000, overlap: int = 150) -> List[str]:
+        """Divide texto en chunks con overlap."""
+        if len(texto) <= chunk_size:
+            return [texto]
+
+        chunks = []
+        start = 0
+        while start < len(texto):
+            end = start + chunk_size
+            chunk = texto[start:end]
+
+            # Intentar cortar en espacio
+            if end < len(texto):
+                last_space = chunk.rfind(' ')
+                if last_space > chunk_size // 2:
+                    end = start + last_space
+                    chunk = texto[start:end]
+
+            chunks.append(chunk)
+            start = end - overlap
+
+        return chunks
 
     def indexar_batch(
         self,
@@ -246,51 +253,71 @@ class RAGService:
         expediente_numero: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
-        Busca actuaciones relevantes.
+        Busca actuaciones relevantes usando Qdrant.
 
         Args:
             query: Texto de búsqueda
             n_results: Número de resultados
             filtros: Filtros adicionales de metadata
             expediente_id: Filtrar por ID de expediente
-            expediente_numero: Filtrar por número de expediente (ej: "FPA-004134-2020")
+            expediente_numero: Filtrar por número de expediente
 
         Returns:
             Lista de resultados con documento, metadata y score
         """
-        # Verificar cache (solo si no hay filtros adicionales)
+        # Verificar cache
         if not filtros:
             cache_key = self._cache_key(query, n_results, expediente_id, expediente_numero)
             cached_results = self._cache_get(cache_key)
             if cached_results is not None:
                 return cached_results
 
-        embeddings_service = self._get_embeddings()
-        chroma = self._get_chroma()
+        try:
+            embeddings_service = self._get_embeddings()
+            qdrant = self._get_qdrant()
 
-        # Construir filtros
-        where = {}
-        if expediente_id:
-            where["expediente_id"] = expediente_id
-        if expediente_numero:
-            where["expediente_numero"] = expediente_numero
-        if filtros:
-            where.update(filtros)
+            # Generar embedding de la query
+            if hasattr(embeddings_service, 'encode_text'):
+                query_vector = embeddings_service.encode_text(query)
+            else:
+                query_vector = embeddings_service.encode(query)
 
-        # Buscar
-        resultados = chroma.search(
-            query_text=query,
-            embeddings_service=embeddings_service,
-            n_results=n_results,
-            where=where if where else None,
-            collection_name=self.collection_name
-        )
+            # Construir filtros
+            filter_dict = {}
+            if expediente_id:
+                filter_dict["expediente_id"] = expediente_id
+            if expediente_numero:
+                filter_dict["expediente_numero"] = expediente_numero
+            if filtros:
+                filter_dict.update(filtros)
 
-        # Guardar en cache (solo si no hay filtros adicionales)
-        if not filtros:
-            self._cache_set(cache_key, resultados)
+            # Buscar en Qdrant
+            results = qdrant.search_similar(
+                query_vector=query_vector,
+                limit=n_results,
+                filter_dict=filter_dict if filter_dict else None
+            )
 
-        return resultados
+            # Convertir a formato estándar
+            resultados = []
+            for result in results:
+                payload = result.payload if hasattr(result, 'payload') else {}
+                resultados.append({
+                    "id": payload.get("chunk_id", ""),
+                    "document": payload.get("texto", ""),
+                    "metadata": {k: v for k, v in payload.items() if k != "texto"},
+                    "score": result.score if hasattr(result, 'score') else 0.0
+                })
+
+            # Guardar en cache
+            if not filtros:
+                self._cache_set(cache_key, resultados)
+
+            return resultados
+
+        except Exception as e:
+            logger.error(f"Error en búsqueda: {e}")
+            return []
 
     def buscar_hibrido(
         self,
@@ -302,7 +329,7 @@ class RAGService:
         use_semantic: bool = True
     ) -> List[Dict[str, Any]]:
         """
-        Busca actuaciones usando búsqueda híbrida (BM25 + Semántica).
+        Busca actuaciones usando búsqueda híbrida (BM25 + Semántica con Qdrant).
 
         Combina resultados de búsqueda por palabras clave y semántica
         usando Reciprocal Rank Fusion (RRF) para mejores resultados.
@@ -325,15 +352,39 @@ class RAGService:
             return cached_results
 
         try:
+            from infrastructure.rag.models.dto import SearchQuery
+
             hybrid = self._get_hybrid_search()
-            resultados = hybrid.search(
-                query=query,
-                n_results=n_results,
-                expediente_id=expediente_id,
-                expediente_numero=expediente_numero,
-                use_bm25=use_bm25,
-                use_semantic=use_semantic
+
+            # Crear query
+            search_query = SearchQuery(
+                texto=query,
+                limit=n_results,
+                filter_expediente=expediente_numero,
+                filter_tipo=None
             )
+
+            # Buscar
+            search_results = hybrid.search(
+                query=search_query,
+                use_dense=use_semantic,
+                use_sparse=use_bm25,
+                use_query_expansion=False,  # Desactivar por defecto para rapidez
+                use_reranking=True
+            )
+
+            # Convertir a formato estándar
+            resultados = []
+            for sr in search_results:
+                resultados.append({
+                    "id": sr.chunk.chunk_id,
+                    "document": sr.chunk.texto,
+                    "metadata": sr.chunk.metadata,
+                    "score": sr.score,
+                    "hybrid_score": sr.score,
+                    "rank": sr.rank,
+                    "highlights": sr.highlights
+                })
 
             # Guardar en cache
             self._cache_set(cache_key, resultados)
@@ -376,8 +427,8 @@ class RAGService:
         """
         llm = self._get_llm()
 
-        # Buscar contextos relevantes
-        contextos = self.buscar(
+        # Buscar contextos relevantes (usar híbrido para mejor calidad)
+        contextos = self.buscar_hibrido(
             query=pregunta,
             n_results=n_contextos,
             expediente_id=expediente_id,
@@ -427,7 +478,7 @@ RESPUESTA:"""
             if incluir_fuentes:
                 resultado["fuentes"] = [
                     {
-                        "id": c["metadata"].get("actuacion_id"),
+                        "id": c["metadata"].get("actuacion_id", c.get("id", "")),
                         "fragmento": c["document"][:200] + "..." if len(c["document"]) > 200 else c["document"],
                         "score": c["score"]
                     }
@@ -455,14 +506,14 @@ RESPUESTA:"""
 
         Args:
             expediente_id: ID del expediente
-            expediente_numero: Número del expediente (ej: "FPA-004134-2020")
+            expediente_numero: Número del expediente
             max_length: Longitud máxima del resumen
 
         Returns:
             Resumen del expediente
         """
         # Buscar todas las actuaciones del expediente
-        contextos = self.buscar(
+        contextos = self.buscar_hibrido(
             query="resumen del caso partes demanda resolución",
             n_results=10,
             expediente_id=expediente_id,
@@ -480,20 +531,17 @@ RESPUESTA:"""
 
     def eliminar_actuacion(self, id_actuacion: str):
         """
-        Elimina una actuación del índice.
+        Elimina una actuación del índice Qdrant.
 
         Args:
             id_actuacion: ID de la actuación
         """
-        chroma = self._get_chroma()
-
-        # Eliminar todos los chunks de la actuación
-        chroma.delete(
-            where={"actuacion_id": id_actuacion},
-            collection_name=self.collection_name
-        )
-
-        logger.info(f"Eliminada actuación del índice: {id_actuacion}")
+        try:
+            qdrant = self._get_qdrant()
+            deleted = qdrant.delete_by_doc_id(id_actuacion)
+            logger.info(f"Eliminada actuación del índice: {id_actuacion} ({deleted} chunks)")
+        except Exception as e:
+            logger.error(f"Error eliminando actuación {id_actuacion}: {e}")
 
     def get_stats(self) -> Dict[str, Any]:
         """
@@ -502,18 +550,25 @@ RESPUESTA:"""
         Returns:
             Dict con estadísticas
         """
-        chroma = self._get_chroma()
-
-        return {
-            "collection": self.collection_name,
-            "total_documents": chroma.count(self.collection_name),
-            "chroma_stats": chroma.get_stats()
-        }
+        try:
+            hybrid = self._get_hybrid_search()
+            stats = hybrid.get_stats()
+            stats["collection"] = self.collection_name
+            return stats
+        except Exception as e:
+            logger.error(f"Error obteniendo stats: {e}")
+            return {
+                "collection": self.collection_name,
+                "error": str(e)
+            }
 
     def limpiar_indice(self):
         """
         Elimina todos los documentos del índice.
         """
-        chroma = self._get_chroma()
-        chroma.delete_collection(self.collection_name)
-        logger.warning(f"Índice {self.collection_name} eliminado")
+        try:
+            qdrant = self._get_qdrant()
+            qdrant.clear_collection()
+            logger.warning(f"Índice {self.collection_name} eliminado")
+        except Exception as e:
+            logger.error(f"Error limpiando índice: {e}")

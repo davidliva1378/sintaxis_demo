@@ -84,8 +84,8 @@ def detect_question_type(query: str) -> QuestionType:
 
     procesal_patterns = [
         "qué sigue", "próximo paso", "estado", "etapa",
-        "instancia", "recurso", "apelación", "situación actual",
-        "notificación", "pendiente"
+        "instancia", "recurso", "apelación", "apelacion", "apelar",
+        "situación actual", "notificación", "pendiente"
     ]
 
     # Detectar tipo

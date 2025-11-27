@@ -4,14 +4,14 @@ import { Badge } from '@/components/ui/badge'
 import ActivityChart from '@/components/dashboard/ActivityChart'
 import StatsChart from '@/components/dashboard/StatsChart'
 import RecentActivity from '@/components/dashboard/RecentActivity'
+import KPICards from '@/components/dashboard/KPICards'
+import VencimientosWidget from '@/components/dashboard/VencimientosWidget'
+import SystemHealthPanel from '@/components/dashboard/SystemHealthPanel'
 import {
   FileText,
   FolderOpen,
   Activity,
   Settings,
-  TrendingUp,
-  Clock,
-  CheckCircle,
   AlertCircle
 } from 'lucide-react'
 import { subDays, format } from 'date-fns'
@@ -19,62 +19,27 @@ import { subDays, format } from 'date-fns'
 export default function DashboardPage() {
   const { user } = useAuthStore()
 
-  const stats = [
-    {
-      title: 'Expedientes',
-      value: '0',
-      description: 'Total de expedientes',
-      icon: FileText,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100 dark:bg-blue-900/20',
-    },
-    {
-      title: 'Workspaces',
-      value: '0',
-      description: 'Espacios de trabajo',
-      icon: FolderOpen,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100 dark:bg-purple-900/20',
-    },
-    {
-      title: 'Activos',
-      value: '0',
-      description: 'En monitoreo',
-      icon: Activity,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100 dark:bg-green-900/20',
-    },
-    {
-      title: 'Actualizaciones',
-      value: '0',
-      description: 'Últimas 24 horas',
-      icon: TrendingUp,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100 dark:bg-orange-900/20',
-    },
-  ]
-
   const quickActions = [
     {
       title: 'Extraer Expedientes',
       description: 'Extraer expedientes del PJN',
       icon: FileText,
       href: '/expedientes',
-      status: 'Próximamente',
+      status: 'Disponible',
     },
     {
       title: 'Iniciar Monitoreo',
-      description: 'Monitorear cambios automáticamente',
+      description: 'Monitorear cambios automaticamente',
       icon: Activity,
       href: '/monitoreo',
-      status: 'Próximamente',
+      status: 'Disponible',
     },
     {
       title: 'Crear Workspace',
       description: 'Organizar expedientes por carpetas',
       icon: FolderOpen,
       href: '/workspaces',
-      status: 'Próximamente',
+      status: 'Disponible',
     },
     {
       title: 'Configurar PJN',
@@ -85,7 +50,7 @@ export default function DashboardPage() {
     },
   ]
 
-  // Datos de ejemplo para gráficos (serán reemplazados con datos reales en futuras fases)
+  // Datos de ejemplo para graficos (seran reemplazados con datos reales en futuras fases)
   const activityData = Array.from({ length: 30 }, (_, i) => ({
     date: format(subDays(new Date(), 29 - i), 'dd/MM'),
     expedientes: Math.floor(Math.random() * 10),
@@ -105,16 +70,16 @@ export default function DashboardPage() {
     {
       id: '1',
       type: 'expediente' as const,
-      title: 'Expediente extraído',
-      description: 'Expediente JUZ-FAM-2024-0123 extraído exitosamente',
+      title: 'Expediente extraido',
+      description: 'Expediente JUZ-FAM-2024-0123 extraido exitosamente',
       timestamp: subDays(new Date(), 0),
       status: 'success' as const,
     },
     {
       id: '2',
       type: 'monitoreo' as const,
-      title: 'Actualización detectada',
-      description: 'Se detectó nueva actuación en expediente JUZ-CIV-2024-0456',
+      title: 'Actualizacion detectada',
+      description: 'Se detecto nueva actuacion en expediente JUZ-CIV-2024-0456',
       timestamp: subDays(new Date(), 1),
       status: 'info' as const,
     },
@@ -159,47 +124,25 @@ export default function DashboardPage() {
               </h3>
               <p className="text-sm text-orange-800 dark:text-orange-200">
                 Para usar las funciones de scraping, necesitas configurar tus credenciales del Portal Judicial Nacional.
-                Ve a <a href="/settings" className="underline font-medium">Configuración</a> para completar este paso.
+                Ve a <a href="/settings" className="underline font-medium">Configuracion</a> para completar este paso.
               </p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon
-          return (
-            <Card key={stat.title}>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  {stat.title}
-                </CardTitle>
-                <div className={`rounded-full p-2 ${stat.bgColor}`}>
-                  <Icon className={`h-4 w-4 ${stat.color}`} />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {stat.description}
-                </p>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+      {/* KPI Cards - Datos reales desde backend */}
+      <KPICards />
 
       {/* Quick Actions */}
       <div>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-          Acciones Rápidas
+          Acciones Rapidas
         </h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {quickActions.map((action) => {
             const Icon = action.icon
-            const isAvailable = action.status === 'Configurado'
+            const isAvailable = action.status === 'Configurado' || action.status === 'Disponible'
             const isPending = action.status === 'Pendiente'
 
             return (
@@ -239,6 +182,12 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Vencimientos + System Health Row */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <VencimientosWidget />
+        <SystemHealthPanel />
+      </div>
+
       {/* Charts Section */}
       <div className="grid gap-6 lg:grid-cols-2">
         <ActivityChart data={activityData} />
@@ -247,52 +196,6 @@ export default function DashboardPage() {
 
       {/* Recent Activity */}
       <RecentActivity activities={recentActivities} />
-
-      {/* System Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Información del Sistema</CardTitle>
-          <CardDescription>Estado actual del sistema</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="flex items-center gap-3">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              <div>
-                <p className="text-sm font-medium">API Backend</p>
-                <p className="text-xs text-gray-500">Conectado</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              <div>
-                <p className="text-sm font-medium">Base de Datos</p>
-                <p className="text-xs text-gray-500">Operativa</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {user?.has_pjn_credentials ? (
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              ) : (
-                <AlertCircle className="h-5 w-5 text-orange-600" />
-              )}
-              <div>
-                <p className="text-sm font-medium">Credenciales PJN</p>
-                <p className="text-xs text-gray-500">
-                  {user?.has_pjn_credentials ? 'Configuradas' : 'No configuradas'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              <div>
-                <p className="text-sm font-medium">Versión</p>
-                <p className="text-xs text-gray-500">v6.0.0</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

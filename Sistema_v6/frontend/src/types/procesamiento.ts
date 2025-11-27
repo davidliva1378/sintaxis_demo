@@ -109,11 +109,24 @@ export interface EstadisticasExpediente {
   tiempo_procesamiento_seg: number
 }
 
+// ============================================================================
+// Entidades Normalizadas (NER)
+// ============================================================================
+
+export interface EntidadNormalizada {
+  original: string
+  normalized: string
+  label: string
+  score: number
+  normalization_type?: string  // fecha, monto, nombre, norma, tribunal, llm
+}
+
 export interface ResultadoExpediente {
   expediente_numero: string
   estadisticas: EstadisticasExpediente
   vencimientos_urgentes: VencimientoUrgente[]
   con_errores: number
+  entidades_por_actuacion?: Record<number, EntidadNormalizada[]>
 }
 
 // ============================================================================
@@ -251,6 +264,27 @@ export const LABELS_URGENCIA: Record<NivelUrgencia, string> = {
   [NivelUrgencia.URGENTE]: 'Urgente (2-3 días)',
   [NivelUrgencia.PROXIMO]: 'Próximo (4-7 días)',
   [NivelUrgencia.NORMAL]: 'Normal'
+}
+
+// Colores para tipos de entidad NER
+export const COLORES_ENTIDAD: Record<string, string> = {
+  'FECHA': 'bg-blue-100 text-blue-800',
+  'MONTO': 'bg-green-100 text-green-800',
+  'PERSONA': 'bg-purple-100 text-purple-800',
+  'JUEZ': 'bg-indigo-100 text-indigo-800',
+  'ABOGADO': 'bg-violet-100 text-violet-800',
+  'ACTOR': 'bg-orange-100 text-orange-800',
+  'DEMANDADO': 'bg-red-100 text-red-800',
+  'NORMA': 'bg-amber-100 text-amber-800',
+  'LEY': 'bg-yellow-100 text-yellow-800',
+  'ARTICULO': 'bg-lime-100 text-lime-800',
+  'TRIBUNAL': 'bg-cyan-100 text-cyan-800',
+  'EXPEDIENTE': 'bg-teal-100 text-teal-800',
+  'default': 'bg-gray-100 text-gray-800'
+}
+
+export function getColorEntidad(label: string): string {
+  return COLORES_ENTIDAD[label.toUpperCase()] || COLORES_ENTIDAD['default']
 }
 
 // ============================================================================

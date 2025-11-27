@@ -200,4 +200,24 @@ export const ragApi = {
   },
 }
 
+/**
+ * Genera un resumen ejecutivo del expediente usando RAG + LLM
+ * @param expedienteNumero - Numero del expediente
+ * @returns Promise con el resumen generado
+ */
+export async function generarResumenExpediente(expedienteNumero: string): Promise<string> {
+  const pregunta = `Genera un resumen ejecutivo conciso del expediente ${expedienteNumero}.
+Incluye: objeto del caso, partes involucradas, estado procesal actual, y aspectos clave a tener en cuenta.
+El resumen debe ser claro, directo y en terminologia juridica apropiada.`
+
+  const response = await ragApi.query({
+    pregunta,
+    limite: 10,
+    filter_expediente: expedienteNumero,
+    temperature: 0.3,  // Baja temperatura para mayor precision
+  })
+
+  return response.respuesta
+}
+
 export default ragApi

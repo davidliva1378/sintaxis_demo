@@ -4,7 +4,7 @@ Servicio de Integración de IA con Procesamiento de Actuaciones.
 Este servicio actúa como intermediario entre el procesamiento de actuaciones
 y los servicios de IA, proporcionando:
 - Clasificación automática de actuaciones
-- Indexación en ChromaDB para búsqueda semántica
+- Indexación en Qdrant para búsqueda semántica
 - Extracción de entidades jurídicas
 
 Se integra con ProcesadorActuacionesService para procesamiento automático.
@@ -62,9 +62,9 @@ class IAIntegrationService:
 
         Args:
             habilitar_clasificacion: Si usar clasificación IA
-            habilitar_rag: Si indexar en ChromaDB
+            habilitar_rag: Si indexar en Qdrant
             habilitar_ner: Si extraer entidades
-            vector_store_path: Ruta para ChromaDB
+            vector_store_path: DEPRECADO - ya no se usa
         """
         self.habilitar_clasificacion = habilitar_clasificacion
         self.habilitar_rag = habilitar_rag
@@ -75,8 +75,6 @@ class IAIntegrationService:
         self._clasificador = None
         self._rag_service = None
         self._ner_service = None
-        self._embeddings = None
-        self._chroma = None
 
         # Repositorio para persistencia de entidades
         self._entidades_repo = EntidadesRepository()
@@ -99,26 +97,11 @@ class IAIntegrationService:
 
     @property
     def rag_service(self):
-        """Obtiene el servicio RAG (lazy loading)."""
+        """Obtiene el servicio RAG (lazy loading). Usa Qdrant internamente."""
         if self._rag_service is None and self.habilitar_rag:
-            from .embeddings_service import EmbeddingsService
             from .rag_service import RAGService
-            from Sistema_v6.infrastructure.vector_store.chroma_client import ChromaClient
-
-            if self._embeddings is None:
-                self._embeddings = EmbeddingsService(device="cpu")
-
-            if self._chroma is None:
-                self._chroma = ChromaClient(
-                    persist_directory=self.vector_store_path,
-                    collection_name="actuaciones"
-                )
-
-            self._rag_service = RAGService(
-                embeddings_service=self._embeddings,
-                chroma_client=self._chroma
-            )
-            logger.info("RAGService cargado")
+            self._rag_service = RAGService()  # RAGService ya usa Qdrant internamente
+            logger.info("RAGService cargado (usando Qdrant)")
         return self._rag_service
 
     @property
@@ -147,7 +130,7 @@ class IAIntegrationService:
             texto: Texto completo de la actuación
             metadata: Metadatos adicionales
             clasificar: Si clasificar la actuación
-            indexar: Si indexar en ChromaDB
+            indexar: Si indexar en Qdrant
             extraer_entidades: Si extraer entidades
 
         Returns:
@@ -191,8 +174,8 @@ class IAIntegrationService:
         # === Indexación RAG ===
         if indexar and self.habilitar_rag:
             try:
-                # Preparar metadata para ChromaDB
-                chroma_metadata = {
+                # Preparar metadata para Qdrant
+                qdrant_metadata = {
                     "expediente_id": str(metadata.get("expediente_id", "")),
                     "expediente_numero": metadata.get("expediente_numero", ""),
                     "tipo": metadata.get("tipo", "DESCONOCIDO"),
@@ -203,16 +186,16 @@ class IAIntegrationService:
 
                 # Agregar clasificación IA si está disponible
                 if resultado["clasificacion"]:
-                    chroma_metadata["tipo_ia"] = resultado["clasificacion"]["tipo"]
-                    chroma_metadata["confianza_ia"] = str(resultado["clasificacion"]["confianza"])
+                    qdrant_metadata["tipo_ia"] = resultado["clasificacion"]["tipo"]
+                    qdrant_metadata["confianza_ia"] = str(resultado["clasificacion"]["confianza"])
 
                 self.rag_service.indexar_actuacion(
                     id_actuacion=str(actuacion_id),
                     texto=texto,
-                    metadata=chroma_metadata
+                    metadata=qdrant_metadata
                 )
                 resultado["indexado"] = True
-                logger.debug(f"Actuación {actuacion_id} indexada en ChromaDB")
+                logger.debug(f"Actuación {actuacion_id} indexada en Qdrant")
             except Exception as e:
                 logger.error(f"Error indexando actuación {actuacion_id}: {e}")
                 resultado["errores"].append(f"indexacion: {str(e)}")
@@ -380,10 +363,11 @@ class IAIntegrationService:
             "ner_cargado": self._ner_service is not None
         }
 
-        # Agregar stats de ChromaDB si está disponible
-        if self._chroma:
+        # Agregar stats de Qdrant si está disponible
+        if self._rag_service:
             try:
-                stats["documentos_indexados"] = self._chroma.count("actuaciones")
+                rag_stats = self._rag_service.get_stats()
+                stats["documentos_indexados"] = rag_stats.get("total_indexed", 0)
             except Exception:
                 stats["documentos_indexados"] = -1
 

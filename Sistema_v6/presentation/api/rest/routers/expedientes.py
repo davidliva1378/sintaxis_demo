@@ -833,3 +833,259 @@ async def obtener_analisis_ia(numero: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error interno: {str(e)}",
         )
+
+
+# ============================================================================
+# Endpoint de Inteligencia Consolidada
+# ============================================================================
+
+class EntidadNormalizadaDTO(BaseModel):
+    """Entidad extraída y normalizada."""
+    original: str
+    normalized: str
+    label: str
+    score: float
+    normalization_type: Optional[str] = None
+
+
+class ParteProcesalDTO(BaseModel):
+    """Parte procesal identificada."""
+    nombre: str
+    rol: str  # ACTOR, DEMANDADO, JUEZ, ABOGADO, PERITO
+    abogado: Optional[str] = None
+
+
+class AnalisisActuacionDTO(BaseModel):
+    """Análisis de una actuación individual."""
+    id: int
+    tipo: str
+    tipo_ia: Optional[str] = None
+    confianza_ia: Optional[float] = None
+    fecha: Optional[str] = None
+    entidades: List[EntidadNormalizadaDTO] = []
+    indexado_rag: bool = False
+
+
+class InteligenciaExpedienteResponse(BaseModel):
+    """Response consolidada de inteligencia del expediente."""
+    expediente_numero: str
+    # Resumen (se genera en frontend o con LLM en PASO 9)
+    resumen_ejecutivo: Optional[str] = None
+    # Partes procesales agrupadas
+    partes_procesales: Dict[str, List[ParteProcesalDTO]]
+    # Entidades normalizadas agrupadas por tipo
+    entidades_normalizadas: Dict[str, List[EntidadNormalizadaDTO]]
+    # Análisis por actuación
+    analisis_actuaciones: List[AnalisisActuacionDTO]
+    # Estadísticas
+    total_actuaciones: int
+    total_entidades: int
+    actuaciones_con_ia: int
+    actuaciones_indexadas: int
+
+
+@router.get("/{numero}/inteligencia", response_model=InteligenciaExpedienteResponse, status_code=status.HTTP_200_OK)
+async def obtener_inteligencia_expediente(numero: str):
+    """Obtiene análisis de inteligencia consolidado del expediente.
+
+    Incluye:
+    - Entidades normalizadas agrupadas (fechas, montos, personas, normas)
+    - Partes procesales (actor, demandado, abogados, juez)
+    - Análisis por actuación con clasificación IA
+    - Estadísticas generales
+
+    Args:
+        numero: Número del expediente
+
+    Returns:
+        InteligenciaExpedienteResponse con análisis consolidado
+
+    Raises:
+        HTTPException 404: Si el expediente no existe
+        HTTPException 500: Error interno
+    """
+    from urllib.parse import unquote
+    numero = unquote(numero)  # Decodificar %2F -> /
+    logger.info(f"GET /expedientes/{numero}/inteligencia")
+
+    try:
+        conn = _get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        # Obtener actuaciones (sin texto_extraido para mejor performance)
+        query = """
+            SELECT
+                id,
+                tipo,
+                detalle,
+                fecha,
+                tipo_ia,
+                confianza_ia,
+                COALESCE(indexado_rag, 0) as indexado_rag
+            FROM actuaciones
+            WHERE expediente_numero = %s
+            ORDER BY id ASC
+        """
+        cursor.execute(query, (numero,))
+        rows = cursor.fetchall()
+
+        # Obtener entidades pre-calculadas de MySQL (evita reprocesar NER)
+        entidades_query = """
+            SELECT entity_type, entity_value, actuacion_id, score
+            FROM entidades_extraidas
+            WHERE expediente_numero = %s
+        """
+        cursor.execute(entidades_query, (numero,))
+        entidades_db = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        # Indexar entidades por actuación para acceso rápido
+        entidades_por_actuacion: Dict[int, list] = {}
+        for ent in entidades_db:
+            act_id = ent.get('actuacion_id')
+            if act_id:
+                if act_id not in entidades_por_actuacion:
+                    entidades_por_actuacion[act_id] = []
+                entidades_por_actuacion[act_id].append(ent)
+
+        if not rows:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No se encontraron actuaciones para el expediente {numero}"
+            )
+
+        # Procesar actuaciones y extraer entidades
+        analisis_actuaciones = []
+        entidades_por_tipo: Dict[str, List[EntidadNormalizadaDTO]] = {
+            'FECHA': [],
+            'MONTO': [],
+            'PERSONA': [],
+            'NORMA': [],
+            'TRIBUNAL': [],
+            'OTROS': []
+        }
+        partes_procesales: Dict[str, List[ParteProcesalDTO]] = {
+            'ACTOR': [],
+            'DEMANDADO': [],
+            'ABOGADO': [],
+            'JUEZ': [],
+            'PERITO': []
+        }
+
+        actuaciones_con_ia = 0
+        actuaciones_indexadas = 0
+        total_entidades = 0
+
+        for row in rows:
+            act_id = row['id']
+
+            # Contar estadísticas
+            if row.get('tipo_ia'):
+                actuaciones_con_ia += 1
+            if row.get('indexado_rag'):
+                actuaciones_indexadas += 1
+
+            # Convertir fecha
+            fecha_str = None
+            if row.get('fecha'):
+                fecha_val = row['fecha']
+                if hasattr(fecha_val, 'strftime'):
+                    fecha_str = fecha_val.strftime('%Y-%m-%d')
+                else:
+                    fecha_str = str(fecha_val)
+
+            # Obtener entidades pre-calculadas de MySQL (sin reprocesar NER)
+            entidades_actuacion = []
+            entidades_act_db = entidades_por_actuacion.get(act_id, [])
+
+            for ent in entidades_act_db:
+                entity_type = ent.get('entity_type', 'OTROS')
+                entity_value = ent.get('entity_value', '')
+                score = float(ent.get('score') or 0.8)
+
+                ent_dto = EntidadNormalizadaDTO(
+                    original=entity_value,
+                    normalized=entity_value,
+                    label=entity_type,
+                    score=score,
+                    normalization_type='db_cached'
+                )
+                entidades_actuacion.append(ent_dto)
+                total_entidades += 1
+
+                # Agrupar por tipo
+                label_upper = entity_type.upper()
+                if label_upper in ['FECHA', 'PLAZO', 'VENCIMIENTO']:
+                    entidades_por_tipo['FECHA'].append(ent_dto)
+                elif label_upper in ['MONTO', 'DINERO', 'HONORARIOS', 'CAPITAL']:
+                    entidades_por_tipo['MONTO'].append(ent_dto)
+                elif label_upper in ['PERSONA', 'JUEZ', 'ABOGADO', 'ACTOR', 'DEMANDADO', 'PERITO', 'TESTIGO']:
+                    entidades_por_tipo['PERSONA'].append(ent_dto)
+                    # También agregar a partes procesales si aplica
+                    if label_upper in partes_procesales:
+                        partes_procesales[label_upper].append(
+                            ParteProcesalDTO(
+                                nombre=entity_value,
+                                rol=label_upper
+                            )
+                        )
+                elif label_upper in ['NORMA', 'LEY', 'ARTICULO', 'DECRETO']:
+                    entidades_por_tipo['NORMA'].append(ent_dto)
+                elif label_upper == 'TRIBUNAL':
+                    entidades_por_tipo['TRIBUNAL'].append(ent_dto)
+                else:
+                    entidades_por_tipo['OTROS'].append(ent_dto)
+
+            analisis_actuaciones.append(AnalisisActuacionDTO(
+                id=act_id,
+                tipo=row['tipo'] or '',
+                tipo_ia=row.get('tipo_ia'),
+                confianza_ia=float(row['confianza_ia']) if row.get('confianza_ia') else None,
+                fecha=fecha_str,
+                entidades=entidades_actuacion,
+                indexado_rag=bool(row.get('indexado_rag'))
+            ))
+
+        # Eliminar duplicados en entidades por normalized value
+        for tipo in entidades_por_tipo:
+            seen = set()
+            unique = []
+            for ent in entidades_por_tipo[tipo]:
+                if ent.normalized not in seen:
+                    seen.add(ent.normalized)
+                    unique.append(ent)
+            entidades_por_tipo[tipo] = unique
+
+        # Eliminar duplicados en partes procesales
+        for rol in partes_procesales:
+            seen = set()
+            unique = []
+            for parte in partes_procesales[rol]:
+                if parte.nombre not in seen:
+                    seen.add(parte.nombre)
+                    unique.append(parte)
+            partes_procesales[rol] = unique
+
+        return InteligenciaExpedienteResponse(
+            expediente_numero=numero,
+            resumen_ejecutivo=None,  # Se implementará en PASO 9
+            partes_procesales=partes_procesales,
+            entidades_normalizadas=entidades_por_tipo,
+            analisis_actuaciones=analisis_actuaciones,
+            total_actuaciones=len(rows),
+            total_entidades=total_entidades,
+            actuaciones_con_ia=actuaciones_con_ia,
+            actuaciones_indexadas=actuaciones_indexadas
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.exception(f"Error al obtener inteligencia de {numero}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno: {str(e)}",
+        )

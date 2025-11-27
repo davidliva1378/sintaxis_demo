@@ -257,6 +257,11 @@ presentation/web/frontend/.next/
 *.sqlite
 *.sqlite3
 
+# ===== Vector Store (DEPRECADO - migrado a Qdrant) =====
+# ChromaDB legacy - estos archivos pueden eliminarse después de verificar Qdrant
+data/vector_store/chroma.sqlite3
+data/vector_store/*/
+
 # ===== Cache =====
 .cache/
 *.cache

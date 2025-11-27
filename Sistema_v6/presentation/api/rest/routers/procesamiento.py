@@ -97,12 +97,22 @@ class EstadisticasExpedienteResponse(BaseModel):
     tiempo_procesamiento_seg: float
 
 
+class EntidadNormalizadaResponse(BaseModel):
+    """Entidad extraída y normalizada del texto"""
+    original: str
+    normalized: str
+    label: str
+    score: float
+    normalization_type: Optional[str] = None
+
+
 class ResultadoExpedienteResponse(BaseModel):
     """Response con resultado de procesamiento de expediente"""
     expediente_numero: str
     estadisticas: EstadisticasExpedienteResponse
     vencimientos_urgentes: List[dict]
     con_errores: int
+    entidades_por_actuacion: Optional[dict[int, List[EntidadNormalizadaResponse]]] = None
 
 
 class VencimientoUrgenteResponse(BaseModel):
@@ -371,11 +381,23 @@ async def procesar_expediente(
                 'actuacion_detalle': actuacion_detalle[:200] if actuacion_detalle else ""
             })
 
+        # Convertir entidades a response (convertir keys de int a str para JSON)
+        entidades_response = None
+        if resultado.get('entidades_por_actuacion'):
+            entidades_response = {
+                act_id: [
+                    EntidadNormalizadaResponse(**ent)
+                    for ent in entidades
+                ]
+                for act_id, entidades in resultado['entidades_por_actuacion'].items()
+            }
+
         return ResultadoExpedienteResponse(
             expediente_numero=data.numero_expediente,
             estadisticas=estadisticas,
             vencimientos_urgentes=vencimientos_urgentes,
-            con_errores=resultado['con_errores']
+            con_errores=resultado['con_errores'],
+            entidades_por_actuacion=entidades_response
         )
 
     except Exception as e:

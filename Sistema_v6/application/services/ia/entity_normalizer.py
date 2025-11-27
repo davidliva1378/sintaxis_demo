@@ -48,14 +48,14 @@ class EntityNormalizer:
         self._llm = llm_service
         self._cache: Dict[str, NormalizedEntity] = {}
 
-        # Patrones de fechas
+        # Patrones de fechas (orden importa: ISO primero para evitar conflictos)
         self.DATE_PATTERNS = [
+            # YYYY-MM-DD (ISO) - debe ir primero para no confundir con DMY
+            (r'^(\d{4})-(\d{2})-(\d{2})$', self._normalize_date_iso),
             # DD/MM/YYYY o DD-MM-YYYY
             (r'(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})', self._normalize_date_dmy),
             # "X de mes de YYYY"
             (r'(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})', self._normalize_date_spanish),
-            # YYYY-MM-DD (ISO)
-            (r'(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})', self._normalize_date_iso),
         ]
 
         # Meses en español
@@ -82,7 +82,7 @@ class EntityNormalizer:
         """Lazy loading del LLM service"""
         if self._llm is None:
             try:
-                from application.services.ia.llm_service import LLMService
+                from infrastructure.rag.services.llm_service import LLMService
                 self._llm = LLMService()
             except Exception as e:
                 logger.warning(f"LLM no disponible para normalización: {e}")

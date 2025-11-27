@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Toaster } from 'sonner'
+import SplashScreen from './components/common/SplashScreen'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
@@ -15,6 +16,8 @@ import AgendaPage from './pages/agenda/AgendaPage'
 import EscritosPage from './pages/escritos/EscritosPage'
 import DestacadosPage from './pages/destacados/DestacadosPage'
 import IAPage from './pages/ia/IAPage'
+import VencimientosPage from './pages/vencimientos/VencimientosPage'
+import EstadisticasPage from './pages/estadisticas/EstadisticasPage'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import MainLayout from './components/layout/MainLayout'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
@@ -22,6 +25,10 @@ import { useThemeStore } from './stores/themeStore'
 
 function App() {
   const theme = useThemeStore((state) => state.theme)
+  const [showSplash, setShowSplash] = useState(() => {
+    // Solo mostrar splash una vez por sesión
+    return !sessionStorage.getItem('splashShown')
+  })
 
   useEffect(() => {
     // Apply theme to document
@@ -32,8 +39,15 @@ function App() {
     }
   }, [theme])
 
+  const handleSplashComplete = () => {
+    setShowSplash(false)
+    sessionStorage.setItem('splashShown', 'true')
+  }
+
   return (
     <ErrorBoundary>
+      {/* Splash Screen - solo se muestra una vez por sesión */}
+      {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
       <BrowserRouter>
         <Routes>
           {/* Public Routes */}
@@ -157,6 +171,26 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <IAPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vencimientos"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <VencimientosPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estadisticas"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <EstadisticasPage />
                 </MainLayout>
               </ProtectedRoute>
             }

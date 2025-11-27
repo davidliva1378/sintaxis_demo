@@ -12,6 +12,8 @@ import {
   Settings,
   Brain,
   MessageCircle,
+  Clock,
+  BarChart3,
 } from 'lucide-react'
 
 const navigation = [
@@ -24,24 +26,26 @@ const navigation = [
     name: 'Expedientes',
     href: '/expedientes',
     icon: FileText,
-    badge: 'Próximamente',
   },
   {
     name: 'Workspaces',
     href: '/workspaces',
     icon: FolderOpen,
-    badge: 'Próximamente',
   },
   {
     name: 'Monitoreo',
     href: '/monitoreo',
     icon: Activity,
-    badge: 'Próximamente',
   },
   {
     name: 'Procesamiento',
     href: '/procesamiento',
     icon: Zap,
+  },
+  {
+    name: 'Vencimientos',
+    href: '/vencimientos',
+    icon: Clock,
   },
   {
     name: 'Agenda',
@@ -68,13 +72,16 @@ const navigation = [
     name: 'Asistente IA',
     href: '/asistente-ia',
     icon: MessageCircle,
-    badge: 'Nuevo',
+  },
+  {
+    name: 'Estadísticas',
+    href: '/estadisticas',
+    icon: BarChart3,
   },
   {
     name: 'Configuración',
     href: '/settings',
     icon: Settings,
-    badge: 'Próximamente',
   },
 ]
 

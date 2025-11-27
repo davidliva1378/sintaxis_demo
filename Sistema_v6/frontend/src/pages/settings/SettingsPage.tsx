@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react'
-import { Settings, User, Key, Lock, Sliders, Activity, Globe, Download, Cog, Code, Server } from 'lucide-react'
+import { Settings, User, Key, Lock, Sliders, Activity, Globe, Download, Cog, Code, Server, Brain } from 'lucide-react'
 import PerfilUsuario from '@/components/settings/PerfilUsuario'
 import CredencialesPJN from '@/components/settings/CredencialesPJN'
 import CambiarPassword from '@/components/settings/CambiarPassword'
@@ -14,8 +14,9 @@ import ConfiguracionScraping from '@/components/settings/ConfiguracionScraping'
 import ConfiguracionAvanzada from '@/components/settings/ConfiguracionAvanzada'
 import ConfiguracionEnDesarrollo from '@/components/settings/ConfiguracionEnDesarrollo'
 import { ConfiguracionMCP } from '@/components/settings/ConfiguracionMCP'
+import ConfiguracionIA from '@/components/settings/ConfiguracionIA'
 
-type TabId = 'perfil' | 'credenciales' | 'password' | 'preferencias' | 'monitoreo' | 'browser' | 'scraping' | 'mcp' | 'avanzado' | 'desarrollo'
+type TabId = 'perfil' | 'credenciales' | 'password' | 'preferencias' | 'monitoreo' | 'browser' | 'scraping' | 'ia' | 'mcp' | 'avanzado' | 'desarrollo'
 
 interface Tab {
   id: TabId
@@ -66,6 +67,12 @@ const tabs: Tab[] = [
     label: 'Extracción',
     icon: Download,
     description: 'Timeouts y límites',
+  },
+  {
+    id: 'ia',
+    label: 'IA / RAG',
+    icon: Brain,
+    description: 'LLM y búsqueda',
   },
   {
     id: 'mcp',
@@ -150,6 +157,7 @@ export default function SettingsPage() {
         {tabActiva === 'monitoreo' && <ConfiguracionMonitoreo />}
         {tabActiva === 'browser' && <ConfiguracionBrowser />}
         {tabActiva === 'scraping' && <ConfiguracionScraping />}
+        {tabActiva === 'ia' && <ConfiguracionIA />}
         {tabActiva === 'mcp' && <ConfiguracionMCP />}
         {tabActiva === 'avanzado' && <ConfiguracionAvanzada />}
         {tabActiva === 'desarrollo' && <ConfiguracionEnDesarrollo />}

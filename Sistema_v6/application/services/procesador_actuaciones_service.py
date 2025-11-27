@@ -58,6 +58,14 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Importar servicios de NER y normalización de entidades
+try:
+    from Sistema_v6.application.services.ia import EntityNormalizer, NERChunker
+    _ner_services_available = True
+except ImportError:
+    _ner_services_available = False
+    logger.warning("Servicios NER (EntityNormalizer, NERChunker) no disponibles")
+
 
 # La función normalizar_numero_expediente se importa de core.domain.expediente_utils
 # Formato unificado: FPA-015960-2018 (con guiones)
@@ -702,6 +710,10 @@ class ProcesadorActuacionesService:
 
         tiempo_procesamiento = time.time() - inicio
 
+        # Obtener estadísticas del resultado (siempre necesario para logging)
+        stats = resultado_procesamiento.get('estadisticas', {})
+        entidades_por_actuacion = {}
+
         # Guardar en BD si se solicita
         if guardar_en_bd:
             # Obtener expediente_id de MySQL
@@ -717,7 +729,8 @@ class ProcesadorActuacionesService:
                         logger.warning(f"No se encontró expediente_id para {numero_expediente}")
                 except Exception as e:
                     logger.warning(f"Error obteniendo expediente_id: {e}")
-            # Guardar clasificaciones individuales
+            # Guardar clasificaciones individuales y extraer entidades
+            entidades_por_actuacion = {}
             for actuacion in actuaciones:
                 act_id = actuacion.get('id')
                 if act_id and act_id in resultado_procesamiento['resultados']:
@@ -739,6 +752,13 @@ class ProcesadorActuacionesService:
                             expediente_id=expediente_id
                         )
 
+                    # Extraer entidades si hay texto disponible
+                    if resultado.texto and resultado.texto.texto_completo:
+                        entidades = self.extraer_entidades_actuacion(resultado.texto.texto_completo)
+                        if entidades:
+                            entidades_por_actuacion[act_id] = entidades
+                            logger.debug(f"Extraídas {len(entidades)} entidades de actuación {act_id}")
+
             # Guardar duplicados
             if resultado_procesamiento['duplicados_detectados']:
                 self.repository.guardar_duplicados(
@@ -747,7 +767,6 @@ class ProcesadorActuacionesService:
                 )
 
             # Guardar estadísticas
-            stats = resultado_procesamiento['estadisticas']
             estadisticas = EstadisticasProcesamiento(
                 expediente_numero=numero_expediente,
                 total_actuaciones=len(actuaciones),
@@ -764,10 +783,14 @@ class ProcesadorActuacionesService:
 
             self.repository.guardar_estadisticas(estadisticas, expediente_id=expediente_id)
 
+        # Agregar entidades al resultado
+        resultado_procesamiento['entidades_por_actuacion'] = entidades_por_actuacion if guardar_en_bd else {}
+
         logger.info(
             f"Expediente {numero_expediente} procesado en {tiempo_procesamiento:.2f}s: "
             f"{stats.get('alta', {}).get('count', 0)} alta, "
-            f"{len(resultado_procesamiento['vencimientos_urgentes'])} vencimientos urgentes"
+            f"{len(resultado_procesamiento['vencimientos_urgentes'])} vencimientos urgentes, "
+            f"{len(entidades_por_actuacion)} actuaciones con entidades"
         )
 
         return resultado_procesamiento
@@ -806,6 +829,45 @@ class ProcesadorActuacionesService:
 
         except MySQLError as e:
             logger.error(f"Error obteniendo vencimientos urgentes: {e}")
+            return []
+
+    def extraer_entidades_actuacion(self, texto: str) -> list[dict]:
+        """
+        Extrae y normaliza entidades de una actuación usando NER.
+
+        Args:
+            texto: Texto de la actuación
+
+        Returns:
+            Lista de entidades normalizadas como dicts
+        """
+        if not _ner_services_available:
+            logger.debug("Servicios NER no disponibles, saltando extracción")
+            return []
+
+        if not texto or len(texto) < 50:
+            return []
+
+        try:
+            # Usar NERChunker para textos largos
+            chunker = NERChunker()
+            entidades_raw = chunker.process_long_text(
+                text=texto,
+                labels=None,  # Usa labels predefinidos (ENTIDADES_JURIDICAS)
+                threshold=0.5
+            )
+
+            if not entidades_raw:
+                return []
+
+            # Normalizar entidades (fechas, montos, nombres)
+            normalizer = EntityNormalizer()
+            entidades_norm = normalizer.normalize(entidades_raw)
+
+            return normalizer.to_dict_list(entidades_norm)
+
+        except Exception as e:
+            logger.warning(f"Error extrayendo entidades: {e}")
             return []
 
     async def obtener_estadisticas_expediente(

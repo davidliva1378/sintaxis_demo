@@ -17,7 +17,8 @@ import {
   StickyNote,
   Filter,
   Palette,
-  Search
+  Search,
+  Download
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -153,6 +154,47 @@ export default function MiAnalisisList({ actuaciones, expedienteNumero }: MiAnal
     }
   }
 
+  const handleExportar = () => {
+    if (!notasData || notasData.total_notas === 0) {
+      toast.error('No hay notas para exportar')
+      return
+    }
+
+    // Preparar datos para exportar
+    const exportData = {
+      expediente: expedienteNumero,
+      fecha_exportacion: new Date().toISOString(),
+      total_notas: notasData.total_notas,
+      total_destacados: notasData.total_destacados,
+      notas: notasData.notas.map(nota => {
+        const actuacion = actuaciones.find(a => a.indice === nota.actuacion_indice)
+        return {
+          actuacion_indice: nota.actuacion_indice,
+          actuacion_tipo: actuacion?.tipo || '',
+          actuacion_fecha: actuacion?.fecha || '',
+          actuacion_detalle: actuacion?.detalle || '',
+          nota: nota.nota,
+          tags: nota.tags,
+          destacado: nota.destacado,
+          color: nota.color
+        }
+      })
+    }
+
+    // Crear archivo y descargar
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `analisis_${expedienteNumero.replace(/\//g, '_')}_${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    toast.success('Analisis exportado correctamente')
+  }
+
   // Filtrar actuaciones
   const actuacionesFiltradas = actuaciones.filter(act => {
     const nota = getNotaForActuacion(act.indice)
@@ -204,6 +246,16 @@ export default function MiAnalisisList({ actuaciones, expedienteNumero }: MiAnal
               <Badge variant="secondary">
                 {notasData?.total_destacados || 0} destacadas
               </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportar}
+                disabled={!notasData || notasData.total_notas === 0}
+                title="Exportar analisis a JSON"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Exportar
+              </Button>
             </div>
           </div>
         </CardHeader>

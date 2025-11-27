@@ -13,6 +13,9 @@ from .llm_service import LLMService
 from .clasificador_service import ClasificadorService, TIPOS_ACTUACION
 from .rag_service import RAGService
 from .ia_integration_service import IAIntegrationService, get_ia_integration_service
+from .entity_normalizer import EntityNormalizer, NormalizedEntity
+from .ner_chunker import NERChunker, ChunkResult
+from .resumen_service import ResumenService, get_resumen_service
 
 __all__ = [
     'EmbeddingsService',
@@ -23,5 +26,11 @@ __all__ = [
     'TIPOS_ACTUACION',
     'RAGService',
     'IAIntegrationService',
-    'get_ia_integration_service'
+    'get_ia_integration_service',
+    'EntityNormalizer',
+    'NormalizedEntity',
+    'NERChunker',
+    'ChunkResult',
+    'ResumenService',
+    'get_resumen_service',
 ]
