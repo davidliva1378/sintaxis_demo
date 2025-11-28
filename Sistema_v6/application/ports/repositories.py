@@ -66,6 +66,18 @@ class IExpedienteRepository(ABC):
         pass
 
     @abstractmethod
+    async def obtener_por_estado(self, estado: str) -> list[ExpedienteResumen]:
+        """Obtiene expedientes filtrados por estado de monitoreo.
+
+        Args:
+            estado: Estado a filtrar (ej: 'activo', 'pausado')
+
+        Returns:
+            Lista de expedientes con ese estado
+        """
+        pass
+
+    @abstractmethod
     async def obtener_activos(self, dias: int = 30) -> list[ExpedienteResumen]:
         """Obtiene expedientes con movimientos recientes.
 

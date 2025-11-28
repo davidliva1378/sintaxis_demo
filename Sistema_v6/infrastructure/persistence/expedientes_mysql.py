@@ -12,16 +12,19 @@ import os
 import json
 import logging
 from pathlib import Path
-from datetime import datetime
-from typing import Optional, Dict, Any, List
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Sequence
 
 import mysql.connector
 from mysql.connector import Error as MySQLError
 
+from application.ports import IExpedienteRepository
+from core.domain.entities import ExpedienteResumen
+
 logger = logging.getLogger(__name__)
 
 
-class ExpedientesRepository:
+class ExpedientesRepository(IExpedienteRepository):
     """
     Repositorio para gestionar expedientes en MySQL.
 
@@ -59,9 +62,19 @@ class ExpedientesRepository:
             logger.error(f"Error conectando a MySQL: {e}")
             raise
 
+    def _map_row_to_entity(self, row: Dict[str, Any]) -> ExpedienteResumen:
+        """Mapea una fila de BD a entidad ExpedienteResumen."""
+        return ExpedienteResumen(
+            numero=row['numero_normalizado'],
+            dependencia=row['dependencia'] or "Sin dependencia",
+            caratula=row['caratula'] or "Sin carátula",
+            situacion=row['situacion'],
+            ultima_actuacion=row['ultima_actuacion'].isoformat() if row['ultima_actuacion'] else None
+        )
+
     def crear_o_actualizar(
         self,
-        expediente_id: int,
+        expediente_id: Optional[int],
         numero_normalizado: str,
         numero_original: str,
         metadata: Optional[Dict[str, Any]] = None
@@ -70,7 +83,7 @@ class ExpedientesRepository:
         Crea o actualiza un expediente en MySQL.
 
         Args:
-            expediente_id: ID del índice JSON
+            expediente_id: ID del índice JSON (opcional)
             numero_normalizado: Número normalizado (ej: FPA_012332_2019)
             numero_original: Número original (ej: FPA 012332/2019)
             metadata: Datos adicionales (dependencia, caratula, etc.)
@@ -115,9 +128,32 @@ class ExpedientesRepository:
                 estado_monitoreo = monitoreo.get('estado', 'activo')
                 prioridad = monitoreo.get('prioridad', 'normal')
 
-            query = """
-                INSERT INTO expedientes (
-                    id,
+            if expediente_id is not None:
+                # Query con ID explícito
+                query = """
+                    INSERT INTO expedientes (
+                        id,
+                        numero_normalizado,
+                        numero_original,
+                        dependencia,
+                        caratula,
+                        situacion,
+                        ultima_actuacion,
+                        estado_monitoreo,
+                        prioridad,
+                        fecha_creacion
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        numero_original = VALUES(numero_original),
+                        dependencia = COALESCE(VALUES(dependencia), dependencia),
+                        caratula = COALESCE(VALUES(caratula), caratula),
+                        situacion = COALESCE(VALUES(situacion), situacion),
+                        ultima_actuacion = COALESCE(VALUES(ultima_actuacion), ultima_actuacion),
+                        estado_monitoreo = VALUES(estado_monitoreo),
+                        prioridad = VALUES(prioridad)
+                """
+                params = (
+                    expediente_id,
                     numero_normalizado,
                     numero_original,
                     dependencia,
@@ -126,35 +162,47 @@ class ExpedientesRepository:
                     ultima_actuacion,
                     estado_monitoreo,
                     prioridad,
-                    fecha_creacion
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    numero_original = VALUES(numero_original),
-                    dependencia = COALESCE(VALUES(dependencia), dependencia),
-                    caratula = COALESCE(VALUES(caratula), caratula),
-                    situacion = COALESCE(VALUES(situacion), situacion),
-                    ultima_actuacion = COALESCE(VALUES(ultima_actuacion), ultima_actuacion),
-                    estado_monitoreo = VALUES(estado_monitoreo),
-                    prioridad = VALUES(prioridad)
-            """
-
-            params = (
-                expediente_id,
-                numero_normalizado,
-                numero_original,
-                dependencia,
-                caratula,
-                situacion,
-                ultima_actuacion,
-                estado_monitoreo,
-                prioridad,
-                datetime.now()
-            )
+                    datetime.now()
+                )
+            else:
+                # Query sin ID (auto-increment)
+                query = """
+                    INSERT INTO expedientes (
+                        numero_normalizado,
+                        numero_original,
+                        dependencia,
+                        caratula,
+                        situacion,
+                        ultima_actuacion,
+                        estado_monitoreo,
+                        prioridad,
+                        fecha_creacion
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        numero_original = VALUES(numero_original),
+                        dependencia = COALESCE(VALUES(dependencia), dependencia),
+                        caratula = COALESCE(VALUES(caratula), caratula),
+                        situacion = COALESCE(VALUES(situacion), situacion),
+                        ultima_actuacion = COALESCE(VALUES(ultima_actuacion), ultima_actuacion),
+                        estado_monitoreo = VALUES(estado_monitoreo),
+                        prioridad = VALUES(prioridad)
+                """
+                params = (
+                    numero_normalizado,
+                    numero_original,
+                    dependencia,
+                    caratula,
+                    situacion,
+                    ultima_actuacion,
+                    estado_monitoreo,
+                    prioridad,
+                    datetime.now()
+                )
 
             cursor.execute(query, params)
             conn.commit()
 
-            logger.debug(f"Expediente {numero_normalizado} guardado con ID {expediente_id}")
+            logger.debug(f"Expediente {numero_normalizado} guardado (ID: {expediente_id if expediente_id else 'Auto'})")
 
             cursor.close()
             conn.close()
@@ -165,16 +213,48 @@ class ExpedientesRepository:
             logger.error(f"Error guardando expediente {numero_normalizado}: {e}")
             return False
 
-    def obtener_por_numero(self, numero_normalizado: str) -> Optional[Dict[str, Any]]:
-        """
-        Obtiene un expediente por su número normalizado.
+    async def guardar(self, expediente: ExpedienteResumen) -> None:
+        """Guarda un expediente en el repositorio."""
+        # Convertir entidad a metadata para crear_o_actualizar
+        metadata = {
+            'dependencia': expediente.dependencia,
+            'caratula': expediente.caratula,
+            'situacion': expediente.situacion,
+            'ultima_actuacion': expediente.ultima_actuacion
+        }
+        
+        # Intentar obtener ID existente para mantenerlo si es posible (aunque crear_o_actualizar lo maneja con ON DUPLICATE KEY)
+        # Pero crear_o_actualizar sin ID usa auto-increment para nuevos.
+        # Si ya existe, ON DUPLICATE KEY UPDATE actualiza.
+        # Así que pasar None es seguro.
+        
+        # Reconstruir numero original (aproximado) si no lo tenemos
+        numero_original = expediente.numero.replace('_', ' ').replace(' ', '/', 1)
+        
+        self.crear_o_actualizar(
+            expediente_id=None,
+            numero_normalizado=expediente.numero,
+            numero_original=numero_original,
+            metadata=metadata
+        )
 
-        Args:
-            numero_normalizado: Número normalizado del expediente
+    async def guardar_varios(self, expedientes: Sequence[ExpedienteResumen]) -> None:
+        """Guarda múltiples expedientes en el repositorio."""
+        for exp in expedientes:
+            await self.guardar(exp)
 
-        Returns:
-            Dict con datos del expediente o None
-        """
+    async def recargar(self) -> None:
+        """Recarga los expedientes (no-op en MySQL)."""
+        pass
+
+    async def existe(self, numero: str) -> bool:
+        """Verifica si existe un expediente con el número dado."""
+        from core.domain.expediente_utils import normalizar_numero_expediente
+        numero_normalizado = normalizar_numero_expediente(numero)
+        return self.obtener_id(numero_normalizado) is not None
+
+    def _obtener_fila_por_numero(self, numero_normalizado: str) -> Optional[Dict[str, Any]]:
+        """Obtiene la fila cruda de un expediente por su número."""
         try:
             conn = self._get_connection()
             cursor = conn.cursor(dictionary=True)
@@ -193,6 +273,28 @@ class ExpedientesRepository:
             logger.error(f"Error obteniendo expediente {numero_normalizado}: {e}")
             return None
 
+    async def obtener_por_numero(self, numero: str) -> ExpedienteResumen | None:
+        """
+        Obtiene un expediente por su número.
+
+        Args:
+            numero: Número del expediente
+
+        Returns:
+            ExpedienteResumen o None
+        """
+        # Normalizar número si es necesario (el repo espera normalizado)
+        # Pero la interfaz recibe "numero" genérico.
+        # Asumimos que el caller puede pasar cualquiera, así que normalizamos.
+        # Importar normalización aquí para evitar circular imports si es necesario
+        from core.domain.expediente_utils import normalizar_numero_expediente
+        numero_normalizado = normalizar_numero_expediente(numero)
+        
+        row = self._obtener_fila_por_numero(numero_normalizado)
+        if row:
+            return self._map_row_to_entity(row)
+        return None
+
     def obtener_id(self, numero_normalizado: str) -> Optional[int]:
         """
         Obtiene el ID de un expediente por su número normalizado.
@@ -203,8 +305,8 @@ class ExpedientesRepository:
         Returns:
             ID del expediente o None si no existe
         """
-        expediente = self.obtener_por_numero(numero_normalizado)
-        return expediente['id'] if expediente else None
+        row = self._obtener_fila_por_numero(numero_normalizado)
+        return row['id'] if row else None
 
     def actualizar_extraccion(
         self,
@@ -358,15 +460,9 @@ class ExpedientesRepository:
 
         return stats
 
-    def listar_todos(self, estado: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def listar_todos(self, estado: Optional[str] = None) -> List[ExpedienteResumen]:
         """
-        Lista todos los expedientes.
-
-        Args:
-            estado: Filtrar por estado de monitoreo (opcional)
-
-        Returns:
-            Lista de expedientes
+        Lista todos los expedientes (método legacy, alias de obtener_todos con filtro).
         """
         try:
             conn = self._get_connection()
@@ -384,13 +480,64 @@ class ExpedientesRepository:
             cursor.close()
             conn.close()
 
-            return resultados
+            return [self._map_row_to_entity(row) for row in resultados]
 
         except MySQLError as e:
             logger.error(f"Error listando expedientes: {e}")
             return []
 
-    def contar(self) -> int:
+    async def obtener_todos(self) -> list[ExpedienteResumen]:
+        """Obtiene todos los expedientes del repositorio."""
+        return await self.listar_todos()
+
+    async def obtener_por_estado(self, estado: str) -> list[ExpedienteResumen]:
+        """Obtiene expedientes filtrados por estado de monitoreo."""
+        return await self.listar_todos(estado=estado)
+
+    async def obtener_activos(self, dias: int = 30) -> list[ExpedienteResumen]:
+        """Obtiene expedientes con movimientos recientes."""
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor(dictionary=True)
+
+            # Calcular fecha de corte
+            fecha_corte = datetime.now().date() - timedelta(days=dias)
+
+            query = "SELECT * FROM expedientes WHERE ultima_actuacion >= %s ORDER BY ultima_actuacion DESC"
+            cursor.execute(query, (fecha_corte,))
+
+            resultados = cursor.fetchall()
+
+            cursor.close()
+            conn.close()
+
+            return [self._map_row_to_entity(row) for row in resultados]
+
+        except MySQLError as e:
+            logger.error(f"Error obteniendo expedientes activos: {e}")
+            return []
+
+    async def filtrar_por_dependencia(self, dependencia: str) -> list[ExpedienteResumen]:
+        """Filtra expedientes por dependencia."""
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor(dictionary=True)
+
+            query = "SELECT * FROM expedientes WHERE dependencia LIKE %s ORDER BY id"
+            cursor.execute(query, (f"%{dependencia}%",))
+
+            resultados = cursor.fetchall()
+
+            cursor.close()
+            conn.close()
+
+            return [self._map_row_to_entity(row) for row in resultados]
+
+        except MySQLError as e:
+            logger.error(f"Error filtrando por dependencia: {e}")
+            return []
+
+    async def contar(self) -> int:
         """
         Cuenta el total de expedientes en MySQL.
 
@@ -412,6 +559,42 @@ class ExpedientesRepository:
         except MySQLError as e:
             logger.error(f"Error contando expedientes: {e}")
             return 0
+
+    async def eliminar(self, numero: str) -> bool:
+        """
+        Elimina un expediente del repositorio.
+
+        Args:
+            numero: Número del expediente a eliminar
+
+        Returns:
+            True si se eliminó, False si no existía
+        """
+        try:
+            # Primero obtener ID para saber si existe
+            from core.domain.expediente_utils import normalizar_numero_expediente
+            numero_normalizado = normalizar_numero_expediente(numero)
+            
+            exp_id = self.obtener_id(numero_normalizado)
+            if not exp_id:
+                return False
+
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            query = "DELETE FROM expedientes WHERE id = %s"
+            cursor.execute(query, (exp_id,))
+            conn.commit()
+
+            cursor.close()
+            conn.close()
+
+            logger.info(f"Eliminado expediente {numero} (ID: {exp_id})")
+            return True
+
+        except MySQLError as e:
+            logger.error(f"Error eliminando expediente {numero}: {e}")
+            return False
 
     def eliminar_todos(self) -> int:
         """

@@ -123,6 +123,11 @@ class JsonExpedienteRepository(IExpedienteRepository):
         await self._cargar()
         return list(self._expedientes.values())
 
+    async def obtener_por_estado(self, estado: str) -> list[ExpedienteResumen]:
+        """Obtiene expedientes filtrados por estado (no soportado en JSON, devuelve todos)."""
+        logger.warning("Filtrado por estado no soportado en JsonExpedienteRepository, devolviendo todos")
+        return await self.obtener_todos()
+
     async def obtener_activos(self, dias: int = 30) -> list[ExpedienteResumen]:
         """Obtiene expedientes con movimientos recientes."""
         await self._cargar()

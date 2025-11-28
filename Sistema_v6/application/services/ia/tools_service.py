@@ -11,8 +11,8 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
 
 from sqlalchemy import text
-from infrastructure.persistence.database import get_db, SessionLocal
-from infrastructure.adapters.repositories.json_expediente_repository import JsonExpedienteRepository
+from infrastructure.persistence.database import MySQLSessionLocal
+
 from infrastructure.adapters.repositories.json_actuacion_repository import JsonActuacionRepository
 from application.services.monitoreo_service import MonitoreoService
 
@@ -51,7 +51,6 @@ class VencimientoInfo(BaseModel):
     fecha_vencimiento: datetime
     estado: str
     dias_restantes: int
-    prioridad: Optional[str] = None
 
 class EntidadExtraida(BaseModel):
     """Entidad extraida por NER."""
@@ -91,9 +90,9 @@ class ToolsService:
         self._session = None
 
     def _get_session(self):
-        """Obtiene sesion de base de datos."""
+        """Obtiene sesion de base de datos MySQL."""
         if self._session is None:
-            self._session = SessionLocal()
+            self._session = MySQLSessionLocal()
         return self._session
 
     def _execute_query(self, query: str, params: dict = None) -> List[Dict]:
@@ -166,7 +165,7 @@ class ToolsService:
 
     def listar_expedientes(
         self,
-        estado: Optional[str] = None,
+        estado: Optional[str] = "activo",
         dependencia: Optional[str] = None,
         prioridad: Optional[str] = None,
         limite: int = 20,
@@ -196,7 +195,7 @@ class ToolsService:
 
         query = f"""
             SELECT
-                e.id, e.numero_normalizado, e.caratula, e.dependencia,
+                e.id, e.numero_normalizado as numero, e.caratula, e.dependencia,
                 e.estado_monitoreo as estado, e.prioridad,
                 e.fecha_creacion, e.fecha_ultima_extraccion,
                 COUNT(a.id) as total_actuaciones,
@@ -233,9 +232,15 @@ class ToolsService:
         Returns:
             Dict con todos los datos del expediente o None
         """
+        # Normalizar numero si es necesario
+        try:
+            numero_norm = normalizar_numero_expediente(numero)
+        except:
+            numero_norm = numero
+
         query = """
             SELECT
-                e.*,
+                e.*, e.numero_normalizado as numero,
                 COUNT(DISTINCT a.id) as total_actuaciones,
                 COUNT(DISTINCT v.id) as total_vencimientos,
                 COUNT(DISTINCT ent.id) as total_entidades,
@@ -244,11 +249,11 @@ class ToolsService:
             FROM expedientes e
             LEFT JOIN actuaciones a ON a.expediente_id = e.id
             LEFT JOIN vencimientos v ON v.expediente_id = e.id
-            LEFT JOIN entidades_extraidas ent ON ent.expediente_id = e.id
-            WHERE e.numero_normalizado = :numero
+            LEFT JOIN entidades_extraidas ent ON ent.expediente_numero = e.numero_normalizado
+            WHERE e.numero_normalizado = :numero OR e.numero_normalizado LIKE :numero_like
             GROUP BY e.id
         """
-        result = self._execute_query(query, {'numero': numero})
+        result = self._execute_query(query, {'numero': numero_norm, 'numero_like': f'%{numero_norm}%'})
         return result[0] if result else None
 
     def buscar_expedientes(
@@ -271,19 +276,26 @@ class ToolsService:
         if campos is None:
             campos = ['numero_normalizado', 'caratula']
 
+        # Intentar normalizar el texto de búsqueda si parece un número de expediente
+        try:
+            texto_norm = normalizar_numero_expediente(texto)
+        except:
+            texto_norm = texto
+
         conditions = []
         params = {'limite': limite}
 
         for i, campo in enumerate(campos):
             if campo in ['numero_normalizado', 'numero_original', 'caratula', 'dependencia']:
                 conditions.append(f"{campo} LIKE :texto_{i}")
-                params[f'texto_{i}'] = f"%{texto}%"
+                # Buscar tanto el texto original como el normalizado
+                params[f'texto_{i}'] = f"%{texto_norm}%"
 
         if not conditions:
             return []
 
         query = f"""
-            SELECT id, numero, caratula, dependencia, estado_monitoreo as estado
+            SELECT id, numero_normalizado as numero, caratula, dependencia, estado_monitoreo as estado
             FROM expedientes
             WHERE {' OR '.join(conditions)}
             ORDER BY fecha_ultima_extraccion DESC
@@ -423,7 +435,7 @@ class ToolsService:
                 CASE WHEN a.texto_extraido LIKE :texto THEN 'contenido' ELSE 'titulo' END as match_en
             FROM actuaciones a
             INNER JOIN expedientes e ON e.id = a.expediente_id
-            WHERE (a.detalle as titulo LIKE :texto OR a.texto_extraido LIKE :texto)
+            WHERE (a.detalle LIKE :texto OR a.texto_extraido LIKE :texto)
         """
         params = {'texto': f"%{texto}%", 'limite': limite}
 
@@ -543,7 +555,7 @@ class ToolsService:
         query = """
             SELECT
                 v.id, e.numero_normalizado as expediente, v.descripcion,
-                v.fecha_vencimiento, v.estado, v.prioridad,
+                v.fecha_vencimiento, v.estado,
                 DATEDIFF(v.fecha_vencimiento, NOW()) as dias_restantes
             FROM vencimientos v
             INNER JOIN expedientes e ON e.id = v.expediente_id
@@ -579,7 +591,7 @@ class ToolsService:
         query = """
             SELECT
                 v.id, e.numero_normalizado as expediente, v.descripcion,
-                v.fecha_vencimiento, v.prioridad,
+                v.fecha_vencimiento,
                 DATEDIFF(v.fecha_vencimiento, NOW()) as dias_restantes
             FROM vencimientos v
             INNER JOIN expedientes e ON e.id = v.expediente_id
@@ -613,7 +625,7 @@ class ToolsService:
         query = """
             SELECT
                 v.id, e.numero_normalizado as expediente, v.descripcion,
-                v.fecha_vencimiento, v.prioridad,
+                v.fecha_vencimiento,
                 DATEDIFF(NOW(), v.fecha_vencimiento) as dias_vencido
             FROM vencimientos v
             INNER JOIN expedientes e ON e.id = v.expediente_id
@@ -713,9 +725,9 @@ class ToolsService:
         query = """
             SELECT
                 ent.id, ent.entity_type as tipo, ent.entity_value as valor,
-                ent.confidence_score as score, ent.actuacion_id
+                ent.score as score, ent.actuacion_id
             FROM entidades_extraidas ent
-            INNER JOIN expedientes e ON e.id = ent.expediente_id
+            INNER JOIN expedientes e ON e.numero_normalizado = ent.expediente_numero
             WHERE e.numero_normalizado = :numero
         """
         params = {'numero': expediente_numero, 'limite': limite}
@@ -724,7 +736,7 @@ class ToolsService:
             query += " AND ent.entity_type = :tipo"
             params['tipo'] = tipo
 
-        query += " ORDER BY ent.confidence_score DESC LIMIT :limite"
+        query += " ORDER BY ent.score DESC LIMIT :limite"
 
         return self._execute_query(query, params)
 
@@ -748,10 +760,10 @@ class ToolsService:
         query = """
             SELECT
                 ent.id, ent.entity_type as tipo, ent.entity_value as valor,
-                ent.confidence_score as score,
+                ent.score as score,
                 e.numero_normalizado as expediente
             FROM entidades_extraidas ent
-            INNER JOIN expedientes e ON e.id = ent.expediente_id
+            INNER JOIN expedientes e ON e.numero_normalizado = ent.expediente_numero
             WHERE ent.entity_value LIKE :valor
         """
         params = {'valor': f"%{valor}%", 'limite': limite}
@@ -760,7 +772,7 @@ class ToolsService:
             query += " AND ent.entity_type = :tipo"
             params['tipo'] = tipo
 
-        query += " ORDER BY ent.confidence_score DESC LIMIT :limite"
+        query += " ORDER BY ent.score DESC LIMIT :limite"
 
         return self._execute_query(query, params)
 
@@ -781,14 +793,14 @@ class ToolsService:
             SELECT
                 ent.entity_type as tipo,
                 COUNT(*) as total,
-                AVG(ent.confidence_score) as score_promedio
+                AVG(ent.score) as score_promedio
             FROM entidades_extraidas ent
         """
         params = {}
 
         if expediente_numero:
             query += """
-                INNER JOIN expedientes e ON e.id = ent.expediente_id
+                INNER JOIN expedientes e ON e.numero_normalizado = ent.expediente_numero
                 WHERE e.numero_normalizado = :numero
             """
             params['numero'] = expediente_numero
@@ -808,8 +820,8 @@ class ToolsService:
             SELECT
                 COUNT(*) as total,
                 COUNT(DISTINCT entity_type) as tipos_distintos,
-                COUNT(DISTINCT expediente_id) as expedientes_con_entidades,
-                AVG(confidence_score) as score_promedio
+                COUNT(DISTINCT expediente_numero) as expedientes_con_entidades,
+                AVG(score) as score_promedio
             FROM entidades_extraidas
         """
         result = self._execute_query(query)
@@ -834,13 +846,13 @@ class ToolsService:
             SELECT
                 ent.entity_value as nombre,
                 ent.entity_type as tipo,
-                ent.confidence_score as score,
+                AVG(ent.score) as score,
                 COUNT(*) as menciones
             FROM entidades_extraidas ent
-            INNER JOIN expedientes e ON e.id = ent.expediente_id
+            INNER JOIN expedientes e ON e.numero_normalizado = ent.expediente_numero
             WHERE e.numero_normalizado = :numero
               AND ent.entity_type IN ('PERSONA', 'PER', 'ABOGADO', 'JUEZ', 'ACTOR', 'DEMANDADO')
-              AND ent.confidence_score >= :score_minimo
+              AND ent.score >= :score_minimo
             GROUP BY ent.entity_value, ent.entity_type
             ORDER BY menciones DESC, score DESC
         """
@@ -897,22 +909,18 @@ class ToolsService:
         query = """
             SELECT
                 e.numero_normalizado, e.caratula, e.estado_monitoreo,
-                COUNT(DISTINCT a.id) as total_actuaciones,
-                SUM(CASE WHEN a.texto_extraido IS NOT NULL THEN 1 ELSE 0 END) as actuaciones_con_texto,
-                SUM(CASE WHEN a.utilidad = 'alta' THEN 1 ELSE 0 END) as actuaciones_alta,
-                SUM(CASE WHEN a.utilidad = 'media' THEN 1 ELSE 0 END) as actuaciones_media,
-                SUM(CASE WHEN a.utilidad = 'baja' THEN 1 ELSE 0 END) as actuaciones_baja,
-                COUNT(DISTINCT v.id) as total_vencimientos,
-                SUM(CASE WHEN v.estado = 'pendiente' THEN 1 ELSE 0 END) as vencimientos_pendientes,
-                COUNT(DISTINCT ent.id) as total_entidades,
-                MIN(a.fecha) as primera_actuacion,
-                MAX(a.fecha) as ultima_actuacion
+                (SELECT COUNT(*) FROM actuaciones WHERE expediente_id = e.id) as total_actuaciones,
+                (SELECT COUNT(*) FROM actuaciones WHERE expediente_id = e.id AND texto_extraido IS NOT NULL) as actuaciones_con_texto,
+                (SELECT COUNT(*) FROM actuaciones WHERE expediente_id = e.id AND utilidad = 'alta') as actuaciones_alta,
+                (SELECT COUNT(*) FROM actuaciones WHERE expediente_id = e.id AND utilidad = 'media') as actuaciones_media,
+                (SELECT COUNT(*) FROM actuaciones WHERE expediente_id = e.id AND utilidad = 'baja') as actuaciones_baja,
+                (SELECT COUNT(*) FROM vencimientos WHERE expediente_id = e.id) as total_vencimientos,
+                (SELECT COUNT(*) FROM vencimientos WHERE expediente_id = e.id AND estado = 'pendiente') as vencimientos_pendientes,
+                (SELECT COUNT(*) FROM entidades_extraidas WHERE expediente_numero = e.numero_normalizado) as total_entidades,
+                (SELECT MIN(fecha) FROM actuaciones WHERE expediente_id = e.id) as primera_actuacion,
+                (SELECT MAX(fecha) FROM actuaciones WHERE expediente_id = e.id) as ultima_actuacion
             FROM expedientes e
-            LEFT JOIN actuaciones a ON a.expediente_id = e.id
-            LEFT JOIN vencimientos v ON v.expediente_id = e.id
-            LEFT JOIN entidades_extraidas ent ON ent.expediente_id = e.id
             WHERE e.numero_normalizado = :numero
-            GROUP BY e.id
         """
         result = self._execute_query(query, {'numero': expediente_numero})
         return result[0] if result else {}
@@ -1031,7 +1039,7 @@ class ToolsService:
             query += " AND e.numero_normalizado = :numero"
             params['numero'] = expediente_numero
 
-        query += " ORDER BY a.score as score_similitud DESC LIMIT :limite"
+        query += " ORDER BY a.score DESC LIMIT :limite"
 
         return self._execute_query(query, params)
 
@@ -1083,15 +1091,19 @@ class ToolsService:
         """
         utilidades = ['alta'] if utilidad_minima == 'alta' else ['alta', 'media']
 
-        query = """
+        # Crear placeholders para IN clause
+        placeholders = ', '.join([f':util_{i}' for i in range(len(utilidades))])
+        
+        query = f"""
             SELECT
                 a.id, e.numero_normalizado as expediente, a.fecha, a.tipo_ia as tipo,
                 a.detalle as titulo, a.utilidad, a.score
             FROM actuaciones a
             INNER JOIN expedientes e ON e.id = a.expediente_id
-            WHERE a.utilidad IN :utilidades
+            WHERE a.utilidad IN ({placeholders})
         """
-        params = {'utilidades': tuple(utilidades), 'limite': limite}
+        params = {f'util_{i}': util for i, util in enumerate(utilidades)}
+        params['limite'] = limite
 
         if expediente_numero:
             query += " AND e.numero_normalizado = :numero"
@@ -1257,73 +1269,7 @@ class ToolsService:
 
         return service.obtener_estadisticas(usuario_id)
 
-    def sincronizar_expedientes_monitoreo(self) -> Dict[str, Any]:
-        """
-        Sincroniza expedientes del sistema principal al monitoreo.
 
-        Returns:
-            Dict con resultado de la sincronización
-        """
-        service = self._get_monitoreo_service()
-        usuario_id = 1
-
-        # Obtener expedientes del sistema principal
-        try:
-            from infrastructure.adapters.repositories.json_expediente_repository import JsonExpedienteRepository
-            repo = JsonExpedienteRepository()
-            expedientes_sistema = repo.obtener_todos()
-        except Exception as e:
-            return {
-                "success": False,
-                "mensaje": f"Error obteniendo expedientes del sistema: {str(e)}",
-                "total_sistema": 0,
-                "nuevos_monitoreados": 0,
-                "ya_monitoreados": 0
-            }
-
-        if not expedientes_sistema:
-            return {
-                "success": True,
-                "mensaje": "No hay expedientes en el sistema para sincronizar",
-                "total_sistema": 0,
-                "nuevos_monitoreados": 0,
-                "ya_monitoreados": 0
-            }
-
-        nuevos = 0
-        ya_existentes = 0
-        errores = []
-
-        for exp in expedientes_sistema:
-            try:
-                service.agregar_expediente(
-                    usuario_id=usuario_id,
-                    expediente_numero=exp.numero,
-                    expediente_caratula=exp.caratula,
-                    expediente_dependencia=exp.dependencia,
-                    prioridad='media'
-                )
-                nuevos += 1
-            except ValueError as e:
-                if "ya está siendo monitoreado" in str(e):
-                    ya_existentes += 1
-                else:
-                    errores.append(f"{exp.numero}: {str(e)}")
-            except Exception as e:
-                errores.append(f"{exp.numero}: {str(e)}")
-
-        resultado = {
-            "success": True,
-            "mensaje": f"Sincronización completada: {nuevos} nuevos, {ya_existentes} ya monitoreados",
-            "total_sistema": len(expedientes_sistema),
-            "nuevos_monitoreados": nuevos,
-            "ya_monitoreados": ya_existentes
-        }
-
-        if errores:
-            resultado["errores"] = errores[:10]
-
-        return resultado
 
     def agregar_expediente_monitoreo(
         self,
@@ -1647,6 +1593,9 @@ class ToolsService:
         Returns:
             Resultado de la tool
         """
+        from core.domain.expediente_utils import normalizar_numero_expediente
+
+        # Importar repositorio de expedientes para obtener expediente_id,
         tool_map = {
             # Expedientes
             "contar_expedientes": self.contar_expedientes,

@@ -129,14 +129,10 @@ class DIContainer:
     def expediente_repo(self) -> IExpedienteRepository:
         """Obtiene el repositorio de expedientes."""
         if self._expediente_repo is None:
-            # Usar expedientes_sistema.json en lugar de expedientes_base.json
-            # para expedientes del usuario (procesados/seleccionados)
-            archivo = self.settings.storage.base_path / self.settings.storage.json_sistema_file
-            self._expediente_repo = JsonExpedienteRepository(
-                storage=self.storage,
-                archivo_json=archivo,
-            )
-            logger.debug(f"JsonExpedienteRepository inicializado: {archivo}")
+            # Usar repositorio MySQL como fuente primaria
+            from infrastructure.persistence.expedientes_mysql import get_expedientes_repository
+            self._expediente_repo = get_expedientes_repository()
+            logger.debug("ExpedientesRepository (MySQL) inicializado")
         return self._expediente_repo
 
     @property

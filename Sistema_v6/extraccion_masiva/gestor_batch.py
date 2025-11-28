@@ -591,7 +591,7 @@ class GestorBatch:
                         })
 
                         # Guardar en repositorio
-                        await self.expediente_repository.save(expediente_dominio)
+                        await self.expediente_repository.guardar(expediente_dominio)
                         logger.info(f"💾 Expediente guardado en repositorio: {numero_expediente}")
                     else:
                         logger.warning(f"⚠️ Expediente {numero_expediente} no guardado: datos inválidos o incompletos")
@@ -617,12 +617,13 @@ class GestorBatch:
             }
 
             # Ejecutar hook de indexación RAG si está disponible
-            if _rag_hook_disponible:
-                try:
-                    hook = obtener_hook()
-                    hook.on_expediente_procesado(numero_expediente, resultado_final)
-                except Exception as e:
-                    logger.warning(f"⚠️ Error en hook RAG (no crítico): {e}")
+            # DESHABILITADO: El usuario prefiere indexación manual a demanda
+            # if _rag_hook_disponible:
+            #     try:
+            #         hook = obtener_hook()
+            #         hook.on_expediente_procesado(numero_expediente, resultado_final)
+            #     except Exception as e:
+            #         logger.warning(f"⚠️ Error en hook RAG (no crítico): {e}")
 
             # ==================================================================
             # RETORNAR RESULTADO

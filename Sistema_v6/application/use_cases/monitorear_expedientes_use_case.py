@@ -137,17 +137,9 @@ class MonitorearExpedientesUseCase:
         try:
             logger.info("Iniciando monitoreo de expedientes")
 
-            # 1. Leer el JSON "sistema"
-            logger.info(f"Leyendo expedientes a monitorear desde {command.json_sistema}")
-            datos_sistema = await self._storage.leer_json(command.json_sistema)
-
-            # Convertir a lista si es necesario
-            if isinstance(datos_sistema, dict):
-                lista_sistema = datos_sistema.get("expedientes", [])
-            else:
-                lista_sistema = datos_sistema
-
-            expedientes = [ExpedienteResumen.from_dict(data) for data in lista_sistema]
+            # 1. Obtener expedientes a monitorear desde el repositorio
+            logger.info("Obteniendo expedientes activos desde el repositorio...")
+            expedientes = await self._expediente_repo.obtener_por_estado("activo")
             logger.info(f"Expedientes a monitorear: {len(expedientes)}")
 
             # 2. Extraer lista actualizada del PJN usando ExtractorMasivo
@@ -383,20 +375,9 @@ class MonitorearExpedientesUseCase:
                             f"Error al verificar {expediente_anterior.numero}: {e}"
                         )
 
-            # 4. Actualizar JSON "sistema" si hubo cambios
+            # 4. Actualizar repositorio si hubo cambios (ya se hizo en el bucle)
             if cambios_detectados:
-                logger.info(
-                    f"Actualizando JSON 'sistema' con {len(cambios_detectados)} cambios"
-                )
-                expedientes_actualizados_filtrados = [
-                    dict_actualizados[normalizar_numero_expediente(exp.numero)]
-                    for exp in expedientes
-                    if normalizar_numero_expediente(exp.numero) in dict_actualizados
-                ]
-                datos_nuevos = [
-                    exp.to_dict() for exp in expedientes_actualizados_filtrados
-                ]
-                await self._storage.guardar_json(datos_nuevos, command.json_sistema)
+                logger.info(f"Se detectaron y guardaron {len(cambios_detectados)} cambios en el repositorio")
 
             # 5. Enviar notificaciones si se configuró
             notificaciones_enviadas = 0
