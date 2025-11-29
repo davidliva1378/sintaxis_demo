@@ -752,8 +752,8 @@ async def get_ia_status():
     # Verificar LLM
     try:
         llm = get_llm()
-        if llm.is_available():
-            status["llm"] = f"ok ({llm.get_current_model()})"
+        if llm.health_check():
+            status["llm"] = f"ok ({llm.model})"
         else:
             status["llm"] = "no disponible"
     except Exception as e:
@@ -783,7 +783,7 @@ async def get_available_models():
 
         # Obtener modelo actual del singleton
         llm = get_llm()
-        current = llm.get_current_model()
+        current = llm.model
 
         # Si no hay modelos pero hay un modelo actual, al menos mostrarlo
         if not models and current:
