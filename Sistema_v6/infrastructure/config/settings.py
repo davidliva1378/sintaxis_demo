@@ -356,6 +356,84 @@ class JWTSettings(BaseSettings):
     access_token_expire_minutes: int = 1440  # 24 horas
 
 
+
+
+class RAGSettings(BaseSettings):
+    """Configuración del sistema RAG (Retrieval-Augmented Generation).
+
+    Attributes:
+        qdrant_host: Host de Qdrant vector database
+        qdrant_port: Puerto de Qdrant
+        qdrant_collection: Nombre de la colección en Qdrant
+        qdrant_grpc_port: Puerto gRPC de Qdrant
+        qdrant_timeout: Timeout para operaciones de Qdrant en segundos
+        embedding_model: Modelo de embeddings de sentence-transformers
+        embedding_dimension: Dimensión de los embeddings
+        embedding_device: Dispositivo para embeddings (cpu/cuda)
+        embedding_batch_size: Tamaño de batch para embeddings
+        spacy_model: Modelo de spaCy para NER
+        ollama_host: Host del servidor Ollama
+        ollama_model: Modelo LLM de Ollama a usar
+        ollama_temperature: Temperature para generación de texto
+        ollama_max_tokens: Máximo de tokens a generar
+        ollama_timeout: Timeout para llamadas a Ollama en segundos
+        chunk_size: Tamaño de chunks en caracteres
+        chunk_overlap: Overlap entre chunks en caracteres
+        search_limit: Límite de resultados en búsqueda híbrida
+        rerank_top_k: Top K resultados después de reranking
+        dense_weight: Peso de búsqueda densa (0-1)
+        sparse_weight: Peso de búsqueda sparse (0-1)
+        bm25_k1: Parámetro k1 de BM25
+        bm25_b: Parámetro b de BM25
+    """
+
+    model_config = SettingsConfigDict(env_prefix="RAG_", case_sensitive=False)
+
+    # Qdrant
+    qdrant_host: str = "localhost"
+    qdrant_port: int = 6333
+    qdrant_collection: str = "actuaciones"
+    qdrant_grpc_port: int = 6334
+    qdrant_timeout: int = 30
+
+    # Embeddings
+    embedding_model: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+    embedding_dimension: int = 768
+    embedding_device: str = "cpu"
+    embedding_batch_size: int = 32
+
+    # spaCy NER
+    spacy_model: str = "es_core_news_md"
+
+    # Ollama LLM
+    ollama_host: str = "http://localhost:11434"
+    ollama_model: str = "llama3.2:1b"  # Modelo ligero por defecto
+    ollama_temperature: float = 0.3
+    ollama_max_tokens: int = 2048
+    ollama_timeout: int = 120
+
+    # Chunking
+    chunk_size: int = 1500
+    chunk_overlap: int = 300
+
+    # Search
+    search_limit: int = 10
+    rerank_top_k: int = 5
+    dense_weight: float = 0.7
+    sparse_weight: float = 0.3
+
+    # BM25
+    bm25_k1: float = 1.5
+    bm25_b: float = 0.75
+
+    # Cache & Storage
+    cache_dir: Path = Field(default_factory=lambda: Path("./data/cache"))
+    vector_store_path: Path = Field(default_factory=lambda: Path("./data/vector_store"))
+    bm25_index_path: Path = Field(default_factory=lambda: Path("./data/bm25_index"))
+    data_dir: Path = Field(default_factory=lambda: Path("./data"))
+    models_dir: Path = Field(default_factory=lambda: Path("./data/models"))
+
+
 class EncryptionSettings(BaseSettings):
     """Configuración de encriptación.
 
@@ -398,6 +476,7 @@ class Settings(BaseSettings):
     api: APISettings = Field(default_factory=APISettings)
     mcp: MCPSettings = Field(default_factory=MCPSettings)
     jwt: JWTSettings = Field(default_factory=JWTSettings)
+    rag: RAGSettings = Field(default_factory=RAGSettings)
     encryption: EncryptionSettings = Field(default_factory=EncryptionSettings)
 
     # General settings
