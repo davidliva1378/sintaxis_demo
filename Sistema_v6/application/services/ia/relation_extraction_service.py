@@ -120,7 +120,7 @@ IMPORTANTE: Responde SOLO en formato JSON con esta estructura:
         """Lazy loading del servicio LLM"""
         if self._llm_service is None:
             try:
-                from application.services.ia.llm_service import LLMService
+                from infrastructure.rag.services.llm_service import LLMService
                 self._llm_service = LLMService()
             except Exception as e:
                 logger.warning(f"No se pudo cargar LLMService: {e}")
