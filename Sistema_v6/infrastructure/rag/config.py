@@ -10,10 +10,10 @@ TODO: Migrar todos los imports a usar:
     rag_config = settings.rag
 """
 
-from infrastructure.config.settings import get_settings, RAGSettings
+from infrastructure.config.settings import get_settings
 
 
-def get_rag_settings() -> RAGSettings:
+def get_rag_settings():
     """
     Obtiene la configuración RAG desde el settings unificado.
     
@@ -30,5 +30,5 @@ def get_rag_settings() -> RAGSettings:
     return get_settings().rag
 
 
-# Re-exportar RAGSettings para compatibilidad
-__all__ = ["get_rag_settings", "RAGSettings"]
+# Re-exportar para compatibilidad
+__all__ = ["get_rag_settings"]
