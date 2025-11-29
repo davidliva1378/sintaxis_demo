@@ -215,7 +215,7 @@ def get_rag():
 def get_llm():
     global _llm
     if _llm is None:
-        from application.services.ia import LLMService
+        from infrastructure.rag.services.llm_service import LLMService
         _llm = LLMService()
     return _llm
 
