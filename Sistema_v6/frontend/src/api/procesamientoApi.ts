@@ -81,6 +81,96 @@ export async function procesarExpediente(
   return response.json()
 }
 
+export interface ProcesarExpedientePayload {
+  numero_expediente: string
+  actuaciones: ActuacionInput[]
+  rutas_pdf?: Record<number, string>
+  guardar_en_bd?: boolean
+  usar_ocr?: boolean
+}
+
+/**
+ * Procesa un expediente con feedback en tiempo real (Streaming).
+ *
+ * @param payload Datos del expediente
+ * @param onProgress Callback para eventos de progreso
+ */
+export const procesarExpedienteStream = async (
+  payload: ProcesarExpedientePayload,
+  onProgress: (event: any) => void, // Assuming StreamEvent is 'any' for now, or needs to be imported/defined
+  signal?: AbortSignal
+): Promise<ResultadoExpediente> => {
+  const token = localStorage.getItem('access_token')
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/procesamiento/expediente/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        ...payload,
+        usar_ocr: payload.usar_ocr ?? true // Default true
+      }),
+      signal
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+      throw new Error(error.detail || `HTTP ${response.status}`)
+    }
+
+    if (!response.body) throw new Error('No response body')
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let finalResult: ResultadoExpediente | null = null
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.trim()) continue
+          try {
+            const event = JSON.parse(line)
+
+            if (event.event === 'error') {
+              throw new Error(event.message || 'Error en el servidor')
+            }
+
+            onProgress(event)
+
+            if (event.event === 'complete' && event.result) {
+              finalResult = event.result
+            }
+          } catch (e) {
+            if (e instanceof Error && e.message !== 'Error parsing stream event:') {
+              throw e
+            }
+            console.warn('Error parsing stream event:', e)
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
+
+    if (!finalResult) throw new Error('Stream finished without result')
+    return finalResult
+  } catch (error) {
+    console.error('Error en stream:', error)
+    throw error
+  }
+}
+
 /**
  * Obtiene todos los vencimientos urgentes del sistema.
  *

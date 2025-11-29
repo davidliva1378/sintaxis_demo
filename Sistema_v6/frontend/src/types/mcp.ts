@@ -43,9 +43,42 @@ export interface MCPTool {
   parameters: Record<string, unknown>;
 }
 
+// Recurso disponible
+export interface MCPResource {
+  uri: string;
+  name: string;
+  mimeType: string;
+  description: string;
+}
+
+// Prompt disponible
+export interface MCPPromptArgument {
+  name: string;
+  description: string;
+  required: boolean;
+}
+
+export interface MCPPrompt {
+  name: string;
+  description: string;
+  arguments: MCPPromptArgument[];
+}
+
 // Lista de tools
 export interface MCPToolsResponse {
   tools: MCPTool[];
+  total: number;
+}
+
+// Lista de recursos
+export interface MCPResourcesResponse {
+  resources: MCPResource[];
+  total: number;
+}
+
+// Lista de prompts
+export interface MCPPromptsResponse {
+  prompts: MCPPrompt[];
   total: number;
 }
 

@@ -34,6 +34,7 @@ export interface Actuacion {
   archivos?: string[];
   /** Ruta al archivo PDF en el servidor */
   ruta_pdf?: string | null;
+  metodo_extraccion?: string;
 }
 
 export interface ExpedienteDetalle extends ExpedienteListado {

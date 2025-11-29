@@ -388,7 +388,25 @@ Responde SOLO con el texto normalizado, sin explicaciones."""
             return self.normalize([entity])[0]
 
     def to_dict_list(self, entities: List[NormalizedEntity]) -> List[Dict[str, Any]]:
-        """Convierte lista de NormalizedEntity a lista de dicts"""
+        """
+        Convierte lista de NormalizedEntity a lista de dicts, filtrando duplicados.
+        Se conserva la entidad con mayor score para cada par (normalized, label).
+        """
+        unique_entities = {}
+        
+        for entity in entities:
+            # Clave única: valor normalizado + etiqueta
+            # Ejemplo: ("PEREZ, JUAN", "PERSONA")
+            key = (entity.normalized, entity.label)
+            
+            if key not in unique_entities:
+                unique_entities[key] = entity
+            else:
+                # Si ya existe, conservar la que tenga mayor score
+                if entity.score > unique_entities[key].score:
+                    unique_entities[key] = entity
+        
+        # Convertir a dicts
         return [
             {
                 "original": e.original,
@@ -397,7 +415,7 @@ Responde SOLO con el texto normalizado, sin explicaciones."""
                 "score": e.score,
                 "normalization_type": e.normalization_type
             }
-            for e in entities
+            for e in unique_entities.values()
         ]
 
     def clear_cache(self):

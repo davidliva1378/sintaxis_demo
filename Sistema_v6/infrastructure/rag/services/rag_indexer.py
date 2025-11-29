@@ -99,7 +99,9 @@ class RAGIndexer:
 
             # Chunking de documentos
             all_chunks = []
-            for doc in documentos:
+            for i, doc in enumerate(documentos):
+                if i % 10 == 0:
+                    logger.info(f"   Processing doc {i}/{len(documentos)}: {doc.doc_id}")
                 chunks = self.chunker.chunk_document(doc)
                 all_chunks.extend(chunks)
 

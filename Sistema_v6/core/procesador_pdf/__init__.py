@@ -85,7 +85,8 @@ def procesar_actuacion(
     ruta_pdf: str = None,
     analizar_vencimientos: bool = True,
     detectar_duplicados: bool = False,
-    actuaciones_comparar: list = None
+    actuaciones_comparar: list = None,
+    usar_ocr: bool = True
 ) -> ResultadoProcesamiento:
     """
     Función helper para procesar una actuación completa.
@@ -100,6 +101,7 @@ def procesar_actuacion(
         analizar_vencimientos: Si analizar vencimientos
         detectar_duplicados: Si detectar duplicados
         actuaciones_comparar: Lista de actuaciones para comparar duplicados
+        usar_ocr: Si usar OCR cuando no hay texto embebido (default: True)
 
     Returns:
         ResultadoProcesamiento con todos los análisis
@@ -145,7 +147,7 @@ def procesar_actuacion(
     texto_extraido = None
     if ruta_pdf:
         try:
-            extractor = ExtractorTexto(usar_ocr=False)  # OCR solo si es necesario
+            extractor = ExtractorTexto(usar_ocr=usar_ocr)  # OCR configurable
             texto_extraido = extractor.extraer(ruta_pdf)
         except Exception as e:
             errores.append(f"Error en extracción de texto: {str(e)}")

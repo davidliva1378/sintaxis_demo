@@ -22,6 +22,7 @@ from presentation.api.rest.schemas import (
     SystemConfigResponse,
     SystemConfigUpdateRequest,
 )
+from core.config.vencimientos_config import VencimientosConfig, VencimientosConfigModel
 
 router = APIRouter(prefix="/config", tags=["configuracion"])
 logger = logging.getLogger(__name__)
@@ -291,6 +292,19 @@ async def actualizar_configuracion_sistema(config: SystemConfigUpdateRequest):
             detail=f"Error al actualizar configuración: {str(e)}"
         )
 
+
+
+@router.get("/vencimientos", response_model=VencimientosConfigModel)
+async def get_vencimientos_config():
+    """Obtiene configuración de vencimientos."""
+    return VencimientosConfig.get_instance().config
+
+
+@router.post("/vencimientos", response_model=VencimientosConfigModel)
+async def update_vencimientos_config(config: VencimientosConfigModel):
+    """Actualiza configuración de vencimientos."""
+    VencimientosConfig.get_instance().update(config.dict())
+    return VencimientosConfig.get_instance().config
 
 def _actualizar_env_file(env_path: Path, updates: dict[str, str]) -> None:
     """Actualiza variables en el archivo .env.

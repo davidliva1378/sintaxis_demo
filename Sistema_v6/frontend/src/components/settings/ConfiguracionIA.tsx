@@ -22,6 +22,8 @@ import {
 import { ragApi, type ConfigResponse, type StatsResponse, type HealthCheckResponse, type ModelsResponse } from '@/api/ragApi'
 import { getIAStatus, setModelo, type IAStatus } from '@/api/iaApi'
 import { cn } from '@/lib/utils'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import ClassificationConfig from './ClassificationConfig'
 
 // Componente de estado de servicio
 function ServiceStatusIndicator({
@@ -211,287 +213,300 @@ export default function ConfiguracionIA() {
         </button>
       </div>
 
-      {/* Estado de Servicios */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-        <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
-          <Cpu className="h-5 w-5 text-gray-500" />
-          Estado de Servicios
-        </h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ServiceStatusIndicator
-            name="Qdrant (Vector DB)"
-            status={health?.qdrant || false}
-            description="Base de datos vectorial para embeddings"
-          />
-          <ServiceStatusIndicator
-            name="Ollama (LLM)"
-            status={health?.ollama || false}
-            description="Servidor de modelos de lenguaje"
-          />
-          <ServiceStatusIndicator
-            name="BM25 Index"
-            status={health?.bm25 || false}
-            description="Índice de búsqueda por keywords"
-          />
-          <ServiceStatusIndicator
-            name="Sistema RAG"
-            status={health?.overall || false}
-            description="Retrieval-Augmented Generation"
-          />
-        </div>
-      </div>
+      <Tabs defaultValue="general" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+          <TabsTrigger value="general">General / RAG</TabsTrigger>
+          <TabsTrigger value="classification">Clasificación</TabsTrigger>
+        </TabsList>
 
-      {/* Estadísticas de Índices */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-        <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
-          <Database className="h-5 w-5 text-gray-500" />
-          Estadísticas de Índices
-        </h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatBox
-            label="Vectores (Qdrant)"
-            value={stats?.qdrant?.count || 0}
-            icon={Sparkles}
-          />
-          <StatBox
-            label="Documentos BM25"
-            value={stats?.bm25?.total_documents || 0}
-            icon={Search}
-          />
-          <StatBox
-            label="Colección"
-            value={stats?.qdrant?.collection || 'actuaciones'}
-            icon={Database}
-          />
-          <StatBox
-            label="Peso Dense/Sparse"
-            value={`${((stats?.weights?.dense || 0.7) * 100).toFixed(0)}/${((stats?.weights?.sparse || 0.3) * 100).toFixed(0)}`}
-            icon={Settings2}
-          />
-        </div>
-      </div>
-
-      {/* Configuración del Modelo */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-        <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
-          <Brain className="h-5 w-5 text-gray-500" />
-          Modelo de Lenguaje (LLM)
-        </h3>
-
-        <div className="space-y-4">
-          {/* Selector de modelo */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Modelo Activo
-            </label>
-            <div className="flex gap-3">
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              >
-                {models?.models.map((model) => (
-                  <option key={model} value={model}>
-                    {model} {model === models.current && '(actual)'}
-                  </option>
-                ))}
-                {(!models || models.models.length === 0) && (
-                  <option value="">No hay modelos disponibles</option>
-                )}
-              </select>
-              <button
-                onClick={handleSaveModel}
-                disabled={saving || !selectedModel || selectedModel === models?.current}
-                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {saving ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                Aplicar
-              </button>
-            </div>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Modelo actual: {models?.current || config?.model || 'No configurado'}
-            </p>
-          </div>
-
-          {/* Temperatura */}
-          <div>
-            <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-              <Thermometer className="h-4 w-4" />
-              Temperatura: {temperature.toFixed(2)}
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={temperature}
-              onChange={(e) => setTemperature(parseFloat(e.target.value))}
-              className="w-full accent-blue-600"
-            />
-            <div className="mt-1 flex justify-between text-xs text-gray-500">
-              <span>Preciso (0.0)</span>
-              <span>Creativo (1.0)</span>
-            </div>
-          </div>
-
-          {/* Info box */}
-          <div className="flex items-start gap-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
-            <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500" />
-            <div className="text-sm text-blue-800 dark:text-blue-200">
-              <p className="font-medium">Sobre la temperatura</p>
-              <p className="mt-1 text-blue-700 dark:text-blue-300">
-                Valores bajos (0.0-0.3) generan respuestas más precisas y consistentes.
-                Valores altos (0.7-1.0) producen respuestas más creativas y variadas.
-                Para análisis legal, se recomienda usar valores bajos.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Configuración de Búsqueda Híbrida */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-        <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
-          <Search className="h-5 w-5 text-gray-500" />
-          Búsqueda Híbrida
-        </h3>
-
-        <div className="space-y-4">
-          {/* Pesos de búsqueda */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Peso Semántico (Dense): {(denseWeight * 100).toFixed(0)}%
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={denseWeight}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value)
-                  setDenseWeight(value)
-                  setSparseWeight(1 - value)
-                }}
-                className="w-full accent-purple-600"
+        <TabsContent value="general" className="space-y-8">
+          {/* Estado de Servicios */}
+          <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+            <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+              <Cpu className="h-5 w-5 text-gray-500" />
+              Estado de Servicios
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ServiceStatusIndicator
+                name="Qdrant (Vector DB)"
+                status={health?.qdrant || false}
+                description="Base de datos vectorial para embeddings"
               />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Búsqueda por significado y contexto
-              </p>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Peso Keywords (Sparse): {(sparseWeight * 100).toFixed(0)}%
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={sparseWeight}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value)
-                  setSparseWeight(value)
-                  setDenseWeight(1 - value)
-                }}
-                className="w-full accent-orange-500"
+              <ServiceStatusIndicator
+                name="Ollama (LLM)"
+                status={health?.ollama || false}
+                description="Servidor de modelos de lenguaje"
               />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Búsqueda por palabras clave exactas (BM25)
-              </p>
-            </div>
-          </div>
-
-          {/* Límite de resultados */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Límite de Resultados: {searchLimit}
-            </label>
-            <input
-              type="range"
-              min="3"
-              max="20"
-              step="1"
-              value={searchLimit}
-              onChange={(e) => setSearchLimit(parseInt(e.target.value))}
-              className="w-full accent-green-600"
-            />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Cantidad máxima de resultados a recuperar para el contexto
-            </p>
-          </div>
-
-          {/* Visualización de balance */}
-          <div className="rounded-lg bg-gray-100 p-4 dark:bg-gray-700/50">
-            <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-              Balance de Búsqueda
-            </p>
-            <div className="flex h-4 overflow-hidden rounded-full">
-              <div
-                className="bg-purple-500 transition-all"
-                style={{ width: `${denseWeight * 100}%` }}
+              <ServiceStatusIndicator
+                name="BM25 Index"
+                status={health?.bm25 || false}
+                description="Índice de búsqueda por keywords"
               />
-              <div
-                className="bg-orange-500 transition-all"
-                style={{ width: `${sparseWeight * 100}%` }}
+              <ServiceStatusIndicator
+                name="Sistema RAG"
+                status={health?.overall || false}
+                description="Retrieval-Augmented Generation"
               />
             </div>
-            <div className="mt-2 flex justify-between text-xs">
-              <span className="text-purple-600 dark:text-purple-400">
-                Semántico ({(denseWeight * 100).toFixed(0)}%)
-              </span>
-              <span className="text-orange-600 dark:text-orange-400">
-                Keywords ({(sparseWeight * 100).toFixed(0)}%)
-              </span>
+          </div>
+
+          {/* Estadísticas de Índices */}
+          <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+            <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+              <Database className="h-5 w-5 text-gray-500" />
+              Estadísticas de Índices
+            </h3>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <StatBox
+                label="Vectores (Qdrant)"
+                value={stats?.qdrant?.count || 0}
+                icon={Sparkles}
+              />
+              <StatBox
+                label="Documentos BM25"
+                value={stats?.bm25?.total_documents || 0}
+                icon={Search}
+              />
+              <StatBox
+                label="Colección"
+                value={stats?.qdrant?.collection || 'actuaciones'}
+                icon={Database}
+              />
+              <StatBox
+                label="Peso Dense/Sparse"
+                value={`${((stats?.weights?.dense || 0.7) * 100).toFixed(0)}/${((stats?.weights?.sparse || 0.3) * 100).toFixed(0)}`}
+                icon={Settings2}
+              />
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Estado de Componentes IA */}
-      {iaStatus && (
-        <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-          <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
-            <Settings2 className="h-5 w-5 text-gray-500" />
-            Componentes de IA
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Clasificador</p>
-              <p className="font-medium text-gray-900 dark:text-white">{iaStatus.clasificador}</p>
-            </div>
-            <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
-              <p className="text-xs text-gray-500 dark:text-gray-400">NER</p>
-              <p className="font-medium text-gray-900 dark:text-white">{iaStatus.ner}</p>
-            </div>
-            <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
-              <p className="text-xs text-gray-500 dark:text-gray-400">RAG</p>
-              <p className="font-medium text-gray-900 dark:text-white">{iaStatus.rag}</p>
-            </div>
-            <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
-              <p className="text-xs text-gray-500 dark:text-gray-400">LLM</p>
-              <p className="font-medium text-gray-900 dark:text-white">{iaStatus.llm}</p>
+          {/* Configuración del Modelo */}
+          <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+            <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+              <Brain className="h-5 w-5 text-gray-500" />
+              Modelo de Lenguaje (LLM)
+            </h3>
+
+            <div className="space-y-4">
+              {/* Selector de modelo */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Modelo Activo
+                </label>
+                <div className="flex gap-3">
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  >
+                    {models?.models.map((model) => (
+                      <option key={model} value={model}>
+                        {model} {model === models.current && '(actual)'}
+                      </option>
+                    ))}
+                    {(!models || models.models.length === 0) && (
+                      <option value="">No hay modelos disponibles</option>
+                    )}
+                  </select>
+                  <button
+                    onClick={handleSaveModel}
+                    disabled={saving || !selectedModel || selectedModel === models?.current}
+                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {saving ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    Aplicar
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Modelo actual: {models?.current || config?.model || 'No configurado'}
+                </p>
+              </div>
+
+              {/* Temperatura */}
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <Thermometer className="h-4 w-4" />
+                  Temperatura: {temperature.toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={temperature}
+                  onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                  className="w-full accent-blue-600"
+                />
+                <div className="mt-1 flex justify-between text-xs text-gray-500">
+                  <span>Preciso (0.0)</span>
+                  <span>Creativo (1.0)</span>
+                </div>
+              </div>
+
+              {/* Info box */}
+              <div className="flex items-start gap-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
+                <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500" />
+                <div className="text-sm text-blue-800 dark:text-blue-200">
+                  <p className="font-medium">Sobre la temperatura</p>
+                  <p className="mt-1 text-blue-700 dark:text-blue-300">
+                    Valores bajos (0.0-0.3) generan respuestas más precisas y consistentes.
+                    Valores altos (0.7-1.0) producen respuestas más creativas y variadas.
+                    Para análisis legal, se recomienda usar valores bajos.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Acciones */}
-      <div className="flex justify-end gap-3">
-        <button
-          onClick={handleReset}
-          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-        >
-          <RotateCcw className="h-4 w-4" />
-          Restaurar
-        </button>
-      </div>
+          {/* Configuración de Búsqueda Híbrida */}
+          <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+            <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+              <Search className="h-5 w-5 text-gray-500" />
+              Búsqueda Híbrida
+            </h3>
+
+            <div className="space-y-4">
+              {/* Pesos de búsqueda */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Peso Semántico (Dense): {(denseWeight * 100).toFixed(0)}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={denseWeight}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value)
+                      setDenseWeight(value)
+                      setSparseWeight(1 - value)
+                    }}
+                    className="w-full accent-purple-600"
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Búsqueda por significado y contexto
+                  </p>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Peso Keywords (Sparse): {(sparseWeight * 100).toFixed(0)}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={sparseWeight}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value)
+                      setSparseWeight(value)
+                      setDenseWeight(1 - value)
+                    }}
+                    className="w-full accent-orange-500"
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Búsqueda por palabras clave exactas (BM25)
+                  </p>
+                </div>
+              </div>
+
+              {/* Límite de resultados */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Límite de Resultados: {searchLimit}
+                </label>
+                <input
+                  type="range"
+                  min="3"
+                  max="20"
+                  step="1"
+                  value={searchLimit}
+                  onChange={(e) => setSearchLimit(parseInt(e.target.value))}
+                  className="w-full accent-green-600"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Cantidad máxima de resultados a recuperar para el contexto
+                </p>
+              </div>
+
+              {/* Visualización de balance */}
+              <div className="rounded-lg bg-gray-100 p-4 dark:bg-gray-700/50">
+                <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Balance de Búsqueda
+                </p>
+                <div className="flex h-4 overflow-hidden rounded-full">
+                  <div
+                    className="bg-purple-500 transition-all"
+                    style={{ width: `${denseWeight * 100}%` }}
+                  />
+                  <div
+                    className="bg-orange-500 transition-all"
+                    style={{ width: `${sparseWeight * 100}%` }}
+                  />
+                </div>
+                <div className="mt-2 flex justify-between text-xs">
+                  <span className="text-purple-600 dark:text-purple-400">
+                    Semántico ({(denseWeight * 100).toFixed(0)}%)
+                  </span>
+                  <span className="text-orange-600 dark:text-orange-400">
+                    Keywords ({(sparseWeight * 100).toFixed(0)}%)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Estado de Componentes IA */}
+          {iaStatus && (
+            <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+              <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+                <Settings2 className="h-5 w-5 text-gray-500" />
+                Componentes de IA
+              </h3>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Clasificador</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{iaStatus.clasificador}</p>
+                </div>
+                <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">NER</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{iaStatus.ner}</p>
+                </div>
+                <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">RAG</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{iaStatus.rag}</p>
+                </div>
+                <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">LLM</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{iaStatus.llm}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Acciones */}
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Restaurar
+            </button>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="classification">
+          <ClassificationConfig />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

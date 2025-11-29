@@ -359,9 +359,13 @@ class MonitoreoRepository:
                     total_cambios_detectados, notas, prioridad,
                     created_at, updated_at
                 FROM expedientes_monitoreados
-                WHERE usuario_id = %s
+                WHERE 1=1
             """
-            params = [usuario_id]
+            params = []
+
+            if usuario_id is not None:
+                query += " AND usuario_id = %s"
+                params.append(usuario_id)
 
             if solo_activos:
                 query += " AND activo = TRUE"
@@ -583,8 +587,12 @@ class MonitoreoRepository:
             conn = get_pooled_connection()
             cursor = conn.cursor()
 
-            query = "SELECT COUNT(*) FROM expedientes_monitoreados WHERE usuario_id = %s"
-            params = [usuario_id]
+            query = "SELECT COUNT(*) FROM expedientes_monitoreados WHERE 1=1"
+            params = []
+
+            if usuario_id is not None:
+                query += " AND usuario_id = %s"
+                params.append(usuario_id)
 
             if solo_activos:
                 query += " AND activo = TRUE"

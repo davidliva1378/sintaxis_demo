@@ -507,7 +507,7 @@ async def listar_expedientes(
     try:
         service = _get_service()
         resultado = service.listar_expedientes(
-            usuario_id=_get_usuario_id(),
+            usuario_id=None,  # None para ver todos los expedientes (modo compartido)
             solo_activos=solo_activos,
             pagina=pagina,
             por_pagina=por_pagina

@@ -61,3 +61,68 @@ class Usuario(Base):
     def __repr__(self) -> str:
         """Representación string del usuario."""
         return f"<Usuario(id={self.id}, username='{self.username}', email='{self.email}')>"
+
+
+class Expediente(Base):
+    """Modelo de expediente."""
+    __tablename__ = "expedientes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    numero_normalizado = Column(String(50), unique=True, index=True)
+    numero_original = Column(String(50))
+    caratula = Column(Text)
+    dependencia = Column(String(255))
+    situacion = Column(String(255))
+    ultima_actuacion = Column(DateTime, nullable=True)
+    
+    # Monitoreo
+    estado_monitoreo = Column(String(50), default="activo")  # activo, pausado, archivado
+    prioridad = Column(String(50), default="normal")
+    
+    # Metadatos
+    fecha_creacion = Column(DateTime, default=datetime.utcnow)
+    fecha_ultima_extraccion = Column(DateTime, nullable=True)
+    fecha_ultimo_procesamiento = Column(DateTime, nullable=True)
+    
+    # Estadisticas
+    total_actuaciones = Column(Integer, default=0)
+    total_pdfs_descargados = Column(Integer, default=0)
+
+
+class Actuacion(Base):
+    """Modelo de actuación."""
+    __tablename__ = "actuaciones"
+
+    id = Column(String(50), primary_key=True)  # ID del sistema judicial o hash
+    expediente_id = Column(Integer, index=True)
+    fecha = Column(DateTime)
+    tipo_ia = Column(String(100))  # Clasificación IA
+    detalle = Column(Text)
+    texto_extraido = Column(Text, nullable=True)
+    utilidad = Column(String(50))  # ALTA, MEDIA, BAJA
+    score = Column(Integer, default=0)
+
+
+class Vencimiento(Base):
+    """Modelo de vencimiento."""
+    __tablename__ = "vencimientos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    expediente_id = Column(Integer, index=True)
+    descripcion = Column(Text)
+    fecha_vencimiento = Column(DateTime)
+    estado = Column(String(50), default="pendiente")  # pendiente, cumplido, vencido
+    prioridad = Column(String(50), default="media")
+
+
+class EntidadExtraida(Base):
+    """Modelo de entidad extraída (NER)."""
+    __tablename__ = "entidades_extraidas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    expediente_id = Column(Integer, index=True)
+    actuacion_id = Column(String(50), nullable=True)
+    entity_type = Column(String(50))  # PERSONA, ORGANIZACION, FECHA, etc.
+    entity_value = Column(Text)
+    confidence_score = Column(Integer, default=0)
+

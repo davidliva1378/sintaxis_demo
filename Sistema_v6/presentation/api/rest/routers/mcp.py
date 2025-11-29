@@ -234,6 +234,32 @@ async def get_tools_stats():
     return manager.get_tool_stats()
 
 
+@router.get("/resources")
+async def get_mcp_resources():
+    """
+    Obtiene la lista de recursos disponibles.
+
+    Returns:
+        Lista de recursos
+    """
+    manager = get_mcp_manager()
+    resources = manager.get_resources_list()
+    return {"resources": resources, "total": len(resources)}
+
+
+@router.get("/prompts")
+async def get_mcp_prompts():
+    """
+    Obtiene la lista de prompts disponibles.
+
+    Returns:
+        Lista de prompts
+    """
+    manager = get_mcp_manager()
+    prompts = manager.get_prompts_list()
+    return {"prompts": prompts, "total": len(prompts)}
+
+
 # === Endpoints de Utilidad ===
 
 @router.get("/claude-config")

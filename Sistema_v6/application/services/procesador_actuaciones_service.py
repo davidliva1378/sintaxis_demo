@@ -41,6 +41,7 @@ from mysql.connector import Error as MySQLError
 # Importar servicio de extracción de texto estructurado
 from application.services.extraccion_texto_service import ExtraccionTextoService
 from core.domain.expediente_utils import normalizar_numero_expediente
+from application.services.ia.ia_integration_service import IAIntegrationService
 
 # Importar repositorio de expedientes para obtener expediente_id
 try:
@@ -271,77 +272,7 @@ class ActuacionesRepository:
             cursor.close()
             conn.close()
 
-            # Integrar con IA si hay texto extraído y el servicio está disponible
-            if texto_extraido and _ia_integration_available:
-                try:
-                    ia_service = get_ia_integration_service(
-                        habilitar_clasificacion=True,
-                        habilitar_rag=True,
-                        habilitar_ner=True
-                    )
-                    resultado_ia = ia_service.procesar_actuacion(
-                        actuacion_id=str(actuacion_id),
-                        texto=texto_extraido,
-                        metadata={
-                            "expediente_id": expediente_id,
-                            "expediente_numero": expediente_numero,
-                            "actuacion_id": actuacion_id,
-                            "tipo": tipo,
-                            "detalle": detalle,
-                            "caratula": ""
-                        },
-                        clasificar=True,
-                        indexar=True,
-                        extraer_entidades=True
-                    )
 
-                    # Persistir clasificación IA en MySQL
-                    if resultado_ia and not resultado_ia.get("skipped"):
-                        try:
-                            conn2 = self._get_connection()
-                            cursor2 = conn2.cursor()
-
-                            clasificacion_ia = resultado_ia.get("clasificacion")
-                            indexado = resultado_ia.get("indexado", False)
-
-                            if clasificacion_ia:
-                                update_query = """
-                                    UPDATE actuaciones SET
-                                        tipo_ia = %s,
-                                        confianza_ia = %s,
-                                        justificacion_ia = %s,
-                                        metodo_ia = %s,
-                                        fecha_clasificacion_ia = %s,
-                                        indexado_rag = %s
-                                    WHERE id = %s
-                                """
-                                cursor2.execute(update_query, (
-                                    clasificacion_ia.get("tipo"),
-                                    clasificacion_ia.get("confianza"),
-                                    clasificacion_ia.get("justificacion"),
-                                    clasificacion_ia.get("metodo"),
-                                    datetime.now(),
-                                    indexado,
-                                    actuacion_id
-                                ))
-                            elif indexado:
-                                # Solo actualizar indexado_rag si no hay clasificación
-                                cursor2.execute(
-                                    "UPDATE actuaciones SET indexado_rag = %s WHERE id = %s",
-                                    (True, actuacion_id)
-                                )
-
-                            conn2.commit()
-                            cursor2.close()
-                            conn2.close()
-
-                        except MySQLError as e2:
-                            logger.warning(f"Error guardando clasificación IA: {e2}")
-
-                    logger.debug(f"Actuación {actuacion_id} procesada con IA")
-                except Exception as e:
-                    logger.warning(f"Error en integración IA para actuación {actuacion_id}: {e}")
-                    # No falla el proceso principal si IA falla
 
             return True
 
@@ -583,6 +514,131 @@ class ActuacionesRepository:
             logger.error(f"Error guardando estadísticas: {e}")
             return False
 
+    def guardar_entidades(
+        self,
+        entidades: list,
+        expediente_numero: str,
+        actuacion_id: int = None
+    ) -> int:
+        """
+        Guarda entidades extraídas en la tabla entidades_extraidas.
+
+        Args:
+            entidades: Lista de dicts con datos de entidades
+            expediente_numero: Número de expediente
+            actuacion_id: ID de la actuación (opcional)
+
+        Returns:
+            Cantidad de entidades guardadas
+        """
+        if not entidades:
+            return 0
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # 1. Eliminar entidades existentes para esta actuación (solo las automáticas)
+            # Esto evita duplicados al reprocesar y mantiene actualizada la lista
+            if actuacion_id:
+                delete_query = "DELETE FROM entidades_extraidas WHERE actuacion_id = %s AND origen = 'ia'"
+                cursor.execute(delete_query, (actuacion_id,))
+
+            # 2. Insertar nuevas entidades
+            query = """
+                INSERT INTO entidades_extraidas (
+                    expediente_numero,
+                    actuacion_id,
+                    entity_type,
+                    entity_value,
+                    score,
+                    start_pos,
+                    end_pos,
+                    origen
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """
+
+            guardados = 0
+            for ent in entidades:
+                # Validar campos obligatorios
+                if not ent.get('text') or not ent.get('label'):
+                    continue
+
+                params = (
+                    expediente_numero,
+                    actuacion_id,
+                    ent.get('label'),       # entity_type
+                    ent.get('text'),        # entity_value
+                    ent.get('score', 0.0),
+                    ent.get('start', 0),
+                    ent.get('end', 0),
+                    'ia'
+                )
+
+                cursor.execute(query, params)
+                guardados += 1
+
+            conn.commit()
+            logger.debug(f"Guardadas {guardados} entidades para actuación {actuacion_id} (previas eliminadas)")
+
+            cursor.close()
+            conn.close()
+
+            return guardados
+
+        except MySQLError as e:
+            logger.error(f"Error guardando entidades: {e}")
+            return 0
+
+    def actualizar_clasificacion_ia(self, actuacion_id: int, resultado_ia: dict) -> bool:
+        """
+        Actualiza los campos de IA en la tabla actuaciones.
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            clasif_ia = resultado_ia.get("clasificacion")
+            indexado = resultado_ia.get("indexado", False)
+
+            if clasif_ia:
+                update_query = """
+                    UPDATE actuaciones 
+                    SET tipo_ia = %s,
+                        confianza_ia = %s,
+                        justificacion_ia = %s,
+                        metodo_ia = %s,
+                        fecha_clasificacion_ia = NOW(),
+                        indexado_rag = %s
+                    WHERE id = %s
+                """
+                cursor.execute(update_query, (
+                    clasif_ia.get("tipo"),
+                    clasif_ia.get("confianza"),
+                    clasif_ia.get("justificacion"),
+                    clasif_ia.get("metodo"),
+                    indexado,
+                    actuacion_id
+                ))
+            elif indexado:
+                # Solo actualizar indexado_rag si no hay clasificación
+                cursor.execute(
+                    "UPDATE actuaciones SET indexado_rag = %s WHERE id = %s",
+                    (True, actuacion_id)
+                )
+
+            conn.commit()
+            updated = cursor.rowcount > 0
+            cursor.close()
+            conn.close()
+            
+            if updated:
+                logger.debug(f"IA actualizada para actuación {actuacion_id}")
+            return updated
+
+        except MySQLError as e:
+            logger.error(f"Error actualizando IA: {e}")
+            return False
 
 # ============================================================================
 # Servicio Principal
@@ -626,6 +682,11 @@ class ProcesadorActuacionesService:
             db_config: Configuración de base de datos
         """
         self.repository = ActuacionesRepository(db_config)
+        self.ia_service = IAIntegrationService(
+            habilitar_clasificacion=True,
+            habilitar_rag=True,
+            habilitar_ner=True
+        )
         logger.info("ProcesadorActuacionesService inicializado")
 
     async def procesar_actuacion_individual(
@@ -849,12 +910,62 @@ class ProcesadorActuacionesService:
                             expediente_id=expediente_id
                         )
 
-                    # Extraer entidades si hay texto disponible
-                    if resultado.texto and resultado.texto.texto_completo:
-                        entidades = self.extraer_entidades_actuacion(resultado.texto.texto_completo)
-                        if entidades:
-                            entidades_por_actuacion[act_id] = entidades
-                            logger.debug(f"Extraídas {len(entidades)} entidades de actuación {act_id}")
+                    # Integración IA Unificada (Clasificación + NER + RAG)
+                    if _ia_integration_available and self.ia_service:
+                        metadata_ia = {
+                            "expediente_id": expediente_id,
+                            "expediente_numero": numero_expediente,
+                            "actuacion_id": act_id,
+                            "tipo": actuacion.get("tipo", "DESCONOCIDO"),
+                            "detalle": actuacion.get("detalle", "") or actuacion.get("descripcion", ""),
+                            "fecha": actuacion.get("fecha", "")
+                        }
+                        
+                        texto_ia = ""
+                        origen_texto = ""
+                        if resultado.texto and resultado.texto.texto_completo:
+                            texto_ia = resultado.texto.texto_completo
+                            origen_texto = "pdf_extract"
+                        
+                        # Fallback de texto para RAG si no hay PDF
+                        if not texto_ia and self.ia_service.habilitar_rag:
+                             detalle = actuacion.get("detalle", "") or actuacion.get("descripcion", "")
+                             tipo = actuacion.get("tipo", "DESCONOCIDO")
+                             if detalle:
+                                 texto_ia = f"TIPO: {tipo}\nDETALLE: {detalle}"
+                                 origen_texto = "metadata_fallback"
+                        
+                        if texto_ia:
+                            # Llamada unificada a IA
+                            res_ia = self.ia_service.procesar_actuacion(
+                                actuacion_id=str(act_id),
+                                texto=texto_ia,
+                                metadata=metadata_ia,
+                                clasificar=True,
+                                indexar=True,
+                                extraer_entidades=True
+                            )
+                            
+                            # Actualizar DB y Entidades
+                            if res_ia and not res_ia.get("skipped"):
+                                self.repository.actualizar_clasificacion_ia(act_id, res_ia)
+                                if res_ia.get("entidades"):
+                                    entidades_por_actuacion[act_id] = res_ia["entidades"]
+                                
+                                if res_ia.get("indexado"):
+                                    logger.debug(f"Actuación {act_id} procesada por IA (Origen: {origen_texto})")
+
+                    # Fallback Manual (Solo si IA NO disponible)
+                    elif resultado.texto and resultado.texto.texto_completo:
+                         entidades = self.extraer_entidades_actuacion(resultado.texto.texto_completo)
+                         if entidades:
+                             entidades_por_actuacion[act_id] = entidades
+                             self.repository.guardar_entidades(
+                                 entidades, 
+                                 numero_expediente, 
+                                 actuacion_id=act_id
+                             )
+                             logger.debug(f"Entidades extraídas manualmente para {act_id}")
 
             # Guardar duplicados
             if resultado_procesamiento['duplicados_detectados']:
@@ -1002,3 +1113,323 @@ class ProcesadorActuacionesService:
         except MySQLError as e:
             logger.error(f"Error obteniendo estadísticas: {e}")
             return None
+
+    async def procesar_expediente_stream(
+        self,
+        numero_expediente: str,
+        actuaciones: list[dict],
+        rutas_pdf: dict[int, str] = None,
+        guardar_en_bd: bool = True,
+        usar_ocr: bool = True
+    ):
+        """
+        Procesa un expediente generando eventos de progreso (Streaming).
+
+        Yields:
+            JSON strings con eventos:
+            - {"event": "start", "total": N}
+            - {"event": "progress", "current": I, "actuacion_id": ID, "status": "..."}
+            - {"event": "saving", "message": "..."}
+            - {"event": "complete", "result": {...}}
+            - {"event": "error", "message": "..."}
+        """
+        import time
+        import json
+        from core.procesador_pdf import (
+            procesar_actuacion,
+            DetectorDuplicados,
+            AnalizadorVencimientos,
+            ClasificadorActuaciones
+        )
+
+        inicio = time.time()
+        rutas_pdf = rutas_pdf or {}
+        total_actuaciones = len(actuaciones)
+        
+        yield json.dumps({
+            "event": "start", 
+            "total": total_actuaciones,
+            "message": f"Iniciando procesamiento de {total_actuaciones} actuaciones..."
+        }) + "\n"
+
+        try:
+            # 1. Auto-descubrimiento de PDFs (si es necesario)
+            # Nota: Esto podría tomar tiempo, quizás deberíamos emitir eventos aquí también
+            # Por ahora lo mantenemos simple reutilizando la lógica pero sin duplicarla demasiado
+            # Si rutas_pdf está vacío, intentamos descubrir
+            if not rutas_pdf:
+                yield json.dumps({
+                    "event": "info", 
+                    "message": "Buscando archivos PDF asociados..."
+                }) + "\n"
+                
+                # Reutilizamos lógica de auto-descubrimiento (simplificada para no duplicar todo el bloque)
+                # Idealmente extraer a método privado, pero por ahora copiamos lo esencial
+                try:
+                    from gestor_directorios.expedientes import GestorDirectoriosExpedientes
+                    gestor = GestorDirectoriosExpedientes.desde_config()
+                    path_expediente, _ = gestor.crear_para_expediente(numero_expediente)
+                    path_actuaciones = path_expediente / "actuaciones"
+                    
+                    if path_actuaciones.exists():
+                        # Estrategia 1: NombreArchivo directo
+                        for act in actuaciones:
+                            act_id = act.get('id') or act.get('Indice')
+                            if not act_id: continue
+                            nombre = act.get('NombreArchivo') or act.get('nombre_archivo') or act.get('archivo')
+                            if nombre and isinstance(nombre, str) and not nombre.startswith('http'):
+                                p = path_actuaciones / nombre
+                                if p.exists(): rutas_pdf[act_id] = str(p)
+                except Exception as e:
+                    logger.warning(f"Error en auto-descubrimiento stream: {e}")
+
+            # 2. Procesamiento iterativo
+            resultados = {}
+            for i, actuacion in enumerate(actuaciones):
+                act_id = actuacion.get("id") or actuacion.get("Indice")
+                
+                # Emitir progreso
+                yield json.dumps({
+                    "event": "progress",
+                    "current": i + 1,
+                    "total": total_actuaciones,
+                    "actuacion_id": act_id,
+                    "message": f"Actuación {i+1}/{total_actuaciones}: Extrayendo texto y clasificando..."
+                }) + "\n"
+
+                # Buscar PDF
+                ruta_pdf = rutas_pdf.get(act_id)
+                if not ruta_pdf and act_id is not None:
+                    try:
+                        ruta_pdf = rutas_pdf.get(int(act_id)) or rutas_pdf.get(str(act_id))
+                    except (ValueError, TypeError): pass
+
+                # Procesar
+                # Nota: procesar_actuacion es síncrono (CPU bound), en un entorno real de alta concurrencia
+                # esto debería correrse en un threadpool, pero para este caso de uso está bien.
+                resultado = procesar_actuacion(
+                    actuacion=actuacion,
+                    ruta_pdf=ruta_pdf,
+                    analizar_vencimientos=True,
+                    detectar_duplicados=False, # Se hace al final
+                    usar_ocr=usar_ocr # Habilitar OCR según parámetro
+                )
+                resultados[act_id] = resultado
+                
+                # Pequeña pausa para permitir que el event loop respire si es necesario
+                # await asyncio.sleep(0) 
+
+            # 3. Post-procesamiento (Duplicados, Stats)
+            yield json.dumps({
+                "event": "analyzing",
+                "message": "Analizando duplicados y generando estadísticas..."
+            }) + "\n"
+
+            # Detección de duplicados
+            duplicados_globales = []
+            try:
+                detector = DetectorDuplicados()
+                duplicados_globales = detector.detectar_duplicados_exactos(actuaciones)
+                duplicados_cedulas = detector.detectar_cedulas_duplicadas(actuaciones)
+                duplicados_globales.extend(duplicados_cedulas)
+                
+                for dup in duplicados_globales:
+                    if dup.actuacion_id_original in resultados:
+                        resultados[dup.actuacion_id_original].duplicados.append(dup)
+                    if dup.actuacion_id_duplicada in resultados:
+                        resultados[dup.actuacion_id_duplicada].duplicados.append(dup)
+            except Exception: pass
+
+            # Vencimientos y Stats
+            todos_vencimientos = []
+            for res in resultados.values():
+                todos_vencimientos.extend(res.vencimientos)
+            
+            analizador = AnalizadorVencimientos()
+            vencimientos_urgentes = analizador.filtrar_vencimientos_urgentes(todos_vencimientos)
+            
+            clasificador = ClasificadorActuaciones()
+            clasificaciones = {act_id: res.clasificacion for act_id, res in resultados.items()}
+            estadisticas_dict = clasificador.estadisticas_clasificacion(clasificaciones)
+
+            tiempo_procesamiento = time.time() - inicio
+
+            # Construir resultado final preliminar
+            resultado_final = {
+                "resultados": resultados, # No serializable directamente, cuidado
+                "estadisticas": estadisticas_dict,
+                "vencimientos_urgentes": vencimientos_urgentes, # Objetos Vencimiento
+                "vencimientos_totales": len(todos_vencimientos),
+                "duplicados_detectados": duplicados_globales,
+                "total_actuaciones": len(actuaciones),
+                "con_errores": len([r for r in resultados.values() if r.tiene_errores])
+            }
+
+            # 4. Persistencia
+            if guardar_en_bd:
+                yield json.dumps({
+                    "event": "saving",
+                    "message": "Guardando resultados en base de datos..."
+                }) + "\n"
+                
+                # Reutilizar lógica de guardado
+                # Necesitamos expediente_id
+                expediente_id = None
+                if _expedientes_repo_available:
+                    try:
+                        numero_normalizado = normalizar_numero_expediente(numero_expediente)
+                        repo = get_expedientes_repository()
+                        expediente_id = repo.obtener_id(numero_normalizado)
+                    except Exception: pass
+
+                # Guardar uno a uno
+                entidades_por_actuacion = {}
+                for i, act in enumerate(actuaciones):
+                    act_id = act.get('id')
+                    if act_id and act_id in resultados:
+                        res = resultados[act_id]
+                        
+                        # Emitir evento de guardado/enriquecimiento
+                        yield json.dumps({
+                            "event": "saving",
+                            "message": f"Guardando actuación {i+1}/{total_actuaciones}..."
+                        }) + "\n"
+
+                        self.repository.guardar_clasificacion(
+                            act_id, res, numero_expediente, act, expediente_id
+                        )
+                        if res.vencimientos:
+                            self.repository.guardar_vencimientos(
+                                act_id, numero_expediente, res.vencimientos, expediente_id
+                            )
+                        
+                        # Integración IA Unificada (Stream)
+                        if _ia_integration_available and self.ia_service:
+                            yield json.dumps({
+                                "event": "analyzing",
+                                "message": f"Actuación {i+1}/{total_actuaciones}: Procesando con IA (Clasificación/NER/RAG)..."
+                            }) + "\n"
+
+                            metadata_ia = {
+                                "expediente_id": expediente_id,
+                                "expediente_numero": numero_expediente,
+                                "actuacion_id": act_id,
+                                "tipo": act.get("tipo", "DESCONOCIDO"),
+                                "detalle": act.get("detalle", "") or act.get("descripcion", ""),
+                                "fecha": act.get("fecha", "")
+                            }
+                            
+                            texto_ia = ""
+                            if res.texto and res.texto.texto_completo:
+                                texto_ia = res.texto.texto_completo
+                            
+                            # Fallback RAG
+                            if not texto_ia and self.ia_service.habilitar_rag:
+                                detalle = act.get("detalle", "") or act.get("descripcion", "")
+                                tipo = act.get("tipo", "DESCONOCIDO")
+                                if detalle:
+                                    texto_ia = f"TIPO: {tipo}\nDETALLE: {detalle}"
+
+                            if texto_ia:
+                                try:
+                                    res_ia = self.ia_service.procesar_actuacion(
+                                        actuacion_id=str(act_id),
+                                        texto=texto_ia,
+                                        metadata=metadata_ia,
+                                        clasificar=True,
+                                        indexar=True,
+                                        extraer_entidades=True
+                                    )
+                                    
+                                    if res_ia and not res_ia.get("skipped"):
+                                        self.repository.actualizar_clasificacion_ia(act_id, res_ia)
+                                        if res_ia.get("entidades"):
+                                            entidades_por_actuacion[act_id] = res_ia["entidades"]
+                                except Exception as e:
+                                    logger.error(f"Error IA stream: {e}")
+
+                        # Fallback Manual
+                        elif res.texto and res.texto.texto_completo:
+                            yield json.dumps({
+                                "event": "analyzing",
+                                "message": f"Actuación {i+1}/{total_actuaciones}: Extrayendo entidades manualmente..."
+                            }) + "\n"
+                            
+                            ents = self.extraer_entidades_actuacion(res.texto.texto_completo)
+                            if ents: 
+                                entidades_por_actuacion[act_id] = ents
+                                self.repository.guardar_entidades(
+                                    ents,
+                                    numero_expediente,
+                                    actuacion_id=act_id
+                                )
+
+                # Guardar globales
+                if duplicados_globales:
+                    self.repository.guardar_duplicados(duplicados_globales, numero_expediente)
+                
+                stats_obj = EstadisticasProcesamiento(
+                    expediente_numero=numero_expediente,
+                    total_actuaciones=len(actuaciones),
+                    actuaciones_alta=estadisticas_dict.get('alta', {}).get('count', 0),
+                    actuaciones_media=estadisticas_dict.get('media', {}).get('count', 0),
+                    actuaciones_baja=estadisticas_dict.get('baja', {}).get('count', 0),
+                    actuaciones_nula=estadisticas_dict.get('nula', {}).get('count', 0),
+                    reduccion_estimada_pct=estadisticas_dict.get('reduccion_estimada', 0.0),
+                    vencimientos_detectados=len(todos_vencimientos),
+                    vencimientos_urgentes=len(vencimientos_urgentes),
+                    duplicados_detectados=len(duplicados_globales),
+                    tiempo_procesamiento_seg=tiempo_procesamiento
+                )
+                self.repository.guardar_estadisticas(stats_obj, expediente_id)
+                
+                # Agregar entidades al resultado final para el cliente
+                resultado_final['entidades_por_actuacion'] = entidades_por_actuacion
+
+            # 5. Finalización
+            # Preparamos el objeto de resultado final serializable
+            # Necesitamos convertir objetos a dicts/tipos simples para JSON
+            
+            # Serializar vencimientos urgentes
+            vencimientos_serializables = []
+            for i, v in enumerate(vencimientos_urgentes):
+                v_dict = vars(v) if hasattr(v, '__dict__') else v
+                # Convertir fechas a str
+                if 'fecha_vencimiento' in v_dict and isinstance(v_dict['fecha_vencimiento'], (datetime, date)):
+                    v_dict['fecha_vencimiento'] = str(v_dict['fecha_vencimiento'])
+                if 'fecha_notificacion' in v_dict and isinstance(v_dict['fecha_notificacion'], (datetime, date)):
+                    v_dict['fecha_notificacion'] = str(v_dict['fecha_notificacion'])
+                # Convertir Enum a value
+                if 'tipo' in v_dict and hasattr(v_dict['tipo'], 'value'):
+                    v_dict['tipo'] = v_dict['tipo'].value
+                vencimientos_serializables.append(v_dict)
+
+            response_payload = {
+                "expediente_numero": numero_expediente,
+                "estadisticas": {
+                    "total_actuaciones": len(actuaciones),
+                    "actuaciones_alta": estadisticas_dict.get('alta', {}).get('count', 0),
+                    "actuaciones_media": estadisticas_dict.get('media', {}).get('count', 0),
+                    "actuaciones_baja": estadisticas_dict.get('baja', {}).get('count', 0),
+                    "actuaciones_nula": estadisticas_dict.get('nula', {}).get('count', 0),
+                    "reduccion_estimada_pct": estadisticas_dict.get('reduccion_estimada', 0.0),
+                    "vencimientos_detectados": len(todos_vencimientos),
+                    "vencimientos_urgentes": len(vencimientos_urgentes),
+                    "duplicados_detectados": len(duplicados_globales),
+                    "tiempo_procesamiento_seg": tiempo_procesamiento
+                },
+                "vencimientos_urgentes": vencimientos_serializables,
+                "con_errores": resultado_final["con_errores"]
+            }
+
+            yield json.dumps({
+                "event": "complete",
+                "result": response_payload
+            }) + "\n"
+
+        except Exception as e:
+            logger.error(f"Error en stream: {e}", exc_info=True)
+            yield json.dumps({
+                "event": "error",
+                "message": str(e)
+            }) + "\n"

@@ -162,6 +162,55 @@ class GestorReseteo:
             ultimo_backup=ultimo_backup
         )
 
+    def _resetear_qdrant(self) -> Dict[str, Any]:
+        """
+        Resetea la colección de Qdrant.
+
+        Returns:
+            Dict con resultado de la operación
+        """
+        resultado = {
+            "exito": False,
+            "detalles": [],
+            "error": None
+        }
+
+        try:
+            from qdrant_client import QdrantClient
+            from qdrant_client.http.models import Distance, VectorParams
+            
+            # Usar configuración por defecto o variables de entorno
+            host = os.getenv("QDRANT_HOST", "localhost")
+            port = int(os.getenv("QDRANT_PORT", "6333"))
+            
+            client = QdrantClient(host=host, port=port)
+            collection_name = "actuaciones"
+
+            # Verificar si existe
+            collections = client.get_collections().collections
+            exists = any(c.name == collection_name for c in collections)
+
+            if exists:
+                client.delete_collection(collection_name)
+                resultado["detalles"].append(f"Colección '{collection_name}' eliminada")
+            
+            # Recrear colección
+            client.create_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(size=768, distance=Distance.COSINE)
+            )
+            resultado["detalles"].append(f"Colección '{collection_name}' recreada vacía")
+            
+            resultado["exito"] = True
+            logger.info("Reset Qdrant completado exitosamente")
+
+        except Exception as e:
+            resultado["error"] = str(e)
+            resultado["detalles"].append(f"Error Qdrant: {str(e)}")
+            logger.error(f"Error reseteando Qdrant: {e}")
+
+        return resultado
+
     def resetear(
         self,
         nivel: NivelReseteo,
@@ -177,6 +226,7 @@ class GestorReseteo:
             dry_run: Si es True, solo simula la operación sin eliminar
             crear_backup: Si es True, crea un backup antes de eliminar
             incluir_procesamiento_mysql: Si es True, limpia tablas MySQL de procesamiento
+                                       (FORZADO a True para COMPLETO y NUCLEAR)
 
         Returns:
             ResultadoReseteo con información de la operación
@@ -186,6 +236,12 @@ class GestorReseteo:
         archivos_eliminados = 0
         espacio_liberado_mb = 0.0
         detalles = []
+
+        # FORZAR limpieza de MySQL para niveles altos para evitar huérfanos
+        if nivel in (NivelReseteo.COMPLETO, NivelReseteo.NUCLEAR):
+            incluir_procesamiento_mysql = True
+            if not dry_run:
+                detalles.append("NOTA: Limpieza de MySQL forzada para evitar datos huérfanos")
 
         # Determinar qué eliminar según el nivel
         paths_a_eliminar = self._get_paths_por_nivel(nivel)
@@ -227,7 +283,7 @@ class GestorReseteo:
                         detalles.append(f"Error eliminando {path.name}: {str(e)}")
 
             # Limpiar datos MySQL de procesamiento si se solicita
-            if incluir_procesamiento_mysql and nivel in (NivelReseteo.COMPLETO, NivelReseteo.NUCLEAR):
+            if incluir_procesamiento_mysql:
                 mysql_resultado = self._limpiar_procesamiento_mysql(nivel)
                 if mysql_resultado["exito"]:
                     detalles.append(f"Limpieza MySQL: {mysql_resultado['registros_eliminados']} registros eliminados")
@@ -235,17 +291,29 @@ class GestorReseteo:
                 else:
                     detalles.append(f"Error MySQL: {mysql_resultado['error']}")
 
+            # Limpiar Qdrant si es nivel COMPLETO o NUCLEAR
+            if nivel in (NivelReseteo.COMPLETO, NivelReseteo.NUCLEAR):
+                qdrant_res = self._resetear_qdrant()
+                if qdrant_res["exito"]:
+                    detalles.extend(qdrant_res["detalles"])
+                else:
+                    detalles.append(f"Error Qdrant: {qdrant_res['error']}")
+
             # Log de la operación
             self._log_operacion(nivel, archivos_eliminados, espacio_liberado_mb, timestamp)
         else:
             detalles.append("Modo dry-run: No se eliminó nada")
 
             # Mostrar qué se eliminaría en MySQL si está activo
-            if incluir_procesamiento_mysql and nivel in (NivelReseteo.COMPLETO, NivelReseteo.NUCLEAR):
+            if incluir_procesamiento_mysql:
                 mysql_preview = self._preview_procesamiento_mysql(nivel)
                 if mysql_preview["exito"]:
                     detalles.append(f"MySQL (simular): {mysql_preview['registros_a_eliminar']} registros a eliminar")
                     detalles.extend(mysql_preview["detalles"])
+            
+            # Mostrar aviso de Qdrant
+            if nivel in (NivelReseteo.COMPLETO, NivelReseteo.NUCLEAR):
+                detalles.append("Qdrant (simular): Se eliminaría y recrearía la colección 'actuaciones'")
 
         return ResultadoReseteo(
             nivel=nivel,
@@ -445,6 +513,7 @@ class GestorReseteo:
 
         elif nivel == NivelReseteo.COMPLETO:
             # Todo excepto DB y configuración
+            # NOTA: No incluimos qdrant_dir porque se limpia vía API
             paths.extend([
                 self.extraccion_masiva_dir,
                 self.expedientes_dir,
@@ -452,12 +521,12 @@ class GestorReseteo:
                 self.logs_dir,
                 self.vector_store_dir,
                 self.bm25_index_dir,
-                self.qdrant_dir,
                 self.data_dir / "expedientes_sistema.json"
             ])
 
         elif nivel == NivelReseteo.NUCLEAR:
             # Todo incluyendo DB
+            # NOTA: No incluimos qdrant_dir porque se limpia vía API
             paths.extend([
                 self.extraccion_masiva_dir,
                 self.expedientes_dir,
@@ -465,7 +534,6 @@ class GestorReseteo:
                 self.logs_dir,
                 self.vector_store_dir,
                 self.bm25_index_dir,
-                self.qdrant_dir,
                 self.data_dir / "expedientes_sistema.json",
                 self.db_path
             ])
@@ -603,6 +671,9 @@ class GestorReseteo:
         try:
             conn = self._get_mysql_connection()
             cursor = conn.cursor()
+            
+            # Desactivar checks de FK temporalmente para facilitar limpieza masiva
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
 
             for tabla in tablas:
                 try:
@@ -612,7 +683,7 @@ class GestorReseteo:
 
                     if count > 0:
                         # Eliminar todos los registros
-                        cursor.execute(f"DELETE FROM {tabla}")
+                        cursor.execute(f"TRUNCATE TABLE {tabla}")
                         resultado["registros_eliminados"] += count
                         resultado["detalles"].append(f"  - {tabla}: {count} registros eliminados")
                         logger.info(f"Limpieza MySQL: {count} registros eliminados de {tabla}")
@@ -623,6 +694,9 @@ class GestorReseteo:
                     # La tabla puede no existir
                     resultado["detalles"].append(f"  - {tabla}: no encontrada o error ({e.errno})")
                     logger.warning(f"No se pudo limpiar tabla {tabla}: {e}")
+            
+            # Reactivar checks de FK
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
 
             conn.commit()
             resultado["exito"] = True

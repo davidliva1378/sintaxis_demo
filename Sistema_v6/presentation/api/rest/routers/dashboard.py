@@ -116,20 +116,19 @@ async def obtener_estadisticas_dashboard():
         with _get_db_connection() as conn:
             cursor = conn.cursor(dictionary=True)
 
-            # 1. Total expedientes (desde workspaces)
+            # 1. Total expedientes (desde expedientes)
             cursor.execute("""
-                SELECT COUNT(DISTINCT expediente_numero) as total
-                FROM workspaces
-                WHERE expediente_numero IS NOT NULL
+                SELECT COUNT(*) as total
+                FROM expedientes
             """)
             result = cursor.fetchone()
             total_expedientes = result['total'] if result else 0
 
             # 2. Expedientes esta semana
             cursor.execute("""
-                SELECT COUNT(DISTINCT expediente_numero) as total
-                FROM workspaces
-                WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                SELECT COUNT(*) as total
+                FROM expedientes
+                WHERE fecha_creacion >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
             """)
             result = cursor.fetchone()
             expedientes_semana = result['total'] if result else 0

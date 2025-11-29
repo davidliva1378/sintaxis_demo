@@ -11,7 +11,6 @@ import {
   Star,
   Settings,
   Brain,
-  MessageCircle,
   Clock,
   BarChart3,
 } from 'lucide-react'
@@ -68,11 +67,7 @@ const navigation = [
     icon: Brain,
     badge: 'Beta',
   },
-  {
-    name: 'Asistente IA',
-    href: '/asistente-ia',
-    icon: MessageCircle,
-  },
+
   {
     name: 'Estadísticas',
     href: '/estadisticas',

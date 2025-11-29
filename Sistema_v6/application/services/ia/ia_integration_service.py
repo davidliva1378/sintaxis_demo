@@ -202,27 +202,43 @@ class IAIntegrationService:
 
         # === Extracción de Entidades ===
         if extraer_entidades and self.habilitar_ner:
-            print(f"[NER DEBUG] Iniciando NER para actuación {actuacion_id}")
+            # print(f"[NER DEBUG] Iniciando NER para actuación {actuacion_id}")
             logger.info(f"Iniciando extracción NER para actuación {actuacion_id} (texto: {len(texto)} chars)")
             try:
-                entidades = self.ner_service.extract_juridico(texto)
-                resultado["entidades"] = entidades
-                print(f"[NER DEBUG] Entidades extraídas: {len(entidades)} tipos")
+                # Usar NERChunker para manejar textos largos y obtener metadatos completos
+                from .ner_chunker import NERChunker
+                chunker = NERChunker(ner_service=self.ner_service)
+                
+                # Extraer entidades detalladas (lista de dicts)
+                entidades_detalladas = chunker.process_long_text(
+                    text=texto,
+                    labels=None, # Usa default
+                    threshold=0.5
+                )
+                
+                # Agrupar para respuesta API (compatibilidad)
+                entidades_agrupadas = {}
+                for ent in entidades_detalladas:
+                    label = ent['label']
+                    val = ent['text']
+                    if label not in entidades_agrupadas:
+                        entidades_agrupadas[label] = []
+                    if val not in entidades_agrupadas[label]:
+                        entidades_agrupadas[label].append(val)
+                
+                resultado["entidades"] = entidades_agrupadas
+                # print(f"[NER DEBUG] Entidades extraídas: {len(entidades_detalladas)} total")
 
                 # Persistir entidades extraídas
                 expediente_numero_raw = metadata.get("expediente_numero", "") if metadata else ""
-                # Normalizar al formato de la BD (con guiones bajos)
                 expediente_numero = normalizar_numero_expediente(expediente_numero_raw)
                 act_id = metadata.get("actuacion_id") if metadata else None
 
-                print(f"[NER DEBUG] Raw: '{expediente_numero_raw}' -> Norm: '{expediente_numero}'")
-
-                # Eliminar entidades IA anteriores para esta actuación antes de insertar nuevas
+                # Eliminar entidades IA anteriores para esta actuación
                 if expediente_numero and act_id:
                     try:
                         from infrastructure.persistence.entidades_repository import EntidadesRepository
                         temp_repo = EntidadesRepository()
-                        # Solo eliminar las de esta actuación específica
                         conn = temp_repo._get_connection()
                         cursor = conn.cursor()
                         cursor.execute(
@@ -233,46 +249,38 @@ class IAIntegrationService:
                         conn.commit()
                         cursor.close()
                         conn.close()
-                        if deleted > 0:
-                            print(f"[NER DEBUG] Eliminadas {deleted} entidades IA anteriores de actuación {act_id}")
+                        # if deleted > 0:
+                        #     print(f"[NER DEBUG] Eliminadas {deleted} entidades IA anteriores")
                     except Exception as e:
                         logger.warning(f"Error eliminando entidades anteriores: {e}")
-                logger.info(f"NER: expediente_numero_raw='{expediente_numero_raw}' -> normalizado='{expediente_numero}'")
 
-                if expediente_numero and entidades:
-                    # Usar un set para evitar duplicados dentro de la misma extracción
-                    entidades_unicas = set()
+                if expediente_numero and entidades_detalladas:
                     entidades_para_batch = []
-
-                    for entity_type, items in entidades.items():
-                        for item in items:
-                            # Crear clave única (tipo + valor normalizado)
-                            clave = (entity_type, item.strip().lower())
-                            if clave not in entidades_unicas:
-                                entidades_unicas.add(clave)
-                                entidades_para_batch.append({
-                                    "expediente_numero": expediente_numero,
-                                    "actuacion_id": act_id,
-                                    "entity_type": entity_type,
-                                    "entity_value": item,
-                                    "score": None,
-                                    "start_pos": None,
-                                    "end_pos": None,
-                                    "origen": 'ia'
-                                })
+                    # Usar set para deduplicar por (tipo, valor, start)
+                    seen = set()
+                    
+                    for ent in entidades_detalladas:
+                        clave = (ent['label'], ent['text'], ent.get('start', 0))
+                        if clave in seen:
+                            continue
+                        seen.add(clave)
+                        
+                        entidades_para_batch.append({
+                            "expediente_numero": expediente_numero,
+                            "actuacion_id": act_id,
+                            "entity_type": ent['label'],
+                            "entity_value": ent['text'],
+                            "score": ent.get('score'),
+                            "start_pos": ent.get('start'),
+                            "end_pos": ent.get('end'),
+                            "origen": 'ia'
+                        })
 
                     if entidades_para_batch:
-                        print(f"[NER DEBUG] Intentando persistir {len(entidades_para_batch)} entidades únicas...")
                         count = self._entidades_repo.crear_batch(entidades_para_batch)
-                        print(f"[NER DEBUG] Persistidas {count} entidades para {expediente_numero}")
                         logger.info(f"NER: Persistidas {count} entidades para {expediente_numero}")
-                    else:
-                        logger.info(f"NER: No hay entidades para persistir en {expediente_numero}")
-                else:
-                    logger.info(f"NER: expediente_numero='{expediente_numero}', entidades={bool(entidades)}")
-
-                total_entidades = sum(len(v) for v in entidades.values())
-                logger.info(f"NER: Extraídas {total_entidades} entidades de actuación {actuacion_id}")
+                
+                logger.info(f"NER: Extraídas {len(entidades_detalladas)} entidades de actuación {actuacion_id}")
             except Exception as e:
                 logger.error(f"Error extrayendo entidades de actuación {actuacion_id}: {e}", exc_info=True)
                 resultado["errores"].append(f"ner: {str(e)}")

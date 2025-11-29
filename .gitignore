@@ -29,6 +29,15 @@ base_datos_simulada/
 datos_extraidos/
 backup_*/
 *.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.node.json
+!pyproject.toml
+!settings.json
+!config/classification_rules.json
+!data/classification_rules.json
+
 
 # Archivos comprimidos y exportaciones
 *.zip

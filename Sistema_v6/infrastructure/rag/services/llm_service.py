@@ -314,8 +314,8 @@ RESPUESTA:"""
                 result = response.json()
                 return result.get("response", "").strip()
             else:
-                logger.error(f"Ollama retornó status {response.status_code}")
-                return "Error: No se pudo generar respuesta"
+                logger.error(f"Ollama retornó status {response.status_code}: {response.text}")
+                return f"Error: No se pudo generar respuesta (Status {response.status_code})"
 
         except Exception as e:
             logger.error(f"Error llamando a Ollama: {e}")
@@ -332,6 +332,32 @@ RESPUESTA:"""
         except Exception as e:
             logger.error(f"Error listando modelos: {e}")
             return []
+
+    def summarize(self, text: str, max_length: int = 500) -> str:
+        """
+        Genera un resumen del texto proporcionado.
+
+        Args:
+            text: Texto a resumir
+            max_length: Longitud aproximada del resumen (en palabras)
+
+        Returns:
+            Resumen generado
+        """
+        try:
+            prompt = f"""Resume el siguiente texto legal de manera concisa y precisa.
+Mantén los puntos clave, fechas, montos y nombres importantes.
+El resumen debe tener aproximadamente {max_length} palabras.
+
+TEXTO:
+{text[:15000]}  # Limitar entrada para evitar errores
+
+RESUMEN:"""
+
+            return self._call_ollama(prompt, temperature=0.2)
+        except Exception as e:
+            logger.error(f"Error generando resumen: {e}")
+            return "No se pudo generar el resumen."
 
 
 # =============================================================================
@@ -506,9 +532,20 @@ class RAGService:
             RAGResponse con respuesta generada
         """
         from infrastructure.rag.models.dto import SearchQuery
+        from core.domain.expediente_utils import normalizar_numero_expediente
+
+        # Extraer y normalizar número de expediente
+        filter_expediente = search_params.get("filter_expediente")
+        if filter_expediente:
+            filter_expediente = normalizar_numero_expediente(filter_expediente)
 
         # 1. Búsqueda híbrida (con pesos dinámicos si se especifican)
-        search_query = SearchQuery(texto=question, **search_params)
+        search_query = SearchQuery(
+            texto=question,
+            limit=search_params.get("limit", 10),
+            filter_expediente=filter_expediente,
+            filter_tipo=search_params.get("filter_tipo")
+        )
         search_results = self.search.search(
             search_query,
             dense_weight=dense_weight,

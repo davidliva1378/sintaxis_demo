@@ -7,8 +7,13 @@ considerando días hábiles, feriados y feria judicial.
 
 import re
 from datetime import datetime, date, timedelta
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any
+import json
 from .models import Vencimiento, TipoVencimiento
+from core.config.vencimientos_config import VencimientosConfig
+# Importación diferida para evitar ciclos si fuera necesario, 
+# pero idealmente LLMService debería estar desacoplado.
+from infrastructure.rag.services.llm_service import LLMService
 
 
 class AnalizadorVencimientos:
@@ -25,6 +30,14 @@ class AnalizadorVencimientos:
         {
             "tipo": TipoVencimiento.CEDULA_ELECTRONICA,
             "regex": r"notific[oóa].*?(?:el|fecha:?)\s*(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})",
+            "plazo_dias": 5,
+            "dias_habiles": True,
+            "confianza": 0.95
+        },
+        # Cédula con fecha en texto (ej: 28noviembre 2025)
+        {
+            "tipo": TipoVencimiento.CEDULA_ELECTRONICA,
+            "regex": r"(?:notific[oóa]|fecha:?|emisi[oó]n).*?\s*(\d{1,2})\s*(?:de)?\s*([a-z]+)\s*(?:de)?\s*(\d{4})",
             "plazo_dias": 5,
             "dias_habiles": True,
             "confianza": 0.95
@@ -106,6 +119,22 @@ class AnalizadorVencimientos:
     FERIA_JUDICIAL_2024 = (date(2024, 1, 1), date(2024, 2, 29))
     FERIA_JUDICIAL_2025 = (date(2025, 1, 1), date(2025, 2, 28))
 
+    # Meses en español
+    MESES = {
+        "enero": 1, "ener": 1, "ene": 1,
+        "febrero": 2, "febr": 2, "feb": 2,
+        "marzo": 3, "marz": 3, "mar": 3,
+        "abril": 4, "abr": 4,
+        "mayo": 5, "may": 5,
+        "junio": 6, "jun": 6,
+        "julio": 7, "jul": 7,
+        "agosto": 8, "agos": 8, "ago": 8,
+        "septiembre": 9, "sept": 9, "sep": 9, "setiembre": 9,
+        "octubre": 10, "octu": 10, "oct": 10,
+        "noviembre": 11, "novi": 11, "nov": 11,
+        "diciembre": 12, "dici": 12, "dic": 12
+    }
+
     def __init__(self, considerar_feria: bool = True):
         """
         Inicializa el analizador.
@@ -115,6 +144,8 @@ class AnalizadorVencimientos:
         """
         self.considerar_feria = considerar_feria
         self._compilar_patrones()
+        self.config_manager = VencimientosConfig.get_instance()
+        self.llm_service = LLMService()
 
     def _compilar_patrones(self):
         """Compila los patrones regex para mejor performance."""
@@ -180,10 +211,25 @@ class AnalizadorVencimientos:
             grupos = match.groups()
 
             # Detectar fecha de notificación
-            if len(grupos) >= 3 and grupos[0].isdigit():
+            if len(grupos) >= 3 and grupos[0] and grupos[0].isdigit():
                 # Tiene fecha explícita (día, mes, año)
                 dia = int(grupos[0])
-                mes = int(grupos[1])
+                
+                # Intentar parsear mes (número o texto)
+                mes_raw = grupos[1].lower()
+                if mes_raw.isdigit():
+                    mes = int(mes_raw)
+                else:
+                    # Buscar en diccionario de meses
+                    mes = self.MESES.get(mes_raw)
+                    if not mes:
+                        # Intentar limpiar caracteres extraños
+                        mes_clean = "".join(filter(str.isalpha, mes_raw))
+                        mes = self.MESES.get(mes_clean)
+                
+                if not mes:
+                    return None
+
                 anio = int(grupos[2])
 
                 # Normalizar año
@@ -199,7 +245,23 @@ class AnalizadorVencimientos:
             # Determinar plazo en días
             if patron_dict.get("plazo_variable"):
                 # El plazo está en el primer grupo capturado
-                plazo_dias = int(grupos[0])
+                # Buscar el grupo que tenga el plazo (puede variar si agregamos grupos de fecha antes)
+                # Asumimos que si hay fecha, el plazo es el último grupo, si no, es el primero
+                # Esto es frágil, mejor usar nombre de grupos o lógica específica
+                # Por ahora, mantenemos compatibilidad: si hay fecha (3 grupos), no es variable usualmente
+                # Si es variable, el regex suele ser distinto.
+                # Revisando los patrones variables:
+                # TRASLADO: r"traslado.*?(?:por|de)\s*(\d+)\s*d[ií]as?" -> 1 grupo (plazo)
+                # Si agregamos fecha a traslado, tendremos más grupos.
+                
+                # Estrategia: buscar el primer grupo que sea dígito y parezca plazo
+                plazo_dias = 0
+                for g in grupos:
+                    if g and g.isdigit():
+                        plazo_dias = int(g)
+                        break
+                if plazo_dias == 0:
+                     return None
             else:
                 # El plazo es fijo según el tipo
                 plazo_dias = patron_dict["plazo_dias"]
@@ -395,6 +457,7 @@ class AnalizadorVencimientos:
             vencimientos.extend(self.analizar_texto(detalle, act_id))
 
         # Si se solicita, analizar PDF
+        texto_para_analisis = detalle
         if extraer_de_pdf and ruta_pdf:
             from .extractor_texto import ExtractorTexto
             extractor = ExtractorTexto(usar_ocr=False)  # Sin OCR para vencimientos
@@ -402,11 +465,135 @@ class AnalizadorVencimientos:
             try:
                 # Extraer solo primeros 1000 caracteres (suficiente para cédulas)
                 texto_pdf = extractor.extraer_primeros_n_caracteres(ruta_pdf, 1000)
-                vencimientos.extend(self.analizar_texto(texto_pdf, act_id))
+                vencimientos_pdf = self.analizar_texto(texto_pdf, act_id)
+                vencimientos.extend(vencimientos_pdf)
+                texto_para_analisis = texto_pdf # Usar texto PDF si está disponible
             except Exception:
                 pass  # Si falla, continuar sin análisis de PDF
 
+        # --- ANÁLISIS HÍBRIDO CON LLM ---
+        if self.config_manager.config.hybrid_analysis_enabled:
+            try:
+                fecha_actuacion = self._parsear_fecha_actuacion(actuacion)
+                margen = timedelta(days=self.config_manager.config.analysis_margin_days)
+                
+                # Solo analizar si es reciente
+                if fecha_actuacion and fecha_actuacion >= date.today() - margen:
+                    vencimientos_llm = self._analizar_con_llm(texto_para_analisis, act_id)
+                    
+                    # Estrategia de Unión: Agregar si no existe uno similar
+                    for v_llm in vencimientos_llm:
+                        if not self._existe_vencimiento_similar(v_llm, vencimientos):
+                            vencimientos.append(v_llm)
+            except Exception as e:
+                print(f"Error en análisis híbrido LLM: {e}")
+
         return vencimientos
+
+    def _parsear_fecha_actuacion(self, actuacion: dict) -> Optional[date]:
+        """Intenta parsear la fecha de la actuación."""
+        fecha_str = actuacion.get("Fecha") or actuacion.get("fecha")
+        if not fecha_str:
+            return None
+        try:
+            # Formatos comunes: "YYYY-MM-DD", "DD/MM/YYYY"
+            if "-" in fecha_str:
+                return datetime.strptime(fecha_str[:10], "%Y-%m-%d").date()
+            elif "/" in fecha_str:
+                return datetime.strptime(fecha_str[:10], "%d/%m/%Y").date()
+            return None
+        except:
+            return None
+
+    def _existe_vencimiento_similar(self, nuevo: Vencimiento, existentes: List[Vencimiento]) -> bool:
+        """Verifica si ya existe un vencimiento similar para evitar duplicados."""
+        for ex in existentes:
+            # Consideramos similar si coincide tipo y fecha de vencimiento
+            if ex.tipo == nuevo.tipo and ex.fecha_vencimiento == nuevo.fecha_vencimiento:
+                return True
+        return False
+
+    def _analizar_con_llm(self, texto: str, actuacion_id: Optional[int]) -> List[Vencimiento]:
+        """Ejecuta el análisis usando LLM."""
+        if not texto or len(texto) < 10:
+            return []
+
+        try:
+            prompt = self._build_dynamic_prompt(texto)
+            # Usar temperatura baja para determinismo
+            response_text = self.llm_service._call_ollama(
+                prompt, 
+                model=self.config_manager.config.llm_model, 
+                temperature=0.0
+            )
+            
+            # Limpiar respuesta para obtener JSON
+            json_str = response_text.strip()
+            if "```json" in json_str:
+                json_str = json_str.split("```json")[1].split("```")[0].strip()
+            elif "```" in json_str:
+                json_str = json_str.split("```")[1].split("```")[0].strip()
+            
+            data = json.loads(json_str)
+            vencimientos_data = data.get("vencimientos", [])
+            
+            resultados = []
+            for v_data in vencimientos_data:
+                try:
+                    fecha_notif = datetime.strptime(v_data["fecha_notificacion"], "%Y-%m-%d").date()
+                    plazo = int(v_data["plazo_dias"])
+                    es_habil = v_data.get("dias_habiles", True)
+                    
+                    if es_habil:
+                        fecha_venc = self.calcular_fecha_vencimiento(fecha_notif, plazo)
+                    else:
+                        fecha_venc = fecha_notif + timedelta(days=plazo)
+                    
+                    tipo_str = v_data.get("tipo", "OTRO")
+                    # Mapear string a Enum si es posible, sino OTRO
+                    tipo = TipoVencimiento.OTRO
+                    for t in TipoVencimiento:
+                        if t.value == tipo_str or t.name == tipo_str:
+                            tipo = t
+                            break
+                            
+                    resultados.append(Vencimiento(
+                        tipo=tipo,
+                        fecha_notificacion=fecha_notif,
+                        plazo_dias=plazo,
+                        fecha_vencimiento=fecha_venc,
+                        dias_habiles=es_habil,
+                        descripcion=f"[IA] {self._generar_descripcion(tipo, fecha_notif, plazo, fecha_venc)}",
+                        actuacion_id=actuacion_id,
+                        texto_fuente=v_data.get("texto_fuente", "")[:200],
+                        confianza=0.85 # Confianza arbitraria para IA
+                    ))
+                except Exception as e:
+                    print(f"Error parseando item LLM: {e}")
+                    continue
+            
+            return resultados
+
+        except Exception as e:
+            print(f"Error en llamada LLM: {e}")
+            return []
+
+    def _build_dynamic_prompt(self, texto: str) -> str:
+        """Construye el prompt con configuración y términos personalizados."""
+        base_prompt = self.config_manager.config.system_prompt
+        custom_terms = self.config_manager.config.custom_terms
+        
+        terms_text = ""
+        if custom_terms:
+            terms_text = "\nREGLAS DE PLAZOS PERSONALIZADAS (Prioridad Alta):\n"
+            for term in custom_terms:
+                nombre = term.get('nombre', '')
+                dias = term.get('dias', 0)
+                tipo_dias = 'hábiles' if term.get('habiles', True) else 'corridos'
+                if nombre and dias > 0:
+                    terms_text += f"- Si detectas '{nombre}': plazo de {dias} días {tipo_dias}.\n"
+        
+        return f"{base_prompt}\n{terms_text}\n\nTEXTO A ANALIZAR:\n{texto}"
 
     def filtrar_vencimientos_urgentes(
         self,

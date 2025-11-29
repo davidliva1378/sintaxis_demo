@@ -929,6 +929,24 @@ async def obtener_inteligencia_expediente(numero: str):
         cursor.execute(query, (numero,))
         rows = cursor.fetchall()
 
+        # Si no hay resultados, intentar con número desnormalizado (formato PJN: FPA 123/2024)
+        if not rows:
+            from core.domain.expediente_utils import desnormalizar_numero_expediente
+            numero_desnormalizado = desnormalizar_numero_expediente(numero)
+            if numero_desnormalizado != numero:
+                logger.info(f"Reintentando con número desnormalizado: {numero_desnormalizado}")
+                cursor.execute(query, (numero_desnormalizado,))
+                rows = cursor.fetchall()
+
+        # Si aún no hay resultados, intentar con número normalizado (formato URL: FPA_123_2024)
+        if not rows:
+            from core.domain.expediente_utils import normalizar_numero_expediente
+            numero_normalizado = normalizar_numero_expediente(numero)
+            if numero_normalizado != numero:
+                logger.info(f"Reintentando con número normalizado: {numero_normalizado}")
+                cursor.execute(query, (numero_normalizado,))
+                rows = cursor.fetchall()
+
         # Obtener entidades pre-calculadas de MySQL (evita reprocesar NER)
         entidades_query = """
             SELECT entity_type, entity_value, actuacion_id, score

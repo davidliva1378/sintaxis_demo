@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import {
   ArrowLeft,
   FileText,
@@ -16,6 +19,7 @@ import {
   ListTodo,
   StickyNote,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -30,7 +34,6 @@ import MiAnalisisList from '@/components/expedientes/MiAnalisisList'
 import InteligenciaPanel from '@/components/expedientes/InteligenciaPanel'
 import {
   obtenerEstadisticasExpediente,
-  procesarExpediente,
   obtenerActuacionesClasificadasExpediente,
   obtenerVencimientosExpediente
 } from '@/api/procesamientoApi'
@@ -102,10 +105,45 @@ export default function ExpedienteDetallePage() {
     }
   }
 
+  // Estado de tabs
+  const [activeTab, setActiveTab] = useState('actuaciones')
+  // Estado de progreso
+  const [progress, setProgress] = useState({ current: 0, total: 0, message: '' })
+  // Estado OCR
+  const [usarOcr, setUsarOcr] = useState(() => {
+    const saved = localStorage.getItem('procesamiento_usar_ocr')
+    return saved !== null ? JSON.parse(saved) : true
+  })
+
+  // Persistir preferencia OCR
+  useEffect(() => {
+    localStorage.setItem('procesamiento_usar_ocr', JSON.stringify(usarOcr))
+  }, [usarOcr])
+
+  // Referencia para cancelar
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  const handleCancelar = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+      setIsProcessing(false)
+      setProgress({ current: 0, total: 0, message: 'Cancelado por usuario' })
+      toast.info('Procesamiento cancelado')
+    }
+  }
+
   const handleProcesar = async () => {
     if (!expedienteActual) return
 
     setIsProcessing(true)
+    setActiveTab('procesamiento') // Cambiar al tab de procesamiento
+    setProgress({ current: 0, total: 0, message: 'Iniciando...' })
+
+    // Crear nuevo controller
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     try {
       // Convertir actuaciones al formato requerido
       const actuacionesInput: ActuacionInput[] = expedienteActual.actuaciones.map((act, index) => ({
@@ -125,11 +163,30 @@ export default function ExpedienteDetallePage() {
         }
       })
 
-      const resultado = await procesarExpediente({
+      // Usar streaming para feedback en tiempo real
+      const { procesarExpedienteStream } = await import('@/api/procesamientoApi')
+
+      const resultado = await procesarExpedienteStream({
         numero_expediente: expedienteActual.numero,
         actuaciones: actuacionesInput,
         rutas_pdf: Object.keys(rutas_pdf).length > 0 ? rutas_pdf : undefined,
-        guardar_en_bd: true
+        guardar_en_bd: true,
+        usar_ocr: usarOcr
+      }, (event) => {
+        // Callback de progreso
+        if (event.event === 'start') {
+          setProgress({ current: 0, total: event.total, message: event.message })
+        } else if (event.event === 'progress') {
+          setProgress({
+            current: event.current,
+            total: event.total,
+            message: event.message
+          })
+        } else if (event.event === 'analyzing') {
+          setProgress(prev => ({ ...prev, message: event.message }))
+        } else if (event.event === 'saving') {
+          setProgress(prev => ({ ...prev, message: event.message }))
+        }
       })
 
       setEstadisticas(resultado.estadisticas)
@@ -148,6 +205,7 @@ export default function ExpedienteDetallePage() {
       })
     } finally {
       setIsProcessing(false)
+      setProgress({ current: 0, total: 0, message: '' })
     }
   }
 
@@ -295,7 +353,7 @@ export default function ExpedienteDetallePage() {
       </Card>
 
       {/* Tabs */}
-      <Tabs defaultValue="actuaciones" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="actuaciones" className="flex items-center gap-2">
             <ListTodo className="h-4 w-4" />
@@ -344,33 +402,83 @@ export default function ExpedienteDetallePage() {
         </TabsContent>
 
         <TabsContent value="procesamiento" className="mt-6 space-y-6">
-          {!isProcesado ? (
+          {!isProcesado || isProcessing ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <BarChart3 className={`h-12 w-12 mx-auto mb-4 ${isProcessing ? 'text-blue-500 animate-pulse' : 'text-gray-300'}`} />
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                  Expediente no procesado
+                  {isProcessing ? 'Procesando Expediente' : 'Expediente no procesado'}
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Procesa el expediente para ver la clasificacion de actuaciones, vencimientos y estadisticas
+                  {isProcessing
+                    ? 'Analizando actuaciones, detectando vencimientos y generando estadísticas...'
+                    : 'Procesa el expediente para ver la clasificacion de actuaciones, vencimientos y estadisticas'}
                 </p>
-                <Button onClick={handleProcesar} disabled={isProcessing}>
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Procesando...
-                    </>
-                  ) : (
-                    <>
+
+                {isProcessing ? (
+                  <div className="max-w-xs mx-auto space-y-3">
+                    <Progress value={progress.total > 0 ? (progress.current / progress.total) * 100 : 0} />
+                    <p className="text-sm text-gray-500 animate-pulse">
+                      {progress.message || 'Procesando...'}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {progress.current} / {progress.total} actuaciones
+                    </p>
+                    <div className="flex justify-center pt-2">
+                      <Button variant="destructive" size="sm" onClick={handleCancelar}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-4">
+                    <Button onClick={handleProcesar}>
                       <BarChart3 className="h-4 w-4 mr-2" />
                       Procesar Expediente
-                    </>
-                  )}
-                </Button>
+                    </Button>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="ocr-mode"
+                        checked={usarOcr}
+                        onCheckedChange={setUsarOcr}
+                      />
+                      <Label htmlFor="ocr-mode" className="text-sm text-gray-600 dark:text-gray-400">
+                        Habilitar OCR (para imágenes)
+                      </Label>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ) : (
             <>
+              <Card className="mb-6">
+                <CardContent className="py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                    <Button onClick={handleProcesar} variant="outline" className="w-full sm:w-auto">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Reprocesar Expediente
+                    </Button>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="ocr-mode-reprocess"
+                        checked={usarOcr}
+                        onCheckedChange={setUsarOcr}
+                      />
+                      <Label htmlFor="ocr-mode-reprocess" className="text-sm text-gray-600 dark:text-gray-400">
+                        Habilitar OCR
+                      </Label>
+                    </div>
+                  </div>
+                  {estadisticas?.tiempo_procesamiento_seg && (
+                    <p className="text-xs text-gray-500">
+                      Procesado en {estadisticas.tiempo_procesamiento_seg.toFixed(1)}s
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
               <EstadisticasExpedientePanel
                 estadisticas={estadisticas}
                 isLoading={isLoadingProcesamiento}

@@ -96,9 +96,21 @@ start_backend() {
     log_info "Iniciando backend en puerto $BACKEND_PORT..."
 
     export PYTHONPATH="$PARENT_DIR:$SCRIPT_DIR:$PYTHONPATH"
+    
+    # Detectar entorno virtual
+    if [ -f ".venv1/bin/uvicorn" ]; then
+        UVICORN_CMD=".venv1/bin/uvicorn"
+        log_info "Usando venv local: $UVICORN_CMD"
+    elif [ -f "/Users/davidalejandroliva/PycharmProjects/sintaXis/.venv1/bin/uvicorn" ]; then
+        UVICORN_CMD="/Users/davidalejandroliva/PycharmProjects/sintaXis/.venv1/bin/uvicorn"
+        log_info "Usando venv absoluto: $UVICORN_CMD"
+    else
+        UVICORN_CMD="uvicorn"
+        log_warn "Usando uvicorn del sistema (puede faltar dependencias)"
+    fi
 
     cd "$SCRIPT_DIR"
-    uvicorn presentation.api.rest.main:app \
+    $UVICORN_CMD presentation.api.rest.main:app \
         --host 0.0.0.0 \
         --port $BACKEND_PORT \
         --reload \

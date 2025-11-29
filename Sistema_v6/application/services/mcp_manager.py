@@ -6,6 +6,7 @@ Permite iniciar, detener y monitorear el proceso del servidor MCP.
 
 import logging
 import os
+import sys
 import json
 import subprocess
 import signal
@@ -18,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 # Rutas de configuracion
 BASE_DIR = Path(__file__).parent.parent.parent
-MCP_SERVER_PATH = BASE_DIR / "mcp" / "sintaxis_mcp_server.py"
-MCP_SERVER_SSE_PATH = BASE_DIR / "mcp" / "sintaxis_mcp_server_sse.py"
+MCP_SERVER_PATH = BASE_DIR / "sintaxis_mcp" / "sintaxis_mcp_server.py"
+MCP_SERVER_SSE_PATH = BASE_DIR / "sintaxis_mcp" / "sintaxis_mcp_server_sse.py"
 CONFIG_DIR = BASE_DIR / "config"
 MCP_CONFIG_FILE = CONFIG_DIR / "mcp_settings.json"
 MCP_PID_FILE = CONFIG_DIR / "mcp_server.pid"
@@ -176,11 +177,12 @@ class MCPManager:
             log_file = open(MCP_LOG_FILE, 'a')
 
             # Construir comando segun modo
+            import sys
             if mode == "sse":
-                cmd = ["python", str(server_path), "--port", str(port), "--host", "0.0.0.0", "--ssl"]
+                cmd = [sys.executable, str(server_path), "--port", str(port), "--host", "0.0.0.0", "--ssl"]
                 stdin_pipe = None  # SSE no necesita stdin
             else:
-                cmd = ["python", str(server_path)]
+                cmd = [sys.executable, str(server_path)]
                 stdin_pipe = subprocess.PIPE  # stdio necesita stdin abierto
 
             # Iniciar proceso
@@ -471,19 +473,112 @@ class MCPManager:
             }
         else:
             # Configuracion para uso local via stdio
+            import os
             config = {
                 "mcpServers": {
                     "sintaxis": {
-                        "command": "python",
+                        "command": sys.executable,
                         "args": [str(MCP_SERVER_PATH)],
                         "env": {
                             "PYTHONPATH": f"{BASE_DIR.parent}:{BASE_DIR}",
-                            "MYSQL_PASSWORD": "${MYSQL_PASSWORD}"
+                            "MYSQL_HOST": os.getenv("MYSQL_HOST", "localhost"),
+                            "MYSQL_PORT": os.getenv("MYSQL_PORT", "3306"),
+                            "MYSQL_DATABASE": os.getenv("MYSQL_DATABASE", "sintaxis"),
+                            "MYSQL_USER": os.getenv("MYSQL_USER", "root"),
+                            "MYSQL_PASSWORD": os.getenv("MYSQL_PASSWORD", "")
                         }
                     }
                 }
             }
         return json.dumps(config, indent=2)
+
+    def get_resources_list(self) -> List[Dict[str, Any]]:
+        """
+        Obtiene la lista de recursos disponibles.
+
+        Returns:
+            Lista de recursos con uri, nombre, descripcion
+        """
+        try:
+            # Importar dinamicamente para evitar errores si mcp no esta instalado
+            from mcp.sintaxis_mcp_server import list_resources
+            import asyncio
+            
+            # list_resources es async, pero aqui necesitamos ejecutarlo sync
+            # Sin embargo, list_resources en sintaxis_mcp_server es un handler decorado
+            # El decorador @app.list_resources() registra la funcion.
+            # Necesitamos acceder al registro interno del servidor.
+            
+            from mcp.sintaxis_mcp_server import app
+            
+            # En mcp-python, app.list_resources() es un decorador.
+            # Pero app._resource_handlers o similar debe tener los handlers.
+            # O mejor, ejecutamos la funcion list_resources directamente si es accesible.
+            # En sintaxis_mcp_server.py:
+            # @app.list_resources()
+            # async def list_resources() -> list[Resource]:
+            
+            # Podemos llamar a la funcion original si la importamos
+            # Pero el decorador podria haberla envuelto.
+            
+            # Vamos a intentar ejecutar la funcion list_resources del modulo
+            from mcp.sintaxis_mcp_server import list_resources as list_resources_func
+            
+            # Ejecutar corrutina en loop nuevo
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            resources = loop.run_until_complete(list_resources_func())
+            loop.close()
+            
+            return [
+                {
+                    "uri": str(r.uri),
+                    "name": str(r.name),
+                    "mimeType": str(r.mimeType),
+                    "description": str(r.description)
+                }
+                for r in resources
+            ]
+            
+        except Exception as e:
+            logger.warning(f"No se pudieron cargar recursos MCP: {e}")
+            return []
+
+    def get_prompts_list(self) -> List[Dict[str, Any]]:
+        """
+        Obtiene la lista de prompts disponibles.
+
+        Returns:
+            Lista de prompts con nombre, descripcion, argumentos
+        """
+        try:
+            from mcp.sintaxis_mcp_server import list_prompts as list_prompts_func
+            import asyncio
+            
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            prompts = loop.run_until_complete(list_prompts_func())
+            loop.close()
+            
+            return [
+                {
+                    "name": str(p.name),
+                    "description": str(p.description),
+                    "arguments": [
+                        {
+                            "name": str(arg.name),
+                            "description": str(arg.description),
+                            "required": bool(arg.required) if hasattr(arg, 'required') else False
+                        }
+                        for arg in p.arguments
+                    ] if p.arguments else []
+                }
+                for p in prompts
+            ]
+            
+        except Exception as e:
+            logger.warning(f"No se pudieron cargar prompts MCP: {e}")
+            return []
 
 
 # Instancia global

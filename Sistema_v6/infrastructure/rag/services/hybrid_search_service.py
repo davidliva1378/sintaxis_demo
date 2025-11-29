@@ -383,7 +383,7 @@ class HybridSearchService:
 
             # 3. Indexar en BM25
             logger.info("   Indexando en BM25...")
-            self.bm25.build_index(chunks)
+            self.bm25.add_chunks(chunks)
             self.bm25.save_index()
 
             logger.info(f"✅ {len(chunks)} chunks indexados exitosamente")

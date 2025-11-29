@@ -20,8 +20,8 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
       interval: 30s
-      timeout: 10s
-      retries: 3
+      timeout: 30s
+      retries: 5
     networks:
       - sistema-pjn-network
 

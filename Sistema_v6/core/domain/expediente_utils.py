@@ -36,6 +36,19 @@ def normalizar_numero_expediente(numero: str) -> str:
     # Reemplazar espacios y barras por guiones bajos
     # Regex: uno o más espacios o barras
     numero_normalizado = re.sub(r'[\s/]+', '_', numero)
+    
+    # Intentar padear el número a 6 dígitos si cumple el formato AAA_N_AAAA
+    partes = numero_normalizado.split('_')
+    if len(partes) == 3 and partes[1].isdigit():
+        # Formato: PREFIJO_NUMERO_AÑO
+        prefijo = partes[0]
+        numero_val = partes[1]
+        anio = partes[2]
+        
+        # Padear número a 6 dígitos
+        numero_padded = numero_val.zfill(6)
+        
+        return f"{prefijo}_{numero_padded}_{anio}"
 
     return numero_normalizado
 

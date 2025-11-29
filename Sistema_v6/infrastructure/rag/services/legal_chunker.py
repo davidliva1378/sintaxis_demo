@@ -202,7 +202,13 @@ class LegalChunker:
 
             # Si el chunk actual es demasiado largo (ej: un párrafo gigante)
             # dividirlo por caracteres
+            loop_count = 0
             while len(current_chunk) > chunk_size * 1.5:  # 1.5x para dar margen
+                loop_count += 1
+                if loop_count > 100:
+                    logger.warning(f"⚠️ Possible infinite loop in chunking for doc {document.doc_id}. Chunk len: {len(current_chunk)}")
+                    break
+                
                 # Cortar en chunk_size
                 split_point = chunk_size
                 # Buscar espacio más cercano para no cortar palabras

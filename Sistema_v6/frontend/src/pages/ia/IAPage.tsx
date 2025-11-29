@@ -115,7 +115,7 @@ const limpiarStorage = () => {
 
 export default function IAPage() {
   // === Estado general ===
-  const [activeTab, setActiveTab] = useState('query')
+  const [activeTab, setActiveTab] = useState('chat')
   const [loading, setLoading] = useState(false)
   const [configOpen, setConfigOpen] = useState(true)
 
@@ -593,7 +593,7 @@ export default function IAPage() {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="query">
             <Sparkles className="h-4 w-4 mr-2" />
-            Consulta RAG
+            Debug RAG
           </TabsTrigger>
           <TabsTrigger value="search">
             <Search className="h-4 w-4 mr-2" />
@@ -790,11 +790,10 @@ export default function IAPage() {
                       )}
 
                       <div
-                        className={`max-w-[80%] rounded-lg p-3 ${
-                          mensaje.rol === 'usuario'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted'
-                        }`}
+                        className={`max-w-[80%] rounded-lg p-3 ${mensaje.rol === 'usuario'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted'
+                          }`}
                       >
                         <p className="whitespace-pre-wrap text-sm">{mensaje.contenido}</p>
 

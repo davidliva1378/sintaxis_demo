@@ -7,6 +7,8 @@ import {
   MCPConfig,
   MCPConfigUpdate,
   MCPToolsResponse,
+  MCPResourcesResponse,
+  MCPPromptsResponse,
   MCPLogsResponse,
   MCPToolStats,
   MCPOperationResult,
@@ -131,6 +133,28 @@ export async function getMCPTools(): Promise<MCPToolsResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/mcp/tools`);
   if (!response.ok) {
     throw new Error('Error obteniendo tools MCP');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene la lista de recursos disponibles.
+ */
+export async function getMCPResources(): Promise<MCPResourcesResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/mcp/resources`);
+  if (!response.ok) {
+    throw new Error('Error obteniendo resources MCP');
+  }
+  return response.json();
+}
+
+/**
+ * Obtiene la lista de prompts disponibles.
+ */
+export async function getMCPPrompts(): Promise<MCPPromptsResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/mcp/prompts`);
+  if (!response.ok) {
+    throw new Error('Error obteniendo prompts MCP');
   }
   return response.json();
 }

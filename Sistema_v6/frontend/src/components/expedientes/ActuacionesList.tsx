@@ -106,9 +106,24 @@ export default function ActuacionesList({ actuaciones, expedienteNumero }: Actua
                       {actuacion.tipo}
                     </Badge>
                     {actuacion.tiene_archivo && (
-                      <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 ml-auto">
-                        <File className="h-4 w-4" />
-                        {actuacion.tipo_archivo?.toUpperCase() || 'PDF'}
+                      <div className="flex items-center gap-2 ml-auto">
+                        {/* Indicador de tipo de contenido (OCR vs Texto) */}
+                        {actuacion.metodo_extraccion && (
+                          <Badge
+                            variant="secondary"
+                            className={`text-[10px] h-5 px-1.5 ${actuacion.metodo_extraccion.includes('ocr')
+                                ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                              }`}
+                          >
+                            {actuacion.metodo_extraccion.includes('ocr') ? 'PDF IMG' : 'PDF TXT'}
+                          </Badge>
+                        )}
+
+                        <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                          <File className="h-4 w-4" />
+                          {actuacion.tipo_archivo?.toUpperCase() || 'PDF'}
+                        </div>
                       </div>
                     )}
                   </div>

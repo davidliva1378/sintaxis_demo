@@ -188,7 +188,8 @@ class LLMService:
         system: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 2000,
-        stop: Optional[List[str]] = None
+        stop: Optional[List[str]] = None,
+        model: Optional[str] = None
     ) -> str:
         """
         Genera texto a partir de un prompt.
@@ -199,6 +200,7 @@ class LLMService:
             temperature: Creatividad (0-1)
             max_tokens: Máximo de tokens a generar
             stop: Secuencias de parada
+            model: Modelo específico a usar (opcional)
 
         Returns:
             Texto generado
@@ -227,7 +229,7 @@ class LLMService:
             options["num_predict"] = max(options.get("num_predict", 100), 100)
 
             response = client.chat(
-                model=self.model,
+                model=model or self.model,
                 messages=messages,
                 options=options
             )

@@ -173,16 +173,18 @@ class MonitoreoService:
 
     def listar_expedientes(
         self,
-        usuario_id: int,
+        usuario_id: Optional[int] = None,
         solo_activos: bool = False,
         pagina: int = 1,
         por_pagina: int = 50
     ) -> Dict[str, Any]:
         """
         Lista los expedientes monitoreados con paginación.
+        
+        Si usuario_id es None, lista todos los expedientes del sistema (modo compartido).
 
         Args:
-            usuario_id: ID del usuario
+            usuario_id: ID del usuario (opcional para modo compartido)
             solo_activos: Solo listar expedientes activos
             pagina: Número de página
             por_pagina: Elementos por página
@@ -191,6 +193,9 @@ class MonitoreoService:
             Dict con expedientes y metadatos de paginación
         """
         offset = (pagina - 1) * por_pagina
+        
+        # Si usuario_id es None, pasamos None al repo para que traiga todo
+        # NOTA: El repositorio debe soportar usuario_id=None para traer todo
         expedientes = self._repo.obtener_expedientes(
             usuario_id=usuario_id,
             solo_activos=solo_activos,

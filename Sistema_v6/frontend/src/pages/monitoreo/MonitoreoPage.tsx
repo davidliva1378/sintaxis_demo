@@ -22,8 +22,8 @@ export default function MonitoreoPage() {
     expedientes,
     estadisticas,
     estadoScheduler,
-    isLoading,
     listarExpedientes,
+    obtenerConfiguracion,
     obtenerEstadisticas,
     obtenerEstadoScheduler,
     toggleMonitoreo,
@@ -38,10 +38,11 @@ export default function MonitoreoPage() {
   const [isVerifyingGlobal, setIsVerifyingGlobal] = useState(false)
 
   useEffect(() => {
+    obtenerConfiguracion()
     listarExpedientes()
     obtenerEstadisticas()
     listarCambios() // Cargar cambios globales al iniciar
-  }, [listarExpedientes, obtenerEstadisticas, listarCambios])
+  }, [obtenerConfiguracion, listarExpedientes, obtenerEstadisticas, listarCambios])
 
   // Polling: actualizar estado del scheduler cada 10 segundos
   useEffect(() => {
@@ -225,6 +226,43 @@ export default function MonitoreoPage() {
               </div>
             )}
           </div>
+
+          {/* Scheduler Status Details */}
+          {estadoScheduler && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Process Status */}
+              <div className="flex items-center gap-2">
+                <div className={`h-2.5 w-2.5 rounded-full ${estadoScheduler.activo ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Proceso: <span className="font-medium">{estadoScheduler.activo ? 'Corriendo' : 'Detenido'}</span>
+                </span>
+              </div>
+
+              {/* Execution Status */}
+              <div className="flex items-center gap-2">
+                {estadoScheduler.ejecutando ? (
+                  <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />
+                ) : (
+                  <div className="h-2.5 w-2.5 rounded-full bg-gray-300 dark:bg-gray-600" />
+                )}
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Actividad: <span className={`font-medium ${estadoScheduler.ejecutando ? 'text-blue-600 dark:text-blue-400' : ''}`}>
+                    {estadoScheduler.ejecutando ? 'Verificando cambios...' : 'En espera'}
+                  </span>
+                </span>
+              </div>
+
+              {/* Work Hours Status */}
+              <div className="flex items-center gap-2">
+                <Clock className={`h-4 w-4 ${estadoScheduler.es_horario_laboral ? 'text-green-500' : 'text-amber-500'}`} />
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Horario: <span className="font-medium">
+                    {estadoScheduler.es_horario_laboral ? 'Dentro de horario' : 'Fuera de horario (Pausado)'}
+                  </span>
+                </span>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
@@ -314,11 +352,10 @@ export default function MonitoreoPage() {
         <div className="flex gap-6">
           <button
             onClick={() => setShowChanges(false)}
-            className={`pb-3 px-1 border-b-2 transition-colors ${
-              !showChanges
-                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-            }`}
+            className={`pb-3 px-1 border-b-2 transition-colors ${!showChanges
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+              : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
           >
             <span className="font-medium">Expedientes Monitoreados</span>
             <Badge className="ml-2">{expedientes.length}</Badge>
@@ -328,11 +365,10 @@ export default function MonitoreoPage() {
               setShowChanges(true)
               setSelectedExpedienteId(undefined)
             }}
-            className={`pb-3 px-1 border-b-2 transition-colors ${
-              showChanges
-                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-            }`}
+            className={`pb-3 px-1 border-b-2 transition-colors ${showChanges
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+              : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
           >
             <span className="font-medium">Historial de Cambios</span>
             {estadisticas && estadisticas.cambios_sin_leer > 0 && (

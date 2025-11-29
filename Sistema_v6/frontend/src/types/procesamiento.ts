@@ -58,6 +58,7 @@ export interface ClasificacionActuacion {
   requiere_pdf: boolean
   tiene_plazo_probable: boolean
   keywords_detectados: string[]
+  metodo_extraccion?: string
 }
 
 export interface Vencimiento {

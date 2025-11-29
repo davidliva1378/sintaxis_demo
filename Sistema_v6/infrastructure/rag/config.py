@@ -33,10 +33,10 @@ class RAGSettings(BaseSettings):
     # ===== spaCy NER =====
     spacy_model: str = "es_core_news_md"
 
-    # ===== Ollama LLM =====
+    # Configuración de Ollama
     ollama_host: str = "http://localhost:11434"
-    ollama_model: str = "llama3.1:8b"
-    ollama_temperature: float = 0.1  # Más determinista para legal
+    ollama_model: str = "llama3.2:1b"  # Usar modelo ligero por defecto para evitar OOM
+    ollama_temperature: float = 0.3
     ollama_max_tokens: int = 2048
     ollama_timeout: int = 120
 

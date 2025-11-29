@@ -81,6 +81,7 @@ class ProcesarExpedienteRequest(BaseModel):
     actuaciones: List[ActuacionInput]
     rutas_pdf: Optional[dict[int, str]] = None
     guardar_en_bd: bool = True
+    usar_ocr: bool = True
 
 
 class EstadisticasExpedienteResponse(BaseModel):
@@ -296,7 +297,8 @@ async def procesar_expediente(
             numero_expediente=data.numero_expediente,
             actuaciones=actuaciones_dict,
             rutas_pdf=data.rutas_pdf,
-            guardar_en_bd=data.guardar_en_bd
+            guardar_en_bd=data.guardar_en_bd,
+            usar_ocr=data.usar_ocr
         )
 
         # Convertir estadísticas a response
@@ -404,7 +406,53 @@ async def procesar_expediente(
         logger.error(f"Error procesando expediente {data.numero_expediente}: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Error al procesar expediente: {str(e)}"
+        )
+
+
+@router.post("/expediente/stream")
+@limiter.limit("5/minute")
+async def procesar_expediente_stream(
+    request: Request,
+    data: ProcesarExpedienteRequest,
+    servicio: ProcesadorActuacionesService = Depends(get_procesador_service)
+):
+    """
+    Procesa un expediente con respuesta en streaming (NDJSON).
+
+    Retorna eventos de progreso en tiempo real:
+    - start: Inicio del proceso
+    - progress: Progreso de cada actuación
+    - saving: Guardando en BD
+    - complete: Resultado final
+    - error: Error ocurrido
+
+    Args:
+        data: Datos del expediente y actuaciones
+
+    Returns:
+        StreamingResponse con eventos JSON
+    """
+    from fastapi.responses import StreamingResponse
+
+    try:
+        actuaciones_dict = [act.model_dump() for act in data.actuaciones]
+
+        return StreamingResponse(
+            servicio.procesar_expediente_stream(
+                numero_expediente=data.numero_expediente,
+                actuaciones=actuaciones_dict,
+                rutas_pdf=data.rutas_pdf,
+                guardar_en_bd=data.guardar_en_bd,
+                usar_ocr=data.usar_ocr
+            ),
+            media_type="application/x-ndjson"
+        )
+
+    except Exception as e:
+        logger.error(f"Error iniciando stream expediente {data.numero_expediente}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al iniciar stream: {str(e)}"
         )
 
 

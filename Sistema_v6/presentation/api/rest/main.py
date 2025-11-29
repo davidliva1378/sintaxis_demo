@@ -93,6 +93,7 @@ from .routers import (
     tools,
     workspaces,
     logs,
+    classification,
 )
 
 logger = logging.getLogger(__name__)
@@ -227,6 +228,7 @@ app.include_router(mcp.router, prefix="/api/v1", tags=["mcp"])
 app.include_router(logs.router, prefix="/api/v1", tags=["logs"])
 app.include_router(tipos_entidad.router, prefix="/api/v1", tags=["tipos_entidad"])
 app.include_router(rag.router, tags=["rag"])
+app.include_router(classification.router, prefix="/api/v1", tags=["classification"])
 app.include_router(dashboard.router, prefix="/api/v1", tags=["dashboard"])
 
 

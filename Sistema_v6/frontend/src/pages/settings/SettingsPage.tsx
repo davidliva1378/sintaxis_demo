@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react'
-import { Settings, User, Key, Lock, Sliders, Activity, Globe, Download, Cog, Code, Server, Brain } from 'lucide-react'
+import { Settings, User, Key, Lock, Sliders, Activity, Globe, Download, Cog, Code, Server, Brain, Tag, Calendar } from 'lucide-react'
 import PerfilUsuario from '@/components/settings/PerfilUsuario'
 import CredencialesPJN from '@/components/settings/CredencialesPJN'
 import CambiarPassword from '@/components/settings/CambiarPassword'
@@ -15,8 +15,10 @@ import ConfiguracionAvanzada from '@/components/settings/ConfiguracionAvanzada'
 import ConfiguracionEnDesarrollo from '@/components/settings/ConfiguracionEnDesarrollo'
 import { ConfiguracionMCP } from '@/components/settings/ConfiguracionMCP'
 import ConfiguracionIA from '@/components/settings/ConfiguracionIA'
+import ClassificationConfig from '@/components/settings/ClassificationConfig'
+import ConfiguracionVencimientos from '@/components/settings/ConfiguracionVencimientos'
 
-type TabId = 'perfil' | 'credenciales' | 'password' | 'preferencias' | 'monitoreo' | 'browser' | 'scraping' | 'ia' | 'mcp' | 'avanzado' | 'desarrollo'
+type TabId = 'perfil' | 'credenciales' | 'password' | 'preferencias' | 'monitoreo' | 'browser' | 'scraping' | 'ia' | 'classification' | 'vencimientos' | 'mcp' | 'avanzado' | 'desarrollo'
 
 interface Tab {
   id: TabId
@@ -73,6 +75,18 @@ const tabs: Tab[] = [
     label: 'IA / RAG',
     icon: Brain,
     description: 'LLM y búsqueda',
+  },
+  {
+    id: 'classification',
+    label: 'Clasificación',
+    icon: Tag,
+    description: 'Reglas y patrones',
+  },
+  {
+    id: 'vencimientos',
+    label: 'Vencimientos',
+    icon: Calendar,
+    description: 'Plazos y reglas',
   },
   {
     id: 'mcp',
@@ -158,6 +172,8 @@ export default function SettingsPage() {
         {tabActiva === 'browser' && <ConfiguracionBrowser />}
         {tabActiva === 'scraping' && <ConfiguracionScraping />}
         {tabActiva === 'ia' && <ConfiguracionIA />}
+        {tabActiva === 'classification' && <ClassificationConfig />}
+        {tabActiva === 'vencimientos' && <ConfiguracionVencimientos />}
         {tabActiva === 'mcp' && <ConfiguracionMCP />}
         {tabActiva === 'avanzado' && <ConfiguracionAvanzada />}
         {tabActiva === 'desarrollo' && <ConfiguracionEnDesarrollo />}

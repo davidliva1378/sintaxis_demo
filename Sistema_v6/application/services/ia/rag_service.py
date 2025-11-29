@@ -163,7 +163,7 @@ class RAGService:
                     chunk_id=chunk_id,
                     doc_id=id_actuacion,
                     chunk_index=i,
-                    chunk_type=ChunkType.ACTUACION,
+                    chunk_type=ChunkType.FULL,
                     texto=chunk_text,
                     metadata={
                         "actuacion_id": id_actuacion,
@@ -414,79 +414,63 @@ class RAGService:
     ) -> Dict[str, Any]:
         """
         Responde una pregunta usando RAG.
-
-        Args:
-            pregunta: Pregunta del usuario
-            n_contextos: Número de contextos a recuperar
-            expediente_id: Filtrar por ID de expediente
-            expediente_numero: Filtrar por número de expediente
-            incluir_fuentes: Si incluir las fuentes usadas
-
-        Returns:
-            Dict con respuesta y fuentes
+        
+        Delegates to LLMService for advanced prompt generation (CoT, dynamic prompts).
         """
-        llm = self._get_llm()
-
-        # Buscar contextos relevantes (usar híbrido para mejor calidad)
-        contextos = self.buscar_hibrido(
-            query=pregunta,
-            n_results=n_contextos,
-            expediente_id=expediente_id,
-            expediente_numero=expediente_numero
-        )
-
-        if not contextos:
-            return {
-                "respuesta": "No encontré información relevante para responder esta pregunta.",
-                "fuentes": [],
-                "confianza": 0.0
-            }
-
-        # Construir contexto para el LLM
-        contexto_texto = "\n\n---\n\n".join([
-            f"[Fragmento {i+1}]\n{c['document']}"
-            for i, c in enumerate(contextos)
-        ])
-
-        system_prompt = """Eres un asistente legal experto en analizar expedientes judiciales argentinos.
-Tu tarea es responder preguntas basándote ÚNICAMENTE en la información proporcionada.
-Si la información no es suficiente para responder, indícalo claramente.
-Sé preciso y conciso en tus respuestas."""
-
-        user_prompt = f"""Basándote en los siguientes fragmentos del expediente, responde la pregunta.
-
-CONTEXTO:
-{contexto_texto}
-
-PREGUNTA: {pregunta}
-
-RESPUESTA:"""
-
         try:
-            respuesta = llm.generate(
-                user_prompt,
-                system=system_prompt,
-                temperature=0.3,
-                max_tokens=500
+            from infrastructure.rag.models.dto import SearchQuery
+            
+            # 1. Buscar contextos (objetos SearchResult)
+            hybrid = self._get_hybrid_search()
+            search_query = SearchQuery(
+                texto=pregunta,
+                limit=n_contextos,
+                filter_expediente=expediente_numero,
+                filter_tipo=None
             )
-
+            
+            # Usar búsqueda híbrida
+            resultados = hybrid.search(
+                query=search_query,
+                use_dense=True,
+                use_sparse=True,
+                use_reranking=True
+            )
+            
+            if not resultados:
+                return {
+                    "respuesta": "No encontré información relevante para responder esta pregunta.",
+                    "fuentes": [],
+                    "confianza": 0.0
+                }
+            
+            # 2. Generar respuesta con LLMService (usa CoT y prompts dinámicos)
+            llm = self._get_llm()
+            rag_response = llm.generate_answer(
+                question=pregunta,
+                search_results=resultados,
+                num_chunks=n_contextos
+            )
+            
+            # 3. Formatear respuesta
             resultado = {
-                "respuesta": respuesta.strip(),
-                "confianza": sum(c["score"] for c in contextos) / len(contextos)
+                "respuesta": rag_response.respuesta,
+                "confianza": sum(r.score for r in resultados) / len(resultados) if resultados else 0.0
             }
-
+            
             if incluir_fuentes:
                 resultado["fuentes"] = [
                     {
-                        "id": c["metadata"].get("actuacion_id", c.get("id", "")),
-                        "fragmento": c["document"][:200] + "..." if len(c["document"]) > 200 else c["document"],
-                        "score": c["score"]
+                        "id": r.chunk.chunk_id,
+                        "fragmento": r.chunk.texto[:200] + "..." if len(r.chunk.texto) > 200 else r.chunk.texto,
+                        "score": r.score,
+                        "metadata": r.chunk.metadata
                     }
-                    for c in contextos
+                    for r in resultados
                 ]
-
+                
             return resultado
-
+            
         except Exception as e:
             logger.error(f"Error generando respuesta: {e}")
             return {
@@ -524,9 +508,11 @@ RESPUESTA:"""
             return "No hay información suficiente para generar un resumen."
 
         llm = self._get_llm()
-
+        
+        # Concatenar textos
         contexto_texto = "\n\n".join([c["document"] for c in contextos])
-
+        
+        # Usar nuevo método summarize
         return llm.summarize(contexto_texto, max_length=max_length)
 
     def eliminar_actuacion(self, id_actuacion: str):

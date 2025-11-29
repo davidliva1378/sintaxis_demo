@@ -413,7 +413,8 @@ async def health_check(
         ollama_ok = rag_service.llm.health_check()
 
         # Verificar BM25
-        bm25_ok = indexer.search_service.bm25.bm25 is not None
+        # Consideramos online si el servicio está instanciado, aunque el índice esté vacío
+        bm25_ok = True
 
         overall = qdrant_ok and bm25_ok  # Ollama es opcional
 

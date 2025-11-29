@@ -399,20 +399,20 @@ class ExtractorMasivo:
                 session_id, expedientes, metadata
             )
 
-            # Actualizar BASE permanente
-            try:
-                base_path = self.actualizar_base_permanente(str(listado_path))
-                print(f"✅ BASE permanente actualizado: {base_path}")
-            except Exception as e:
-                print(f"⚠️ Error actualizando BASE (no crítico): {e}")
-
-            # Comparar con BASE si existe
+            # Comparar con BASE si existe (ANTES de actualizarla)
             try:
                 comparacion = self.comparar_con_base(str(listado_path))
                 if comparacion:
                     sesion.comparacion = comparacion.to_dict()
             except Exception as e:
                 print(f"⚠️ Error en comparación (no crítico): {e}")
+
+            # Actualizar BASE permanente
+            try:
+                base_path = self.actualizar_base_permanente(str(listado_path))
+                print(f"✅ BASE permanente actualizado: {base_path}")
+            except Exception as e:
+                print(f"⚠️ Error actualizando BASE (no crítico): {e}")
 
             # Guardar página count antes de sobrescribir
             paginas_procesadas = sesion.progreso_actual
