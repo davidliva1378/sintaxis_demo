@@ -10,7 +10,7 @@ import type {
   SesionExtraccion,
 } from '../types/expediente';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 console.log('API Base URL:', API_BASE_URL);
 
 const apiClient = axios.create({
@@ -111,7 +111,7 @@ export const extraccionMasivaApi = {
   /**
    * Carga un listado desde el servidor
    */
-  async cargarListado(listado_path: string): Promise<{
+  async cargarListado(_listado_path: string): Promise<{
     session_id: string;
     timestamp: string;
     total: number;

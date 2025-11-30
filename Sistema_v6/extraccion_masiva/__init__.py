@@ -16,6 +16,14 @@ from .models import (
     EstadoExpediente,
     TipoExtraccion,
 )
+from .exportadores import (
+    exportar_json,
+    exportar_csv,
+    exportar_excel,
+    exportar_csv_resultados,
+    generar_estadisticas,
+    generar_reporte_html,
+)
 
 __all__ = [
     "ExtractorMasivo",
@@ -26,4 +34,10 @@ __all__ = [
     "SesionExtraccion",
     "EstadoExpediente",
     "TipoExtraccion",
+    "exportar_json",
+    "exportar_csv",
+    "exportar_excel",
+    "exportar_csv_resultados",
+    "generar_estadisticas",
+    "generar_reporte_html",
 ]

@@ -9,6 +9,7 @@ export interface ExpedienteListado {
   situacion: string;
   fecha_inicio: string;
   ultima_actuacion: string;
+  ya_agregado?: boolean;
 }
 
 // Alias para compatibilidad con el store
@@ -47,6 +48,7 @@ export interface SolicitudExtraccion {
   numero: string;
   anio: string;
   dependencia?: string;
+  tipo?: string;
 }
 
 export interface PaginacionResult<T> {

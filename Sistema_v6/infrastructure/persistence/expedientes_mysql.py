@@ -13,7 +13,7 @@ import json
 import logging
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 import mysql.connector
 from mysql.connector import Error as MySQLError
@@ -252,6 +252,48 @@ class ExpedientesRepository(IExpedienteRepository):
         from core.domain.expediente_utils import normalizar_numero_expediente
         numero_normalizado = normalizar_numero_expediente(numero)
         return self.obtener_id(numero_normalizado) is not None
+
+    async def verificar_existencia_masiva(self, numeros: List[str]) -> Set[str]:
+        """
+        Verifica la existencia de múltiples expedientes.
+        
+        Args:
+            numeros: Lista de números de expediente
+            
+        Returns:
+            Set con los números normalizados que existen en la BD
+        """
+        if not numeros:
+            return set()
+            
+        from core.domain.expediente_utils import normalizar_numero_expediente
+        numeros_norm = [normalizar_numero_expediente(n) for n in numeros]
+        
+        if not numeros_norm:
+            return set()
+            
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            # Crear placeholders para la query IN (%s, %s, ...)
+            placeholders = ', '.join(['%s'] * len(numeros_norm))
+            query = f"SELECT numero_normalizado FROM expedientes WHERE numero_normalizado IN ({placeholders})"
+            
+            cursor.execute(query, numeros_norm)
+            resultados = cursor.fetchall()
+            
+            existentes = {row[0] for row in resultados}
+            
+            cursor.close()
+            conn.close()
+            
+            return existentes
+            
+        except MySQLError as e:
+            logger.error(f"Error verificando existencia masiva: {e}")
+            return set()
+
 
     def _obtener_fila_por_numero(self, numero_normalizado: str) -> Optional[Dict[str, Any]]:
         """Obtiene la fila cruda de un expediente por su número."""

@@ -1,5 +1,10 @@
 # Sistema v6 - Sistema de Gestión de Expedientes PJN
 
+[![CI/CD Pipeline](https://github.com/USER/REPO/workflows/CI%2FCD%20Pipeline/badge.svg)](https://github.com/USER/REPO/actions)
+[![codecov](https://codecov.io/gh/USER/REPO/branch/main/graph/badge.svg)](https://codecov.io/gh/USER/REPO)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
 Sistema modular para extracción, monitoreo y gestión de expedientes del Poder Judicial de la Nación (PJN).
 
 ## 📁 Estructura del Proyecto
@@ -222,13 +227,56 @@ PUT    /api/expedientes/{numero}/estado     # Actualizar estado
 
 ## 🧪 Testing
 
-```bash
-# Ejecutar tests unitarios
-pytest tests/
+### Ejecutar Tests Localmente
 
-# Ejecutar con cobertura
-pytest --cov=Sistema_v6 tests/
+```bash
+# Todos los tests
+pytest
+
+# Con cobertura
+pytest --cov=. --cov-report=html --cov-report=term-missing
+
+# Solo tests unitarios
+pytest -m unit
+
+# Solo tests de integración
+pytest -m integration
+
+# Tests en paralelo (más rápido)
+pytest -n auto
+
+# Excluir tests lentos
+pytest -m "not slow"
 ```
+
+### Ver Reporte de Cobertura
+
+```bash
+# Generar reporte HTML
+pytest --cov=. --cov-report=html
+
+# Abrir en navegador
+open htmlcov/index.html  # macOS
+xdg-open htmlcov/index.html  # Linux
+```
+
+### Markers Disponibles
+
+- `unit`: Tests unitarios (rápidos, sin dependencias externas)
+- `integration`: Tests de integración (pueden requerir servicios externos)
+- `e2e`: Tests end-to-end (requieren sistema completo)
+- `slow`: Tests lentos (omitir con `-m "not slow"`)
+- `rag`: Tests que requieren servicios RAG (Qdrant, Ollama)
+- `db`: Tests que requieren base de datos
+- `browser`: Tests que requieren navegador Playwright
+
+### Configuración de Tests
+
+La configuración de pytest está en `pytest.ini`. Incluye:
+- Cobertura mínima requerida: 80%
+- Modo asyncio automático
+- Reportes de cobertura en HTML, XML y terminal
+- Exclusión de archivos de test obsoletos
 
 ## 📝 Logs
 

@@ -585,6 +585,72 @@ async def obtener_resumen(session_id: str):
     )
 
 
+@router.get("/base")
+async def obtener_listado_base():
+    """
+    Obtener el listado base de expedientes (última extracción completa).
+    """
+    try:
+        from Sistema_v6.configuracion.config import Config
+        from infrastructure.di_container import get_container
+        
+        # Directorio de listados
+        listados_dir = Config.EXTRACCION_MASIVA_DIR / "listados"
+        
+        # Instanciar extractor solo para usar sus métodos de carga
+        extractor = ExtractorMasivo(data_dir=str(listados_dir))
+        
+        # Buscar listado_base.json
+        base_path = listados_dir / "listado_base.json"
+        
+        raise RuntimeError(f"DEBUG PATHS: listados_dir={listados_dir}, exists={listados_dir.exists()}, base_path={base_path}, exists={base_path.exists()}")
+        
+        if not base_path.exists():
+             # Fallback: buscar el más reciente
+             if not listados_dir.exists():
+                 raise HTTPException(status_code=404, detail="No hay directorio de listados")
+                 
+             archivos = sorted(listados_dir.glob("listado_*.json"), reverse=True)
+             if not archivos:
+                 raise HTTPException(status_code=404, detail="No hay listados disponibles")
+             base_path = archivos[0]
+             
+        resultado = extractor.cargar_listado(str(base_path))
+        
+        # Verificar existencia en BD
+        if resultado and "expedientes" in resultado:
+            try:
+                repo = get_container().expediente_repo
+                expedientes = resultado["expedientes"]
+                numeros = [e["numero"] for e in expedientes if "numero" in e]
+                
+                # Verificar en lotes para no saturar
+                existentes = set()
+                lote_size = 1000
+                for i in range(0, len(numeros), lote_size):
+                    lote = numeros[i:i+lote_size]
+                    existentes_lote = await repo.verificar_existencia_masiva(lote)
+                    existentes.update(existentes_lote)
+                
+                # Marcar expedientes
+                for exp in expedientes:
+                    if "numero" in exp:
+                        exp["ya_agregado"] = exp["numero"] in existentes
+                        
+            except Exception as e:
+                logger.error(f"Error verificando existencia en BD: {e}")
+                # No fallar todo el request si falla la verificación
+                
+        return resultado
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error cargando listado base: {e}")
+        raise HTTPException(status_code=500, detail=f"Error cargando listado base: {str(e)}")
+
+
+
 # ==================== WebSocket ====================
 
 @router.websocket("/ws/{session_id}")

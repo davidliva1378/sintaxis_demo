@@ -185,7 +185,7 @@ export async function chatIAStream(
   onError: (error: string) => void
 ): Promise<void> {
   const token = localStorage.getItem('auth_token')
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  const API_BASE_URL = import.meta.env.VITE_API_URL
 
   const response = await fetch(`${API_BASE_URL}/api/v1/ia/chat/stream`, {
     method: 'POST',

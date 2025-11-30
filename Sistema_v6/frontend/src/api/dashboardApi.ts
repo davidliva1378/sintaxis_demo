@@ -69,7 +69,7 @@ export interface VencimientosUrgentes {
 // Config
 // ============================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_BASE_URL = import.meta.env.VITE_API_URL
 
 // Helper para obtener headers con autenticacion
 function getAuthHeaders(): HeadersInit {

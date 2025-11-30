@@ -109,6 +109,12 @@ def _get_credentials() -> tuple[str, str]:
     return username, password
 
 
+import asyncio
+from fastapi import WebSocket, WebSocketDisconnect
+
+# Estado global de tareas en background (para poder cancelarlas)
+_tasks: dict[str, asyncio.Task] = {}
+
 async def _ejecutar_extraccion_background(
     session_id: str,
     username: str,
@@ -127,9 +133,9 @@ async def _ejecutar_extraccion_background(
 
         # Callback para actualizar la sesión en tiempo real
         def actualizar_sesion(sesion_actualizada: SesionExtraccion):
-            logger.info(f"📡 Callback recibido: session_id={session_id}, estado={sesion_actualizada.estado}")
+            # logger.info(f"📡 Callback recibido: session_id={session_id}, estado={sesion_actualizada.estado}")
             _sesiones[session_id] = sesion_actualizada
-            logger.info(f"✓ Sesión actualizada en _sesiones")
+            # logger.info(f"✓ Sesión actualizada en _sesiones")
 
         # Ejecutar extracción pasando la sesión y el callback
         await extractor.extraer_listado_completo(
@@ -146,6 +152,13 @@ async def _ejecutar_extraccion_background(
             sesion.comparacion = comparacion
             _sesiones[session_id] = sesion
 
+    except asyncio.CancelledError:
+        logger.info(f"🛑 Extracción cancelada: {session_id}")
+        if session_id in _sesiones:
+            _sesiones[session_id].estado = "cancelado"
+            _sesiones[session_id].mensaje = "Extracción cancelada por el usuario"
+            # Asegurar que se guarde el estado final
+            
     except Exception as e:
         # Capturar y loguear el traceback completo
         tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -155,27 +168,25 @@ async def _ejecutar_extraccion_background(
         if session_id in _sesiones:
             _sesiones[session_id].estado = "error"
             _sesiones[session_id].mensaje = f"Error en extracción: {str(e)}"
+    finally:
+        # Limpiar tarea del registro
+        if session_id in _tasks:
+            del _tasks[session_id]
 
 
 @router.post("/listado", response_model=ListadoResponse)
 async def extraer_listado_completo(
     request: ListadoRequest,
-    background_tasks: BackgroundTasks,
+    # background_tasks: BackgroundTasks, # Ya no usamos BackgroundTasks de FastAPI para poder cancelar
 ) -> ListadoResponse:
     """
     Extrae el listado completo de expedientes del PJN.
 
     Flujo:
     1. Crea sesión inicial y la guarda en _sesiones
-    2. Inicia extracción en background task
+    2. Inicia extracción en background task (asyncio.create_task)
     3. Retorna inmediatamente con session_id
     4. El frontend hace polling a /sesion/{session_id} para obtener progreso
-
-    Args:
-        request: Configuración de extracción y fecha de corte opcional
-
-    Returns:
-        ListadoResponse con session_id y estado inicial
     """
     try:
         # Obtener credenciales
@@ -205,15 +216,17 @@ async def extraer_listado_completo(
         # Guardar sesión
         _sesiones[session_id] = sesion
 
-        # Ejecutar extracción en background
-        background_tasks.add_task(
-            _ejecutar_extraccion_background,
-            session_id,
-            username,
-            password,
-            config,
-            request.fecha_corte,
+        # Ejecutar extracción en background (Task controlable)
+        task = asyncio.create_task(
+            _ejecutar_extraccion_background(
+                session_id,
+                username,
+                password,
+                config,
+                request.fecha_corte,
+            )
         )
+        _tasks[session_id] = task
 
         return ListadoResponse(
             session_id=session_id,
@@ -305,6 +318,12 @@ async def _ejecutar_procesamiento_background(
             _sesiones[session_id].mensaje = f"Procesados {resumen.exitosos}/{resumen.total} expedientes"
             _sesiones[session_id].archivos_descargados = resumen.archivos_descargados
 
+    except asyncio.CancelledError:
+        logger.info(f"🛑 Procesamiento cancelado: {session_id}")
+        if session_id in _sesiones:
+            _sesiones[session_id].estado = "cancelado"
+            _sesiones[session_id].mensaje = "Procesamiento cancelado por el usuario"
+
     except Exception as e:
         # Capturar y loguear el traceback completo
         tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
@@ -314,27 +333,18 @@ async def _ejecutar_procesamiento_background(
         if session_id in _sesiones:
             _sesiones[session_id].estado = "error"
             _sesiones[session_id].mensaje = f"Error en procesamiento: {str(e)}"
+    finally:
+        if session_id in _tasks:
+            del _tasks[session_id]
 
 
 @router.post("/procesar-seleccionados", response_model=ProcesarSeleccionadosResponse)
 async def procesar_expedientes_seleccionados(
     request: ProcesarSeleccionadosRequest,
-    background_tasks: BackgroundTasks,
+    # background_tasks: BackgroundTasks,
 ) -> ProcesarSeleccionadosResponse:
     """
     Procesa SOLO los expedientes seleccionados por el usuario.
-
-    Flujo:
-    1. Crea sesión inicial y la guarda en _sesiones
-    2. Inicia procesamiento en background task
-    3. Retorna inmediatamente con session_id
-    4. El frontend hace polling a /sesion/{session_id} para obtener progreso
-
-    Args:
-        request: Lista de números de expediente a procesar
-
-    Returns:
-        ProcesarSeleccionadosResponse con session_id y estado inicial
     """
     try:
         # Obtener credenciales
@@ -368,16 +378,18 @@ async def procesar_expedientes_seleccionados(
         # Guardar sesión
         _sesiones[session_id] = sesion
 
-        # Ejecutar procesamiento en background
-        background_tasks.add_task(
-            _ejecutar_procesamiento_background,
-            session_id,
-            request.numeros_expedientes,
-            username,
-            password,
-            config,
-            expediente_repo,
+        # Ejecutar procesamiento en background (Task controlable)
+        task = asyncio.create_task(
+            _ejecutar_procesamiento_background(
+                session_id,
+                request.numeros_expedientes,
+                username,
+                password,
+                config,
+                expediente_repo,
+            )
         )
+        _tasks[session_id] = task
 
         return ProcesarSeleccionadosResponse(
             session_id=session_id,
@@ -396,6 +408,72 @@ async def procesar_expedientes_seleccionados(
             status_code=500,
             detail=f"Error al iniciar procesamiento: {str(e)}"
         )
+
+
+@router.post("/cancelar/{session_id}")
+async def cancelar_sesion(session_id: str):
+    """Cancela una sesión de extracción o procesamiento en curso."""
+    if session_id not in _sesiones:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    
+    if session_id in _tasks:
+        task = _tasks[session_id]
+        if not task.done():
+            task.cancel()
+            return {"mensaje": "Cancelación solicitada"}
+    
+    return {"mensaje": "La sesión no estaba activa o ya finalizó"}
+
+
+@router.post("/pausar/{session_id}")
+async def pausar_sesion(session_id: str):
+    """Pausa una sesión (No implementado)."""
+    raise HTTPException(status_code=501, detail="Pausa no implementada aún")
+
+
+@router.post("/reanudar/{session_id}")
+async def reanudar_sesion(session_id: str):
+    """Reanuda una sesión (No implementado)."""
+    raise HTTPException(status_code=501, detail="Reanudación no implementada aún")
+
+
+@router.websocket("/sesion/{session_id}/ws")
+async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    """Endpoint WebSocket para monitoreo en tiempo real."""
+    await websocket.accept()
+    try:
+        if session_id not in _sesiones:
+            await websocket.close(code=4004, reason="Sesión no encontrada")
+            return
+
+        # Loop de envío de estado
+        while True:
+            sesion = _sesiones.get(session_id)
+            if sesion:
+                await websocket.send_json(sesion.to_dict())
+                
+                # Si terminó, cerrar conexión limpiamente
+                if sesion.estado in ["completado", "error", "cancelado", "error_agotado"]:
+                    # Esperar un poco para asegurar que el cliente reciba el último estado
+                    await asyncio.sleep(1) 
+                    await websocket.close(code=1000, reason="Proceso finalizado")
+                    break
+            else:
+                await websocket.close(code=4004, reason="Sesión desapareció")
+                break
+            
+            # Polling cada 500ms
+            await asyncio.sleep(0.5)
+            
+    except WebSocketDisconnect:
+        # Cliente se desconectó
+        pass
+    except Exception as e:
+        logger.error(f"Error en WebSocket {session_id}: {e}")
+        try:
+            await websocket.close(code=1011, reason=f"Error interno: {str(e)}")
+        except:
+            pass
 
 
 @router.get("/sesion/{session_id}", response_model=dict)
@@ -472,3 +550,61 @@ async def obtener_expedientes_listado(session_id: str) -> dict:
             status_code=500,
             detail=f"Error al cargar listado: {str(e)}"
         )
+
+
+@router.get("/base", response_model=dict)
+async def obtener_listado_base():
+    """
+    Obtener el listado base de expedientes (última extracción completa).
+    """
+    try:
+        from infrastructure.config import get_settings
+        settings = get_settings()
+        
+        # Directorio de listados
+        # Usar settings.storage.base_path / "extraccion_masiva" / "listados"
+        # Ojo: settings.storage.base_path apunta a "data"
+        listados_dir = settings.storage.base_path / "extraccion_masiva" / "listados"
+        
+        # Instanciar extractor solo para usar sus métodos de carga
+        extractor = ExtractorMasivo()
+        
+        # Buscar listado_base.json
+        base_path = listados_dir / "listado_base.json"
+        
+        if not base_path.exists():
+             # Fallback: buscar el más reciente
+             if not listados_dir.exists():
+                 raise HTTPException(status_code=404, detail="No hay directorio de listados")
+                 
+             archivos = sorted(listados_dir.glob("listado_*.json"), reverse=True)
+             if not archivos:
+                 raise HTTPException(status_code=404, detail="No hay listados disponibles")
+             base_path = archivos[0]
+             
+        resultado = extractor.cargar_listado(str(base_path))
+        
+        # Verificar existencia en BD
+        if resultado and "expedientes" in resultado:
+            try:
+                repo = get_container().expediente_repo
+                numeros = [e["numero"] for e in resultado["expedientes"] if "numero" in e]
+                
+                # Usar el nuevo método optimizado
+                existentes = await repo.verificar_existencia_masiva(numeros)
+                
+                # Marcar expedientes
+                for exp in resultado["expedientes"]:
+                    if exp.get("numero") in existentes:
+                        exp["ya_agregado"] = True
+            except Exception as e:
+                logger.warning(f"Error verificando existencia en BD: {e}")
+                # No fallar si la BD no está disponible, solo no marcar como agregados
+        
+        return resultado
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al obtener listado base: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")

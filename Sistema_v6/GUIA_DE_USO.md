@@ -7,7 +7,7 @@ Esta guía te muestra cómo ejecutar y usar el Sistema PJN v6 de forma práctica
 El sistema funciona correctamente si este comando muestra la información:
 
 ```bash
-cd "F:\RESPALDO DAVID\Sistema_v2\Sistema_v6"
+cd "ruta/al/proyecto/Sistema_v6"
 python -m presentation.cli.main info
 ```
 
@@ -18,7 +18,7 @@ python -m presentation.cli.main info
 La forma más simple de ver todo el sistema en acción:
 
 ```bash
-cd "F:\RESPALDO DAVID\Sistema_v2\Sistema_v6"
+cd "ruta/al/proyecto/Sistema_v6"
 python ejecutar_ejemplo.py
 ```
 
@@ -78,7 +78,7 @@ python -m presentation.cli.main monitorear \
 
 #### Iniciar servidor:
 ```bash
-cd "F:\RESPALDO DAVID\Sistema_v2\Sistema_v6"
+cd "ruta/al/proyecto/Sistema_v6"
 uvicorn presentation.api.rest.main:app --reload
 ```
 
@@ -256,7 +256,7 @@ ls -la data/
 
 **Solución:** Ejecuta desde el directorio correcto:
 ```bash
-cd "F:\RESPALDO DAVID\Sistema_v2\Sistema_v6"
+cd "ruta/al/proyecto/Sistema_v6"
 python ejecutar_ejemplo.py
 ```
 
@@ -319,7 +319,7 @@ import sys
 from pathlib import Path
 
 # Agregar Sistema_v6 al path
-sys.path.insert(0, str(Path("F:/RESPALDO DAVID/Sistema_v2/Sistema_v6")))
+sys.path.insert(0, str(Path("ruta/al/proyecto/Sistema_v6")))
 
 from infrastructure.di_container import get_container
 

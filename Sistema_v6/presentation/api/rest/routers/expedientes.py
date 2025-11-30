@@ -6,9 +6,9 @@ import json
 import logging
 import math
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Annotated
 
-from fastapi import APIRouter, HTTPException, status, Request, Query
+from fastapi import APIRouter, HTTPException, status, Request, Query, Body
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -86,11 +86,11 @@ def _get_db_connection():
 
 @router.post("/extraer", response_model=ExtraerExpedientesResponse, status_code=status.HTTP_200_OK)
 @limiter.limit("5/minute")
-async def extraer_expedientes(request: Request, data: ExtraerExpedientesRequest):
+async def extraer_expedientes(request: Request):
     """Extrae la lista completa de expedientes del PJN.
 
     Args:
-        request: Datos de la petición
+        request: Request object for rate limiting and body parsing
 
     Returns:
         ExtraerExpedientesResponse con resultado
@@ -98,6 +98,11 @@ async def extraer_expedientes(request: Request, data: ExtraerExpedientesRequest)
     Raises:
         HTTPException: Si hay error en la extracción
     """
+    try:
+        body = await request.json()
+        data = ExtraerExpedientesRequest(**body)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Invalid request body: {str(e)}")
     logger.info("POST /expedientes/extraer")
 
     try:
