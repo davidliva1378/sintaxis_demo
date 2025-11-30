@@ -17,7 +17,7 @@ import asyncio
 import logging
 from datetime import datetime, time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -56,6 +56,7 @@ class MonitorSchedulerService:
         json_sistema_path: Path,
         workspaces_dir: Path,
         monitoreo_service: "MonitoreoService | None" = None,
+        notification_service: Any = None,
     ):
         """Inicializa el servicio de scheduler.
 
@@ -65,12 +66,14 @@ class MonitorSchedulerService:
             json_sistema_path: Ruta al JSON sistema
             workspaces_dir: Directorio base de workspaces
             monitoreo_service: Servicio de monitoreo para registrar cambios (opcional)
+            notification_service: Servicio de notificaciones (WebSocket) (opcional)
         """
         self._use_case = monitorear_use_case
         self._config = config
         self._json_sistema_path = json_sistema_path
         self._workspaces_dir = workspaces_dir
         self._monitoreo_service = monitoreo_service
+        self._notification_service = notification_service
 
         # Scheduler
         self.scheduler = AsyncIOScheduler()
@@ -102,6 +105,8 @@ class MonitorSchedulerService:
             await self._programar_expedientes()
 
         logger.info("MonitorSchedulerService iniciado correctamente")
+        if self._notification_service:
+            await self._notification_service.broadcast({"type": "scheduler_status", "status": "started"})
 
     async def stop(self) -> None:
         """Detiene el scheduler y limpia los jobs.
@@ -134,6 +139,8 @@ class MonitorSchedulerService:
         self._job_expedientes = None
 
         logger.info("MonitorSchedulerService detenido")
+        if self._notification_service:
+            await self._notification_service.broadcast({"type": "scheduler_status", "status": "stopped"})
 
     async def _programar_expedientes(self) -> None:
         """Programa el job de monitoreo de expedientes.
@@ -180,6 +187,8 @@ class MonitorSchedulerService:
 
         try:
             logger.info("=== Ejecutando verificación programada de expedientes ===")
+            if self._notification_service:
+                await self._notification_service.broadcast({"type": "verificacion_inicio"})
 
             # Crear comando
             from application.dtos import MonitorearExpedientesCommand
@@ -315,6 +324,14 @@ class MonitorSchedulerService:
                     f"Error en verificación (duración: {duracion:.2f}s): "
                     f"{resultado.error}"
                 )
+
+            if self._notification_service:
+                await self._notification_service.broadcast({
+                    "type": "verificacion_fin",
+                    "success": resultado.success,
+                    "cambios": response.total_cambios if resultado.success else 0,
+                    "duracion": duracion
+                })
 
             # Re-programar si cambió el intervalo (horario laboral <-> no laboral)
             await self._verificar_y_actualizar_intervalo()

@@ -7,7 +7,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, WebSocket
+from fastapi.responses import StreamingResponse
+import io
+from ..websocket.monitoreo_ws import websocket_monitoreo_endpoint
 
 from application.dtos import MonitorearExpedientesCommand
 from infrastructure.di_container import get_container
@@ -131,7 +134,9 @@ async def iniciar_monitoreo(request: IniciarMonitoreoRequest):
 
 
 @router.post("/start", response_model=StartSchedulerResponse, status_code=status.HTTP_200_OK)
-async def iniciar_scheduler():
+async def iniciar_scheduler(
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+):
     """Inicia el scheduler de monitoreo continuo.
 
     El scheduler ejecutará verificaciones periódicas según la configuración
@@ -158,6 +163,10 @@ async def iniciar_scheduler():
         # Iniciar scheduler
         await scheduler.start()
 
+        # Actualizar estado en BD
+        service = _get_service()
+        service.actualizar_configuracion(current_user.id, activo=True)
+
         intervalo = scheduler.obtener_estado()["intervalo_actual_minutos"]
 
         return StartSchedulerResponse(
@@ -176,12 +185,17 @@ async def iniciar_scheduler():
         logger.exception("Error inesperado al iniciar scheduler")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error interno: {str(e)}",
+            detail=f"Error interno: {str(e)}"
         )
 
 
+
+
+
 @router.post("/stop", response_model=StopSchedulerResponse, status_code=status.HTTP_200_OK)
-async def detener_scheduler():
+async def detener_scheduler(
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+):
     """Detiene el scheduler de monitoreo continuo.
 
     Espera a que termine cualquier verificación en curso antes de detener.
@@ -205,13 +219,17 @@ async def detener_scheduler():
         # Detener scheduler
         await scheduler.stop()
 
+        # Actualizar estado en BD
+        service = _get_service()
+        service.actualizar_configuracion(current_user.id, activo=False)
+
         return StopSchedulerResponse(success=True, mensaje="Scheduler detenido correctamente")
 
     except Exception as e:
         logger.exception("Error inesperado al detener scheduler")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error interno: {str(e)}",
+            detail=f"Error interno: {str(e)}"
         )
 
 
@@ -313,50 +331,11 @@ def _get_service() -> MonitoreoService:
     return MonitoreoService()
 
 
-# Dependencia opcional para autenticación (fallback a usuario_id=1 para desarrollo)
-async def get_optional_current_user(
-    token: Annotated[Optional[str], Depends(oauth2_scheme)] = None
-) -> Optional[Usuario]:
-    """Obtiene el usuario actual si está autenticado, None si no."""
-    if token is None:
-        return None
-    try:
-        from .auth import get_current_user
-        from sqlalchemy.orm import Session
-        from infrastructure.persistence.database import get_db
-
-        # Crear sesión para validar token
-        db = next(get_db())
-        try:
-            return await get_current_user(token, db)
-        finally:
-            db.close()
-    except Exception:
-        return None
-
-
-def _get_usuario_id_from_user(user: Optional[Usuario]) -> int:
-    """Obtiene el usuario_id del usuario o fallback a 1 para desarrollo."""
-    if user is not None:
-        return user.id
-    # Fallback para desarrollo sin autenticación
-    return 1
-
-
-def _get_usuario_id() -> int:
-    """Fallback a usuario_id=1 para desarrollo.
-
-    NOTA: Esta función es temporal mientras no se implementa
-    autenticación completa en todos los endpoints.
-    """
-    return 1
-
-
 # --- CONFIGURACION ---
 
 @router.get("/configuracion", response_model=ConfiguracionMonitoreoResponse)
 async def obtener_configuracion(
-    current_user: Annotated[Optional[Usuario], Depends(get_optional_current_user)] = None
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
 ):
     """Obtiene la configuración de monitoreo del usuario.
 
@@ -371,7 +350,7 @@ async def obtener_configuracion(
     logger.info("GET /monitoreo/configuracion")
     try:
         service = _get_service()
-        usuario_id = _get_usuario_id_from_user(current_user)
+        usuario_id = current_user.id
 
         logger.debug(f"Obteniendo configuracion para usuario_id={usuario_id}")
 
@@ -411,13 +390,13 @@ async def obtener_configuracion(
 @router.put("/configuracion", response_model=ConfiguracionMonitoreoResponse)
 async def actualizar_configuracion(
     request: ActualizarConfiguracionRequest,
-    current_user: Annotated[Optional[Usuario], Depends(get_optional_current_user)] = None
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
 ):
     """Actualiza la configuración de monitoreo del usuario."""
     logger.info("PUT /monitoreo/configuracion")
     try:
         service = _get_service()
-        usuario_id = _get_usuario_id_from_user(current_user)
+        usuario_id = current_user.id
 
         logger.info(f"Actualizando configuración para usuario_id={usuario_id}")
         logger.debug(f"Datos recibidos: activo={request.activo}, frecuencia={request.frecuencia}, "
@@ -493,12 +472,14 @@ async def actualizar_configuracion(
         logger.exception("Error actualizando configuración")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 # --- EXPEDIENTES MONITOREADOS ---
 
 @router.get("/expedientes", response_model=ListaExpedientesResponse)
 async def listar_expedientes(
+    current_user: Annotated[Usuario, Depends(get_current_active_user)],
     solo_activos: bool = False,
+    prioridad: str | None = None,
+    busqueda: str | None = None,
     pagina: int = 1,
     por_pagina: int = 50
 ):
@@ -509,6 +490,8 @@ async def listar_expedientes(
         resultado = service.listar_expedientes(
             usuario_id=None,  # None para ver todos los expedientes (modo compartido)
             solo_activos=solo_activos,
+            prioridad=prioridad,
+            busqueda=busqueda,
             pagina=pagina,
             por_pagina=por_pagina
         )
@@ -524,14 +507,51 @@ async def listar_expedientes(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/exportar")
+async def exportar_expedientes(
+    current_user: Annotated[Usuario, Depends(get_current_active_user)],
+    solo_activos: bool = False,
+    prioridad: str | None = None,
+    busqueda: str | None = None,
+    formato: str = 'csv'
+):
+    """Exporta los expedientes monitoreados."""
+    logger.info(f"GET /monitoreo/exportar?formato={formato}")
+    try:
+        service = _get_service()
+        contenido = service.exportar_expedientes(
+            usuario_id=None,
+            solo_activos=solo_activos,
+            prioridad=prioridad,
+            busqueda=busqueda,
+            formato=formato
+        )
+
+        if formato == 'csv':
+            return StreamingResponse(
+                io.StringIO(contenido),
+                media_type="text/csv",
+                headers={"Content-Disposition": f"attachment; filename=monitoreo_expedientes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
+            )
+
+        raise HTTPException(status_code=400, detail="Formato no soportado")
+
+    except Exception as e:
+        logger.exception("Error exportando expedientes")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/expedientes", response_model=ExpedienteMonitoreado, status_code=201)
-async def agregar_expediente(request: AgregarExpedienteRequest):
+async def agregar_expediente(
+    request: AgregarExpedienteRequest,
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+):
     """Agrega un expediente al monitoreo."""
     logger.info(f"POST /monitoreo/expedientes - {request.expediente_numero}")
     try:
         service = _get_service()
         exp = service.agregar_expediente(
-            usuario_id=_get_usuario_id(),
+            usuario_id=current_user.id,
             expediente_numero=request.expediente_numero,
             expediente_caratula=request.expediente_caratula,
             expediente_dependencia=request.expediente_dependencia,
@@ -547,12 +567,15 @@ async def agregar_expediente(request: AgregarExpedienteRequest):
 
 
 @router.get("/expedientes/{expediente_numero}", response_model=ExpedienteMonitoreado)
-async def obtener_expediente(expediente_numero: str):
+async def obtener_expediente(
+    expediente_numero: str,
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+):
     """Obtiene un expediente monitoreado específico."""
     logger.info(f"GET /monitoreo/expedientes/{expediente_numero}")
     try:
         service = _get_service()
-        exp = service.obtener_expediente(_get_usuario_id(), expediente_numero)
+        exp = service.obtener_expediente(current_user.id, expediente_numero)
         if not exp:
             raise HTTPException(status_code=404, detail="Expediente no encontrado")
         return ExpedienteMonitoreado(**exp)
@@ -564,13 +587,17 @@ async def obtener_expediente(expediente_numero: str):
 
 
 @router.put("/expedientes/{expediente_numero}", response_model=ExpedienteMonitoreado)
-async def actualizar_expediente(expediente_numero: str, request: ActualizarExpedienteRequest):
+async def actualizar_expediente(
+    expediente_numero: str,
+    request: ActualizarExpedienteRequest,
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+):
     """Actualiza un expediente monitoreado."""
     logger.info(f"PUT /monitoreo/expedientes/{expediente_numero}")
     try:
         service = _get_service()
         exp = service.actualizar_expediente(
-            usuario_id=_get_usuario_id(),
+            usuario_id=current_user.id,
             expediente_numero=expediente_numero,
             activo=request.activo,
             prioridad=request.prioridad,
@@ -587,12 +614,15 @@ async def actualizar_expediente(expediente_numero: str, request: ActualizarExped
 
 
 @router.delete("/expedientes/{expediente_numero}")
-async def eliminar_expediente(expediente_numero: str):
+async def eliminar_expediente(
+    expediente_numero: str,
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+):
     """Elimina un expediente del monitoreo."""
     logger.info(f"DELETE /monitoreo/expedientes/{expediente_numero}")
     try:
         service = _get_service()
-        deleted = service.eliminar_expediente(_get_usuario_id(), expediente_numero)
+        deleted = service.eliminar_expediente(current_user.id, expediente_numero)
         if not deleted:
             raise HTTPException(status_code=404, detail="Expediente no encontrado")
         return {"success": True, "mensaje": f"Expediente {expediente_numero} eliminado"}
@@ -604,12 +634,15 @@ async def eliminar_expediente(expediente_numero: str):
 
 
 @router.post("/expedientes/{expediente_numero}/pausar", response_model=ExpedienteMonitoreado)
-async def pausar_expediente(expediente_numero: str):
+async def pausar_expediente(
+    expediente_numero: str,
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+):
     """Pausa el monitoreo de un expediente."""
     logger.info(f"POST /monitoreo/expedientes/{expediente_numero}/pausar")
     try:
         service = _get_service()
-        exp = service.pausar_expediente(_get_usuario_id(), expediente_numero)
+        exp = service.pausar_expediente(current_user.id, expediente_numero)
         if not exp:
             raise HTTPException(status_code=404, detail="Expediente no encontrado")
         return ExpedienteMonitoreado(**exp)
@@ -621,12 +654,15 @@ async def pausar_expediente(expediente_numero: str):
 
 
 @router.post("/expedientes/{expediente_numero}/reanudar", response_model=ExpedienteMonitoreado)
-async def reanudar_expediente(expediente_numero: str):
+async def reanudar_expediente(
+    expediente_numero: str,
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+):
     """Reanuda el monitoreo de un expediente."""
     logger.info(f"POST /monitoreo/expedientes/{expediente_numero}/reanudar")
     try:
         service = _get_service()
-        exp = service.reanudar_expediente(_get_usuario_id(), expediente_numero)
+        exp = service.reanudar_expediente(current_user.id, expediente_numero)
         if not exp:
             raise HTTPException(status_code=404, detail="Expediente no encontrado")
         return ExpedienteMonitoreado(**exp)
@@ -638,7 +674,9 @@ async def reanudar_expediente(expediente_numero: str):
 
 
 @router.post("/sincronizar")
-async def sincronizar_expedientes():
+async def sincronizar_expedientes(
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+):
     """Sincroniza todos los expedientes del sistema principal con el monitoreo.
 
     Este endpoint registra automáticamente todos los expedientes que están
@@ -665,7 +703,7 @@ async def sincronizar_expedientes():
 
         # Obtener servicio de monitoreo
         service = _get_service()
-        usuario_id = _get_usuario_id()
+        usuario_id = current_user.id
 
         nuevos = 0
         ya_existentes = 0
@@ -713,6 +751,7 @@ async def sincronizar_expedientes():
 
 @router.get("/cambios", response_model=ListaCambiosResponse)
 async def listar_cambios(
+    current_user: Annotated[Usuario, Depends(get_current_active_user)],
     solo_no_leidos: bool = False,
     tipo_cambio: str | None = None,
     expediente_numero: str | None = None,
@@ -724,7 +763,7 @@ async def listar_cambios(
     try:
         service = _get_service()
         resultado = service.listar_cambios(
-            usuario_id=_get_usuario_id(),
+            usuario_id=current_user.id,
             solo_no_leidos=solo_no_leidos,
             tipo_cambio=tipo_cambio,
             expediente_numero=expediente_numero,
@@ -738,7 +777,10 @@ async def listar_cambios(
 
 
 @router.post("/cambios/{cambio_id}/marcar-leido", response_model=MarcarLeidoResponse)
-async def marcar_cambio_leido(cambio_id: int):
+async def marcar_cambio_leido(
+    cambio_id: int,
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+):
     """Marca un cambio como leído."""
     logger.info(f"POST /monitoreo/cambios/{cambio_id}/marcar-leido")
     try:
@@ -751,12 +793,14 @@ async def marcar_cambio_leido(cambio_id: int):
 
 
 @router.post("/cambios/marcar-todos-leidos", response_model=MarcarLeidoResponse)
-async def marcar_todos_leidos():
+async def marcar_todos_leidos(
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+):
     """Marca todos los cambios como leídos."""
     logger.info("POST /monitoreo/cambios/marcar-todos-leidos")
     try:
         service = _get_service()
-        cantidad = service.marcar_todos_leidos(_get_usuario_id())
+        cantidad = service.marcar_todos_leidos(current_user.id)
         return MarcarLeidoResponse(success=True, cantidad_marcados=cantidad)
     except Exception as e:
         logger.exception("Error marcando todos leídos")
@@ -766,13 +810,21 @@ async def marcar_todos_leidos():
 # --- ESTADISTICAS ---
 
 @router.get("/estadisticas", response_model=EstadisticasMonitoreoResponse)
-async def obtener_estadisticas():
+async def obtener_estadisticas(
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+):
     """Obtiene estadísticas del monitoreo."""
     logger.info("GET /monitoreo/estadisticas")
     try:
         service = _get_service()
-        stats = service.obtener_estadisticas(_get_usuario_id())
+        stats = service.obtener_estadisticas(current_user.id)
         return EstadisticasMonitoreoResponse(**stats)
     except Exception as e:
         logger.exception("Error obteniendo estadísticas")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.websocket("/ws/{usuario_id}")
+async def websocket_endpoint(websocket: WebSocket, usuario_id: int):
+    """Endpoint WebSocket para monitoreo en tiempo real."""
+    await websocket_monitoreo_endpoint(websocket, usuario_id)

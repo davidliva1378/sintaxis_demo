@@ -175,6 +175,8 @@ class MonitoreoService:
         self,
         usuario_id: Optional[int] = None,
         solo_activos: bool = False,
+        prioridad: Optional[str] = None,
+        busqueda: Optional[str] = None,
         pagina: int = 1,
         por_pagina: int = 50
     ) -> Dict[str, Any]:
@@ -199,10 +201,17 @@ class MonitoreoService:
         expedientes = self._repo.obtener_expedientes(
             usuario_id=usuario_id,
             solo_activos=solo_activos,
+            prioridad=prioridad,
+            busqueda=busqueda,
             limit=por_pagina,
             offset=offset
         )
-        total = self._repo.contar_expedientes(usuario_id, solo_activos)
+        total = self._repo.contar_expedientes(
+            usuario_id=usuario_id, 
+            solo_activos=solo_activos,
+            prioridad=prioridad,
+            busqueda=busqueda
+        )
 
         return {
             'expedientes': expedientes,
@@ -460,3 +469,64 @@ class MonitoreoService:
             usuario_id=usuario_id,
             solo_activos=True
         )
+
+    def exportar_expedientes(
+        self,
+        usuario_id: Optional[int] = None,
+        solo_activos: bool = False,
+        prioridad: Optional[str] = None,
+        busqueda: Optional[str] = None,
+        formato: str = 'csv'
+    ) -> str:
+        """
+        Exporta los expedientes monitoreados a CSV.
+
+        Args:
+            usuario_id: ID del usuario (opcional)
+            solo_activos: Filtrar solo activos
+            prioridad: Filtrar por prioridad
+            busqueda: Filtrar por búsqueda
+            formato: Formato de exportación ('csv')
+
+        Returns:
+            Contenido del archivo exportado
+        """
+        # Obtener todos (limit alto para traer todo)
+        expedientes = self._repo.obtener_expedientes(
+            usuario_id=usuario_id,
+            solo_activos=solo_activos,
+            prioridad=prioridad,
+            busqueda=busqueda,
+            limit=100000,
+            offset=0
+        )
+
+        if formato == 'csv':
+            import csv
+            import io
+
+            output = io.StringIO()
+            writer = csv.writer(output)
+
+            # Headers
+            writer.writerow([
+                'Expediente', 'Carátula', 'Dependencia', 'Estado',
+                'Prioridad', 'Última Verificación', 'Cambios Detectados', 'Notas'
+            ])
+
+            for exp in expedientes:
+                writer.writerow([
+                    exp['expediente_numero'],
+                    exp.get('expediente_caratula', ''),
+                    exp.get('expediente_dependencia', ''),
+                    'Activo' if exp['activo'] else 'Pausado',
+                    exp['prioridad'],
+                    exp.get('ultima_verificacion', ''),
+                    exp['total_cambios_detectados'],
+                    exp.get('notas', '')
+                ])
+
+            return output.getvalue()
+
+        raise ValueError(f"Formato {formato} no soportado")
+

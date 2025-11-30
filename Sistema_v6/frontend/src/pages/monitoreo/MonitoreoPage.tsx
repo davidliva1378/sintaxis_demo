@@ -3,11 +3,15 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Activity, Play, Pause, Plus, Bell, Clock, TrendingUp, AlertCircle, Settings, RefreshCw } from 'lucide-react'
+import { Activity, Play, Pause, Plus, Bell, Clock, TrendingUp, AlertCircle, Settings, RefreshCw, Download } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { useMonitoreoStore } from '@/stores/monitoreoStore'
 import MonitoreoCard from '@/components/monitoreo/MonitoreoCard'
 import LogsList from '@/components/monitoreo/LogsList'
@@ -31,6 +35,13 @@ export default function MonitoreoPage() {
     removerExpediente,
     verificarExpediente,
     listarCambios,
+    connectWebSocket,
+    disconnectWebSocket,
+    filtros,
+    setFiltros,
+    paginacion,
+    cambiarPagina,
+    exportarReporte,
   } = useMonitoreoStore()
 
   const [showChanges, setShowChanges] = useState(false)
@@ -42,24 +53,15 @@ export default function MonitoreoPage() {
     listarExpedientes()
     obtenerEstadisticas()
     listarCambios() // Cargar cambios globales al iniciar
-  }, [obtenerConfiguracion, listarExpedientes, obtenerEstadisticas, listarCambios])
-
-  // Polling: actualizar estado del scheduler cada 10 segundos
-  useEffect(() => {
-    // Actualizar inmediatamente
-    obtenerEstadisticas()
     obtenerEstadoScheduler()
 
-    // Configurar polling
-    const interval = setInterval(() => {
-      obtenerEstadisticas()
-      obtenerEstadoScheduler()
-      listarExpedientes() // Recargar expedientes para actualizar "última verificación"
-    }, 10000) // 10 segundos
+    // Conectar WebSocket
+    connectWebSocket()
 
-    // Cleanup al desmontar
-    return () => clearInterval(interval)
-  }, [obtenerEstadisticas, obtenerEstadoScheduler, listarExpedientes])
+    return () => {
+      disconnectWebSocket()
+    }
+  }, [obtenerConfiguracion, listarExpedientes, obtenerEstadisticas, listarCambios, obtenerEstadoScheduler, connectWebSocket, disconnectWebSocket])
 
   const handleToggleMonitoreo = async () => {
     if (configuracion) {
@@ -151,6 +153,22 @@ export default function MonitoreoPage() {
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isVerifyingGlobal ? 'animate-spin' : ''}`} />
             {isVerifyingGlobal ? 'Verificando...' : 'Verificar Ahora'}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => useMonitoreoStore.getState().sincronizarExpedientes()}
+            disabled={isVerifyingGlobal}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Sincronizar Todo
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => exportarReporte()}
+            disabled={expedientes.length === 0}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Exportar
           </Button>
           <Link to="/settings">
             <Button variant="outline">
@@ -379,40 +397,119 @@ export default function MonitoreoPage() {
       </div>
 
       {/* Contenido de tabs */}
+      {/* Contenido de tabs */}
       {!showChanges ? (
         /* Tab: Expedientes Monitoreados */
-        expedientes.length === 0 ? (
-          <Card className="p-12">
-            <div className="text-center">
-              <Activity className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                No hay expedientes monitoreados
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                Agrega expedientes al monitoreo desde el módulo de Expedientes para recibir
-                notificaciones automáticas cuando haya cambios
-              </p>
-              <Button onClick={() => window.location.href = '/expedientes'}>
-                <Plus className="h-4 w-4 mr-2" />
-                Ir a Expedientes
-              </Button>
-            </div>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {expedientes.map(expediente => (
-              <MonitoreoCard
-                key={expediente.id}
-                expediente={expediente}
-                ejecutando={estadoScheduler?.ejecutando || false}
-                onToggle={handleToggleExpediente}
-                onRemove={handleRemoverExpediente}
-                onVerify={handleVerificarExpediente}
-                onViewChanges={handleViewChanges}
+        <>
+          {/* Filtros */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6 items-end">
+            <div className="flex-1 w-full">
+              <Label htmlFor="search" className="mb-2 block">Buscar</Label>
+              <Input
+                id="search"
+                placeholder="Buscar por número o carátula..."
+                value={filtros.busqueda || ''}
+                onChange={(e) => setFiltros({ busqueda: e.target.value })}
               />
-            ))}
+            </div>
+            <div className="w-full md:w-[200px]">
+              <Label htmlFor="prioridad" className="mb-2 block">Prioridad</Label>
+              <Select
+                value={filtros.prioridad || 'todas'}
+                onValueChange={(val) => setFiltros({ prioridad: val === 'todas' ? undefined : val })}
+              >
+                <SelectTrigger id="prioridad">
+                  <SelectValue placeholder="Prioridad" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  <SelectItem value="alta">Alta</SelectItem>
+                  <SelectItem value="media">Media</SelectItem>
+                  <SelectItem value="baja">Baja</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center space-x-2 pb-2">
+              <Switch
+                id="solo-activos"
+                checked={filtros.soloActivos}
+                onCheckedChange={(checked) => setFiltros({ soloActivos: checked })}
+              />
+              <Label htmlFor="solo-activos">Solo Activos</Label>
+            </div>
           </div>
-        )
+
+          {expedientes.length === 0 ? (
+            <Card className="p-12">
+              <div className="text-center">
+                <Activity className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  No hay expedientes monitoreados
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                  Agrega expedientes al monitoreo desde el módulo de Expedientes para recibir
+                  notificaciones automáticas cuando haya cambios
+                </p>
+                <Button onClick={() => window.location.href = '/expedientes'}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ir a Expedientes
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {expedientes.map(expediente => (
+                  <MonitoreoCard
+                    key={expediente.id}
+                    expediente={expediente}
+                    ejecutando={estadoScheduler?.ejecutando || false}
+                    onToggle={handleToggleExpediente}
+                    onRemove={handleRemoverExpediente}
+                    onVerify={handleVerificarExpediente}
+                    onViewChanges={handleViewChanges}
+                  />
+                ))}
+              </div>
+
+              {/* Paginación */}
+              {paginacion.totalPaginas > 1 && (
+                <div className="flex items-center justify-between mt-6">
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    Mostrando {((paginacion.pagina - 1) * paginacion.porPagina) + 1} a {Math.min(paginacion.pagina * paginacion.porPagina, paginacion.total)} de {paginacion.total} expedientes
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => cambiarPagina(paginacion.pagina - 1)}
+                      disabled={paginacion.pagina === 1}
+                    >
+                      Anterior
+                    </Button>
+                    <div className="flex items-center px-2 text-sm font-medium text-gray-900 dark:text-white">
+                      Página {paginacion.pagina} de {paginacion.totalPaginas}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => cambiarPagina(paginacion.pagina + 1)}
+                      disabled={paginacion.pagina === paginacion.totalPaginas}
+                    >
+                      Siguiente
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {expedientes.length === 0 && (
+                <div className="text-center py-10 text-gray-500">
+                  No se encontraron expedientes con los filtros actuales.
+                </div>
+              )}
+            </>
+          )}
+        </>
       ) : (
         /* Tab: Historial de Cambios */
         <div>

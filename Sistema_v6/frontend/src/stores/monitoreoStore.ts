@@ -24,6 +24,18 @@ interface MonitoreoState {
   estadisticas: EstadisticasMonitoreo | null
   estadoScheduler: EstadoMonitoreoResponse | null
   isLoading: boolean
+  socket: WebSocket | null
+  filtros: {
+    soloActivos: boolean
+    prioridad: string | undefined
+    busqueda: string | undefined
+  }
+  paginacion: {
+    pagina: number
+    porPagina: number
+    total: number
+    totalPaginas: number
+  }
 
   // Acciones - Configuración
   obtenerConfiguracion: () => Promise<void>
@@ -32,7 +44,10 @@ interface MonitoreoState {
 
   // Acciones - Expedientes Monitoreados
   listarExpedientes: () => Promise<void>
+  cambiarPagina: (pagina: number) => Promise<void>
+  setFiltros: (filtros: Partial<MonitoreoState['filtros']>) => void
   agregarExpediente: (data: SolicitudMonitorear) => Promise<void>
+  sincronizarExpedientes: () => Promise<void>
   removerExpediente: (id: number) => Promise<void>
   toggleExpediente: (id: number, activo: boolean) => Promise<void>
   verificarExpediente: (id: number) => Promise<void>
@@ -45,9 +60,12 @@ interface MonitoreoState {
   // Acciones - Estadísticas
   obtenerEstadisticas: () => Promise<void>
   obtenerEstadoScheduler: () => Promise<void>
+  exportarReporte: () => Promise<void>
 
   // Utilidades
   limpiar: () => void
+  connectWebSocket: () => void
+  disconnectWebSocket: () => void
 }
 
 export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
@@ -58,6 +76,18 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
   estadisticas: null,
   estadoScheduler: null,
   isLoading: false,
+  socket: null,
+  filtros: {
+    soloActivos: false,
+    prioridad: undefined,
+    busqueda: undefined,
+  },
+  paginacion: {
+    pagina: 1,
+    porPagina: 50,
+    total: 0,
+    totalPaginas: 0,
+  },
 
   // Obtener configuración del monitoreo
   obtenerConfiguracion: async () => {
@@ -158,7 +188,14 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
     set({ isLoading: true })
 
     try {
-      const response = await monitoreoApi.listarExpedientes()
+      const { filtros, paginacion } = get()
+      const response = await monitoreoApi.listarExpedientes(
+        filtros.soloActivos,
+        filtros.prioridad,
+        filtros.busqueda,
+        paginacion.pagina,
+        paginacion.porPagina
+      )
 
       // Mapear respuesta al tipo del frontend
       const expedientes: ExpedienteMonitoreado[] = response.expedientes.map(exp => ({
@@ -178,7 +215,16 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
         updated_at: exp.updated_at,
       }))
 
-      set({ expedientes })
+      set({
+        expedientes,
+        paginacion: {
+          ...get().paginacion,
+          total: response.total,
+          totalPaginas: response.total_paginas,
+          pagina: response.pagina,
+          porPagina: response.por_pagina
+        }
+      })
     } catch (error: any) {
       console.error('Error al listar expedientes:', error)
       toast.error('Error al cargar expedientes monitoreados')
@@ -186,6 +232,22 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
     } finally {
       set({ isLoading: false })
     }
+  },
+
+  // Actualizar filtros y recargar
+  setFiltros: (nuevosFiltros: Partial<MonitoreoState['filtros']>) => {
+    set(state => ({
+      filtros: { ...state.filtros, ...nuevosFiltros }
+    }))
+    get().listarExpedientes()
+  },
+
+  // Cambiar página
+  cambiarPagina: async (pagina: number) => {
+    set(state => ({
+      paginacion: { ...state.paginacion, pagina }
+    }))
+    await get().listarExpedientes()
   },
 
   // Agregar expediente al monitoreo
@@ -220,6 +282,34 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
     } catch (error: any) {
       console.error('Error al agregar expediente:', error)
       toast.error(error.message || 'Error al agregar expediente al monitoreo')
+    }
+  },
+
+  // Sincronizar expedientes del sistema
+  sincronizarExpedientes: async () => {
+    set({ isLoading: true })
+    try {
+      toast.info('Sincronizando expedientes...', { id: 'sync' })
+      const response = await monitoreoApi.sincronizarExpedientes()
+
+      if (response.success) {
+        toast.success(response.mensaje, {
+          description: `Nuevos: ${response.nuevos_monitoreados}, Ya monitoreados: ${response.ya_monitoreados}`
+        })
+        // Recargar lista
+        await get().listarExpedientes()
+        await get().obtenerEstadisticas()
+      } else {
+        toast.error('Error en sincronización', {
+          description: response.mensaje
+        })
+      }
+    } catch (error: any) {
+      console.error('Error al sincronizar:', error)
+      toast.error('Error al sincronizar expedientes')
+    } finally {
+      set({ isLoading: false })
+      toast.dismiss('sync')
     }
   },
 
@@ -275,7 +365,7 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
   },
 
   // Verificar expediente manualmente
-  verificarExpediente: async (id: number) => {
+  verificarExpediente: async (_id: number) => {
     set({ isLoading: true })
     try {
       // Toast de inicio
@@ -338,7 +428,7 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
         id: cambio.id,
         expediente_monitoreado_id: cambio.expediente_monitoreado_id,
         expediente_numero: cambio.expediente_numero,
-        expediente_caratula: cambio.expediente_caratula || undefined,
+        expediente_caratula: cambio.expediente_caratula || '',
         tipo_cambio: cambio.tipo_cambio,
         descripcion: cambio.descripcion,
         detalles: cambio.detalles || undefined,
@@ -402,8 +492,8 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
         cambios_semana: response.cambios_semana,
         cambios_mes: response.cambios_mes,
         cambios_sin_leer: response.cambios_sin_leer,
-        ultima_ejecucion: response.ultima_ejecucion || null,
-        proxima_ejecucion: response.proxima_ejecucion || null,
+        ultima_ejecucion: response.ultima_ejecucion || undefined,
+        proxima_ejecucion: response.proxima_ejecucion || undefined,
       }
 
       set({ estadisticas })
@@ -422,14 +512,105 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
     }
   },
 
+  // Exportar reporte
+  exportarReporte: async () => {
+    try {
+      const { filtros } = get()
+      toast.info('Generando reporte...')
+      await monitoreoApi.exportarReporte(
+        filtros.soloActivos,
+        filtros.prioridad,
+        filtros.busqueda
+      )
+      toast.success('Reporte descargado')
+    } catch (error: any) {
+      console.error('Error al exportar:', error)
+      toast.error('Error al generar el reporte')
+    }
+  },
+
   // Limpiar estado
   limpiar: () => {
+    get().disconnectWebSocket()
     set({
       configuracion: null,
       expedientes: [],
       cambios: [],
       estadisticas: null,
       isLoading: false,
+      socket: null,
+      filtros: {
+        soloActivos: false,
+        prioridad: undefined,
+        busqueda: undefined,
+      },
+      paginacion: {
+        pagina: 1,
+        porPagina: 50,
+        total: 0,
+        totalPaginas: 0,
+      },
     })
   },
+
+  // WebSocket
+  connectWebSocket: () => {
+    const { socket } = get()
+    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+      return
+    }
+
+    // Usar usuario_id=1 hardcoded por ahora, igual que en backend
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    // Ajustar puerto si es necesario (asumiendo backend en 8000)
+    const wsUrl = `${protocol}//${window.location.hostname}:8000/api/v1/monitoreo/ws/1`
+
+    console.log('Conectando WS Monitoreo:', wsUrl)
+    const newSocket = new WebSocket(wsUrl)
+
+    newSocket.onopen = () => {
+      console.log('WS Monitoreo conectado')
+    }
+
+    newSocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        console.log('WS Mensaje:', data)
+
+        if (data.type === 'scheduler_status') {
+          get().obtenerEstadoScheduler()
+        } else if (data.type === 'verificacion_inicio') {
+          const current = get().estadoScheduler
+          if (current) set({ estadoScheduler: { ...current, ejecutando: true } })
+        } else if (data.type === 'verificacion_fin') {
+          get().obtenerEstadoScheduler()
+          get().obtenerEstadisticas()
+          get().listarExpedientes()
+          if (data.success && data.cambios > 0) {
+            toast.info(`Verificación completada: ${data.cambios} cambios detectados`)
+            get().listarCambios()
+          }
+        }
+      } catch (e) {
+        console.error('Error procesando mensaje WS:', e)
+      }
+    }
+
+    newSocket.onclose = () => {
+      console.log('WS Monitoreo desconectado')
+      set({ socket: null })
+      // Reintentar conexión en 5s si no se desconectó intencionalmente
+      // (Implementación simple, se puede mejorar)
+    }
+
+    set({ socket: newSocket })
+  },
+
+  disconnectWebSocket: () => {
+    const { socket } = get()
+    if (socket) {
+      socket.close()
+      set({ socket: null })
+    }
+  }
 }))

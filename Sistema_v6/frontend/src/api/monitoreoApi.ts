@@ -177,17 +177,51 @@ export interface ListaExpedientesResponse {
  */
 export async function listarExpedientes(
   soloActivos = false,
+  prioridad?: string,
+  busqueda?: string,
   pagina = 1,
   porPagina = 50
 ): Promise<ListaExpedientesResponse> {
   const response = await apiClient.get<ListaExpedientesResponse>('/api/v1/monitoreo/expedientes', {
     params: {
       solo_activos: soloActivos,
+      prioridad,
+      busqueda,
       pagina,
       por_pagina: porPagina,
     }
   })
   return response.data
+}
+
+/**
+ * Exporta los expedientes monitoreados a CSV
+ */
+export async function exportarReporte(
+  soloActivos = false,
+  prioridad?: string,
+  busqueda?: string,
+  formato = 'csv'
+): Promise<void> {
+  const response = await apiClient.get('/api/v1/monitoreo/exportar', {
+    params: {
+      solo_activos: soloActivos,
+      prioridad,
+      busqueda,
+      formato
+    },
+    responseType: 'blob'
+  })
+
+  // Crear link de descarga
+  const url = window.URL.createObjectURL(new Blob([response.data]))
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', `monitoreo_expedientes_${new Date().toISOString().slice(0, 10)}.csv`)
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
 }
 
 /**

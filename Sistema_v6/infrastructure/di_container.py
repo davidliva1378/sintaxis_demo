@@ -77,6 +77,7 @@ class DIContainer:
         self._gestor_estados = None
         self._monitor_scheduler = None
         self._monitoreo_service = None
+        self._monitoreo_ws_manager = None
 
     # === Adapters ===
 
@@ -197,6 +198,15 @@ class DIContainer:
         return self._monitoreo_service
 
     @property
+    def monitoreo_ws_manager(self):
+        """Obtiene el gestor de WebSockets de monitoreo."""
+        if self._monitoreo_ws_manager is None:
+            from infrastructure.services.monitoreo_ws_manager import MonitoreoWebSocketManager
+            self._monitoreo_ws_manager = MonitoreoWebSocketManager()
+            logger.debug("MonitoreoWebSocketManager inicializado")
+        return self._monitoreo_ws_manager
+
+    @property
     def monitor_scheduler(self):
         """Obtiene el servicio de scheduler de monitoreo."""
         if self._monitor_scheduler is None:
@@ -217,6 +227,7 @@ class DIContainer:
                 json_sistema_path=json_sistema_path,
                 workspaces_dir=workspaces_dir,
                 monitoreo_service=self.monitoreo_service,
+                notification_service=self.monitoreo_ws_manager,
             )
             logger.debug("MonitorSchedulerService inicializado")
         return self._monitor_scheduler

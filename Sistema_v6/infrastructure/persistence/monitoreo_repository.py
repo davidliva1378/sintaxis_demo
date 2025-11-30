@@ -331,6 +331,8 @@ class MonitoreoRepository:
         self,
         usuario_id: int,
         solo_activos: bool = False,
+        prioridad: Optional[str] = None,
+        busqueda: Optional[str] = None,
         limit: Optional[int] = None,
         offset: int = 0
     ) -> List[Dict[str, Any]]:
@@ -369,6 +371,16 @@ class MonitoreoRepository:
 
             if solo_activos:
                 query += " AND activo = TRUE"
+
+            if prioridad:
+                query += " AND prioridad = %s"
+                params.append(prioridad)
+
+            if busqueda:
+                query += " AND (expediente_numero LIKE %s OR expediente_caratula LIKE %s)"
+                term = f"%{busqueda}%"
+                params.append(term)
+                params.append(term)
 
             query += " ORDER BY prioridad DESC, created_at DESC"
 
@@ -571,7 +583,13 @@ class MonitoreoRepository:
             if conn:
                 conn.close()
 
-    def contar_expedientes(self, usuario_id: int, solo_activos: bool = False) -> int:
+    def contar_expedientes(
+        self, 
+        usuario_id: int, 
+        solo_activos: bool = False,
+        prioridad: Optional[str] = None,
+        busqueda: Optional[str] = None
+    ) -> int:
         """
         Cuenta los expedientes monitoreados de un usuario.
 
@@ -596,6 +614,16 @@ class MonitoreoRepository:
 
             if solo_activos:
                 query += " AND activo = TRUE"
+
+            if prioridad:
+                query += " AND prioridad = %s"
+                params.append(prioridad)
+
+            if busqueda:
+                query += " AND (expediente_numero LIKE %s OR expediente_caratula LIKE %s)"
+                term = f"%{busqueda}%"
+                params.append(term)
+                params.append(term)
 
             cursor.execute(query, params)
             count = cursor.fetchone()[0]
