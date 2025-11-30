@@ -251,6 +251,7 @@ async def _ejecutar_procesamiento_background(
     password: str,
     config: ConfigExtraccionMasiva,
     expediente_repo,
+    monitoreo_service=None
 ):
     """Ejecuta el procesamiento de expedientes seleccionados en background."""
     try:
@@ -298,7 +299,8 @@ async def _ejecutar_procesamiento_background(
             config=config,
             on_progress=callback_progreso,
             expediente_repository=expediente_repo,
-            caratulas=caratulas_expedientes
+            caratulas=caratulas_expedientes,
+            monitoreo_service=monitoreo_service
         )
 
         # Procesar seleccionados
@@ -358,6 +360,7 @@ async def procesar_expedientes_seleccionados(
         # Obtener repositorio del DI Container
         container = get_container()
         expediente_repo = container.expediente_repo
+        monitoreo_service = container.monitoreo_service
 
         # Crear sesión inicial
         from datetime import datetime
@@ -387,6 +390,7 @@ async def procesar_expedientes_seleccionados(
                 password,
                 config,
                 expediente_repo,
+                monitoreo_service
             )
         )
         _tasks[session_id] = task

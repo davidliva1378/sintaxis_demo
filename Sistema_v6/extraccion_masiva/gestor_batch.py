@@ -9,7 +9,7 @@ import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional, Callable
+from typing import List, Dict, Optional, Callable, Any
 from uuid import uuid4
 
 from playwright.async_api import Page, async_playwright, Browser, BrowserContext
@@ -63,6 +63,7 @@ class GestorBatch:
         on_progress: Optional[Callable[[int, int, str], None]] = None,
         expediente_repository: Optional["IExpedienteRepository"] = None,
         caratulas: Optional[Dict[str, str]] = None,
+        monitoreo_service: Optional[Any] = None,
     ):
         """
         Args:
@@ -70,11 +71,13 @@ class GestorBatch:
             on_progress: Callback para reportar progreso (actual, total, mensaje)
             expediente_repository: Repositorio para guardar expedientes procesados
             caratulas: Diccionario {numero_expediente: caratula} para filtrado preciso
+            monitoreo_service: Servicio de monitoreo para agregar expedientes automáticamente
         """
         self.config = config or ConfigExtraccionMasiva()
         self.on_progress = on_progress
         self.expediente_repository = expediente_repository
         self.caratulas = caratulas or {}
+        self.monitoreo_service = monitoreo_service
         self._estados: Dict[str, EstadoExpediente] = {}
         self._errores: List[Dict] = []
 
@@ -593,6 +596,23 @@ class GestorBatch:
                         # Guardar en repositorio
                         await self.expediente_repository.guardar(expediente_dominio)
                         logger.info(f"💾 Expediente guardado en repositorio: {numero_expediente}")
+
+                        # Agregar al monitoreo automático si el servicio está disponible
+                        if self.monitoreo_service:
+                            try:
+                                # Usamos usuario ID 1 por defecto ya que es un proceso batch
+                                self.monitoreo_service.agregar_expediente(
+                                    usuario_id=1,
+                                    expediente_numero=numero_expediente,
+                                    expediente_caratula=caratula,
+                                    expediente_dependencia=dependencia,
+                                    prioridad='media',
+                                    notas='Agregado automáticamente tras extracción masiva'
+                                )
+                                logger.info(f"👁️ Expediente {numero_expediente} agregado al monitoreo")
+                            except Exception as e_mon:
+                                # No fallar el proceso si falla el monitoreo
+                                logger.warning(f"⚠️ No se pudo agregar al monitoreo: {e_mon}")
                     else:
                         logger.warning(f"⚠️ Expediente {numero_expediente} no guardado: datos inválidos o incompletos")
 
