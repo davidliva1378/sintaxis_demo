@@ -20,8 +20,17 @@ class MCPConfigUpdate(BaseModel):
     auto_start: Optional[bool] = None
     mode: Optional[str] = None
     port: Optional[int] = None
+    host: Optional[str] = None
     workspace_path: Optional[str] = None
     log_level: Optional[str] = None
+    # Opciones de seguridad SSE
+    ssl_enabled: Optional[bool] = None
+    ssl_cert: Optional[str] = None
+    ssl_key: Optional[str] = None
+    auth_enabled: Optional[bool] = None
+    rate_limit_enabled: Optional[bool] = None
+    rate_limit_rpm: Optional[int] = None
+    rate_limit_rpm_auth: Optional[int] = None
 
 
 class ToolsEnableRequest(BaseModel):
@@ -187,16 +196,38 @@ async def clear_mcp_logs():
 # === Endpoints de Tools ===
 
 @router.get("/tools")
-async def get_mcp_tools():
+async def get_mcp_tools(category: Optional[str] = None):
     """
     Obtiene la lista de tools disponibles con estado.
+
+    Args:
+        category: Filtrar por categoría (expedientes, actuaciones, vencimientos,
+                  entidades, estadisticas, analisis, monitoreo)
 
     Returns:
         Lista de tools con nombre, descripción, categoría, habilitada
     """
     manager = get_mcp_manager()
     tools = manager.get_tools_list()
+
+    if category:
+        tools = [t for t in tools if t.get("category") == category]
+
     return {"tools": tools, "total": len(tools)}
+
+
+@router.get("/tools/summary")
+async def get_mcp_tools_summary():
+    """
+    Obtiene resumen de tools agrupadas por categoría.
+
+    Returns:
+        Resumen con conteos por categoría y total de tools
+    """
+    from sintaxis_mcp.core.tools_registry import get_registry
+
+    registry = get_registry()
+    return registry.get_summary()
 
 
 @router.put("/tools/enable")

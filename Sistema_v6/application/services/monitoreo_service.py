@@ -470,6 +470,56 @@ class MonitoreoService:
             solo_activos=True
         )
 
+    def eliminar_cambio(self, cambio_id: int) -> bool:
+        """
+        Elimina un cambio detectado.
+
+        Args:
+            cambio_id: ID del cambio
+
+        Returns:
+            True si se eliminó
+        """
+        return self._repo.eliminar_cambio(cambio_id)
+
+    def eliminar_cambios_leidos(self, usuario_id: int) -> int:
+        """
+        Elimina todos los cambios marcados como leídos.
+
+        Args:
+            usuario_id: ID del usuario
+
+        Returns:
+            Cantidad de cambios eliminados
+        """
+        return self._repo.eliminar_cambios_leidos(usuario_id)
+
+    def exportar_cambios(
+        self,
+        usuario_id: int,
+        solo_no_leidos: bool = False,
+        tipo_cambio: Optional[str] = None,
+        formato: str = 'csv'
+    ) -> str:
+        """
+        Exporta el historial de cambios.
+
+        Args:
+            usuario_id: ID del usuario
+            solo_no_leidos: Solo cambios sin leer
+            tipo_cambio: Filtrar por tipo
+            formato: 'csv' o 'json'
+
+        Returns:
+            Contenido del archivo exportado
+        """
+        return self._repo.exportar_cambios(
+            usuario_id=usuario_id,
+            solo_no_leidos=solo_no_leidos,
+            tipo_cambio=tipo_cambio,
+            formato=formato
+        )
+
     def exportar_expedientes(
         self,
         usuario_id: Optional[int] = None,

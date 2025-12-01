@@ -10,9 +10,16 @@ export interface MCPStatus {
   started_at: string | null;
   mode: 'stdio' | 'sse';
   port: number;
+  host: string;
   auto_start: boolean;
   enabled_tools_count: number;
   log_file: string | null;
+  // Opciones de seguridad (modo SSE)
+  ssl_enabled: boolean;
+  auth_enabled: boolean;
+  rate_limit_enabled: boolean;
+  rate_limit_rpm: number;
+  rate_limit_rpm_auth: number;
 }
 
 // Configuración del servidor MCP
@@ -20,18 +27,36 @@ export interface MCPConfig {
   auto_start: boolean;
   mode: 'stdio' | 'sse';
   port: number;
+  host: string;
   workspace_path: string;
   enabled_tools: string[];
   log_level: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
+  // Opciones de seguridad (modo SSE)
+  ssl_enabled: boolean;
+  ssl_cert: string | null;
+  ssl_key: string | null;
+  auth_enabled: boolean;
+  rate_limit_enabled: boolean;
+  rate_limit_rpm: number;
+  rate_limit_rpm_auth: number;
 }
 
 // Actualización parcial de configuración
 export interface MCPConfigUpdate {
   auto_start?: boolean;
-  mode?: string;
+  mode?: 'stdio' | 'sse';
   port?: number;
+  host?: string;
   workspace_path?: string;
-  log_level?: string;
+  log_level?: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
+  // Opciones de seguridad (modo SSE)
+  ssl_enabled?: boolean;
+  ssl_cert?: string;
+  ssl_key?: string;
+  auth_enabled?: boolean;
+  rate_limit_enabled?: boolean;
+  rate_limit_rpm?: number;
+  rate_limit_rpm_auth?: number;
 }
 
 // Tool disponible
@@ -124,6 +149,7 @@ export type ToolCategory =
   | 'entidades'
   | 'estadisticas'
   | 'analisis'
+  | 'monitoreo'
   | 'otro';
 
 // Mapeo de categorías a labels
@@ -134,6 +160,7 @@ export const TOOL_CATEGORY_LABELS: Record<ToolCategory, string> = {
   entidades: 'Entidades NER',
   estadisticas: 'Estadísticas',
   analisis: 'Análisis',
+  monitoreo: 'Monitoreo',
   otro: 'Otros',
 };
 
@@ -145,5 +172,6 @@ export const TOOL_CATEGORY_COLORS: Record<ToolCategory, string> = {
   entidades: 'bg-purple-100 text-purple-800',
   estadisticas: 'bg-pink-100 text-pink-800',
   analisis: 'bg-indigo-100 text-indigo-800',
+  monitoreo: 'bg-orange-100 text-orange-800',
   otro: 'bg-gray-100 text-gray-800',
 };

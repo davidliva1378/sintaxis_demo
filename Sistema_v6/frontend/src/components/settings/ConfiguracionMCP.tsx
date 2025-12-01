@@ -275,23 +275,42 @@ export function ConfiguracionMCP() {
           </div>
 
           {status?.running && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">PID:</span>{' '}
-                <span className="font-mono">{status.pid}</span>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">PID:</span>{' '}
+                  <span className="font-mono">{status.pid}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Uptime:</span>{' '}
+                  <span>{formatUptime(status.uptime_seconds)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Modo:</span>{' '}
+                  <span className="uppercase">{status.mode}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Tools:</span>{' '}
+                  <span>{status.enabled_tools_count}</span>
+                </div>
               </div>
-              <div>
-                <span className="text-muted-foreground">Uptime:</span>{' '}
-                <span>{formatUptime(status.uptime_seconds)}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Modo:</span>{' '}
-                <span className="uppercase">{status.mode}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Tools:</span>{' '}
-                <span>{status.enabled_tools_count}</span>
-              </div>
+
+              {status.mode === 'sse' && (
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Badge variant={status.ssl_enabled ? 'default' : 'secondary'}>
+                    {status.ssl_enabled ? 'SSL' : 'No SSL'}
+                  </Badge>
+                  <Badge variant={status.auth_enabled ? 'default' : 'secondary'}>
+                    {status.auth_enabled ? 'Auth' : 'Sin Auth'}
+                  </Badge>
+                  <Badge variant={status.rate_limit_enabled ? 'default' : 'secondary'}>
+                    {status.rate_limit_enabled ? `Rate: ${status.rate_limit_rpm}/${status.rate_limit_rpm_auth} rpm` : 'Sin Rate Limit'}
+                  </Badge>
+                  <span className="text-muted-foreground ml-2">
+                    {status.host}:{status.port}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -367,22 +386,39 @@ export function ConfiguracionMCP() {
               </div>
 
               {config?.mode === 'sse' && (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">Puerto SSE</div>
-                    <div className="text-sm text-muted-foreground">
-                      Puerto para conexiones remotas
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">Host</div>
+                      <div className="text-sm text-muted-foreground">
+                        Dirección de escucha (0.0.0.0 para todas)
+                      </div>
                     </div>
+                    <Input
+                      type="text"
+                      value={config?.host ?? '0.0.0.0'}
+                      onChange={(e) => handleConfigChange('host', e.target.value)}
+                      className="w-32 text-sm font-mono"
+                    />
                   </div>
-                  <Input
-                    type="number"
-                    value={config?.port ?? 8765}
-                    onChange={(e) => handleConfigChange('port', parseInt(e.target.value))}
-                    className="w-24 text-sm"
-                    min={1024}
-                    max={65535}
-                  />
-                </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">Puerto SSE</div>
+                      <div className="text-sm text-muted-foreground">
+                        Puerto para conexiones remotas
+                      </div>
+                    </div>
+                    <Input
+                      type="number"
+                      value={config?.port ?? 8765}
+                      onChange={(e) => handleConfigChange('port', parseInt(e.target.value))}
+                      className="w-24 text-sm"
+                      min={1024}
+                      max={65535}
+                    />
+                  </div>
+                </>
               )}
 
               <div className="flex items-center justify-between">
@@ -405,19 +441,113 @@ export function ConfiguracionMCP() {
               </div>
 
               {config?.mode === 'sse' && (
-                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md text-sm">
-                  <div className="font-medium text-blue-700 dark:text-blue-300">
-                    Modo SSE con HTTPS habilitado
+                <>
+                  {/* Sección de Seguridad */}
+                  <div className="pt-4 border-t">
+                    <h4 className="font-medium text-sm text-muted-foreground mb-3">Seguridad (modo SSE)</h4>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">SSL/HTTPS</div>
+                          <div className="text-sm text-muted-foreground">
+                            Habilitar conexión cifrada con certificado auto-firmado
+                          </div>
+                        </div>
+                        <Switch
+                          checked={config?.ssl_enabled ?? true}
+                          onCheckedChange={(checked) => handleConfigChange('ssl_enabled', checked)}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">Autenticación</div>
+                          <div className="text-sm text-muted-foreground">
+                            Requerir Bearer token para acceso
+                          </div>
+                        </div>
+                        <Switch
+                          checked={config?.auth_enabled ?? false}
+                          onCheckedChange={(checked) => handleConfigChange('auth_enabled', checked)}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">Rate Limiting</div>
+                          <div className="text-sm text-muted-foreground">
+                            Limitar peticiones por minuto
+                          </div>
+                        </div>
+                        <Switch
+                          checked={config?.rate_limit_enabled ?? false}
+                          onCheckedChange={(checked) => handleConfigChange('rate_limit_enabled', checked)}
+                        />
+                      </div>
+
+                      {config?.rate_limit_enabled && (
+                        <div className="ml-4 pl-4 border-l space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-medium">RPM (sin auth)</div>
+                              <div className="text-xs text-muted-foreground">
+                                Peticiones/minuto sin autenticación
+                              </div>
+                            </div>
+                            <Input
+                              type="number"
+                              value={config?.rate_limit_rpm ?? 60}
+                              onChange={(e) => handleConfigChange('rate_limit_rpm', parseInt(e.target.value))}
+                              className="w-20 text-sm"
+                              min={1}
+                              max={1000}
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-medium">RPM (con auth)</div>
+                              <div className="text-xs text-muted-foreground">
+                                Peticiones/minuto con autenticación
+                              </div>
+                            </div>
+                            <Input
+                              type="number"
+                              value={config?.rate_limit_rpm_auth ?? 120}
+                              onChange={(e) => handleConfigChange('rate_limit_rpm_auth', parseInt(e.target.value))}
+                              className="w-20 text-sm"
+                              min={1}
+                              max={1000}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-blue-600 dark:text-blue-400 mt-1">
-                    El servidor escuchará en el puerto {config?.port ?? 8765}.
-                    Configura Claude Desktop con la URL: https://IP:{config?.port ?? 8765}/sse
+
+                  {/* Información de conexión */}
+                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md text-sm">
+                    <div className="font-medium text-blue-700 dark:text-blue-300">
+                      Modo SSE {config?.ssl_enabled ? 'con HTTPS' : 'HTTP'} habilitado
+                    </div>
+                    <div className="text-blue-600 dark:text-blue-400 mt-1">
+                      El servidor escuchará en {config?.host ?? '0.0.0.0'}:{config?.port ?? 8765}.
+                      Configura Claude Desktop con la URL: {config?.ssl_enabled ? 'https' : 'http'}://IP:{config?.port ?? 8765}/sse
+                    </div>
+                    {config?.ssl_enabled && (
+                      <div className="text-blue-500 dark:text-blue-500 mt-2 text-xs">
+                        Nota: Se genera un certificado auto-firmado. Es posible que necesites
+                        importarlo como confiable en tu sistema.
+                      </div>
+                    )}
+                    {config?.auth_enabled && (
+                      <div className="text-amber-600 dark:text-amber-400 mt-2 text-xs">
+                        Autenticación activa: El token se genera en var/ssl/auth_token.txt
+                      </div>
+                    )}
                   </div>
-                  <div className="text-blue-500 dark:text-blue-500 mt-2 text-xs">
-                    Nota: Se genera un certificado auto-firmado. Es posible que necesites
-                    importarlo como confiable en tu sistema.
-                  </div>
-                </div>
+                </>
               )}
             </CardContent>
           </Card>

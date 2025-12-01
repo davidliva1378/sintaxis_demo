@@ -685,17 +685,16 @@ class ToolsService:
         Estadisticas generales de vencimientos.
 
         Returns:
-            Dict con conteos por estado y prioridad
+            Dict con conteos por estado
         """
         query = """
             SELECT
                 COUNT(*) as total,
                 SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as pendientes,
-                SUM(CASE WHEN estado = 'cumplido' THEN 1 ELSE 0 END) as cumplidos,
+                SUM(CASE WHEN estado = 'atendido' THEN 1 ELSE 0 END) as atendidos,
                 SUM(CASE WHEN estado = 'vencido' THEN 1 ELSE 0 END) as vencidos,
                 SUM(CASE WHEN estado = 'pendiente' AND fecha_vencimiento < NOW() THEN 1 ELSE 0 END) as atrasados,
-                SUM(CASE WHEN estado = 'pendiente' AND fecha_vencimiento BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as urgentes_7dias,
-                SUM(CASE WHEN prioridad = 'alta' AND estado = 'pendiente' THEN 1 ELSE 0 END) as alta_prioridad
+                SUM(CASE WHEN estado = 'pendiente' AND fecha_vencimiento BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as urgentes_7dias
             FROM vencimientos
         """
         result = self._execute_query(query)
@@ -937,7 +936,7 @@ class ToolsService:
                 COUNT(*) as total_actuaciones,
                 SUM(CASE WHEN tipo_ia IS NOT NULL THEN 1 ELSE 0 END) as clasificadas,
                 SUM(CASE WHEN utilidad IS NOT NULL THEN 1 ELSE 0 END) as con_utilidad,
-                AVG(score_utilidad) as score_promedio
+                AVG(score) as score_promedio
             FROM actuaciones
         """
         result = self._execute_query(query)
@@ -978,7 +977,7 @@ class ToolsService:
                 'actuacion' as tipo_evento,
                 a.fecha as fecha,
                 e.numero_normalizado as expediente,
-                a.detalle as titulo as descripcion
+                CONVERT(a.detalle USING utf8mb4) as descripcion
             FROM actuaciones a
             INNER JOIN expedientes e ON e.id = a.expediente_id
             WHERE a.fecha >= :fecha_limite
@@ -989,7 +988,7 @@ class ToolsService:
                 'vencimiento' as tipo_evento,
                 v.fecha_vencimiento as fecha,
                 e.numero_normalizado as expediente,
-                v.descripcion
+                CONVERT(v.descripcion USING utf8mb4) as descripcion
             FROM vencimientos v
             INNER JOIN expedientes e ON e.id = v.expediente_id
             WHERE v.fecha_vencimiento >= :fecha_limite
@@ -1362,6 +1361,61 @@ class ToolsService:
                 "success": False,
                 "mensaje": f"Expediente {expediente_numero} no encontrado en monitoreo"
             }
+
+    def sincronizar_expedientes_monitoreo(self) -> Dict[str, Any]:
+        """
+        Sincroniza expedientes activos del sistema principal al monitoreo.
+
+        Agrega automáticamente los expedientes con estado_monitoreo='activo'
+        al sistema de monitoreo si no están ya presentes.
+
+        Returns:
+            Dict con estadísticas de sincronización
+        """
+        service = self._get_monitoreo_service()
+        usuario_id = 1
+
+        # Obtener expedientes activos del sistema principal
+        query = """
+            SELECT numero_normalizado, caratula, dependencia
+            FROM expedientes
+            WHERE estado_monitoreo = 'activo'
+        """
+        expedientes = self._execute_query(query)
+
+        agregados = 0
+        ya_existentes = 0
+        errores = 0
+
+        for exp in expedientes:
+            numero = exp['numero_normalizado']
+            try:
+                # Verificar si ya está en monitoreo
+                existente = service.obtener_expediente(usuario_id, numero)
+                if existente:
+                    ya_existentes += 1
+                else:
+                    # Agregar al monitoreo
+                    service.agregar_expediente(
+                        usuario_id=usuario_id,
+                        expediente_numero=numero,
+                        expediente_caratula=exp.get('caratula'),
+                        expediente_dependencia=exp.get('dependencia'),
+                        prioridad='media'
+                    )
+                    agregados += 1
+            except Exception as e:
+                errores += 1
+                logger.error(f"Error sincronizando {numero}: {e}")
+
+        return {
+            "success": True,
+            "mensaje": f"Sincronización completada",
+            "agregados": agregados,
+            "ya_existentes": ya_existentes,
+            "errores": errores,
+            "total_procesados": len(expedientes)
+        }
 
     # ============================================================
     # UTILIDADES

@@ -54,9 +54,18 @@ class MCPManager:
             "auto_start": False,
             "mode": "stdio",
             "port": 8765,
+            "host": "0.0.0.0",
             "workspace_path": str(BASE_DIR),
             "enabled_tools": [],  # Vacio = todas habilitadas
-            "log_level": "INFO"
+            "log_level": "INFO",
+            # Opciones SSE/Seguridad
+            "ssl_enabled": True,  # HTTPS para modo SSE
+            "ssl_cert": None,  # Ruta certificado personalizado
+            "ssl_key": None,  # Ruta clave privada personalizada
+            "auth_enabled": False,  # Autenticación Bearer
+            "rate_limit_enabled": False,  # Rate limiting
+            "rate_limit_rpm": 60,  # Requests/min anónimo
+            "rate_limit_rpm_auth": 120,  # Requests/min autenticado
         }
 
         if MCP_CONFIG_FILE.exists():
@@ -120,9 +129,16 @@ class MCPManager:
             "started_at": None,
             "mode": self.config.get("mode", "stdio"),
             "port": self.config.get("port", 8765),
+            "host": self.config.get("host", "0.0.0.0"),
             "auto_start": self.config.get("auto_start", False),
-            "enabled_tools_count": len(self.config.get("enabled_tools", [])) or 29,  # 29 = todas
-            "log_file": str(MCP_LOG_FILE) if MCP_LOG_FILE.exists() else None
+            "enabled_tools_count": len(self.config.get("enabled_tools", [])) or 37,
+            "log_file": str(MCP_LOG_FILE) if MCP_LOG_FILE.exists() else None,
+            # Opciones de seguridad (solo relevantes en modo SSE)
+            "ssl_enabled": self.config.get("ssl_enabled", True),
+            "auth_enabled": self.config.get("auth_enabled", False),
+            "rate_limit_enabled": self.config.get("rate_limit_enabled", False),
+            "rate_limit_rpm": self.config.get("rate_limit_rpm", 60),
+            "rate_limit_rpm_auth": self.config.get("rate_limit_rpm_auth", 120),
         }
 
         if running and MCP_PID_FILE.exists():
@@ -179,7 +195,28 @@ class MCPManager:
             # Construir comando segun modo
             import sys
             if mode == "sse":
-                cmd = [sys.executable, str(server_path), "--port", str(port), "--host", "0.0.0.0", "--ssl"]
+                host = self.config.get("host", "0.0.0.0")
+                cmd = [sys.executable, str(server_path), "--port", str(port), "--host", host]
+
+                # Opciones SSL
+                if self.config.get("ssl_enabled", True):
+                    cmd.append("--ssl")
+                    if self.config.get("ssl_cert"):
+                        cmd.extend(["--cert", self.config["ssl_cert"]])
+                    if self.config.get("ssl_key"):
+                        cmd.extend(["--key", self.config["ssl_key"]])
+
+                # Opciones de autenticación
+                if self.config.get("auth_enabled", False):
+                    cmd.append("--auth")
+
+                # Opciones de rate limiting
+                if self.config.get("rate_limit_enabled", False):
+                    cmd.append("--rate-limit")
+                    rpm = self.config.get("rate_limit_rpm", 60)
+                    rpm_auth = self.config.get("rate_limit_rpm_auth", 120)
+                    cmd.extend(["--rpm", str(rpm), "--rpm-auth", str(rpm_auth)])
+
                 stdin_pipe = None  # SSE no necesita stdin
             else:
                 cmd = [sys.executable, str(server_path)]
@@ -318,7 +355,13 @@ class MCPManager:
             Dict con resultado
         """
         # Validar campos
-        valid_keys = ["auto_start", "mode", "port", "workspace_path", "enabled_tools", "log_level"]
+        valid_keys = [
+            "auto_start", "mode", "port", "host", "workspace_path",
+            "enabled_tools", "log_level",
+            "ssl_enabled", "ssl_cert", "ssl_key",
+            "auth_enabled", "rate_limit_enabled",
+            "rate_limit_rpm", "rate_limit_rpm_auth"
+        ]
 
         for key, value in new_config.items():
             if key in valid_keys:
@@ -373,50 +416,32 @@ class MCPManager:
 
     def get_tools_list(self) -> List[Dict[str, Any]]:
         """
-        Obtiene la lista de tools disponibles.
+        Obtiene la lista de tools disponibles desde ToolsRegistry.
 
         Returns:
             Lista de tools con nombre, descripcion, categoria, habilitada
-        """
-        from application.services.ia.tools_service import ToolsService
 
-        tools_service = ToolsService()
-        definitions = tools_service.get_tool_definitions()
+        Note:
+            Usa sintaxis_mcp.core.ToolsRegistry como fuente única de verdad
+            para las 37 tools organizadas en 7 categorías.
+        """
+        from sintaxis_mcp.core.tools_registry import get_registry
+
+        registry = get_registry()
+        tool_definitions = registry.get_all_definitions()
 
         enabled = set(self.config.get("enabled_tools", []))
         all_enabled = len(enabled) == 0
 
-        # Categorizar tools
-        categories = {
-            "expedientes": ["contar_expedientes", "listar_expedientes", "obtener_expediente",
-                          "buscar_expedientes", "expedientes_recientes", "expedientes_por_dependencia"],
-            "actuaciones": ["listar_actuaciones", "buscar_actuaciones", "obtener_texto_actuacion",
-                          "actuaciones_por_tipo", "actuaciones_con_texto"],
-            "vencimientos": ["vencimientos_pendientes", "vencimientos_urgentes", "vencimientos_vencidos",
-                           "resumen_vencimientos", "proximos_vencimientos"],
-            "entidades": ["listar_entidades", "buscar_entidades", "personas_expediente",
-                        "entidades_por_tipo", "estadisticas_entidades"],
-            "estadisticas": ["estadisticas_sistema", "estadisticas_expediente",
-                           "estadisticas_procesamiento", "actividad_reciente"],
-            "analisis": ["duplicados_detectados", "clasificacion_ia",
-                        "actuaciones_importantes", "resumen_expediente"]
-        }
-
-        # Invertir para busqueda rapida
-        tool_category = {}
-        for cat, tools in categories.items():
-            for tool in tools:
-                tool_category[tool] = cat
-
         result = []
-        for tool_def in definitions:
-            name = tool_def["name"]
+        for tool_def in tool_definitions:
             result.append({
-                "name": name,
-                "description": tool_def.get("description", ""),
-                "category": tool_category.get(name, "otro"),
-                "enabled": all_enabled or name in enabled,
-                "parameters": tool_def.get("parameters", {})
+                "name": tool_def.name,
+                "description": tool_def.description,
+                "category": tool_def.category.value,
+                "enabled": all_enabled or tool_def.name in enabled,
+                "parameters": tool_def.parameters,
+                "required": tool_def.required_params
             })
 
         return result
