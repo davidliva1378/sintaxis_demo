@@ -524,6 +524,8 @@ class GestorBatch:
                 except Exception as e:
                     logger.warning(f"⚠️ Error en clasificación (no crítico): {e}")
 
+
+            
             # ==================================================================
             # PASO 5: Guardar en repositorio (si está disponible)
             # ==================================================================
@@ -596,6 +598,35 @@ class GestorBatch:
                         # Guardar en repositorio
                         await self.expediente_repository.guardar(expediente_dominio)
                         logger.info(f"💾 Expediente guardado en repositorio: {numero_expediente}")
+
+                        # ==================================================================
+                        # PASO 5.5: Persistir actuaciones en MySQL (Ahora que existe el expediente)
+                        # ==================================================================
+                        if ruta_json and ruta_json.exists():
+                            try:
+                                logger.info(f"💾 Persistiendo actuaciones en MySQL para {numero_expediente}...")
+                                
+                                # Importar servicio de procesamiento
+                                from application.services.procesador_actuaciones_service import ProcesadorActuacionesService
+                                from infrastructure.config import get_settings
+                                
+                                # Obtener configuración de BD desde Settings
+                                settings = get_settings()
+                                db_config = settings.database.model_dump()
+                                
+                                # Crear servicio con db_config
+                                procesador = ProcesadorActuacionesService(db_config)
+                                
+                                # Procesar JSON y guardar en MySQL
+                                await procesador.procesar_desde_json(
+                                    numero_expediente=numero_expediente,
+                                    ruta_json=str(ruta_json)
+                                )
+                                
+                                logger.info(f"✅ Actuaciones persistidas en MySQL: {total_actuaciones} actuaciones")
+                                
+                            except Exception as e:
+                                logger.error(f"❌ Error persistiendo actuaciones en MySQL: {e}", exc_info=True)
 
                         # Agregar al monitoreo automático si el servicio está disponible
                         if self.monitoreo_service:

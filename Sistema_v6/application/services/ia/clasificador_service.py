@@ -207,7 +207,7 @@ class ClasificadorService:
     def _get_llm(self):
         """Obtiene el servicio LLM (lazy loading)."""
         if self._llm_service is None:
-            from .llm_service import LLMService
+            from infrastructure.rag.services.llm_service import LLMService
             self._llm_service = LLMService()
         return self._llm_service
 

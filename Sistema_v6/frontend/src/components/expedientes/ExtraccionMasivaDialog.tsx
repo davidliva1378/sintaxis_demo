@@ -40,7 +40,8 @@ export default function ExtraccionMasivaDialog({ onClose }: ExtraccionMasivaDial
     procesarExpedientesSeleccionados,
     cargarListadoBase,
     setEstado,
-    resetExtraccionMasiva
+    resetExtraccionMasiva,
+    descargarReporte
   } = useExtraccionStore()
 
   // Resetear estado al montar el componente para evitar estados residuales
@@ -487,6 +488,7 @@ export default function ExtraccionMasivaDialog({ onClose }: ExtraccionMasivaDial
               onVolverAFiltrado={() => setMostrarReporte(false)}
               onCerrar={handleClose}
               onContinuar={() => setMostrarReporte(false)}
+              onDescargar={descargarReporte}
             />
           )}
 

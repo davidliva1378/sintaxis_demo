@@ -141,6 +141,23 @@ class LLMService:
             logger.error(f"Ollama health check falló: {e}")
             return False
 
+    def generate(
+        self,
+        prompt: str,
+        system: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        model: Optional[str] = None
+    ) -> str:
+        """
+        Genera texto libre (wrapper para _call_ollama compatible con ClasificadorService).
+        """
+        full_prompt = prompt
+        if system:
+            full_prompt = f"{system}\n\n{prompt}"
+            
+        return self._call_ollama(full_prompt, model=model, temperature=temperature)
+
     def generate_answer(
         self,
         question: str,

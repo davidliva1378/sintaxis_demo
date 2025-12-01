@@ -9,18 +9,49 @@ Endpoints para:
 - Obtener actuaciones por utilidad
 """
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request
 from pydantic import BaseModel, Field
 from datetime import date, datetime
 import logging
 import os
+import re
 
 from presentation.api.rest.rate_limiter import limiter
 
 from application.services.procesador_actuaciones_service import ProcesadorActuacionesService
 
 logger = logging.getLogger(__name__)
+
+
+def get_numero_formatos(numero: str) -> Tuple[str, str]:
+    """
+    Genera ambos formatos del número de expediente.
+
+    Args:
+        numero: Número en cualquier formato
+
+    Returns:
+        Tupla (numero_normalizado, numero_original)
+        Ejemplo: ('FPA_000635_2017', 'FPA 000635/2017')
+    """
+    # Si viene con guiones bajos, convertir a formato original
+    partes = re.match(r'^([A-Z]+)_(\d+)_(\d+)$', numero)
+    if partes:
+        numero_normalizado = numero
+        numero_original = f"{partes.group(1)} {partes.group(2)}/{partes.group(3)}"
+    else:
+        # Si viene con espacios/barras, generar normalizado
+        partes2 = re.match(r'^([A-Z]+)\s+(\d+)/(\d+)$', numero)
+        if partes2:
+            numero_original = numero
+            numero_normalizado = f"{partes2.group(1)}_{partes2.group(2)}_{partes2.group(3)}"
+        else:
+            # Formato desconocido, usar tal cual
+            numero_normalizado = numero
+            numero_original = numero
+
+    return numero_normalizado, numero_original
 
 
 # ============================================================================
@@ -501,6 +532,9 @@ async def obtener_vencimientos_expediente(
         Lista de vencimientos del expediente ordenados por fecha
     """
     try:
+        # Obtener ambos formatos del número
+        numero_norm, numero_orig = get_numero_formatos(numero)
+
         conn = servicio.repository._get_connection()
         cursor = conn.cursor(dictionary=True)
 
@@ -524,11 +558,11 @@ async def obtener_vencimientos_expediente(
                 COALESCE(a.detalle, 'Sin detalle') as actuacion_detalle
             FROM vencimientos v
             LEFT JOIN actuaciones a ON v.actuacion_id = a.id
-            WHERE v.expediente_numero = %s
+            WHERE v.expediente_numero IN (%s, %s)
             ORDER BY v.fecha_vencimiento ASC
         """
 
-        cursor.execute(query, (numero,))
+        cursor.execute(query, (numero_norm, numero_orig))
         vencimientos = cursor.fetchall()
 
         cursor.close()
@@ -573,6 +607,9 @@ async def obtener_actuaciones_clasificadas_expediente(
         Lista de actuaciones con su clasificación de utilidad
     """
     try:
+        # Obtener ambos formatos del número
+        numero_norm, numero_orig = get_numero_formatos(numero)
+
         conn = servicio.repository._get_connection()
         cursor = conn.cursor(dictionary=True)
 
@@ -589,7 +626,7 @@ async def obtener_actuaciones_clasificadas_expediente(
                 DATEDIFF(v.fecha_vencimiento, CURDATE()) as dias_restantes
             FROM actuaciones a
             LEFT JOIN vencimientos v ON a.id = v.actuacion_id
-            WHERE a.expediente_numero = %s
+            WHERE a.expediente_numero IN (%s, %s)
               AND a.utilidad IS NOT NULL
             ORDER BY
                 CASE a.utilidad
@@ -601,7 +638,7 @@ async def obtener_actuaciones_clasificadas_expediente(
                 a.score DESC
         """
 
-        cursor.execute(query, (numero,))
+        cursor.execute(query, (numero_norm, numero_orig))
         actuaciones = cursor.fetchall()
 
         cursor.close()

@@ -9,6 +9,15 @@ import type {
   Actuacion,
 } from '@/types/expediente'
 
+interface ProcessingState {
+  isProcessing: boolean
+  progress: {
+    current: number
+    total: number
+    message: string
+  }
+}
+
 interface ExpedientesState {
   // Estado
   expedientes: ExpedienteResumen[]
@@ -22,6 +31,7 @@ interface ExpedientesState {
   }
   isLoading: boolean
   isExtracting: boolean
+  processingStates: Record<string, ProcessingState>
 
   // Acciones
   listarExpedientes: (filtros?: ExpedienteFiltros, pagina?: number) => Promise<void>
@@ -31,6 +41,8 @@ interface ExpedientesState {
   limpiarFiltros: () => void
   setPagina: (pagina: number) => void
   limpiarExpedienteActual: () => void
+  setProcessingState: (numero: string, state: ProcessingState) => void
+  clearProcessingState: (numero: string) => void
 }
 
 export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
@@ -46,6 +58,7 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
   },
   isLoading: false,
   isExtracting: false,
+  processingStates: {},
 
   // Listar expedientes con filtros y paginación
   listarExpedientes: async (filtros?: ExpedienteFiltros, pagina?: number) => {
@@ -194,5 +207,22 @@ export const useExpedientesStore = create<ExpedientesState>((set, get) => ({
   // Limpiar expediente actual
   limpiarExpedienteActual: () => {
     set({ expedienteActual: null })
+  },
+
+  setProcessingState: (numero: string, state: ProcessingState) => {
+    set((prev) => ({
+      processingStates: {
+        ...prev.processingStates,
+        [numero]: state,
+      },
+    }))
+  },
+
+  clearProcessingState: (numero: string) => {
+    set((prev) => {
+      const newStates = { ...prev.processingStates }
+      delete newStates[numero]
+      return { processingStates: newStates }
+    })
   },
 }))

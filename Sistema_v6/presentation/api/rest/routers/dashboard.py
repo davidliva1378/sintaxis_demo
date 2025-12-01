@@ -154,7 +154,7 @@ async def obtener_estadisticas_dashboard():
             # 5. Expedientes monitoreados activos
             cursor.execute("""
                 SELECT COUNT(*) as total
-                FROM expedientes_monitoreo
+                FROM expedientes_monitoreados
                 WHERE activo = 1
             """)
             result = cursor.fetchone()

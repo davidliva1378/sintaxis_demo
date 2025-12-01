@@ -27,11 +27,16 @@ class AuthSettings(BaseSettings):
         session_timeout_seconds: Timeout de sesión en segundos
     """
 
-    model_config = SettingsConfigDict(env_prefix="PJN_", case_sensitive=False)
+    model_config = SettingsConfigDict(
+        env_file=str(PROJECT_ROOT / ".env"),
+        env_prefix="PJN_", 
+        case_sensitive=False,
+        extra="ignore"
+    )
 
     login_url: str = Field(default="https://portalpjn.pjn.gov.ar/inicio", alias="LOGIN_URL")
-    usuario: str | None = Field(default=None, alias="USER")
-    password: str | None = Field(default=None, alias="PASSWORD")
+    usuario: str | None = Field(default=None, validation_alias="PJN_USER")
+    password: str | None = Field(default=None, validation_alias="PJN_PASSWORD")
     session_file_name: str = "pjn_session.json"
     session_timeout_seconds: int = 3600
 
@@ -446,6 +451,31 @@ class EncryptionSettings(BaseSettings):
     fernet_key: str | None = None  # Se genera automáticamente si no se proporciona
 
 
+class DatabaseSettings(BaseSettings):
+    """Configuración de base de datos MySQL.
+
+    Attributes:
+        host: Host de la base de datos
+        port: Puerto de la base de datos
+        user: Usuario de la base de datos
+        password: Password de la base de datos
+        database: Nombre de la base de datos
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=str(PROJECT_ROOT / ".env"),
+        env_prefix="MYSQL_",
+        case_sensitive=False,
+        extra="ignore"
+    )
+
+    host: str = "localhost"
+    port: int = 3306
+    user: str = "root"
+    password: str = ""
+    database: str = "sintaxis"
+
+
 class Settings(BaseSettings):
     """Configuración principal del sistema.
 
@@ -477,7 +507,10 @@ class Settings(BaseSettings):
     mcp: MCPSettings = Field(default_factory=MCPSettings)
     jwt: JWTSettings = Field(default_factory=JWTSettings)
     rag: RAGSettings = Field(default_factory=RAGSettings)
+    jwt: JWTSettings = Field(default_factory=JWTSettings)
+    rag: RAGSettings = Field(default_factory=RAGSettings)
     encryption: EncryptionSettings = Field(default_factory=EncryptionSettings)
+    database: DatabaseSettings = Field(default_factory=DatabaseSettings)
 
     # General settings
     environment: Literal["development", "production", "testing"] = "development"

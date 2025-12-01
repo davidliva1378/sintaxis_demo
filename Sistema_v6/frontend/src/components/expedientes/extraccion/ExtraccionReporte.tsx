@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { Download } from 'lucide-react'
+import { Download, FileJson, FileSpreadsheet, FileText } from 'lucide-react'
 import { ComparacionDetalladaPanel } from './ComparacionDetalladaPanel'
 import type { ExpedienteResumen } from '@/types/expediente'
 import type { ProgresoExtraccion } from '@/stores/extraccionStore'
@@ -19,6 +19,7 @@ interface ExtraccionReporteProps {
     onVolverAFiltrado: () => void
     onCerrar: () => void
     onContinuar: () => void
+    onDescargar: (formato: 'json' | 'excel' | 'csv' | 'html') => void
 }
 
 export function ExtraccionReporte({
@@ -34,7 +35,8 @@ export function ExtraccionReporte({
     motivoFinalizacion,
     onVolverAFiltrado,
     onCerrar,
-    onContinuar
+    onContinuar,
+    onDescargar
 }: ExtraccionReporteProps) {
     if (estado !== 'completado') return null
 
@@ -160,6 +162,42 @@ export function ExtraccionReporte({
                     <ComparacionDetalladaPanel comparacion={comparacion} />
                 </div>
             )}
+
+            {/* Descarga de Reportes */}
+            <div className="flex flex-col items-center gap-3 border-t pt-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Descargar Reporte
+                </h3>
+                <div className="flex gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onDescargar('json')}
+                        className="gap-2"
+                    >
+                        <FileJson className="h-4 w-4" />
+                        JSON
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onDescargar('excel')}
+                        className="gap-2"
+                    >
+                        <FileSpreadsheet className="h-4 w-4" />
+                        Excel
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onDescargar('csv')}
+                        className="gap-2"
+                    >
+                        <FileText className="h-4 w-4" />
+                        CSV
+                    </Button>
+                </div>
+            </div>
 
             {/* Botones contextuales según tipo de extracción */}
             <div className="flex flex-col items-center gap-4 pt-4">

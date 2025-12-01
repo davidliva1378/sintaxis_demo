@@ -140,14 +140,23 @@ class DIContainer:
     def actuacion_repo(self) -> IActuacionRepository:
         """Obtiene el repositorio de actuaciones."""
         if self._actuacion_repo is None:
-            workspaces_base = (
+            from infrastructure.persistence.actuaciones_mysql import MysqlActuacionRepository
+            
+            # Usar configuración de DB
+            db_config = {
+                "host": self.settings.database.host,
+                "port": self.settings.database.port,
+                "database": self.settings.database.database,
+                "user": self.settings.database.user,
+                "password": self.settings.database.password,
+            }
+            
+            workspaces_dir = (
                 self.settings.storage.base_path / self.settings.storage.workspaces_dir
             )
-            self._actuacion_repo = JsonActuacionRepository(
-                storage=self.storage,
-                workspaces_base=workspaces_base,
-            )
-            logger.debug(f"JsonActuacionRepository inicializado: {workspaces_base}")
+            
+            self._actuacion_repo = MysqlActuacionRepository(db_config, workspaces_path=workspaces_dir)
+            logger.debug("MysqlActuacionRepository inicializado")
         return self._actuacion_repo
 
     @property

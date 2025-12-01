@@ -422,21 +422,69 @@ async def obtener_actuaciones(numero: str):
 
         # Buscar el directorio del expediente
         pdf_base_path = None
+        exp_dir_path = None
         if workspaces_base.exists():
             for dir_path in workspaces_base.iterdir():
                 if dir_path.is_dir() and numero_normalizado in dir_path.name:
+                    exp_dir_path = dir_path
                     pdf_dir = dir_path / "actuaciones"
                     if pdf_dir.exists():
                         pdf_base_path = pdf_dir
                     break
 
+        # FALLBACK: Si las actuaciones de MySQL no tienen nombre_archivo, cargar desde JSON
+        actuaciones_sin_archivo = all(not act.nombre_archivo for act in actuaciones)
+        json_nombre_archivo_map = {}
+
+        if actuaciones_sin_archivo and exp_dir_path:
+            json_path = exp_dir_path / "json" / f"actuaciones-{numero_normalizado.replace('_', '-')}.json"
+            if not json_path.exists():
+                # Intentar variantes del nombre
+                json_dir = exp_dir_path / "json"
+                if json_dir.exists():
+                    for json_file in json_dir.glob("actuaciones-*.json"):
+                        json_path = json_file
+                        break
+
+            if json_path.exists():
+                try:
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        json_data = json.load(f)
+                    actuaciones_json = json_data.get("Actuaciones", [])
+                    for act_json in actuaciones_json:
+                        indice_key = act_json.get('Indice') or act_json.get('indice')
+                        nombre = (
+                            act_json.get('NombreArchivo') or
+                            act_json.get('nombre_archivo') or
+                            act_json.get('archivo')
+                        )
+                        tiene_archivo = act_json.get('TieneArchivo') or act_json.get('tiene_archivo') or False
+                        if indice_key is not None and nombre:
+                            json_nombre_archivo_map[indice_key] = {
+                                'nombre_archivo': nombre,
+                                'tiene_archivo': tiene_archivo
+                            }
+                    logger.info(f"Fallback JSON: {len(json_nombre_archivo_map)} actuaciones con archivo de {json_path.name}")
+                except Exception as e:
+                    logger.warning(f"Error leyendo JSON de actuaciones: {e}")
+
         # Convertir a response
         actuaciones_response = []
         for act in actuaciones:
+            # Usar nombre_archivo del MySQL o fallback desde JSON
+            nombre_archivo = act.nombre_archivo
+            tiene_archivo = act.tiene_archivo
+
+            # Si no tiene nombre_archivo, buscar en el mapa del JSON
+            if not nombre_archivo and act.indice in json_nombre_archivo_map:
+                json_info = json_nombre_archivo_map[act.indice]
+                nombre_archivo = json_info['nombre_archivo']
+                tiene_archivo = json_info['tiene_archivo'] or tiene_archivo
+
             # Construir ruta_pdf si tiene archivo
             ruta_pdf = None
-            if act.nombre_archivo and pdf_base_path:
-                posible_ruta = pdf_base_path / act.nombre_archivo
+            if nombre_archivo and pdf_base_path:
+                posible_ruta = pdf_base_path / nombre_archivo
                 if posible_ruta.exists():
                     ruta_pdf = str(posible_ruta)
 
@@ -450,12 +498,12 @@ async def obtener_actuaciones(numero: str):
                     detalle=act.detalle,
                     foja=act.foja,
                     firmante=None,  # La entidad no tiene firmante
-                    archivos=[act.nombre_archivo] if act.nombre_archivo else [],
+                    archivos=[nombre_archivo] if nombre_archivo else [],
                     ruta_pdf=ruta_pdf,
-                    tiene_archivo=act.tiene_archivo,
-                    nombre_archivo=act.nombre_archivo,
+                    tiene_archivo=tiene_archivo,
+                    nombre_archivo=nombre_archivo,
                     tipo_archivo=getattr(act, 'tipo_archivo', None),
-                    descargado=getattr(act, 'descargado', False),
+                    descargado=bool(ruta_pdf),  # Si existe el PDF, está descargado
                     es_historica=getattr(act, 'es_historica', False),
                 )
             )
@@ -607,49 +655,39 @@ async def obtener_texto_actuacion(numero: str, indice: int):
         conn = _get_db_connection()
         cursor = conn.cursor(dictionary=True)
 
-        # Buscar por expediente_numero y tipo (ya que ruta_pdf puede ser NULL)
-        # Primero intentamos por tipo y detalle para mayor precisión
+        # Buscar por indice (columna indice, NO id) y número de expediente
         query = """
             SELECT
                 id,
+                indice,
                 detalle,
                 texto_json,
                 tiene_texto_extraido,
                 metodo_extraccion,
                 texto_extraido
             FROM actuaciones
-            WHERE expediente_numero = %s AND tipo = %s
-            ORDER BY id
+            WHERE indice = %s AND expediente_numero = %s
         """
 
-        cursor.execute(query, (numero, actuacion.tipo))
-        rows = cursor.fetchall()
+        cursor.execute(query, (indice, numero))
+        row = cursor.fetchone()
 
-        # Si hay múltiples resultados, intentar filtrar por detalle
-        row = None
-        if rows:
-            if len(rows) == 1:
-                row = rows[0]
-            else:
-                # Buscar el que coincida mejor con el índice
-                # El índice en el frontend corresponde a la posición en la lista
-                for i, r in enumerate(rows):
-                    # Comparar por detalle si está disponible
-                    if actuacion.detalle and r.get('detalle') == actuacion.detalle:
-                        row = r
-                        break
-                # Si no encontró por detalle, usar el primero
-                if row is None:
-                    row = rows[0]
-
-        # Si no encuentra, intentar con número normalizado
+        # Si no encuentra, intentar con variantes del número
         if row is None:
-            from core.domain.utils import normalizar_numero_expediente
+            from core.domain.expediente_utils import normalizar_numero_expediente
             numero_normalizado = normalizar_numero_expediente(numero)
-            cursor.execute(query, (numero_normalizado, actuacion.tipo))
-            rows = cursor.fetchall()
-            if rows:
-                row = rows[0]
+            cursor.execute(query, (indice, numero_normalizado))
+            row = cursor.fetchone()
+
+        # Si aún no encuentra, buscar formato original (con espacios y /)
+        if row is None:
+            # Convertir FPA_000635_2017 -> FPA 000635/2017
+            import re
+            partes = re.match(r'^([A-Z]+)_(\d+)_(\d+)$', numero)
+            if partes:
+                numero_original = f"{partes.group(1)} {partes.group(2)}/{partes.group(3)}"
+                cursor.execute(query, (indice, numero_original))
+                row = cursor.fetchone()
 
         cursor.close()
         conn.close()

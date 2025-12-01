@@ -24,14 +24,22 @@ interface TextoActuacionPanelProps {
   expedienteNumero: string
   actuacionIndice: number
   nombreArchivo?: string
+  expanded?: boolean
+  onToggle?: () => void
 }
 
 export default function TextoActuacionPanel({
   expedienteNumero,
   actuacionIndice,
-  nombreArchivo
+  nombreArchivo,
+  expanded,
+  onToggle
 }: TextoActuacionPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [internalExpanded, setInternalExpanded] = useState(false)
+
+  const isExpanded = expanded !== undefined ? expanded : internalExpanded
+  const handleToggle = onToggle || (() => setInternalExpanded(!internalExpanded))
+
   const [isLoading, setIsLoading] = useState(false)
   const [texto, setTexto] = useState<TextoExtraidoResponse | null>(null)
   const [copied, setCopied] = useState(false)
@@ -113,7 +121,7 @@ export default function TextoActuacionPanel({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={handleToggle}
           >
             {isExpanded ? (
               <ChevronUp className="h-4 w-4" />
@@ -167,8 +175,8 @@ export default function TextoActuacionPanel({
 
               {/* Texto */}
               <div className="relative">
-                <div className="max-h-80 overflow-y-auto rounded-lg bg-gray-50 dark:bg-gray-900 p-3 text-sm font-mono">
-                  <pre className="whitespace-pre-wrap break-words">
+                <div className="max-h-[500px] overflow-y-auto rounded-lg bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 p-4 text-sm font-mono leading-relaxed shadow-inner">
+                  <pre className="whitespace-pre-wrap break-words text-gray-700 dark:text-gray-300 font-medium">
                     {texto.texto_normalizado || texto.texto_completo || 'Sin texto'}
                   </pre>
                 </div>
@@ -197,12 +205,22 @@ export default function TextoActuacionPanel({
               )}
             </div>
           ) : (
-            <div className="text-center py-4 text-sm text-gray-500">
-              <FileText className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-              No hay texto extraido disponible
-              <p className="text-xs mt-1">
-                Procesa el expediente para extraer el texto del PDF
+            <div className="flex flex-col items-center justify-center py-8 text-center bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-200 dark:border-gray-800">
+              <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-full mb-3">
+                <FileText className="h-6 w-6 text-gray-400" />
+              </div>
+              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                No hay texto extraído disponible
+              </h3>
+              <p className="text-xs text-gray-500 max-w-xs mb-4">
+                El texto de esta actuación no ha sido procesado o no se pudo extraer automáticamente.
               </p>
+              {nombreArchivo && (
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => toast.info(`Abre el PDF "${nombreArchivo}" desde la lista principal`)}>
+                  <FileType className="h-3 w-3" />
+                  Ver PDF Original
+                </Button>
+              )}
             </div>
           )}
         </CardContent>

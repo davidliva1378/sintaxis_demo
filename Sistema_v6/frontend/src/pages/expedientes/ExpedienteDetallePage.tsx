@@ -53,6 +53,8 @@ export default function ExpedienteDetallePage() {
     isLoading,
     obtenerExpediente,
     limpiarExpedienteActual,
+    processingStates,
+    setProcessingState,
   } = useExpedientesStore()
 
   // Estado de procesamiento
@@ -60,7 +62,11 @@ export default function ExpedienteDetallePage() {
   const [vencimientos, setVencimientos] = useState<VencimientoUrgente[]>([])
   const [actuacionesClasificadas, setActuacionesClasificadas] = useState<ActuacionPorUtilidad[]>([])
   const [isLoadingProcesamiento, setIsLoadingProcesamiento] = useState(false)
-  const [isProcessing, setIsProcessing] = useState(false)
+
+  // Estado derivado del store
+  const processingState = numero ? processingStates[numero] : undefined
+  const isProcessing = processingState?.isProcessing || false
+  const progress = processingState?.progress || { current: 0, total: 0, message: '' }
   const [isProcesado, setIsProcesado] = useState(false)
 
   useEffect(() => {
@@ -107,8 +113,6 @@ export default function ExpedienteDetallePage() {
 
   // Estado de tabs
   const [activeTab, setActiveTab] = useState('actuaciones')
-  // Estado de progreso
-  const [progress, setProgress] = useState({ current: 0, total: 0, message: '' })
   // Estado OCR
   const [usarOcr, setUsarOcr] = useState(() => {
     const saved = localStorage.getItem('procesamiento_usar_ocr')
@@ -127,8 +131,12 @@ export default function ExpedienteDetallePage() {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
-      setIsProcessing(false)
-      setProgress({ current: 0, total: 0, message: 'Cancelado por usuario' })
+      if (numero) {
+        setProcessingState(numero, {
+          isProcessing: false,
+          progress: { current: 0, total: 0, message: 'Cancelado por usuario' }
+        })
+      }
       toast.info('Procesamiento cancelado')
     }
   }
@@ -136,9 +144,13 @@ export default function ExpedienteDetallePage() {
   const handleProcesar = async () => {
     if (!expedienteActual) return
 
-    setIsProcessing(true)
+    const numeroExp = expedienteActual.numero
+
+    setProcessingState(numeroExp, {
+      isProcessing: true,
+      progress: { current: 0, total: 0, message: 'Iniciando...' }
+    })
     setActiveTab('procesamiento') // Cambiar al tab de procesamiento
-    setProgress({ current: 0, total: 0, message: 'Iniciando...' })
 
     // Crear nuevo controller
     const controller = new AbortController()
@@ -175,17 +187,29 @@ export default function ExpedienteDetallePage() {
       }, (event) => {
         // Callback de progreso
         if (event.event === 'start') {
-          setProgress({ current: 0, total: event.total, message: event.message })
+          setProcessingState(numeroExp, {
+            isProcessing: true,
+            progress: { current: 0, total: event.total, message: event.message }
+          })
         } else if (event.event === 'progress') {
-          setProgress({
-            current: event.current,
-            total: event.total,
-            message: event.message
+          setProcessingState(numeroExp, {
+            isProcessing: true,
+            progress: {
+              current: event.current,
+              total: event.total,
+              message: event.message
+            }
           })
         } else if (event.event === 'analyzing') {
-          setProgress(prev => ({ ...prev, message: event.message }))
+          setProcessingState(numeroExp, {
+            isProcessing: true,
+            progress: { ...progress, message: event.message }
+          })
         } else if (event.event === 'saving') {
-          setProgress(prev => ({ ...prev, message: event.message }))
+          setProcessingState(numeroExp, {
+            isProcessing: true,
+            progress: { ...progress, message: event.message }
+          })
         }
       })
 
@@ -204,8 +228,10 @@ export default function ExpedienteDetallePage() {
         description: error instanceof Error ? error.message : 'Error desconocido'
       })
     } finally {
-      setIsProcessing(false)
-      setProgress({ current: 0, total: 0, message: '' })
+      setProcessingState(numeroExp, {
+        isProcessing: false,
+        progress: { current: 0, total: 0, message: '' }
+      })
     }
   }
 

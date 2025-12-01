@@ -42,6 +42,7 @@ from mysql.connector import Error as MySQLError
 from application.services.extraccion_texto_service import ExtraccionTextoService
 from core.domain.expediente_utils import normalizar_numero_expediente
 from application.services.ia.ia_integration_service import IAIntegrationService
+from infrastructure.persistence.actuaciones_mysql import MysqlActuacionRepository
 
 # Importar repositorio de expedientes para obtener expediente_id
 try:
@@ -108,537 +109,7 @@ class EstadisticasProcesamiento:
 # ============================================================================
 
 
-class ActuacionesRepository:
-    """
-    Repositorio para persistir resultados de procesamiento en MySQL.
-
-    Gestiona las tablas:
-    - actuaciones: Actualiza campos de clasificación
-    - vencimientos: Inserta vencimientos detectados
-    - duplicados_detectados: Inserta duplicados encontrados
-    - procesamiento_estadisticas: Guarda estadísticas
-    """
-
-    def __init__(self, db_config: dict):
-        """
-        Inicializa el repositorio con la configuración de BD.
-
-        Args:
-            db_config: Dict con host, port, database, user, password
-        """
-        self.db_config = db_config
-        logger.info(f"ActuacionesRepository inicializado para BD: {db_config.get('database')}")
-
-    def _get_connection(self):
-        """Obtiene una conexión a la base de datos"""
-        try:
-            conn = mysql.connector.connect(**self.db_config)
-            return conn
-        except MySQLError as e:
-            logger.error(f"Error conectando a MySQL: {e}")
-            raise
-
-    def guardar_clasificacion(
-        self,
-        actuacion_id: int,
-        resultado: ResultadoProcesamiento,
-        expediente_numero: str = None,
-        actuacion_data: dict = None,
-        expediente_id: int = None
-    ) -> bool:
-        """
-        Guarda los resultados de clasificación en la tabla actuaciones.
-
-        Usa INSERT ... ON DUPLICATE KEY UPDATE para crear el registro si no existe.
-
-        Args:
-            actuacion_id: ID de la actuación
-            resultado: Resultado del procesamiento
-            expediente_numero: Número del expediente
-            actuacion_data: Dict con datos de la actuación (tipo, detalle, etc.)
-            expediente_id: ID del expediente en MySQL (opcional)
-
-        Returns:
-            True si se guardó correctamente
-        """
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
-            clasificacion = resultado.clasificacion
-
-            # Convertir UtilidadJuridica enum a string
-            utilidad_str = clasificacion.utilidad.value  # nula, baja, media, alta
-
-            # Convertir keywords_detectados a JSON
-            keywords_json = json.dumps(clasificacion.keywords_detectados) if clasificacion.keywords_detectados else None
-
-            # Hash del contenido y texto estructurado (si hay texto extraído)
-            hash_contenido = None
-            texto_extraido = None
-            texto_json = None
-            tiene_texto_extraido = False
-            metodo_extraccion = None
-
-            if resultado.texto:
-                import hashlib
-                texto_extraido = resultado.texto.texto_completo
-                hash_contenido = hashlib.md5(texto_extraido.encode()).hexdigest()
-
-                # Generar texto estructurado para almacenamiento JSON
-                extraccion_service = ExtraccionTextoService(usar_ocr=False)
-                texto_estructurado = extraccion_service.convertir_resultado(resultado)
-                if texto_estructurado:
-                    texto_json = ExtraccionTextoService.generar_json_para_db(texto_estructurado)
-                    tiene_texto_extraido = True
-                    metodo_extraccion = resultado.texto.metodo_extraccion
-
-            # Datos de la actuación
-            tipo = actuacion_data.get('tipo', '') if actuacion_data else ''
-            detalle = actuacion_data.get('detalle', '') if actuacion_data else ''
-            tiene_archivo = actuacion_data.get('tiene_archivo', False) if actuacion_data else False
-
-            # Usar INSERT ... ON DUPLICATE KEY UPDATE para crear el registro si no existe
-            query = """
-                INSERT INTO actuaciones (
-                    id,
-                    expediente_id,
-                    expediente_numero,
-                    tipo,
-                    detalle,
-                    tiene_archivo,
-                    utilidad,
-                    score,
-                    motivo_clasificacion,
-                    requiere_pdf,
-                    tiene_plazo_probable,
-                    es_duplicado_probable,
-                    keywords_detectados,
-                    fecha_clasificacion,
-                    texto_extraido,
-                    hash_contenido,
-                    texto_json,
-                    tiene_texto_extraido,
-                    metodo_extraccion
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    expediente_id = VALUES(expediente_id),
-                    expediente_numero = VALUES(expediente_numero),
-                    tipo = VALUES(tipo),
-                    detalle = VALUES(detalle),
-                    tiene_archivo = VALUES(tiene_archivo),
-                    utilidad = VALUES(utilidad),
-                    score = VALUES(score),
-                    motivo_clasificacion = VALUES(motivo_clasificacion),
-                    requiere_pdf = VALUES(requiere_pdf),
-                    tiene_plazo_probable = VALUES(tiene_plazo_probable),
-                    es_duplicado_probable = VALUES(es_duplicado_probable),
-                    keywords_detectados = VALUES(keywords_detectados),
-                    fecha_clasificacion = VALUES(fecha_clasificacion),
-                    texto_extraido = VALUES(texto_extraido),
-                    hash_contenido = VALUES(hash_contenido),
-                    texto_json = VALUES(texto_json),
-                    tiene_texto_extraido = VALUES(tiene_texto_extraido),
-                    metodo_extraccion = VALUES(metodo_extraccion)
-            """
-
-            params = (
-                actuacion_id,
-                expediente_id,
-                expediente_numero,
-                tipo,
-                detalle,
-                tiene_archivo,
-                utilidad_str,
-                clasificacion.score,
-                clasificacion.motivo,
-                clasificacion.requiere_pdf,
-                clasificacion.tiene_plazo_probable,
-                len(resultado.duplicados) > 0,  # es_duplicado_probable
-                keywords_json,
-                datetime.now(),
-                texto_extraido,
-                hash_contenido,
-                texto_json,
-                tiene_texto_extraido,
-                metodo_extraccion
-            )
-
-            cursor.execute(query, params)
-            conn.commit()
-
-            logger.debug(f"Clasificación guardada para actuación {actuacion_id}: {utilidad_str}")
-
-            cursor.close()
-            conn.close()
-
-
-
-            return True
-
-        except MySQLError as e:
-            logger.error(f"Error guardando clasificación de actuación {actuacion_id}: {e}")
-            return False
-
-    def guardar_vencimientos(
-        self,
-        actuacion_id: int,
-        expediente_numero: str,
-        vencimientos: list,
-        expediente_id: int = None
-    ) -> int:
-        """
-        Guarda vencimientos detectados en la tabla vencimientos.
-
-        Usa INSERT ON DUPLICATE KEY UPDATE para evitar duplicados cuando
-        se reprocesa el mismo expediente.
-
-        Args:
-            actuacion_id: ID de la actuación
-            expediente_numero: Número de expediente
-            vencimientos: Lista de objetos Vencimiento
-            expediente_id: ID del expediente en MySQL (opcional)
-
-        Returns:
-            Cantidad de vencimientos guardados
-        """
-        if not vencimientos:
-            return 0
-
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
-            # Usar INSERT ON DUPLICATE KEY UPDATE para deduplicación
-            query = """
-                INSERT INTO vencimientos (
-                    actuacion_id,
-                    expediente_numero,
-                    expediente_id,
-                    tipo,
-                    fecha_notificacion,
-                    plazo_dias,
-                    fecha_vencimiento,
-                    dias_habiles,
-                    descripcion,
-                    texto_fuente,
-                    confianza,
-                    estado
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    fecha_notificacion = VALUES(fecha_notificacion),
-                    plazo_dias = VALUES(plazo_dias),
-                    dias_habiles = VALUES(dias_habiles),
-                    descripcion = VALUES(descripcion),
-                    texto_fuente = VALUES(texto_fuente),
-                    confianza = VALUES(confianza)
-            """
-
-            guardados = 0
-            for venc in vencimientos:
-                params = (
-                    actuacion_id,
-                    expediente_numero,
-                    expediente_id,
-                    venc.tipo.value,  # Enum a string
-                    venc.fecha_notificacion,
-                    venc.plazo_dias,
-                    venc.fecha_vencimiento,
-                    venc.dias_habiles,
-                    venc.descripcion,
-                    venc.texto_fuente,
-                    venc.confianza,
-                    'pendiente'
-                )
-
-                cursor.execute(query, params)
-                guardados += 1
-
-            conn.commit()
-            logger.info(f"Guardados {guardados} vencimientos para actuación {actuacion_id}")
-
-            cursor.close()
-            conn.close()
-
-            return guardados
-
-        except MySQLError as e:
-            logger.error(f"Error guardando vencimientos: {e}")
-            return 0
-
-    def guardar_duplicados(
-        self,
-        duplicados: list,
-        expediente_numero: str
-    ) -> int:
-        """
-        Guarda duplicados detectados en la tabla duplicados_detectados.
-
-        Args:
-            duplicados: Lista de objetos DuplicadoDetectado
-            expediente_numero: Número de expediente
-
-        Returns:
-            Cantidad de duplicados guardados
-        """
-        if not duplicados:
-            return 0
-
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
-            query = """
-                INSERT INTO duplicados_detectados (
-                    actuacion_original_id,
-                    actuacion_duplicada_id,
-                    tipo,
-                    similitud,
-                    hash_normalizado,
-                    motivo
-                ) VALUES (%s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    similitud = VALUES(similitud),
-                    motivo = VALUES(motivo)
-            """
-
-            guardados = 0
-            for dup in duplicados:
-                params = (
-                    dup.actuacion_id_original,
-                    dup.actuacion_id_duplicada,
-                    dup.tipo.value,  # Enum a string
-                    dup.similitud,
-                    dup.hash_normalizado,
-                    dup.motivo
-                )
-
-                cursor.execute(query, params)
-                guardados += 1
-
-            conn.commit()
-            logger.info(f"Guardados {guardados} duplicados para expediente {expediente_numero}")
-
-            cursor.close()
-            conn.close()
-
-            return guardados
-
-        except MySQLError as e:
-            logger.error(f"Error guardando duplicados: {e}")
-            return 0
-
-    def guardar_estadisticas(
-        self,
-        estadisticas: EstadisticasProcesamiento,
-        expediente_id: int = None
-    ) -> bool:
-        """
-        Guarda estadísticas de procesamiento.
-
-        Usa INSERT ON DUPLICATE KEY UPDATE para mantener solo el último
-        registro de estadísticas por expediente (evita duplicados).
-
-        Args:
-            estadisticas: Objeto EstadisticasProcesamiento
-            expediente_id: ID del expediente en MySQL (opcional)
-
-        Returns:
-            True si se guardó correctamente
-        """
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
-            # Usar INSERT ON DUPLICATE KEY UPDATE para deduplicación
-            query = """
-                INSERT INTO procesamiento_estadisticas (
-                    expediente_numero,
-                    expediente_id,
-                    fecha_procesamiento,
-                    total_actuaciones,
-                    actuaciones_alta,
-                    actuaciones_media,
-                    actuaciones_baja,
-                    actuaciones_nula,
-                    reduccion_estimada_pct,
-                    vencimientos_detectados,
-                    vencimientos_urgentes,
-                    duplicados_detectados,
-                    tiempo_procesamiento_seg,
-                    version_procesador
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    fecha_procesamiento = VALUES(fecha_procesamiento),
-                    total_actuaciones = VALUES(total_actuaciones),
-                    actuaciones_alta = VALUES(actuaciones_alta),
-                    actuaciones_media = VALUES(actuaciones_media),
-                    actuaciones_baja = VALUES(actuaciones_baja),
-                    actuaciones_nula = VALUES(actuaciones_nula),
-                    reduccion_estimada_pct = VALUES(reduccion_estimada_pct),
-                    vencimientos_detectados = VALUES(vencimientos_detectados),
-                    vencimientos_urgentes = VALUES(vencimientos_urgentes),
-                    duplicados_detectados = VALUES(duplicados_detectados),
-                    tiempo_procesamiento_seg = VALUES(tiempo_procesamiento_seg),
-                    version_procesador = VALUES(version_procesador)
-            """
-
-            params = (
-                estadisticas.expediente_numero,
-                expediente_id,
-                datetime.now(),
-                estadisticas.total_actuaciones,
-                estadisticas.actuaciones_alta,
-                estadisticas.actuaciones_media,
-                estadisticas.actuaciones_baja,
-                estadisticas.actuaciones_nula,
-                estadisticas.reduccion_estimada_pct,
-                estadisticas.vencimientos_detectados,
-                estadisticas.vencimientos_urgentes,
-                estadisticas.duplicados_detectados,
-                estadisticas.tiempo_procesamiento_seg,
-                estadisticas.version_procesador
-            )
-
-            cursor.execute(query, params)
-            conn.commit()
-
-            logger.info(f"Estadísticas guardadas para expediente {estadisticas.expediente_numero}")
-
-            cursor.close()
-            conn.close()
-
-            return True
-
-        except MySQLError as e:
-            logger.error(f"Error guardando estadísticas: {e}")
-            return False
-
-    def guardar_entidades(
-        self,
-        entidades: list,
-        expediente_numero: str,
-        actuacion_id: int = None
-    ) -> int:
-        """
-        Guarda entidades extraídas en la tabla entidades_extraidas.
-
-        Args:
-            entidades: Lista de dicts con datos de entidades
-            expediente_numero: Número de expediente
-            actuacion_id: ID de la actuación (opcional)
-
-        Returns:
-            Cantidad de entidades guardadas
-        """
-        if not entidades:
-            return 0
-
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
-            # 1. Eliminar entidades existentes para esta actuación (solo las automáticas)
-            # Esto evita duplicados al reprocesar y mantiene actualizada la lista
-            if actuacion_id:
-                delete_query = "DELETE FROM entidades_extraidas WHERE actuacion_id = %s AND origen = 'ia'"
-                cursor.execute(delete_query, (actuacion_id,))
-
-            # 2. Insertar nuevas entidades
-            query = """
-                INSERT INTO entidades_extraidas (
-                    expediente_numero,
-                    actuacion_id,
-                    entity_type,
-                    entity_value,
-                    score,
-                    start_pos,
-                    end_pos,
-                    origen
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """
-
-            guardados = 0
-            for ent in entidades:
-                # Validar campos obligatorios
-                if not ent.get('text') or not ent.get('label'):
-                    continue
-
-                params = (
-                    expediente_numero,
-                    actuacion_id,
-                    ent.get('label'),       # entity_type
-                    ent.get('text'),        # entity_value
-                    ent.get('score', 0.0),
-                    ent.get('start', 0),
-                    ent.get('end', 0),
-                    'ia'
-                )
-
-                cursor.execute(query, params)
-                guardados += 1
-
-            conn.commit()
-            logger.debug(f"Guardadas {guardados} entidades para actuación {actuacion_id} (previas eliminadas)")
-
-            cursor.close()
-            conn.close()
-
-            return guardados
-
-        except MySQLError as e:
-            logger.error(f"Error guardando entidades: {e}")
-            return 0
-
-    def actualizar_clasificacion_ia(self, actuacion_id: int, resultado_ia: dict) -> bool:
-        """
-        Actualiza los campos de IA en la tabla actuaciones.
-        """
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-
-            clasif_ia = resultado_ia.get("clasificacion")
-            indexado = resultado_ia.get("indexado", False)
-
-            if clasif_ia:
-                update_query = """
-                    UPDATE actuaciones 
-                    SET tipo_ia = %s,
-                        confianza_ia = %s,
-                        justificacion_ia = %s,
-                        metodo_ia = %s,
-                        fecha_clasificacion_ia = NOW(),
-                        indexado_rag = %s
-                    WHERE id = %s
-                """
-                cursor.execute(update_query, (
-                    clasif_ia.get("tipo"),
-                    clasif_ia.get("confianza"),
-                    clasif_ia.get("justificacion"),
-                    clasif_ia.get("metodo"),
-                    indexado,
-                    actuacion_id
-                ))
-            elif indexado:
-                # Solo actualizar indexado_rag si no hay clasificación
-                cursor.execute(
-                    "UPDATE actuaciones SET indexado_rag = %s WHERE id = %s",
-                    (True, actuacion_id)
-                )
-
-            conn.commit()
-            updated = cursor.rowcount > 0
-            cursor.close()
-            conn.close()
-            
-            if updated:
-                logger.debug(f"IA actualizada para actuación {actuacion_id}")
-            return updated
-
-        except MySQLError as e:
-            logger.error(f"Error actualizando IA: {e}")
-            return False
+# ActuacionesRepository removido (usar MysqlActuacionRepository)
 
 # ============================================================================
 # Servicio Principal
@@ -674,20 +145,42 @@ class ProcesadorActuacionesService:
         ... )
     """
 
-    def __init__(self, db_config: dict):
+    def __init__(self, db_config: dict, base_dir: Path = None):
         """
-        Inicializa el servicio de procesamiento.
+        Inicializa el servicio.
 
         Args:
-            db_config: Configuración de base de datos
+            db_config: Configuración de BD
+            base_dir: Directorio base para archivos (opcional)
         """
-        self.repository = ActuacionesRepository(db_config)
-        self.ia_service = IAIntegrationService(
-            habilitar_clasificacion=True,
-            habilitar_rag=True,
-            habilitar_ner=True
-        )
-        logger.info("ProcesadorActuacionesService inicializado")
+        self.db_config = db_config
+        self.base_dir = base_dir or Path("data")
+        
+        # Inicializar repositorio usando MysqlActuacionRepository
+        self.repository = MysqlActuacionRepository(db_config)
+        
+        # Inicializar servicio de integración IA si está disponible
+        self.ia_service = None
+        if _ia_integration_available:
+            try:
+                self.ia_service = get_ia_integration_service()
+                logger.info("Servicio de Integración IA inicializado")
+            except Exception as e:
+                logger.warning(f"No se pudo inicializar servicio IA: {e}")
+
+    def _get_expediente_id(self, numero_expediente: str) -> Optional[int]:
+        """Obtiene el ID del expediente desde MySQL."""
+        try:
+            conn = self.repository._get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM expedientes WHERE numero_normalizado = %s OR numero_original = %s", (numero_expediente, numero_expediente))
+            row = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            return row[0] if row else None
+        except Exception as e:
+            logger.error(f"Error obteniendo ID de expediente {numero_expediente}: {e}")
+            return None
 
     async def procesar_actuacion_individual(
         self,
@@ -718,24 +211,100 @@ class ProcesadorActuacionesService:
 
         # Guardar en BD si se solicita
         if guardar_en_bd:
-            actuacion_id = actuacion.get('id')
+            indice = actuacion.get('id') # El 'id' del input es el índice
             expediente_numero = actuacion.get('expediente_numero', '')
-            if actuacion_id:
-                self.repository.guardar_clasificacion(
-                    actuacion_id,
+            
+            # Resolver expediente_id
+            expediente_id = self._get_expediente_id(expediente_numero)
+            
+            if indice and expediente_id:
+                real_id = self.repository.guardar_clasificacion(
+                    indice,
                     resultado,
                     expediente_numero=expediente_numero,
-                    actuacion_data=actuacion
+                    actuacion_data=actuacion,
+                    expediente_id=expediente_id,
+                    ruta_pdf=ruta_pdf
                 )
 
-                if resultado.vencimientos:
-                    self.repository.guardar_vencimientos(
-                        actuacion_id,
-                        expediente_numero,
-                        resultado.vencimientos
-                    )
+                if real_id:
+                    # Actualizar ID en el resultado para que coincida con BD
+                    resultado.actuacion_id = real_id
+                    
+                    if resultado.vencimientos:
+                        self.repository.guardar_vencimientos(
+                            real_id,
+                            expediente_numero,
+                            resultado.vencimientos,
+                            expediente_id=expediente_id
+                        )
+                    
+                    # Guardar entidades si existen
+                    if hasattr(resultado, 'entidades') and resultado.entidades:
+                         self.repository.guardar_entidades(
+                            resultado.entidades,
+                            expediente_numero,
+                            actuacion_id=real_id
+                        )
+            elif not expediente_id:
+                logger.warning(f"No se encontró expediente_id para {expediente_numero}, no se guardó actuación.")
 
         return resultado
+
+    async def procesar_desde_json(
+        self,
+        numero_expediente: str,
+        ruta_json: str,
+        guardar_en_bd: bool = True
+    ) -> dict:
+        """
+        Procesa actuaciones desde un archivo JSON y las persiste en MySQL.
+
+        Args:
+            numero_expediente: Número del expediente
+            ruta_json: Ruta al archivo JSON con las actuaciones
+            guardar_en_bd: Si guardar resultados en BD
+
+        Returns:
+            Dict con estadísticas del procesamiento
+        """
+        import json
+        from pathlib import Path
+
+        # Cargar JSON
+        json_path = Path(ruta_json)
+        if not json_path.exists():
+            raise FileNotFoundError(f"No se encontró el archivo JSON: {ruta_json}")
+
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        # Extraer actuaciones del JSON
+        # Intentar diferentes formatos
+        actuaciones = (
+            data.get("actuaciones_actuales", []) +
+            data.get("actuaciones_historicas", [])
+        )
+        
+        # Formato alternativo
+        if not actuaciones:
+            actuaciones = data.get("Actuaciones", [])
+
+        if not actuaciones:
+            logger.warning(f"No se encontraron actuaciones en {ruta_json}")
+            return {
+                "total_actuaciones": 0,
+                "actuaciones_procesadas": 0,
+                "error": "No se encontraron actuaciones en el JSON"
+            }
+
+        # Procesar con el método existente
+        return await self.procesar_expediente_completo(
+            numero_expediente=numero_expediente,
+            actuaciones=actuaciones,
+            rutas_pdf=None,  # No hay PDFs en este flujo
+            guardar_en_bd=guardar_en_bd
+        )
 
     async def procesar_expediente_completo(
         self,
@@ -879,7 +448,7 @@ class ProcesadorActuacionesService:
             if _expedientes_repo_available:
                 try:
                     # numero_normalizado ya se obtiene al inicio del método
-                    repo_expedientes = get_expedientes_repository()
+                    repo_expedientes = get_expedientes_repository(self.db_config)
                     expediente_id = repo_expedientes.obtener_id(numero_normalizado)
                     if expediente_id:
                         logger.debug(f"Obtenido expediente_id {expediente_id} para {numero_expediente}")
@@ -890,21 +459,28 @@ class ProcesadorActuacionesService:
             # Guardar clasificaciones individuales y extraer entidades
             entidades_por_actuacion = {}
             for actuacion in actuaciones:
-                act_id = actuacion.get('id')
+                act_id = actuacion.get('id') or actuacion.get('Indice')
                 if act_id and act_id in resultado_procesamiento['resultados']:
                     resultado = resultado_procesamiento['resultados'][act_id]
-                    self.repository.guardar_clasificacion(
+                    
+                    # Guardar clasificación y obtener ID real
+                    real_id = self.repository.guardar_clasificacion(
                         act_id,
                         resultado,
                         expediente_numero=numero_expediente,
                         actuacion_data=actuacion,
-                        expediente_id=expediente_id
+                        expediente_id=expediente_id,
+                        ruta_pdf=rutas_pdf.get(act_id) if rutas_pdf else None
                     )
+
+                    if not real_id:
+                        logger.warning(f"No se pudo guardar clasificación para actuación {act_id}")
+                        continue
 
                     # Guardar vencimientos
                     if resultado.vencimientos:
                         self.repository.guardar_vencimientos(
-                            act_id,
+                            real_id,
                             numero_expediente,
                             resultado.vencimientos,
                             expediente_id=expediente_id
@@ -915,7 +491,7 @@ class ProcesadorActuacionesService:
                         metadata_ia = {
                             "expediente_id": expediente_id,
                             "expediente_numero": numero_expediente,
-                            "actuacion_id": act_id,
+                            "actuacion_id": real_id,
                             "tipo": actuacion.get("tipo", "DESCONOCIDO"),
                             "detalle": actuacion.get("detalle", "") or actuacion.get("descripcion", ""),
                             "fecha": actuacion.get("fecha", "")
@@ -938,7 +514,7 @@ class ProcesadorActuacionesService:
                         if texto_ia:
                             # Llamada unificada a IA
                             res_ia = self.ia_service.procesar_actuacion(
-                                actuacion_id=str(act_id),
+                                actuacion_id=str(real_id),
                                 texto=texto_ia,
                                 metadata=metadata_ia,
                                 clasificar=True,
@@ -948,12 +524,12 @@ class ProcesadorActuacionesService:
                             
                             # Actualizar DB y Entidades
                             if res_ia and not res_ia.get("skipped"):
-                                self.repository.actualizar_clasificacion_ia(act_id, res_ia)
+                                self.repository.actualizar_clasificacion_ia(real_id, res_ia)
                                 if res_ia.get("entidades"):
                                     entidades_por_actuacion[act_id] = res_ia["entidades"]
                                 
                                 if res_ia.get("indexado"):
-                                    logger.debug(f"Actuación {act_id} procesada por IA (Origen: {origen_texto})")
+                                    logger.debug(f"Actuación {real_id} (idx {act_id}) procesada por IA (Origen: {origen_texto})")
 
                     # Fallback Manual (Solo si IA NO disponible)
                     elif resultado.texto and resultado.texto.texto_completo:
@@ -963,9 +539,9 @@ class ProcesadorActuacionesService:
                              self.repository.guardar_entidades(
                                  entidades, 
                                  numero_expediente, 
-                                 actuacion_id=act_id
+                                 actuacion_id=real_id
                              )
-                             logger.debug(f"Entidades extraídas manualmente para {act_id}")
+                             logger.debug(f"Entidades extraídas manualmente para {real_id} (idx {act_id})")
 
             # Guardar duplicados
             if resultado_procesamiento['duplicados_detectados']:
@@ -1104,6 +680,15 @@ class ProcesadorActuacionesService:
 
             cursor.execute(query, (numero_expediente,))
             estadisticas = cursor.fetchone()
+
+            # Si no encuentra, intentar con formato original (FPA_000635_2017 -> FPA 000635/2017)
+            if estadisticas is None:
+                import re
+                partes = re.match(r'^([A-Z]+)_(\d+)_(\d+)$', numero_expediente)
+                if partes:
+                    numero_original = f"{partes.group(1)} {partes.group(2)}/{partes.group(3)}"
+                    cursor.execute(query, (numero_original,))
+                    estadisticas = cursor.fetchone()
 
             cursor.close()
             conn.close()
