@@ -3,25 +3,24 @@
  */
 
 import { apiClient } from './client'
-import type { VencimientoUrgente, NivelUrgencia } from '@/types/procesamiento'
+import type {
+  VencimientoUrgente,
+  FiltrosVencimientos,
+  EstadisticasVencimientosSimple
+} from '@/types/vencimiento'
+import { FILTROS_TEMPORALES } from '@/types/vencimiento'
 
-// === Tipos ===
+// Re-exportar tipos para compatibilidad
+export type { VencimientoUrgente, FiltrosVencimientos }
+export { FILTROS_TEMPORALES }
+export type FiltroTemporalKey = keyof typeof FILTROS_TEMPORALES
 
-export interface VencimientoGlobal extends VencimientoUrgente {
-  fecha_notificacion?: string
-}
-
-export interface FiltrosVencimientos {
-  dias_desde?: number         // Desde hace X días (para incluir vencidos)
-  dias_hasta?: number         // Hasta X días adelante
-  nivel_urgencia?: NivelUrgencia | 'todos'
-  ocultarVencidos?: boolean   // No mostrar ya vencidos
-  expediente?: string         // Filtrar por expediente
-  limite?: number
-}
+// Alias para compatibilidad
+export type VencimientoGlobal = VencimientoUrgente
+export type EstadisticasVencimientos = EstadisticasVencimientosSimple
 
 export interface VencimientosResponse {
-  vencimientos: VencimientoGlobal[]
+  vencimientos: VencimientoUrgente[]
   total: number
   filtros_aplicados?: {
     dias_desde: number
@@ -30,71 +29,70 @@ export interface VencimientosResponse {
   }
 }
 
-export interface EstadisticasVencimientos {
-  total: number
-  vencidos: number
-  criticos: number
-  urgentes: number
-  proximos: number
-  normales: number
-}
-
-// === Filtros predefinidos ===
-
-export const FILTROS_TEMPORALES = {
-  HOY: { label: 'Vence hoy', dias_desde: 0, dias_hasta: 0 },
-  PROXIMOS_3_DIAS: { label: 'Próximos 3 días', dias_desde: 0, dias_hasta: 3 },
-  PROXIMOS_7_DIAS: { label: 'Próximos 7 días', dias_desde: 0, dias_hasta: 7 },
-  PROXIMOS_15_DIAS: { label: 'Próximos 15 días', dias_desde: 0, dias_hasta: 15 },
-  PROXIMOS_30_DIAS: { label: 'Próximos 30 días', dias_desde: 0, dias_hasta: 30 },
-  ULTIMOS_7_DIAS: { label: 'Últimos 7 días (vencidos)', dias_desde: -7, dias_hasta: 0 },
-  TODOS: { label: 'Todos', dias_desde: -30, dias_hasta: 30 },
-} as const
-
-export type FiltroTemporalKey = keyof typeof FILTROS_TEMPORALES
-
 // === API ===
 
 export const vencimientosApi = {
   /**
-   * Obtiene vencimientos globales con filtros
+   * Obtiene vencimientos globales con filtros (filtrado en backend)
    */
   async getVencimientos(filtros: FiltrosVencimientos = {}): Promise<VencimientosResponse> {
-    const params = new URLSearchParams()
+    // Construir parámetros para el endpoint /api/v1/vencimientos
+    const params: Record<string, string | number | boolean> = {
+      limite: filtros.limite ?? 100,
+      offset: filtros.offset ?? 0,
+    }
 
-    // El endpoint existente usa dias_adelante, calculamos basado en filtros
-    const diasAdelante = filtros.dias_hasta ?? 7
-    params.append('limite', String(filtros.limite ?? 100))
+    // Filtros de expediente
+    if (filtros.expediente || filtros.expediente_numero) {
+      params.expediente = filtros.expediente || filtros.expediente_numero || ''
+    }
+
+    // Filtros de fechas
+    if (filtros.dias_desde !== undefined && filtros.dias_hasta !== undefined) {
+      // Calcular fechas desde/hasta basado en días relativos
+      const hoy = new Date()
+      const desde = new Date(hoy)
+      desde.setDate(hoy.getDate() + filtros.dias_desde)
+      const hasta = new Date(hoy)
+      hasta.setDate(hoy.getDate() + filtros.dias_hasta)
+
+      params.desde = desde.toISOString().split('T')[0]
+      params.hasta = hasta.toISOString().split('T')[0]
+    } else if (filtros.fecha_desde) {
+      params.desde = filtros.fecha_desde
+    }
+    if (filtros.fecha_hasta) {
+      params.hasta = filtros.fecha_hasta
+    }
+
+    // Filtro de estado
+    if (filtros.estado) {
+      params.estado = filtros.estado
+    }
+
+    // Filtro de tipo
+    if (filtros.tipo) {
+      params.tipo = filtros.tipo
+    }
+
+    // Filtro de urgencia
+    if (filtros.nivel_urgencia && filtros.nivel_urgencia !== 'todos') {
+      params.urgencia = filtros.nivel_urgencia
+    }
+
+    // Solo pendientes si se ocultan vencidos
+    if (filtros.ocultarVencidos) {
+      params.solo_pendientes = true
+    }
 
     const response = await apiClient.get<{ vencimientos: VencimientoGlobal[], total: number }>(
-      `/api/v1/dashboard/vencimientos-urgentes?${params.toString()}`
+      '/api/v1/vencimientos',
+      { params }
     )
 
-    let vencimientos = response.data.vencimientos || []
-
-    // Aplicar filtros del lado del cliente
-    if (filtros.dias_desde !== undefined) {
-      vencimientos = vencimientos.filter(v => v.dias_restantes >= filtros.dias_desde!)
-    }
-    if (filtros.dias_hasta !== undefined) {
-      vencimientos = vencimientos.filter(v => v.dias_restantes <= filtros.dias_hasta!)
-    }
-    if (filtros.ocultarVencidos) {
-      vencimientos = vencimientos.filter(v => v.dias_restantes >= 0)
-    }
-    if (filtros.nivel_urgencia && filtros.nivel_urgencia !== 'todos') {
-      vencimientos = vencimientos.filter(v => v.nivel_urgencia === filtros.nivel_urgencia)
-    }
-    if (filtros.expediente) {
-      const exp = filtros.expediente.toLowerCase()
-      vencimientos = vencimientos.filter(v =>
-        v.expediente_numero.toLowerCase().includes(exp)
-      )
-    }
-
     return {
-      vencimientos,
-      total: vencimientos.length,
+      vencimientos: response.data.vencimientos || [],
+      total: response.data.total,
       filtros_aplicados: {
         dias_desde: filtros.dias_desde ?? -7,
         dias_hasta: filtros.dias_hasta ?? 7,
@@ -104,44 +102,105 @@ export const vencimientosApi = {
   },
 
   /**
-   * Obtiene estadísticas de vencimientos
+   * Obtiene estadísticas de vencimientos desde el backend
    */
   async getEstadisticas(): Promise<EstadisticasVencimientos> {
-    const response = await this.getVencimientos({ dias_desde: -30, dias_hasta: 30, limite: 500 })
+    try {
+      // Intentar usar el endpoint de estadísticas si existe
+      const response = await apiClient.get<{
+        total: number
+        pendientes: number
+        vencidos: number
+        atendidos: number
+        cancelados: number
+        criticos_hoy: number
+        urgentes_3_dias: number
+        proximos_7_dias: number
+        por_tipo: Record<string, number>
+      }>('/api/v1/vencimientos/estadisticas')
 
-    const stats: EstadisticasVencimientos = {
-      total: response.total,
-      vencidos: 0,
-      criticos: 0,
-      urgentes: 0,
-      proximos: 0,
-      normales: 0
-    }
-
-    for (const v of response.vencimientos) {
-      switch (v.nivel_urgencia) {
-        case 'vencido': stats.vencidos++; break
-        case 'critico': stats.criticos++; break
-        case 'urgente': stats.urgentes++; break
-        case 'proximo': stats.proximos++; break
-        default: stats.normales++
+      // Mapear a formato simple
+      return {
+        total: response.data.total,
+        vencidos: response.data.vencidos,
+        criticos: response.data.criticos_hoy,
+        urgentes: response.data.urgentes_3_dias,
+        proximos: response.data.proximos_7_dias,
+        normales: response.data.total - response.data.vencidos - response.data.criticos_hoy -
+                  response.data.urgentes_3_dias - response.data.proximos_7_dias
       }
-    }
+    } catch {
+      // Fallback: calcular desde vencimientos
+      const response = await this.getVencimientos({ dias_desde: -30, dias_hasta: 30, limite: 500 })
 
-    return stats
+      const stats: EstadisticasVencimientos = {
+        total: response.total,
+        vencidos: 0,
+        criticos: 0,
+        urgentes: 0,
+        proximos: 0,
+        normales: 0
+      }
+
+      for (const v of response.vencimientos) {
+        switch (v.nivel_urgencia) {
+          case 'vencido': stats.vencidos++; break
+          case 'critico': stats.criticos++; break
+          case 'urgente': stats.urgentes++; break
+          case 'proximo': stats.proximos++; break
+          default: stats.normales++
+        }
+      }
+
+      return stats
+    }
   },
 
   /**
    * Obtiene vencimientos para un expediente específico
    */
   async getVencimientosExpediente(expedienteNumero: string): Promise<VencimientoGlobal[]> {
-    const response = await this.getVencimientos({
-      expediente: expedienteNumero,
-      dias_desde: -30,
-      dias_hasta: 60,
-      limite: 100
+    try {
+      // Usar endpoint específico si existe
+      const response = await apiClient.get<{ vencimientos: VencimientoGlobal[] }>(
+        `/api/v1/vencimientos/expediente/${encodeURIComponent(expedienteNumero)}`
+      )
+      return response.data.vencimientos || []
+    } catch {
+      // Fallback: usar filtro general
+      const response = await this.getVencimientos({
+        expediente: expedienteNumero,
+        dias_desde: -30,
+        dias_hasta: 60,
+        limite: 100
+      })
+      return response.vencimientos
+    }
+  },
+
+  /**
+   * Elimina un vencimiento
+   */
+  async eliminarVencimiento(id: number): Promise<void> {
+    await apiClient.delete(`/api/v1/vencimientos/${id}`)
+  },
+
+  /**
+   * Marca un vencimiento como atendido
+   */
+  async atenderVencimiento(id: number, notas?: string): Promise<void> {
+    await apiClient.post(`/api/v1/vencimientos/${id}/atender`, null, {
+      params: notas ? { notas } : undefined
     })
-    return response.vencimientos
+  },
+
+  /**
+   * Cancela un vencimiento
+   */
+  async cancelarVencimiento(id: number, notas?: string): Promise<void> {
+    await apiClient.post(`/api/v1/vencimientos/${id}/cancelar`, null, {
+      params: notas ? { notas } : undefined
+    })
   }
 }
 

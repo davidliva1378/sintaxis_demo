@@ -52,10 +52,19 @@ from __future__ import annotations
 import logging
 from dotenv import load_dotenv
 import os
+import sys
 
 # Cargar variables de entorno explícitamente para asegurar que
 # módulos que usan os.getenv() (como mysql_pool.py) funcionen correctamente
 load_dotenv()
+
+# Configurar logging básico para que los mensajes del lifespan se muestren
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s:     %(message)s",
+    stream=sys.stdout
+)
+
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -83,14 +92,17 @@ from .routers import (
     escritos,
     expedientes,
     extraccion_masiva,
+    feriados,
     health,
     ia,
     mcp,
     monitoreo,
+    notificaciones,
     procesamiento,
     rag,
     tipos_entidad,
     tools,
+    vencimientos,
     workspaces,
     logs,
     classification,
@@ -106,36 +118,41 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     Se ejecuta al inicio y al final de la aplicación.
     """
     # Startup
-    logger.info("Iniciando Sistema PJN API v6...")
+    print("\n" + "=" * 60)
+    print("🚀 Iniciando Sistema PJN API v6...")
+    print("=" * 60)
+
     settings = get_settings()
-    logger.info(f"API configurada en: {settings.api.host}:{settings.api.port}")
-    logger.info(f"Base path: {settings.storage.base_path}")
+    print(f"📍 API configurada en: {settings.api.host}:{settings.api.port}")
+    print(f"📁 Base path: {settings.storage.base_path}")
 
     # Iniciar scheduler de monitoreo automáticamente si está activo en MySQL
     container = get_container()
     scheduler = container.monitor_scheduler
 
     try:
-        logger.info("Verificando configuración de monitoreo...")
+        print("\n🔍 Verificando configuración de monitoreo en MySQL...")
         monitoreo_service = container.monitoreo_service
         config_db = monitoreo_service.repository.obtener_configuracion(usuario_id=1)
 
         if config_db and config_db.get('activo'):
-            logger.info("Configuración de monitoreo activa en MySQL, iniciando scheduler...")
+            print("✓ Configuración de monitoreo activa, iniciando scheduler...")
             await scheduler.start()
             estado = scheduler.obtener_estado()
-            logger.info(
-                f"✓ MonitorSchedulerService iniciado: "
-                f"intervalo={estado.get('intervalo_actual_minutos')}min, "
-                f"horario_laboral={estado.get('es_horario_laboral')}, "
-                f"próxima_ejecución={estado.get('proxima_ejecucion')}"
+            print(
+                f"✅ MonitorSchedulerService ACTIVO:\n"
+                f"   • Intervalo: {estado.get('intervalo_actual_minutos')} minutos\n"
+                f"   • Horario laboral: {'Sí' if estado.get('es_horario_laboral') else 'No'}\n"
+                f"   • Próxima ejecución: {estado.get('proxima_ejecucion')}"
             )
         else:
-            logger.info("Monitoreo no activo en MySQL, scheduler no iniciado")
-            logger.info("Para activar el monitoreo, use POST /api/v1/monitoreo/start")
+            print("ℹ️  Monitoreo no activo en MySQL, scheduler no iniciado")
+            print("   Para activar: POST /api/v1/monitoreo/start")
     except Exception as e:
-        logger.error(f"Error al iniciar scheduler automáticamente: {e}")
-        logger.info("El scheduler se puede iniciar manualmente via POST /api/v1/monitoreo/start")
+        print(f"⚠️  Error al iniciar scheduler: {e}")
+        print("   El scheduler se puede iniciar manualmente via POST /api/v1/monitoreo/start")
+
+    print("=" * 60 + "\n")
 
     yield
 
@@ -230,6 +247,9 @@ app.include_router(tipos_entidad.router, prefix="/api/v1", tags=["tipos_entidad"
 app.include_router(rag.router, tags=["rag"])
 app.include_router(classification.router, prefix="/api/v1", tags=["classification"])
 app.include_router(dashboard.router, prefix="/api/v1", tags=["dashboard"])
+app.include_router(feriados.router, prefix="/api/v1", tags=["feriados"])
+app.include_router(vencimientos.router, prefix="/api/v1", tags=["vencimientos"])
+app.include_router(notificaciones.router, prefix="/api/v1/notificaciones", tags=["notificaciones"])
 
 
 # === Root Endpoint ===

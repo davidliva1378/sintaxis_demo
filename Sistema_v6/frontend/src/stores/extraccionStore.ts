@@ -53,6 +53,12 @@ interface ExtraccionState {
     }>
     // Total esperado reportado por PJN
     total_esperado: number | null
+    // Campos de feedback de procesamiento detallado
+    expediente_procesando: string | null
+    actuacion_actual: number
+    actuaciones_total: number
+    fase_procesamiento: string
+    mensaje_procesamiento: string
 
     // Acciones
     iniciarExtraccionMasivaAvanzada: (config: ConfigExtraccion) => Promise<string>
@@ -94,6 +100,12 @@ export const useExtraccionStore = create<ExtraccionState>((set, get) => ({
     intentos_maximos: 3,
     historial_intentos: [],
     total_esperado: null,
+    // Campos de feedback de procesamiento detallado
+    expediente_procesando: null,
+    actuacion_actual: 0,
+    actuaciones_total: 0,
+    fase_procesamiento: '',
+    mensaje_procesamiento: '',
 
     iniciarExtraccionMasivaAvanzada: async (config: ConfigExtraccion): Promise<string> => {
         try {
@@ -340,6 +352,12 @@ export const useExtraccionStore = create<ExtraccionState>((set, get) => ({
                 intentos_maximos: data.intentos_maximos || 3,
                 historial_intentos: data.historial_intentos || [],
                 total_esperado: data.metadata?.total_esperado || null,
+                // Campos de feedback de procesamiento detallado
+                expediente_procesando: data.expediente_procesando || null,
+                actuacion_actual: data.actuacion_actual || 0,
+                actuaciones_total: data.actuaciones_total || 0,
+                fase_procesamiento: data.fase_procesamiento || '',
+                mensaje_procesamiento: data.mensaje_procesamiento || '',
                 progreso: {
                     actual: data.progreso_actual || 0,
                     total: data.progreso_total || 0,
@@ -518,6 +536,12 @@ export const useExtraccionStore = create<ExtraccionState>((set, get) => ({
             intentos_realizados: 0,
             historial_intentos: [],
             total_esperado: null,
+            // Reset campos de feedback de procesamiento
+            expediente_procesando: null,
+            actuacion_actual: 0,
+            actuaciones_total: 0,
+            fase_procesamiento: '',
+            mensaje_procesamiento: '',
         })
     },
 

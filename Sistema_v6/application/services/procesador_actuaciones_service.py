@@ -10,8 +10,9 @@ Wrapper sobre Sistema_v5.procesador_pdf que provee:
 Integra el módulo procesador_pdf con el sistema Sistema_v6.
 """
 
+import asyncio
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import Optional, Protocol, Callable
 from dataclasses import dataclass
 from datetime import datetime
 import logging
@@ -255,7 +256,8 @@ class ProcesadorActuacionesService:
         self,
         numero_expediente: str,
         ruta_json: str,
-        guardar_en_bd: bool = True
+        guardar_en_bd: bool = True,
+        progress_callback: Callable[[str, int, int, str], None] = None
     ) -> dict:
         """
         Procesa actuaciones desde un archivo JSON y las persiste en MySQL.
@@ -264,6 +266,7 @@ class ProcesadorActuacionesService:
             numero_expediente: Número del expediente
             ruta_json: Ruta al archivo JSON con las actuaciones
             guardar_en_bd: Si guardar resultados en BD
+            progress_callback: Función(fase, actual, total, mensaje) para reportar progreso
 
         Returns:
             Dict con estadísticas del procesamiento
@@ -303,7 +306,8 @@ class ProcesadorActuacionesService:
             numero_expediente=numero_expediente,
             actuaciones=actuaciones,
             rutas_pdf=None,  # No hay PDFs en este flujo
-            guardar_en_bd=guardar_en_bd
+            guardar_en_bd=guardar_en_bd,
+            progress_callback=progress_callback
         )
 
     async def procesar_expediente_completo(
@@ -311,7 +315,8 @@ class ProcesadorActuacionesService:
         numero_expediente: str,
         actuaciones: list[dict],
         rutas_pdf: dict[int, str] = None,
-        guardar_en_bd: bool = True
+        guardar_en_bd: bool = True,
+        progress_callback: Callable[[str, int, int, str], None] = None
     ) -> dict:
         """
         Procesa todas las actuaciones de un expediente.
@@ -321,15 +326,21 @@ class ProcesadorActuacionesService:
             actuaciones: Lista de actuaciones del expediente
             rutas_pdf: Dict {actuacion_id: ruta_pdf}
             guardar_en_bd: Si guardar resultados en BD
+            progress_callback: Función(fase, actual, total, mensaje) para reportar progreso
 
         Returns:
             Dict con resultados, estadísticas y vencimientos urgentes
         """
         import time
         inicio = time.time()
+        total_actuaciones = len(actuaciones)
 
-        logger.info(f"Procesando expediente {numero_expediente}. Actuaciones: {len(actuaciones)}. Rutas PDF: {len(rutas_pdf) if rutas_pdf else 0}")
-        
+        logger.info(f"Procesando expediente {numero_expediente}. Actuaciones: {total_actuaciones}. Rutas PDF: {len(rutas_pdf) if rutas_pdf else 0}")
+
+        # Emitir progreso inicial
+        if progress_callback:
+            progress_callback("iniciando", 0, total_actuaciones, f"Iniciando procesamiento de {total_actuaciones} actuaciones...")
+
         # Normalizar número de expediente (necesario para búsquedas posteriores)
         numero_normalizado = normalizar_numero_expediente(numero_expediente)
 
@@ -427,6 +438,10 @@ class ProcesadorActuacionesService:
 
         logger.info(f"Llamando a procesar_expediente con {len(rutas_pdf) if rutas_pdf else 0} rutas de PDF")
 
+        # Emitir progreso: Extrayendo texto y clasificando
+        if progress_callback:
+            progress_callback("extrayendo", 0, total_actuaciones, "Extrayendo texto y clasificando actuaciones...")
+
         # Procesar con procesador_pdf
         resultado_procesamiento = procesar_expediente(
             actuaciones=actuaciones,
@@ -456,13 +471,23 @@ class ProcesadorActuacionesService:
                         logger.warning(f"No se encontró expediente_id para {numero_expediente}")
                 except Exception as e:
                     logger.warning(f"Error obteniendo expediente_id: {e}")
+            # Emitir progreso: Guardando en BD
+            if progress_callback:
+                progress_callback("guardando", 0, total_actuaciones, "Guardando clasificaciones en base de datos...")
+
             # Guardar clasificaciones individuales y extraer entidades
             entidades_por_actuacion = {}
-            for actuacion in actuaciones:
+            for i, actuacion in enumerate(actuaciones):
                 act_id = actuacion.get('id') or actuacion.get('Indice')
                 if act_id and act_id in resultado_procesamiento['resultados']:
                     resultado = resultado_procesamiento['resultados'][act_id]
-                    
+
+                    # Emitir progreso por actuación
+                    if progress_callback:
+                        progress_callback("guardando", i + 1, total_actuaciones, f"Actuación {i + 1}/{total_actuaciones}: Guardando...")
+                        # Ceder control al event loop para permitir que el polling HTTP responda
+                        await asyncio.sleep(0)
+
                     # Guardar clasificación y obtener ID real
                     real_id = self.repository.guardar_clasificacion(
                         act_id,
@@ -488,6 +513,12 @@ class ProcesadorActuacionesService:
 
                     # Integración IA Unificada (Clasificación + NER + RAG)
                     if _ia_integration_available and self.ia_service:
+                        # Emitir progreso: procesando con IA
+                        if progress_callback:
+                            progress_callback("ia", i + 1, total_actuaciones, f"Actuación {i + 1}/{total_actuaciones}: Procesando con IA...")
+                            # Ceder control al event loop para permitir que el polling HTTP responda
+                            await asyncio.sleep(0)
+
                         metadata_ia = {
                             "expediente_id": expediente_id,
                             "expediente_numero": numero_expediente,
@@ -512,22 +543,26 @@ class ProcesadorActuacionesService:
                                  origen_texto = "metadata_fallback"
                         
                         if texto_ia:
-                            # Llamada unificada a IA
-                            res_ia = self.ia_service.procesar_actuacion(
-                                actuacion_id=str(real_id),
-                                texto=texto_ia,
-                                metadata=metadata_ia,
-                                clasificar=True,
-                                indexar=True,
-                                extraer_entidades=True
+                            # Llamada unificada a IA (ejecutar en thread pool para no bloquear event loop)
+                            loop = asyncio.get_event_loop()
+                            res_ia = await loop.run_in_executor(
+                                None,  # Usa ThreadPoolExecutor por defecto
+                                lambda: self.ia_service.procesar_actuacion(
+                                    actuacion_id=str(real_id),
+                                    texto=texto_ia,
+                                    metadata=metadata_ia,
+                                    clasificar=True,
+                                    indexar=True,
+                                    extraer_entidades=True
+                                )
                             )
-                            
+
                             # Actualizar DB y Entidades
                             if res_ia and not res_ia.get("skipped"):
                                 self.repository.actualizar_clasificacion_ia(real_id, res_ia)
                                 if res_ia.get("entidades"):
                                     entidades_por_actuacion[act_id] = res_ia["entidades"]
-                                
+
                                 if res_ia.get("indexado"):
                                     logger.debug(f"Actuación {real_id} (idx {act_id}) procesada por IA (Origen: {origen_texto})")
 

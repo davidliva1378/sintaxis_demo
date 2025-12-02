@@ -1,5 +1,30 @@
 """MCP Server - Model Context Protocol Server for Sistema PJN v6.
 
+⚠️ DEPRECADO: Este módulo está deprecado desde 2024-12-01.
+   Solo tiene 6 tools y el modo HTTP no está implementado.
+
+   USE EN SU LUGAR:
+   - STDIO: python -m sintaxis_mcp.sintaxis_mcp_server
+   - SSE:   python -m sintaxis_mcp.sintaxis_mcp_server_sse
+
+   El nuevo servidor tiene 37 tools organizadas en 7 categorías:
+   1. Expedientes (6): contar, listar, obtener, buscar, por_dependencia, recientes
+   2. Actuaciones (5): listar, buscar, por_tipo, con_texto, obtener_texto
+   3. Vencimientos (5): pendientes, urgentes, vencidos, próximos, resumen
+   4. Entidades NER (5): listar, buscar, por_tipo, estadísticas, personas
+   5. Estadísticas (4): sistema, expediente, procesamiento, actividad
+   6. Análisis (4): duplicados, clasificación_ia, importantes, resumen
+   7. Monitoreo (8): estado, listar, cambios, estadísticas, agregar, pausar, reanudar, sincronizar
+
+   Además soporta:
+   - Autenticación Bearer con tokens
+   - Rate limiting
+   - Transporte SSE para acceso remoto vía ngrok/Cloudflare
+
+---
+
+LEGACY: Este módulo se mantiene por compatibilidad pero no recibe actualizaciones.
+
 Este módulo implementa un servidor MCP (Model Context Protocol) que expone
 las capacidades del sistema a modelos de lenguaje (LLMs) a través de herramientas
 estructuradas.
@@ -10,10 +35,10 @@ MCP permite que los LLMs:
 - Creen workspaces y organicen información
 - Monitoreen cambios automáticamente
 
-Uso:
+Uso (DEPRECADO):
     ```bash
-    # Iniciar servidor MCP
-    python -m presentation.api.mcp.server
+    # Usar el nuevo servidor en su lugar
+    python -m sintaxis_mcp.sintaxis_mcp_server
     ```
 
 Protocolo:
@@ -285,7 +310,22 @@ class MCPServer:
 
 
 async def main():
-    """Función principal para iniciar el servidor MCP."""
+    """Función principal para iniciar el servidor MCP.
+
+    ⚠️ DEPRECADO: Este servidor está deprecado.
+    Use en su lugar:
+    - python -m sintaxis_mcp.sintaxis_mcp_server (STDIO, 37 tools)
+    - python -m sintaxis_mcp.sintaxis_mcp_server_sse (SSE, 37 tools + auth)
+    """
+    import warnings
+    warnings.warn(
+        "presentation.api.mcp.server está DEPRECADO. "
+        "Use sintaxis_mcp.sintaxis_mcp_server o sintaxis_mcp.sintaxis_mcp_server_sse. "
+        "Este servidor solo tiene 6 tools vs 37 del nuevo.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+
     # Configurar logging
     logging.basicConfig(
         level=logging.INFO,

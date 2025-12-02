@@ -1,23 +1,38 @@
-import { Clock, AlertTriangle, FileText } from 'lucide-react'
+import { useState } from 'react'
+import { Clock, AlertTriangle, FileText, Check, X, MoreVertical, Loader2 } from 'lucide-react'
 import { VencimientoUrgente, NivelUrgencia, formatDiasRestantes, COLORES_URGENCIA } from '@/types/procesamiento'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useVencimientosStore } from '@/stores/vencimientosStore'
 
 interface VencimientosUrgentesListaProps {
   vencimientos: VencimientoUrgente[]
   limite?: number
+  onVencimientoActualizado?: () => void
 }
 
 export default function VencimientosUrgentesLista({
   vencimientos,
-  limite
+  limite,
+  onVencimientoActualizado
 }: VencimientosUrgentesListaProps) {
   const vencimientosAMostrar = limite ? vencimientos.slice(0, limite) : vencimientos
 
   return (
     <div className="space-y-3">
       {vencimientosAMostrar.map((venc) => (
-        <VencimientoCard key={venc.id} vencimiento={venc} />
+        <VencimientoCard
+          key={venc.id}
+          vencimiento={venc}
+          onActualizado={onVencimientoActualizado}
+        />
       ))}
 
       {limite && vencimientos.length > limite && (
@@ -31,9 +46,36 @@ export default function VencimientosUrgentesLista({
   )
 }
 
-function VencimientoCard({ vencimiento }: { vencimiento: VencimientoUrgente }) {
+interface VencimientoCardProps {
+  vencimiento: VencimientoUrgente
+  onActualizado?: () => void
+}
+
+function VencimientoCard({ vencimiento, onActualizado }: VencimientoCardProps) {
+  const [procesando, setProcesando] = useState(false)
+  const { atenderVencimiento, cancelarVencimiento } = useVencimientosStore()
   const colorClasses = getColorClasses(vencimiento.nivel_urgencia)
   const fechaVenc = parseISO(vencimiento.fecha_vencimiento)
+
+  const handleAtender = async () => {
+    setProcesando(true)
+    try {
+      await atenderVencimiento(vencimiento.id)
+      onActualizado?.()
+    } finally {
+      setProcesando(false)
+    }
+  }
+
+  const handleCancelar = async () => {
+    setProcesando(true)
+    try {
+      await cancelarVencimiento(vencimiento.id)
+      onActualizado?.()
+    } finally {
+      setProcesando(false)
+    }
+  }
 
   return (
     <div className={`
@@ -72,23 +114,53 @@ function VencimientoCard({ vencimiento }: { vencimiento: VencimientoUrgente }) {
           )}
         </div>
 
-        {/* Fecha y urgencia */}
-        <div className="text-right space-y-1">
-          <div className={`flex items-center gap-1 justify-end ${colorClasses.text}`}>
-            <Clock className="h-4 w-4" />
-            <span className="text-sm font-semibold">
-              {formatDiasRestantes(vencimiento.dias_restantes)}
+        {/* Fecha, urgencia y acciones */}
+        <div className="flex items-start gap-2">
+          <div className="text-right space-y-1">
+            <div className={`flex items-center gap-1 justify-end ${colorClasses.text}`}>
+              <Clock className="h-4 w-4" />
+              <span className="text-sm font-semibold">
+                {formatDiasRestantes(vencimiento.dias_restantes)}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {format(fechaVenc, "d 'de' MMMM", { locale: es })}
+            </p>
+            <span className={`
+              inline-block text-xs font-semibold px-2 py-1 rounded
+              ${colorClasses.urgenciaBadge}
+            `}>
+              {getNivelUrgenciaLabel(vencimiento.nivel_urgencia)}
             </span>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {format(fechaVenc, "d 'de' MMMM", { locale: es })}
-          </p>
-          <span className={`
-            inline-block text-xs font-semibold px-2 py-1 rounded
-            ${colorClasses.urgenciaBadge}
-          `}>
-            {getNivelUrgenciaLabel(vencimiento.nivel_urgencia)}
-          </span>
+
+          {/* Menu de acciones */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                disabled={procesando}
+              >
+                {procesando ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <MoreVertical className="h-4 w-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleAtender} className="text-green-600">
+                <Check className="h-4 w-4 mr-2" />
+                Marcar como atendido
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleCancelar} className="text-red-600">
+                <X className="h-4 w-4 mr-2" />
+                Cancelar vencimiento
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </div>

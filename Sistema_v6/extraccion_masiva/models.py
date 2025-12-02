@@ -216,6 +216,12 @@ class SesionExtraccion:
     historial_intentos: List[Dict[str, Any]] = field(default_factory=list)  # Historial de cada intento
     # Metadata de extracción (incluye total_esperado, paginas_esperadas, etc.)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    # Campos de feedback para procesamiento de actuaciones
+    expediente_procesando: Optional[str] = None  # Número del expediente siendo procesado
+    actuacion_actual: int = 0  # Actuación actual en proceso (1-indexed)
+    actuaciones_total: int = 0  # Total de actuaciones del expediente actual
+    fase_procesamiento: str = ""  # "extrayendo", "clasificando", "ia", "guardando"
+    mensaje_procesamiento: str = ""  # Mensaje descriptivo del paso actual
 
     def to_dict(self) -> Dict:
         return {
@@ -236,5 +242,11 @@ class SesionExtraccion:
             "intentos_realizados": self.intentos_realizados,
             "intentos_maximos": self.intentos_maximos,
             "historial_intentos": self.historial_intentos,
-            "metadata": self.metadata
+            "metadata": self.metadata,
+            # Campos de feedback de procesamiento
+            "expediente_procesando": self.expediente_procesando,
+            "actuacion_actual": self.actuacion_actual,
+            "actuaciones_total": self.actuaciones_total,
+            "fase_procesamiento": self.fase_procesamiento,
+            "mensaje_procesamiento": self.mensaje_procesamiento
         }

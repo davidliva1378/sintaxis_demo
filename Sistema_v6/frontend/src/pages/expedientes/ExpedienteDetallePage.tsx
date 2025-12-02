@@ -111,6 +111,17 @@ export default function ExpedienteDetallePage() {
     }
   }
 
+  // Recargar solo vencimientos (para actualizar después de eliminar/modificar)
+  const recargarVencimientos = async () => {
+    if (!expedienteActual?.numero) return
+    try {
+      const venc = await obtenerVencimientosExpediente(expedienteActual.numero)
+      setVencimientos(venc)
+    } catch (error) {
+      console.error('Error recargando vencimientos:', error)
+    }
+  }
+
   // Estado de tabs
   const [activeTab, setActiveTab] = useState('actuaciones')
   // Estado OCR
@@ -525,6 +536,7 @@ export default function ExpedienteDetallePage() {
           <VencimientosExpedientePanel
             vencimientos={vencimientos}
             isLoading={isLoadingProcesamiento}
+            onVencimientoActualizado={recargarVencimientos}
           />
         </TabsContent>
 

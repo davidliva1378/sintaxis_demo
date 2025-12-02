@@ -11,9 +11,14 @@ from typing import List, Optional, Tuple, Dict, Any
 import json
 from .models import Vencimiento, TipoVencimiento
 from core.config.vencimientos_config import VencimientosConfig
-# Importación diferida para evitar ciclos si fuera necesario, 
+# Importación diferida para evitar ciclos si fuera necesario,
 # pero idealmente LLMService debería estar desacoplado.
 from infrastructure.rag.services.llm_service import LLMService
+# Servicio de feriados dinámico desde BD
+from application.services.feriados_service import get_feriados_service
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AnalizadorVencimientos:
@@ -146,6 +151,13 @@ class AnalizadorVencimientos:
         self._compilar_patrones()
         self.config_manager = VencimientosConfig.get_instance()
         self.llm_service = LLMService()
+        # Intentar usar servicio de feriados dinámico de BD
+        self._feriados_service = None
+        try:
+            self._feriados_service = get_feriados_service()
+            logger.info("AnalizadorVencimientos usando FeriadosService dinámico desde BD")
+        except Exception as e:
+            logger.warning(f"FeriadosService no disponible, usando calendario estático: {e}")
 
     def _compilar_patrones(self):
         """Compila los patrones regex para mejor performance."""
@@ -360,23 +372,38 @@ class AnalizadorVencimientos:
         """
         Verifica si una fecha es feriado.
 
+        Primero intenta usar el servicio de feriados dinámico (BD),
+        y si no está disponible, usa el calendario estático como fallback.
+
         Args:
             fecha: Fecha a verificar
 
         Returns:
             True si es feriado
         """
+        # Intentar usar servicio dinámico
+        if self._feriados_service:
+            try:
+                es_feriado, _ = self._feriados_service.es_feriado(fecha)
+                return es_feriado
+            except Exception as e:
+                logger.warning(f"Error consultando feriados dinámicos: {e}")
+
+        # Fallback a calendario estático
         if fecha.year == 2024:
             return fecha in self.FERIADOS_2024
         elif fecha.year == 2025:
             return fecha in self.FERIADOS_2025
         else:
-            # Para años futuros, usar librería holidays
+            # Para años futuros sin calendario estático
             return False
 
     def es_feria_judicial(self, fecha: date) -> bool:
         """
         Verifica si una fecha cae en feria judicial.
+
+        Primero intenta usar el servicio de feriados dinámico (BD),
+        y si no está disponible, usa los períodos estáticos como fallback.
 
         Args:
             fecha: Fecha a verificar
@@ -384,6 +411,14 @@ class AnalizadorVencimientos:
         Returns:
             True si es feria judicial
         """
+        # Intentar usar servicio dinámico
+        if self._feriados_service:
+            try:
+                return self._feriados_service.es_feria_judicial(fecha)
+            except Exception as e:
+                logger.warning(f"Error consultando feria judicial dinámica: {e}")
+
+        # Fallback a calendario estático
         if fecha.year == 2024:
             inicio, fin = self.FERIA_JUDICIAL_2024
         elif fecha.year == 2025:
@@ -476,17 +511,24 @@ class AnalizadorVencimientos:
             try:
                 fecha_actuacion = self._parsear_fecha_actuacion(actuacion)
                 margen = timedelta(days=self.config_manager.config.analysis_margin_days)
-                
+
                 # Solo analizar si es reciente
                 if fecha_actuacion and fecha_actuacion >= date.today() - margen:
                     vencimientos_llm = self._analizar_con_llm(texto_para_analisis, act_id)
-                    
+
                     # Estrategia de Unión: Agregar si no existe uno similar
                     for v_llm in vencimientos_llm:
                         if not self._existe_vencimiento_similar(v_llm, vencimientos):
                             vencimientos.append(v_llm)
             except Exception as e:
-                print(f"Error en análisis híbrido LLM: {e}")
+                logger.error(
+                    f"Error en análisis híbrido LLM (actuación {act_id}): {e}",
+                    extra={
+                        "actuacion_id": act_id,
+                        "error_type": type(e).__name__,
+                        "hybrid_enabled": True
+                    }
+                )
 
         return vencimientos
 
@@ -514,7 +556,12 @@ class AnalizadorVencimientos:
         return False
 
     def _analizar_con_llm(self, texto: str, actuacion_id: Optional[int]) -> List[Vencimiento]:
-        """Ejecuta el análisis usando LLM."""
+        """
+        Ejecuta el análisis usando LLM.
+
+        Registra advertencias estructuradas cuando el LLM no está disponible
+        o falla el análisis, permitiendo diagnóstico sin interrumpir el flujo.
+        """
         if not texto or len(texto) < 10:
             return []
 
@@ -522,33 +569,38 @@ class AnalizadorVencimientos:
             prompt = self._build_dynamic_prompt(texto)
             # Usar temperatura baja para determinismo
             response_text = self.llm_service._call_ollama(
-                prompt, 
-                model=self.config_manager.config.llm_model, 
+                prompt,
+                model=self.config_manager.config.llm_model,
                 temperature=0.0
             )
-            
+
             # Limpiar respuesta para obtener JSON
             json_str = response_text.strip()
             if "```json" in json_str:
                 json_str = json_str.split("```json")[1].split("```")[0].strip()
             elif "```" in json_str:
                 json_str = json_str.split("```")[1].split("```")[0].strip()
-            
+
             data = json.loads(json_str)
             vencimientos_data = data.get("vencimientos", [])
-            
+
+            if vencimientos_data:
+                logger.info(
+                    f"LLM detectó {len(vencimientos_data)} vencimiento(s) en actuación {actuacion_id}"
+                )
+
             resultados = []
             for v_data in vencimientos_data:
                 try:
                     fecha_notif = datetime.strptime(v_data["fecha_notificacion"], "%Y-%m-%d").date()
                     plazo = int(v_data["plazo_dias"])
                     es_habil = v_data.get("dias_habiles", True)
-                    
+
                     if es_habil:
                         fecha_venc = self.calcular_fecha_vencimiento(fecha_notif, plazo)
                     else:
                         fecha_venc = fecha_notif + timedelta(days=plazo)
-                    
+
                     tipo_str = v_data.get("tipo", "OTRO")
                     # Mapear string a Enum si es posible, sino OTRO
                     tipo = TipoVencimiento.OTRO
@@ -556,7 +608,7 @@ class AnalizadorVencimientos:
                         if t.value == tipo_str or t.name == tipo_str:
                             tipo = t
                             break
-                            
+
                     resultados.append(Vencimiento(
                         tipo=tipo,
                         fecha_notificacion=fecha_notif,
@@ -569,13 +621,63 @@ class AnalizadorVencimientos:
                         confianza=0.85 # Confianza arbitraria para IA
                     ))
                 except Exception as e:
-                    print(f"Error parseando item LLM: {e}")
+                    logger.warning(
+                        f"Error parseando vencimiento LLM (actuación {actuacion_id}): {e}",
+                        extra={
+                            "actuacion_id": actuacion_id,
+                            "raw_data": str(v_data)[:200],
+                            "error_type": type(e).__name__
+                        }
+                    )
                     continue
-            
+
             return resultados
 
+        except ConnectionError as e:
+            # Ollama no está corriendo o no responde
+            logger.warning(
+                f"LLM no disponible (Ollama sin conexión) para actuación {actuacion_id}: {e}",
+                extra={
+                    "actuacion_id": actuacion_id,
+                    "llm_model": self.config_manager.config.llm_model,
+                    "error_type": "ConnectionError",
+                    "texto_len": len(texto)
+                }
+            )
+            return []
+        except json.JSONDecodeError as e:
+            # LLM respondió pero con formato inválido
+            logger.warning(
+                f"Respuesta LLM con formato inválido para actuación {actuacion_id}: {e}",
+                extra={
+                    "actuacion_id": actuacion_id,
+                    "error_type": "JSONDecodeError",
+                    "error_detail": str(e)
+                }
+            )
+            return []
         except Exception as e:
-            print(f"Error en llamada LLM: {e}")
+            # Otros errores (timeout, modelo no encontrado, etc.)
+            error_msg = str(e).lower()
+            if "connection" in error_msg or "refused" in error_msg:
+                logger.warning(
+                    f"LLM no disponible para análisis híbrido (actuación {actuacion_id}): {e}",
+                    extra={
+                        "actuacion_id": actuacion_id,
+                        "llm_model": self.config_manager.config.llm_model,
+                        "error_type": type(e).__name__,
+                        "suggestion": "Verificar que Ollama esté corriendo: ollama serve"
+                    }
+                )
+            else:
+                logger.error(
+                    f"Error inesperado en análisis LLM (actuación {actuacion_id}): {e}",
+                    extra={
+                        "actuacion_id": actuacion_id,
+                        "error_type": type(e).__name__,
+                        "texto_preview": texto[:100] if texto else ""
+                    }
+                )
             return []
 
     def _build_dynamic_prompt(self, texto: str) -> str:

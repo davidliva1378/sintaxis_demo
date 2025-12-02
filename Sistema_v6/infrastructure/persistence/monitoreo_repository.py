@@ -974,3 +974,179 @@ class MonitoreoRepository:
         for key in ['fecha_deteccion', 'created_at']:
             if row.get(key):
                 row[key] = row[key].isoformat()
+
+    # =========================================================================
+    # ELIMINACION DE CAMBIOS
+    # =========================================================================
+
+    def eliminar_cambio(self, cambio_id: int) -> bool:
+        """
+        Elimina un cambio detectado por su ID.
+
+        Args:
+            cambio_id: ID del cambio
+
+        Returns:
+            True si se elimino
+        """
+        conn = None
+        try:
+            conn = get_pooled_connection()
+            cursor = conn.cursor()
+
+            # Obtener expediente_monitoreado_id antes de eliminar
+            cursor.execute(
+                "SELECT expediente_monitoreado_id FROM cambios_detectados WHERE id = %s",
+                (cambio_id,)
+            )
+            result = cursor.fetchone()
+
+            if not result:
+                cursor.close()
+                return False
+
+            exp_mon_id = result[0]
+
+            # Eliminar el cambio
+            cursor.execute(
+                "DELETE FROM cambios_detectados WHERE id = %s",
+                (cambio_id,)
+            )
+
+            # Decrementar contador en expediente monitoreado
+            cursor.execute("""
+                UPDATE expedientes_monitoreados
+                SET total_cambios_detectados = GREATEST(0, total_cambios_detectados - 1)
+                WHERE id = %s
+            """, (exp_mon_id,))
+
+            conn.commit()
+            deleted = cursor.rowcount > 0
+
+            cursor.close()
+            logger.info(f"Cambio {cambio_id} eliminado")
+            return deleted
+
+        except MySQLError as e:
+            logger.error(f"Error eliminando cambio: {e}")
+            raise
+        finally:
+            if conn:
+                conn.close()
+
+    def eliminar_cambios_leidos(self, usuario_id: int) -> int:
+        """
+        Elimina todos los cambios marcados como leidos de un usuario.
+
+        Args:
+            usuario_id: ID del usuario
+
+        Returns:
+            Cantidad de cambios eliminados
+        """
+        conn = None
+        try:
+            conn = get_pooled_connection()
+            cursor = conn.cursor()
+
+            # Primero obtener los IDs de expedientes afectados y cantidad por cada uno
+            cursor.execute("""
+                SELECT c.expediente_monitoreado_id, COUNT(*) as cantidad
+                FROM cambios_detectados c
+                INNER JOIN expedientes_monitoreados em
+                    ON c.expediente_monitoreado_id = em.id
+                WHERE em.usuario_id = %s AND c.leido = TRUE
+                GROUP BY c.expediente_monitoreado_id
+            """, (usuario_id,))
+
+            expedientes_counts = cursor.fetchall()
+
+            # Eliminar los cambios leidos
+            cursor.execute("""
+                DELETE c FROM cambios_detectados c
+                INNER JOIN expedientes_monitoreados em
+                    ON c.expediente_monitoreado_id = em.id
+                WHERE em.usuario_id = %s AND c.leido = TRUE
+            """, (usuario_id,))
+
+            count = cursor.rowcount
+
+            # Actualizar contadores en expedientes monitoreados
+            for exp_id, cantidad in expedientes_counts:
+                cursor.execute("""
+                    UPDATE expedientes_monitoreados
+                    SET total_cambios_detectados = GREATEST(0, total_cambios_detectados - %s)
+                    WHERE id = %s
+                """, (cantidad, exp_id))
+
+            conn.commit()
+            cursor.close()
+
+            if count > 0:
+                logger.info(f"{count} cambios leidos eliminados para usuario {usuario_id}")
+
+            return count
+
+        except MySQLError as e:
+            logger.error(f"Error eliminando cambios leidos: {e}")
+            raise
+        finally:
+            if conn:
+                conn.close()
+
+    def exportar_cambios(
+        self,
+        usuario_id: int,
+        solo_no_leidos: bool = False,
+        tipo_cambio: Optional[str] = None,
+        formato: str = 'csv'
+    ) -> str:
+        """
+        Exporta el historial de cambios a CSV o JSON.
+
+        Args:
+            usuario_id: ID del usuario
+            solo_no_leidos: Solo cambios sin leer
+            tipo_cambio: Filtrar por tipo
+            formato: 'csv' o 'json'
+
+        Returns:
+            Contenido del archivo exportado
+        """
+        # Obtener todos los cambios (sin paginacion)
+        cambios = self.obtener_cambios(
+            usuario_id=usuario_id,
+            solo_no_leidos=solo_no_leidos,
+            tipo_cambio=tipo_cambio,
+            limit=100000,
+            offset=0
+        )
+
+        if formato == 'json':
+            return json.dumps(cambios, ensure_ascii=False, indent=2)
+
+        # CSV por defecto
+        import csv
+        import io
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # Headers
+        writer.writerow([
+            'ID', 'Expediente', 'Caratula', 'Tipo Cambio',
+            'Descripcion', 'Leido', 'Fecha Deteccion'
+        ])
+
+        for cambio in cambios:
+            writer.writerow([
+                cambio['id'],
+                cambio['expediente_numero'],
+                cambio.get('expediente_caratula', ''),
+                cambio['tipo_cambio'],
+                cambio['descripcion'],
+                'Si' if cambio['leido'] else 'No',
+                cambio['fecha_deteccion']
+            ])
+
+        return output.getvalue()

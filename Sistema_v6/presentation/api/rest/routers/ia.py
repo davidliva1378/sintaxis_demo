@@ -9,12 +9,41 @@ Proporciona endpoints para:
 """
 
 import logging
+import json
+from pathlib import Path
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+# Archivo para persistir configuración de modelo LLM
+_LLM_CONFIG_FILE = Path(__file__).parent.parent.parent.parent.parent / "data" / "llm_config.json"
+
+
+def _load_saved_model() -> Optional[str]:
+    """Carga el modelo guardado del archivo de configuración."""
+    try:
+        if _LLM_CONFIG_FILE.exists():
+            with open(_LLM_CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                return config.get('model')
+    except Exception as e:
+        logger.warning(f"Error cargando configuración de modelo: {e}")
+    return None
+
+
+def _save_model_config(model: str) -> bool:
+    """Guarda el modelo seleccionado en archivo de configuración."""
+    try:
+        _LLM_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(_LLM_CONFIG_FILE, 'w') as f:
+            json.dump({'model': model}, f)
+        return True
+    except Exception as e:
+        logger.error(f"Error guardando configuración de modelo: {e}")
+        return False
 
 
 # === Función para obtener estadísticas del sistema ===
@@ -217,6 +246,11 @@ def get_llm():
     if _llm is None:
         from infrastructure.rag.services.llm_service import LLMService
         _llm = LLMService()
+        # Cargar modelo guardado si existe
+        saved_model = _load_saved_model()
+        if saved_model:
+            _llm.model = saved_model
+            logger.info(f"Modelo LLM cargado desde configuración: {saved_model}")
     return _llm
 
 
@@ -834,7 +868,10 @@ async def set_model(request: SetModelRequest):
             llm.model = request.model
             # Resetear el cliente para que se reinicialice con el nuevo modelo
             llm._client = None
-            logger.info(f"Modelo cambiado a: {request.model}")
+
+            # Persistir el cambio en archivo de configuración
+            _save_model_config(request.model)
+            logger.info(f"Modelo cambiado y guardado: {request.model}")
 
             return {
                 "success": True,

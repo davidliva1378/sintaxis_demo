@@ -350,6 +350,77 @@ RESPUESTA:"""
             logger.error(f"Error listando modelos: {e}")
             return []
 
+    def stream(
+        self,
+        prompt: str,
+        system: Optional[str] = None,
+        temperature: Optional[float] = None,
+        model: Optional[str] = None
+    ):
+        """
+        Genera texto en streaming (token por token).
+
+        Args:
+            prompt: Prompt del usuario
+            system: System prompt opcional
+            temperature: Temperature del LLM
+            model: Modelo a usar
+
+        Yields:
+            Tokens generados uno por uno
+        """
+        try:
+            url = f"{self.base_url}/api/generate"
+
+            use_model = model or self.model
+            use_temperature = temperature if temperature is not None else self.temperature
+
+            # Combinar system prompt si existe
+            full_prompt = prompt
+            if system:
+                full_prompt = f"{system}\n\n{prompt}"
+
+            payload = {
+                "model": use_model,
+                "prompt": full_prompt,
+                "stream": True,
+                "options": {
+                    "temperature": use_temperature,
+                    "num_predict": self.max_tokens,
+                }
+            }
+
+            # Usar streaming con requests
+            with requests.post(
+                url,
+                json=payload,
+                stream=True,
+                timeout=self.settings.ollama_timeout
+            ) as response:
+                if response.status_code != 200:
+                    logger.error(f"Ollama retornó status {response.status_code}")
+                    yield f"Error: Status {response.status_code}"
+                    return
+
+                for line in response.iter_lines():
+                    if line:
+                        try:
+                            import json as json_module
+                            data = json_module.loads(line)
+                            token = data.get("response", "")
+                            if token:
+                                yield token
+                            # Verificar si terminó
+                            if data.get("done", False):
+                                break
+                        except Exception as parse_error:
+                            logger.warning(f"Error parseando línea de stream: {parse_error}")
+                            continue
+
+        except Exception as e:
+            logger.error(f"Error en stream de Ollama: {e}")
+            yield f"Error: {str(e)}"
+
     def summarize(self, text: str, max_length: int = 500) -> str:
         """
         Genera un resumen del texto proporcionado.

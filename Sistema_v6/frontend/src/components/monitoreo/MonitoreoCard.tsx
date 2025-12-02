@@ -21,6 +21,16 @@ import {
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import type { ExpedienteMonitoreado } from '@/types/monitoreo'
 
@@ -43,6 +53,7 @@ export default function MonitoreoCard({
 }: MonitoreoCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const navigate = useNavigate()
 
   const formatFecha = (fecha: string | null | undefined) => {
@@ -70,13 +81,12 @@ export default function MonitoreoCard({
 
   const handleRemove = () => {
     setShowMenu(false)
-    if (
-      confirm(
-        `¿Estás seguro de remover "${expediente.expediente_numero}" del monitoreo?\n\nEsto detendrá las verificaciones automáticas.`
-      )
-    ) {
-      onRemove(expediente.id)
-    }
+    setShowDeleteDialog(true)
+  }
+
+  const confirmRemove = () => {
+    setShowDeleteDialog(false)
+    onRemove(expediente.id)
   }
 
   const handleViewExpediente = () => {
@@ -251,6 +261,29 @@ export default function MonitoreoCard({
           <RefreshCw className={`h-4 w-4 ${isVerifying ? 'animate-spin' : ''}`} />
         </Button>
       </div>
+
+      {/* AlertDialog para confirmar eliminación */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover del monitoreo</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de remover "{expediente.expediente_numero}" del monitoreo?
+              <br /><br />
+              Esto detendrá las verificaciones automáticas para este expediente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRemove}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

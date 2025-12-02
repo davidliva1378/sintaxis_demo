@@ -11,10 +11,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { AlertTriangle, Clock, Calendar, ExternalLink } from 'lucide-react'
 import {
   getVencimientosUrgentes,
-  VencimientoUrgenteDashboard,
   VencimientosUrgentes,
   getUrgenciaColor,
 } from '@/api/dashboardApi'
+import type { NivelUrgencia } from '@/types/vencimiento'
 
 interface VencimientosWidgetProps {
   className?: string
@@ -22,21 +22,20 @@ interface VencimientosWidgetProps {
   onError?: (error: Error) => void
 }
 
-const urgenciaLabels: Record<VencimientoUrgenteDashboard['nivel_urgencia'], string> = {
+const urgenciaLabels: Record<NivelUrgencia, string> = {
   vencido: 'Vencido',
   critico: 'Critico',
   urgente: 'Urgente',
   proximo: 'Proximo',
+  normal: 'Normal',
 }
 
-const urgenciaIcons: Record<
-  VencimientoUrgenteDashboard['nivel_urgencia'],
-  React.ComponentType<{ className?: string }>
-> = {
+const urgenciaIcons: Record<NivelUrgencia, React.ComponentType<{ className?: string }>> = {
   vencido: AlertTriangle,
   critico: AlertTriangle,
   urgente: Clock,
   proximo: Calendar,
+  normal: Calendar,
 }
 
 export default function VencimientosWidget({

@@ -244,6 +244,197 @@ async def resumen_vencimientos():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/vencimiento/{vencimiento_id}/atender")
+async def atender_vencimiento_tool(vencimiento_id: int):
+    """
+    Marca un vencimiento como atendido.
+
+    Util para que el agente IA pueda gestionar vencimientos directamente.
+    """
+    try:
+        from application.services.feriados_service import get_feriados_service
+        import mysql.connector
+        import os
+
+        conn = mysql.connector.connect(
+            host=os.getenv("MYSQL_HOST", "localhost"),
+            port=int(os.getenv("MYSQL_PORT", "3306")),
+            database=os.getenv("MYSQL_DATABASE", "sintaxis"),
+            user=os.getenv("MYSQL_USER", "root"),
+            password=os.getenv("MYSQL_PASSWORD", ""),
+        )
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            UPDATE vencimientos
+            SET estado = 'atendido', actualizado_en = NOW()
+            WHERE id = %s AND estado = 'pendiente'
+        """, (vencimiento_id,))
+
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Vencimiento no encontrado o ya procesado")
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return {
+            "success": True,
+            "mensaje": f"Vencimiento {vencimiento_id} marcado como atendido"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/vencimiento/{vencimiento_id}/cancelar")
+async def cancelar_vencimiento_tool(
+    vencimiento_id: int,
+    motivo: Optional[str] = Query(None, description="Motivo de cancelacion")
+):
+    """
+    Cancela un vencimiento.
+
+    Util para que el agente IA pueda descartar vencimientos falsos positivos.
+    """
+    try:
+        import mysql.connector
+        import os
+
+        conn = mysql.connector.connect(
+            host=os.getenv("MYSQL_HOST", "localhost"),
+            port=int(os.getenv("MYSQL_PORT", "3306")),
+            database=os.getenv("MYSQL_DATABASE", "sintaxis"),
+            user=os.getenv("MYSQL_USER", "root"),
+            password=os.getenv("MYSQL_PASSWORD", ""),
+        )
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            UPDATE vencimientos
+            SET estado = 'cancelado', actualizado_en = NOW()
+            WHERE id = %s AND estado IN ('pendiente', 'vencido')
+        """, (vencimiento_id,))
+
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Vencimiento no encontrado o ya procesado")
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return {
+            "success": True,
+            "mensaje": f"Vencimiento {vencimiento_id} cancelado" + (f" - Motivo: {motivo}" if motivo else "")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/verificar-dia-habil")
+async def verificar_dia_habil_tool(
+    fecha: str = Query(..., description="Fecha a verificar (YYYY-MM-DD)")
+):
+    """
+    Verifica si una fecha es dia habil judicial.
+
+    Considera fines de semana, feriados y feria judicial.
+    Util para calcular plazos procesales correctamente.
+    """
+    try:
+        from datetime import datetime
+        from application.services.feriados_service import get_feriados_service
+
+        fecha_dt = datetime.strptime(fecha, "%Y-%m-%d").date()
+        service = get_feriados_service()
+
+        es_habil = service.es_dia_habil(fecha_dt)
+        es_feriado, nombre_feriado = service.es_feriado(fecha_dt)
+        es_feria = service.es_feria_judicial(fecha_dt)
+        es_fin_semana = fecha_dt.weekday() >= 5
+
+        return {
+            "fecha": fecha,
+            "es_habil": es_habil,
+            "es_feriado": es_feriado,
+            "nombre_feriado": nombre_feriado,
+            "es_feria_judicial": es_feria,
+            "es_fin_semana": es_fin_semana,
+            "dia_semana": ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"][fecha_dt.weekday()]
+        }
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha invalido. Usar YYYY-MM-DD")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/calcular-vencimiento")
+async def calcular_vencimiento_tool(
+    fecha_inicio: str = Query(..., description="Fecha de notificacion (YYYY-MM-DD)"),
+    dias_plazo: int = Query(..., ge=1, le=365, description="Dias habiles del plazo")
+):
+    """
+    Calcula la fecha de vencimiento considerando dias habiles.
+
+    Util para determinar cuando vence un plazo procesal.
+    """
+    try:
+        from datetime import datetime
+        from application.services.feriados_service import get_feriados_service
+
+        fecha_dt = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+        service = get_feriados_service()
+
+        fecha_venc = service.calcular_fecha_vencimiento(fecha_dt, dias_plazo)
+        dias_corridos = (fecha_venc - fecha_dt).days
+
+        return {
+            "fecha_inicio": fecha_inicio,
+            "dias_plazo": dias_plazo,
+            "fecha_vencimiento": fecha_venc.strftime("%Y-%m-%d"),
+            "dias_corridos": dias_corridos,
+            "dia_semana_vencimiento": ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"][fecha_venc.weekday()]
+        }
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha invalido. Usar YYYY-MM-DD")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/feriados/{anio}")
+async def listar_feriados_tool(
+    anio: int,
+    tipo: Optional[str] = Query(None, description="Filtrar por tipo: nacional, judicial, feria_judicial")
+):
+    """
+    Lista los feriados de un año.
+
+    Util para planificar plazos y entender el calendario judicial.
+    """
+    try:
+        from application.services.feriados_service import get_feriados_service
+
+        service = get_feriados_service()
+        feriados = service.obtener_feriados_año(anio)
+
+        if tipo:
+            feriados = [f for f in feriados if f.get('tipo') == tipo]
+
+        feria = service.obtener_feria_judicial(anio)
+
+        return {
+            "anio": anio,
+            "total_feriados": len(feriados),
+            "feriados": feriados,
+            "feria_judicial": feria
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================
 # ENTIDADES NER
 # ============================================================

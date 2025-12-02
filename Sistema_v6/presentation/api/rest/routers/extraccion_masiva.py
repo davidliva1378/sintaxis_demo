@@ -260,6 +260,9 @@ async def _ejecutar_procesamiento_background(
         if not sesion:
             return
 
+        # Contenedor para el gestor (permite acceso desde el callback antes de que se asigne)
+        gestor_ref = {"gestor": None}
+
         # Callback para actualizar progreso en tiempo real
         def callback_progreso(actual: int, total: int, mensaje: str):
             if session_id in _sesiones:
@@ -267,6 +270,15 @@ async def _ejecutar_procesamiento_background(
                 _sesiones[session_id].progreso_actual = actual
                 _sesiones[session_id].progreso_total = total
                 _sesiones[session_id].mensaje = mensaje
+
+                # Actualizar también estado de procesamiento detallado desde el gestor
+                if gestor_ref["gestor"]:
+                    estado_proc = gestor_ref["gestor"].obtener_estado_procesamiento()
+                    _sesiones[session_id].expediente_procesando = estado_proc.get("expediente_procesando")
+                    _sesiones[session_id].actuacion_actual = estado_proc.get("actuacion_actual", 0)
+                    _sesiones[session_id].actuaciones_total = estado_proc.get("actuaciones_total", 0)
+                    _sesiones[session_id].fase_procesamiento = estado_proc.get("fase_procesamiento", "")
+                    _sesiones[session_id].mensaje_procesamiento = estado_proc.get("mensaje_procesamiento", "")
 
         # Cargar listado BASE para obtener carátulas
         from pathlib import Path
@@ -302,6 +314,8 @@ async def _ejecutar_procesamiento_background(
             caratulas=caratulas_expedientes,
             monitoreo_service=monitoreo_service
         )
+        # Asignar gestor a la referencia para que el callback pueda accederlo
+        gestor_ref["gestor"] = gestor
 
         # Procesar seleccionados
         resumen = await gestor.procesar_seleccionados(

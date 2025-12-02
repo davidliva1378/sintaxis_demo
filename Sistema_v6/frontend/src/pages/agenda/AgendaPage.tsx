@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Calendar,
   Clock,
@@ -13,7 +14,9 @@ import {
   Loader2,
   CalendarDays,
   ListTodo,
-  Bell
+  Bell,
+  RefreshCw,
+  FileWarning
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -26,12 +29,26 @@ import {
   obtenerResumen
 } from '@/api/agendaApi'
 import type { Evento, ResumenAgenda, TipoEvento, Prioridad } from '@/types/agenda'
+import { useVencimientosStore } from '@/stores/vencimientosStore'
+import type { Vencimiento } from '@/stores/vencimientosStore'
 
 export default function AgendaPage() {
   const [eventos, setEventos] = useState<Evento[]>([])
   const [resumen, setResumen] = useState<ResumenAgenda | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [activeTab, setActiveTab] = useState('eventos')
+
+  // Store de vencimientos
+  const {
+    vencimientos,
+    estadisticas,
+    isLoading: isLoadingVencimientos,
+    listarVencimientos,
+    obtenerEstadisticas,
+    atenderVencimiento,
+    cancelarVencimiento
+  } = useVencimientosStore()
 
   // Form state
   const [nuevoTitulo, setNuevoTitulo] = useState('')
@@ -42,6 +59,9 @@ export default function AgendaPage() {
 
   useEffect(() => {
     cargarDatos()
+    // Cargar vencimientos pendientes
+    listarVencimientos({ estado: 'pendiente' })
+    obtenerEstadisticas()
   }, [])
 
   const cargarDatos = async () => {
@@ -156,55 +176,64 @@ export default function AgendaPage() {
         </Button>
       </div>
 
-      {/* Stats */}
-      {resumen && (
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Pendientes</p>
-                  <p className="text-2xl font-bold">{resumen.total_pendientes}</p>
-                </div>
-                <ListTodo className="h-8 w-8 text-blue-500" />
+      {/* Stats combinados */}
+      <div className="grid gap-4 md:grid-cols-5">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Eventos</p>
+                <p className="text-2xl font-bold">{resumen?.total_pendientes || 0}</p>
               </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Hoy</p>
-                  <p className="text-2xl font-bold">{resumen.total_hoy}</p>
-                </div>
-                <Calendar className="h-8 w-8 text-green-500" />
+              <ListTodo className="h-8 w-8 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Vencimientos</p>
+                <p className="text-2xl font-bold">{estadisticas?.pendientes || 0}</p>
               </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Esta Semana</p>
-                  <p className="text-2xl font-bold">{resumen.total_semana}</p>
-                </div>
-                <CalendarDays className="h-8 w-8 text-purple-500" />
+              <FileWarning className="h-8 w-8 text-orange-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Urgentes (3d)</p>
+                <p className="text-2xl font-bold text-orange-600">{estadisticas?.urgentes_3_dias || 0}</p>
               </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Vencidos</p>
-                  <p className="text-2xl font-bold text-red-600">{resumen.total_vencidos}</p>
-                </div>
-                <AlertTriangle className="h-8 w-8 text-red-500" />
+              <Clock className="h-8 w-8 text-orange-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Proximos (7d)</p>
+                <p className="text-2xl font-bold">{estadisticas?.proximos_7_dias || 0}</p>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+              <CalendarDays className="h-8 w-8 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Vencidos</p>
+                <p className="text-2xl font-bold text-red-600">{estadisticas?.vencidos || 0}</p>
+              </div>
+              <AlertTriangle className="h-8 w-8 text-red-500" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Form */}
       {showForm && (
@@ -272,80 +301,259 @@ export default function AgendaPage() {
         </Card>
       )}
 
-      {/* Lista de Eventos */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Eventos Pendientes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {eventos.length === 0 ? (
-            <div className="py-8 text-center">
-              <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No hay eventos pendientes</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {eventos.map((evento) => (
-                <div
-                  key={evento.id}
-                  className={`p-4 rounded-lg border ${
-                    evento.urgencia === 'vencido'
-                      ? 'border-red-200 bg-red-50 dark:bg-red-900/10'
-                      : evento.urgencia === 'proximo'
-                      ? 'border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10'
-                      : 'border-gray-200 dark:border-gray-700'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        {getTipoIcon(evento.tipo)}
-                        <span className="font-medium">{evento.titulo}</span>
-                        <Badge className={getPrioridadColor(evento.prioridad)}>
-                          {evento.prioridad}
-                        </Badge>
-                        {evento.urgencia === 'vencido' && (
-                          <Badge variant="destructive">Vencido</Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatFecha(evento.fecha_inicio)}
-                        </span>
-                        {evento.expediente_numero && (
-                          <span>Exp: {evento.expediente_numero}</span>
-                        )}
-                        {evento.dias_restantes !== null && evento.dias_restantes > 0 && (
-                          <span>En {evento.dias_restantes} dias</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCompletar(evento.id)}
-                        title="Completar"
-                      >
-                        <Check className="h-4 w-4 text-green-600" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEliminar(evento.id)}
-                        title="Eliminar"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600" />
-                      </Button>
-                    </div>
-                  </div>
+      {/* Tabs: Eventos y Vencimientos */}
+      <Tabs defaultValue="eventos" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="eventos" className="flex items-center gap-2">
+            <ListTodo className="h-4 w-4" />
+            Eventos ({eventos.length})
+          </TabsTrigger>
+          <TabsTrigger value="vencimientos" className="flex items-center gap-2">
+            <FileWarning className="h-4 w-4" />
+            Vencimientos ({vencimientos.length})
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Tab: Eventos */}
+        <TabsContent value="eventos">
+          <Card>
+            <CardHeader>
+              <CardTitle>Eventos Pendientes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {eventos.length === 0 ? (
+                <div className="py-8 text-center">
+                  <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">No hay eventos pendientes</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ) : (
+                <div className="space-y-3">
+                  {eventos.map((evento) => (
+                    <div
+                      key={evento.id}
+                      className={`p-4 rounded-lg border ${
+                        evento.urgencia === 'vencido'
+                          ? 'border-red-200 bg-red-50 dark:bg-red-900/10'
+                          : evento.urgencia === 'proximo'
+                          ? 'border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10'
+                          : 'border-gray-200 dark:border-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            {getTipoIcon(evento.tipo)}
+                            <span className="font-medium">{evento.titulo}</span>
+                            <Badge className={getPrioridadColor(evento.prioridad)}>
+                              {evento.prioridad}
+                            </Badge>
+                            {evento.urgencia === 'vencido' && (
+                              <Badge variant="destructive">Vencido</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {formatFecha(evento.fecha_inicio)}
+                            </span>
+                            {evento.expediente_numero && (
+                              <span>Exp: {evento.expediente_numero}</span>
+                            )}
+                            {evento.dias_restantes !== null && evento.dias_restantes > 0 && (
+                              <span>En {evento.dias_restantes} dias</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCompletar(evento.id)}
+                            title="Completar"
+                          >
+                            <Check className="h-4 w-4 text-green-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEliminar(evento.id)}
+                            title="Eliminar"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab: Vencimientos */}
+        <TabsContent value="vencimientos">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Vencimientos Procesales</CardTitle>
+                <CardDescription>
+                  Plazos detectados automaticamente en actuaciones
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  listarVencimientos({ estado: 'pendiente' })
+                  obtenerEstadisticas()
+                }}
+                disabled={isLoadingVencimientos}
+              >
+                {isLoadingVencimientos ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {isLoadingVencimientos ? (
+                <div className="py-8 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500" />
+                  <p className="text-gray-500 mt-2">Cargando vencimientos...</p>
+                </div>
+              ) : vencimientos.length === 0 ? (
+                <div className="py-8 text-center">
+                  <FileWarning className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">No hay vencimientos pendientes</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {vencimientos.map((venc) => (
+                    <VencimientoCard
+                      key={venc.id}
+                      vencimiento={venc}
+                      onAtender={() => atenderVencimiento(venc.id)}
+                      onCancelar={() => cancelarVencimiento(venc.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
+
+// Componente para mostrar vencimiento en agenda
+function VencimientoCard({
+  vencimiento,
+  onAtender,
+  onCancelar
+}: {
+  vencimiento: Vencimiento
+  onAtender: () => void
+  onCancelar: () => void
+}) {
+  const [procesando, setProcesando] = useState(false)
+
+  const getUrgenciaBorder = (urgencia: string) => {
+    switch (urgencia) {
+      case 'vencido': return 'border-black bg-black/5'
+      case 'critico': return 'border-red-200 bg-red-50 dark:bg-red-900/10'
+      case 'urgente': return 'border-orange-200 bg-orange-50 dark:bg-orange-900/10'
+      case 'proximo': return 'border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10'
+      default: return 'border-gray-200 dark:border-gray-700'
+    }
+  }
+
+  const getUrgenciaBadge = (urgencia: string) => {
+    switch (urgencia) {
+      case 'vencido': return 'bg-black text-white'
+      case 'critico': return 'bg-red-600 text-white'
+      case 'urgente': return 'bg-orange-500 text-white'
+      case 'proximo': return 'bg-yellow-400 text-gray-900'
+      default: return 'bg-green-500 text-white'
+    }
+  }
+
+  const handleAtender = async () => {
+    setProcesando(true)
+    try {
+      await onAtender()
+    } finally {
+      setProcesando(false)
+    }
+  }
+
+  const handleCancelar = async () => {
+    setProcesando(true)
+    try {
+      await onCancelar()
+    } finally {
+      setProcesando(false)
+    }
+  }
+
+  return (
+    <div className={`p-4 rounded-lg border ${getUrgenciaBorder(vencimiento.nivel_urgencia)}`}>
+      <div className="flex items-start justify-between">
+        <div className="flex-1 space-y-1">
+          <div className="flex items-center gap-2">
+            <FileWarning className="h-4 w-4" />
+            <span className="font-medium">{vencimiento.expediente_numero}</span>
+            <Badge className={getUrgenciaBadge(vencimiento.nivel_urgencia)}>
+              {vencimiento.nivel_urgencia.toUpperCase()}
+            </Badge>
+            <Badge variant="outline">
+              {vencimiento.tipo.replace('_', ' ')}
+            </Badge>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1">
+            {vencimiento.descripcion}
+          </p>
+          <div className="flex items-center gap-4 text-sm text-gray-500">
+            <span className="flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              Vence: {format(new Date(vencimiento.fecha_vencimiento), "dd/MM/yyyy", { locale: es })}
+            </span>
+            <span className="font-medium">
+              {vencimiento.dias_restantes < 0
+                ? `${Math.abs(vencimiento.dias_restantes)} dias vencido`
+                : vencimiento.dias_restantes === 0
+                ? 'Vence HOY'
+                : `${vencimiento.dias_restantes} dias restantes`}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleAtender}
+            disabled={procesando}
+            title="Marcar como atendido"
+          >
+            {procesando ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Check className="h-4 w-4 text-green-600" />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCancelar}
+            disabled={procesando}
+            title="Cancelar vencimiento"
+          >
+            <Trash2 className="h-4 w-4 text-red-600" />
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
+import {
   Calendar,
   Clock,
   AlertTriangle,
@@ -26,20 +34,45 @@ import {
   XCircle,
   AlertOctagon,
   Timer,
-  CalendarClock
+  CalendarClock,
+  ChevronDown,
+  Loader2,
+  MoreVertical,
+  Trash2,
+  CheckCircle,
+  Ban
 } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { vencimientosApi, FILTROS_TEMPORALES, type FiltroTemporalKey, type VencimientoGlobal, type EstadisticasVencimientos } from '@/api/vencimientosApi'
-import { NivelUrgencia, COLORES_URGENCIA, LABELS_URGENCIA, formatDiasRestantes } from '@/types/procesamiento'
+import type { NivelUrgencia } from '@/types/vencimiento'
+import { COLORES_URGENCIA, LABELS_URGENCIA, formatDiasRestantes } from '@/types/vencimiento'
+
+// Constantes para paginacion
+const ITEMS_PER_PAGE = 50
+const CARD_HEIGHT = 140 // Altura estimada de cada tarjeta
+
+/**
+ * Normaliza número de expediente al formato usado en la BD de expedientes.
+ * Convierte "FRE 004409/2021" a "FRE_004409_2021"
+ */
+function normalizarExpedienteNumero(numero: string): string {
+  return numero
+    .replace(/\s+/g, '_')  // Espacios a guiones bajos
+    .replace(/\//g, '_')   // Barras a guiones bajos
+}
 
 export default function VencimientosPage() {
   const navigate = useNavigate()
   const [vencimientos, setVencimientos] = useState<VencimientoGlobal[]>([])
   const [stats, setStats] = useState<EstadisticasVencimientos | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(true)
+  const [offset, setOffset] = useState(0)
+  const [total, setTotal] = useState(0)
 
   // Filtros
   const [filtroTemporal, setFiltroTemporal] = useState<FiltroTemporalKey>('PROXIMOS_7_DIAS')
@@ -47,10 +80,15 @@ export default function VencimientosPage() {
   const [busqueda, setBusqueda] = useState('')
   const [nivelUrgencia, setNivelUrgencia] = useState<NivelUrgencia | 'todos'>('todos')
 
-  // Cargar datos
+  // Ref para scroll container
+  const parentRef = useRef<HTMLDivElement>(null)
+
+  // Cargar datos iniciales (resetea paginacion)
   const cargarDatos = async () => {
     setIsLoading(true)
     setError(null)
+    setOffset(0)
+    setHasMore(true)
     try {
       const filtro = FILTROS_TEMPORALES[filtroTemporal]
       const [vencResponse, statsResponse] = await Promise.all([
@@ -60,11 +98,14 @@ export default function VencimientosPage() {
           ocultarVencidos,
           nivel_urgencia: nivelUrgencia,
           expediente: busqueda || undefined,
-          limite: 200
+          limite: ITEMS_PER_PAGE,
+          offset: 0
         }),
         vencimientosApi.getEstadisticas()
       ])
       setVencimientos(vencResponse.vencimientos)
+      setTotal(vencResponse.total || vencResponse.vencimientos.length)
+      setHasMore(vencResponse.vencimientos.length >= ITEMS_PER_PAGE)
       setStats(statsResponse)
     } catch (err) {
       console.error('Error cargando vencimientos:', err)
@@ -75,9 +116,47 @@ export default function VencimientosPage() {
     }
   }
 
+  // Cargar mas (infinite scroll)
+  const cargarMas = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return
+
+    setIsLoadingMore(true)
+    try {
+      const filtro = FILTROS_TEMPORALES[filtroTemporal]
+      const newOffset = offset + ITEMS_PER_PAGE
+
+      const vencResponse = await vencimientosApi.getVencimientos({
+        dias_desde: filtro.dias_desde,
+        dias_hasta: filtro.dias_hasta,
+        ocultarVencidos,
+        nivel_urgencia: nivelUrgencia,
+        expediente: busqueda || undefined,
+        limite: ITEMS_PER_PAGE,
+        offset: newOffset
+      })
+
+      setVencimientos(prev => [...prev, ...vencResponse.vencimientos])
+      setOffset(newOffset)
+      setHasMore(vencResponse.vencimientos.length >= ITEMS_PER_PAGE)
+    } catch (err) {
+      console.error('Error cargando mas vencimientos:', err)
+      toast.error('Error al cargar mas vencimientos')
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [isLoadingMore, hasMore, offset, filtroTemporal, ocultarVencidos, nivelUrgencia, busqueda])
+
   useEffect(() => {
     cargarDatos()
   }, [filtroTemporal, ocultarVencidos, nivelUrgencia])
+
+  // Debounce para busqueda
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (busqueda !== '') cargarDatos()
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [busqueda])
 
   // Filtro de búsqueda local
   const vencimientosFiltrados = useMemo(() => {
@@ -210,48 +289,149 @@ export default function VencimientosPage() {
     </div>
   )
 
-  // Vencimiento Card
+  // Handlers para acciones de vencimientos
+  const handleEliminarVencimiento = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!confirm('¿Está seguro de eliminar este vencimiento?')) return
+    try {
+      await vencimientosApi.eliminarVencimiento(id)
+      toast.success('Vencimiento eliminado')
+      // Remover de la lista local
+      setVencimientos(prev => prev.filter(v => v.id !== id))
+    } catch (err) {
+      console.error('Error eliminando vencimiento:', err)
+      toast.error('Error al eliminar vencimiento')
+    }
+  }
+
+  const handleAtenderVencimiento = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      await vencimientosApi.atenderVencimiento(id)
+      toast.success('Vencimiento marcado como atendido')
+      // Remover de la lista local (ya no está pendiente)
+      setVencimientos(prev => prev.filter(v => v.id !== id))
+    } catch (err) {
+      console.error('Error atendiendo vencimiento:', err)
+      toast.error('Error al marcar como atendido')
+    }
+  }
+
+  const handleCancelarVencimiento = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      await vencimientosApi.cancelarVencimiento(id)
+      toast.success('Vencimiento cancelado')
+      // Remover de la lista local
+      setVencimientos(prev => prev.filter(v => v.id !== id))
+    } catch (err) {
+      console.error('Error cancelando vencimiento:', err)
+      toast.error('Error al cancelar vencimiento')
+    }
+  }
+
+  // Vencimiento Card - Mejorada con caratula y acciones
   const VencimientoCard = ({ vencimiento }: { vencimiento: VencimientoGlobal }) => (
     <Card
-      className="cursor-pointer hover:shadow-md transition-shadow overflow-hidden"
-      onClick={() => navigate(`/expedientes/${encodeURIComponent(vencimiento.expediente_numero)}`)}
+      className="cursor-pointer hover:shadow-md transition-shadow overflow-hidden group"
+      onClick={() => navigate(`/expedientes/${encodeURIComponent(normalizarExpedienteNumero(vencimiento.expediente_numero))}`)}
     >
-      <div className={`h-1 ${getBgColorUrgencia(vencimiento.nivel_urgencia)}`} />
+      <div className={`h-1.5 ${getBgColorUrgencia(vencimiento.nivel_urgencia)}`} />
       <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
+            {/* Header: Badge urgencia + tipo */}
             <div className="flex items-center gap-2 mb-2">
-              <Badge className={COLORES_URGENCIA[vencimiento.nivel_urgencia]}>
+              <Badge className={`${COLORES_URGENCIA[vencimiento.nivel_urgencia]} text-xs`}>
                 {getIconoUrgencia(vencimiento.nivel_urgencia)}
                 <span className="ml-1">{LABELS_URGENCIA[vencimiento.nivel_urgencia]}</span>
               </Badge>
-              <span className="text-sm font-medium text-muted-foreground truncate">
-                {vencimiento.tipo}
-              </span>
+              <Badge variant="outline" className="text-xs">
+                {vencimiento.tipo?.replace(/_/g, ' ')}
+              </Badge>
             </div>
 
-            <p className="font-semibold text-primary hover:underline mb-1">
+            {/* Numero de expediente */}
+            <p className="font-semibold text-primary hover:underline text-sm">
               {vencimiento.expediente_numero}
             </p>
 
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {vencimiento.actuacion_detalle || vencimiento.descripcion || 'Sin descripcion'}
+            {/* Caratula - destacada */}
+            {(vencimiento as any).caratula && (
+              <p className="text-sm font-medium text-foreground mt-1 line-clamp-2">
+                {(vencimiento as any).caratula}
+              </p>
+            )}
+
+            {/* Descripcion del vencimiento */}
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+              {vencimiento.descripcion || 'Sin descripcion'}
             </p>
 
-            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+            {/* Footer: Fecha + Dependencia */}
+            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
-                {formatFecha(vencimiento.fecha_vencimiento)}
+                <span>Vence: {formatFecha(vencimiento.fecha_vencimiento)}</span>
               </div>
+              {(vencimiento as any).dependencia && (
+                <span className="truncate max-w-[150px]" title={(vencimiento as any).dependencia}>
+                  {(vencimiento as any).dependencia.split(' - ')[0]}
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="text-right flex-shrink-0">
-            <div className={`text-2xl font-bold ${getTextColorUrgencia(vencimiento.nivel_urgencia)}`}>
-              {formatDiasRestantes(vencimiento.dias_restantes)}
+          {/* Columna derecha: Menu + Dias restantes */}
+          <div className="flex flex-col items-end gap-1">
+            {/* Menú de acciones - visible en hover o siempre */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 opacity-60 hover:opacity-100 group-hover:opacity-100"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={(e) => handleAtenderVencimiento(vencimiento.id, e as any)}
+                  className="text-green-600"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Marcar atendido
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={(e) => handleCancelarVencimiento(vencimiento.id, e as any)}
+                  className="text-orange-600"
+                >
+                  <Ban className="h-4 w-4 mr-2" />
+                  Cancelar
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={(e) => handleEliminarVencimiento(vencimiento.id, e as any)}
+                  className="text-red-600"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Dias restantes */}
+            <div className="text-right">
+              <div className={`text-2xl font-bold ${getTextColorUrgencia(vencimiento.nivel_urgencia)}`}>
+                {vencimiento.dias_restantes < 0
+                  ? Math.abs(vencimiento.dias_restantes)
+                  : vencimiento.dias_restantes}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {vencimiento.dias_restantes < 0 ? 'dias vencido' : 'dias'}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">restantes</p>
-            <ChevronRight className="h-4 w-4 mt-2 text-muted-foreground ml-auto" />
           </div>
         </div>
       </CardContent>
@@ -418,12 +598,55 @@ export default function VencimientosPage() {
       {/* Lista de vencimientos agrupados */}
       {!isLoading && !error && vencimientosFiltrados.length > 0 && (
         <div>
+          {/* Info de paginacion */}
+          <div className="flex items-center justify-between mb-4 text-sm text-muted-foreground">
+            <span>
+              Mostrando {vencimientosFiltrados.length} de {total > 0 ? total : vencimientosFiltrados.length} vencimientos
+            </span>
+            {hasMore && (
+              <span className="text-xs">
+                Scroll o click en "Cargar mas" para ver mas resultados
+              </span>
+            )}
+          </div>
+
           {/* Mostrar por grupos en orden de urgencia */}
           <GrupoVencimientos nivel="vencido" vencimientos={vencimientosAgrupados.vencido} />
           <GrupoVencimientos nivel="critico" vencimientos={vencimientosAgrupados.critico} />
           <GrupoVencimientos nivel="urgente" vencimientos={vencimientosAgrupados.urgente} />
           <GrupoVencimientos nivel="proximo" vencimientos={vencimientosAgrupados.proximo} />
           <GrupoVencimientos nivel="normal" vencimientos={vencimientosAgrupados.normal} />
+
+          {/* Cargar mas */}
+          {hasMore && (
+            <div className="flex justify-center mt-6 mb-4">
+              <Button
+                variant="outline"
+                onClick={cargarMas}
+                disabled={isLoadingMore}
+                className="gap-2"
+              >
+                {isLoadingMore ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cargando...
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4" />
+                    Cargar mas vencimientos
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* Mensaje fin de lista */}
+          {!hasMore && vencimientosFiltrados.length > ITEMS_PER_PAGE && (
+            <div className="text-center text-sm text-muted-foreground py-4 border-t mt-4">
+              Has visto todos los {vencimientosFiltrados.length} vencimientos
+            </div>
+          )}
         </div>
       )}
     </div>

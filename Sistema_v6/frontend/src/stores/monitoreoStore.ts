@@ -12,9 +12,15 @@ import type {
   SolicitudMonitorear,
   ActualizarMonitoreo,
   FrecuenciaMonitoreo,
+  TipoCambio,
 } from '@/types/monitoreo'
 import * as monitoreoApi from '@/api/monitoreoApi'
 import type { EstadoMonitoreoResponse } from '@/api/monitoreoApi'
+import { getErrorMessage } from '@/lib/errorHandling'
+
+// Constantes para reconexión WebSocket
+const WS_RECONNECT_DELAY = 5000 // 5 segundos
+const WS_MAX_RECONNECT_ATTEMPTS = 10
 
 interface MonitoreoState {
   // Estado
@@ -25,10 +31,16 @@ interface MonitoreoState {
   estadoScheduler: EstadoMonitoreoResponse | null
   isLoading: boolean
   socket: WebSocket | null
+  wsReconnectAttempts: number
+  wsReconnectTimer: ReturnType<typeof setTimeout> | null
   filtros: {
     soloActivos: boolean
     prioridad: string | undefined
     busqueda: string | undefined
+  }
+  filtrosCambios: {
+    tipoCambio: TipoCambio | undefined
+    soloNoLeidos: boolean
   }
   paginacion: {
     pagina: number
@@ -56,6 +68,10 @@ interface MonitoreoState {
   listarCambios: (expedienteId?: number) => Promise<void>
   marcarComoLeido: (id: number) => Promise<void>
   marcarTodosLeidos: () => Promise<void>
+  eliminarCambio: (id: number) => Promise<void>
+  eliminarCambiosLeidos: () => Promise<void>
+  setFiltrosCambios: (filtros: Partial<MonitoreoState['filtrosCambios']>) => void
+  exportarCambios: (formato?: 'csv' | 'json') => Promise<void>
 
   // Acciones - Estadísticas
   obtenerEstadisticas: () => Promise<void>
@@ -77,10 +93,16 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
   estadoScheduler: null,
   isLoading: false,
   socket: null,
+  wsReconnectAttempts: 0,
+  wsReconnectTimer: null,
   filtros: {
     soloActivos: false,
     prioridad: undefined,
     busqueda: undefined,
+  },
+  filtrosCambios: {
+    tipoCambio: undefined,
+    soloNoLeidos: false,
   },
   paginacion: {
     pagina: 1,
@@ -110,9 +132,9 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
       }
 
       set({ configuracion: config })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al obtener configuración:', error)
-      toast.error('Error al cargar la configuración del monitoreo')
+      toast.error(getErrorMessage(error, 'Error al cargar la configuración del monitoreo'))
     }
   },
 
@@ -138,9 +160,9 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
 
       set({ configuracion: config })
       toast.success('Configuración actualizada correctamente')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al actualizar configuración:', error)
-      toast.error('Error al actualizar la configuración')
+      toast.error(getErrorMessage(error, 'Error al actualizar la configuración'))
     }
   },
 
@@ -177,9 +199,9 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
 
       // Refrescar estado para obtener datos actualizados
       await get().obtenerConfiguracion()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al cambiar estado del monitoreo:', error)
-      toast.error(`Error al ${activo ? 'iniciar' : 'detener'} el monitoreo: ${error.message}`)
+      toast.error(`Error al ${activo ? 'iniciar' : 'detener'} el monitoreo: ${getErrorMessage(error)}`)
     }
   },
 
@@ -225,9 +247,9 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
           porPagina: response.por_pagina
         }
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al listar expedientes:', error)
-      toast.error('Error al cargar expedientes monitoreados')
+      toast.error(getErrorMessage(error, 'Error al cargar expedientes monitoreados'))
       set({ expedientes: [] })
     } finally {
       set({ isLoading: false })
@@ -279,9 +301,9 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
       toast.success('Expediente agregado al monitoreo', {
         description: `${data.expediente_numero} será verificado automáticamente`,
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al agregar expediente:', error)
-      toast.error(error.message || 'Error al agregar expediente al monitoreo')
+      toast.error(getErrorMessage(error, 'Error al agregar expediente al monitoreo'))
     }
   },
 
@@ -304,9 +326,9 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
           description: response.mensaje
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al sincronizar:', error)
-      toast.error('Error al sincronizar expedientes')
+      toast.error(getErrorMessage(error, 'Error al sincronizar expedientes'))
     } finally {
       set({ isLoading: false })
       toast.dismiss('sync')
@@ -330,9 +352,9 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
       }))
 
       toast.success('Expediente removido del monitoreo')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al remover expediente:', error)
-      toast.error(error.message || 'Error al remover expediente')
+      toast.error(getErrorMessage(error, 'Error al remover expediente'))
     }
   },
 
@@ -358,9 +380,9 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
       }))
 
       toast.success(activo ? 'Monitoreo activado' : 'Monitoreo pausado')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al cambiar estado del expediente:', error)
-      toast.error(error.message || 'Error al cambiar el estado')
+      toast.error(getErrorMessage(error, 'Error al cambiar el estado'))
     }
   },
 
@@ -394,10 +416,10 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
           description: response.error || 'Error desconocido'
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al verificar expediente:', error)
       toast.error('Error al verificar expediente', {
-        description: error.message || 'Error de conexión'
+        description: getErrorMessage(error, 'Error de conexión')
       })
     } finally {
       set({ isLoading: false })
@@ -439,9 +461,9 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
       }))
 
       set({ cambios })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al listar cambios:', error)
-      toast.error('Error al cargar cambios detectados')
+      toast.error(getErrorMessage(error, 'Error al cargar cambios detectados'))
       set({ cambios: [] })
     } finally {
       set({ isLoading: false })
@@ -458,8 +480,9 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
           c.id === id ? { ...c, leido: true } : c
         ),
       }))
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al marcar como leído:', error)
+      toast.error(getErrorMessage(error, 'Error al marcar como leído'))
     }
   },
 
@@ -473,9 +496,9 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
       }))
 
       toast.success(`${response.cantidad_marcados} cambios marcados como leídos`)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al marcar todos como leídos:', error)
-      toast.error('Error al marcar como leídos')
+      toast.error(getErrorMessage(error, 'Error al marcar como leídos'))
     }
   },
 
@@ -497,7 +520,7 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
       }
 
       set({ estadisticas })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al obtener estadísticas:', error)
     }
   },
@@ -507,7 +530,7 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
     try {
       const response = await monitoreoApi.obtenerEstadoMonitoreo()
       set({ estadoScheduler: response })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al obtener estado del scheduler:', error)
     }
   },
@@ -523,9 +546,9 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
         filtros.busqueda
       )
       toast.success('Reporte descargado')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error al exportar:', error)
-      toast.error('Error al generar el reporte')
+      toast.error(getErrorMessage(error, 'Error al generar el reporte'))
     }
   },
 
@@ -539,10 +562,16 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
       estadisticas: null,
       isLoading: false,
       socket: null,
+      wsReconnectAttempts: 0,
+      wsReconnectTimer: null,
       filtros: {
         soloActivos: false,
         prioridad: undefined,
         busqueda: undefined,
+      },
+      filtrosCambios: {
+        tipoCambio: undefined,
+        soloNoLeidos: false,
       },
       paginacion: {
         pagina: 1,
@@ -553,23 +582,100 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
     })
   },
 
-  // WebSocket
+  // Filtros de cambios
+  setFiltrosCambios: (nuevosFiltros: Partial<MonitoreoState['filtrosCambios']>) => {
+    set(state => ({
+      filtrosCambios: { ...state.filtrosCambios, ...nuevosFiltros }
+    }))
+    get().listarCambios()
+  },
+
+  // Eliminar un cambio individual
+  eliminarCambio: async (id: number) => {
+    try {
+      await monitoreoApi.eliminarCambio(id)
+      set(state => ({
+        cambios: state.cambios.filter(c => c.id !== id)
+      }))
+      toast.success('Cambio eliminado')
+    } catch (error: unknown) {
+      console.error('Error al eliminar cambio:', error)
+      toast.error(getErrorMessage(error, 'Error al eliminar cambio'))
+    }
+  },
+
+  // Eliminar todos los cambios leídos
+  eliminarCambiosLeidos: async () => {
+    try {
+      const response = await monitoreoApi.eliminarCambiosLeidos()
+      set(state => ({
+        cambios: state.cambios.filter(c => !c.leido)
+      }))
+      toast.success(`${response.cantidad_eliminados} cambios eliminados`)
+    } catch (error: unknown) {
+      console.error('Error al eliminar cambios leídos:', error)
+      toast.error(getErrorMessage(error, 'Error al eliminar cambios'))
+    }
+  },
+
+  // Exportar historial de cambios
+  exportarCambios: async (formato: 'csv' | 'json' = 'csv') => {
+    try {
+      const { filtrosCambios } = get()
+      toast.info('Generando exportación...')
+      await monitoreoApi.exportarCambios(
+        filtrosCambios.soloNoLeidos,
+        filtrosCambios.tipoCambio,
+        formato
+      )
+      toast.success('Historial de cambios descargado')
+    } catch (error: unknown) {
+      console.error('Error al exportar cambios:', error)
+      toast.error(getErrorMessage(error, 'Error al exportar cambios'))
+    }
+  },
+
+  // WebSocket con reconexión automática
   connectWebSocket: () => {
-    const { socket } = get()
+    const { socket, wsReconnectTimer, wsReconnectAttempts } = get()
+
+    // Si ya está conectado o conectando, no hacer nada
     if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
       return
     }
 
-    // Usar usuario_id=1 hardcoded por ahora, igual que en backend
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    // Ajustar puerto si es necesario (asumiendo backend en 8000)
-    const wsUrl = `${protocol}//${window.location.hostname}:8000/api/v1/monitoreo/ws/1`
+    // Limpiar timer de reconexión si existe
+    if (wsReconnectTimer) {
+      clearTimeout(wsReconnectTimer)
+      set({ wsReconnectTimer: null })
+    }
 
-    console.log('Conectando WS Monitoreo:', wsUrl)
+    // Obtener user ID del localStorage (guardado al hacer login)
+    const userStr = localStorage.getItem('user')
+    let userId = 1 // Fallback
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr)
+        userId = user.id || 1
+      } catch {
+        console.warn('No se pudo parsear usuario de localStorage')
+      }
+    }
+
+    // Construir URL del WebSocket con token
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const token = localStorage.getItem('access_token')
+    const wsUrl = token
+      ? `${protocol}//${window.location.hostname}:8000/api/v1/monitoreo/ws/${userId}?token=${token}`
+      : `${protocol}//${window.location.hostname}:8000/api/v1/monitoreo/ws/${userId}`
+
+    console.log(`Conectando WS Monitoreo (usuario ${userId})...`)
     const newSocket = new WebSocket(wsUrl)
 
     newSocket.onopen = () => {
       console.log('WS Monitoreo conectado')
+      // Reset intentos de reconexión al conectar exitosamente
+      set({ wsReconnectAttempts: 0 })
     }
 
     newSocket.onmessage = (event) => {
@@ -596,21 +702,55 @@ export const useMonitoreoStore = create<MonitoreoState>((set, get) => ({
       }
     }
 
+    newSocket.onerror = () => {
+      console.error('Error en WS Monitoreo')
+      // El error dispara onclose, que manejará la reconexión
+    }
+
     newSocket.onclose = () => {
       console.log('WS Monitoreo desconectado')
       set({ socket: null })
-      // Reintentar conexión en 5s si no se desconectó intencionalmente
-      // (Implementación simple, se puede mejorar)
+
+      // Reconexión automática con backoff exponencial
+      const attempts = get().wsReconnectAttempts
+      if (attempts < WS_MAX_RECONNECT_ATTEMPTS) {
+        const delay = WS_RECONNECT_DELAY * Math.pow(1.5, attempts)
+        console.log(`Reconectando WS en ${Math.round(delay / 1000)}s (intento ${attempts + 1}/${WS_MAX_RECONNECT_ATTEMPTS})...`)
+
+        const timer = setTimeout(() => {
+          set({ wsReconnectAttempts: attempts + 1 })
+          get().connectWebSocket()
+        }, delay)
+
+        set({ wsReconnectTimer: timer })
+      } else {
+        console.warn('Se alcanzó el máximo de intentos de reconexión WS')
+        toast.error('Conexión perdida con el servidor de monitoreo', {
+          description: 'Recarga la página para reconectar'
+        })
+      }
     }
 
     set({ socket: newSocket })
   },
 
   disconnectWebSocket: () => {
-    const { socket } = get()
+    const { socket, wsReconnectTimer } = get()
+
+    // Cancelar timer de reconexión
+    if (wsReconnectTimer) {
+      clearTimeout(wsReconnectTimer)
+    }
+
+    // Cerrar socket
     if (socket) {
       socket.close()
-      set({ socket: null })
     }
+
+    set({
+      socket: null,
+      wsReconnectTimer: null,
+      wsReconnectAttempts: 0
+    })
   }
 }))

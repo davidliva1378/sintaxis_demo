@@ -807,6 +807,78 @@ async def marcar_todos_leidos(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/cambios/leidos")
+async def eliminar_cambios_leidos(
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+):
+    """Elimina todos los cambios marcados como leídos."""
+    logger.info("DELETE /monitoreo/cambios/leidos")
+    try:
+        service = _get_service()
+        cantidad = service.eliminar_cambios_leidos(current_user.id)
+        return {"success": True, "cantidad_eliminados": cantidad}
+    except Exception as e:
+        logger.exception("Error eliminando cambios leídos")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/cambios/{cambio_id}")
+async def eliminar_cambio(
+    cambio_id: int,
+    current_user: Annotated[Usuario, Depends(get_current_active_user)]
+):
+    """Elimina un cambio detectado."""
+    logger.info(f"DELETE /monitoreo/cambios/{cambio_id}")
+    try:
+        service = _get_service()
+        deleted = service.eliminar_cambio(cambio_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Cambio no encontrado")
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error eliminando cambio")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/cambios/exportar")
+async def exportar_cambios(
+    current_user: Annotated[Usuario, Depends(get_current_active_user)],
+    solo_no_leidos: bool = False,
+    tipo_cambio: str | None = None,
+    formato: str = 'csv'
+):
+    """Exporta el historial de cambios."""
+    logger.info(f"GET /monitoreo/cambios/exportar?formato={formato}")
+    try:
+        service = _get_service()
+        contenido = service.exportar_cambios(
+            usuario_id=current_user.id,
+            solo_no_leidos=solo_no_leidos,
+            tipo_cambio=tipo_cambio,
+            formato=formato
+        )
+
+        if formato == 'json':
+            return StreamingResponse(
+                io.StringIO(contenido),
+                media_type="application/json",
+                headers={"Content-Disposition": f"attachment; filename=historial_cambios_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"}
+            )
+
+        # CSV por defecto
+        return StreamingResponse(
+            io.StringIO(contenido),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=historial_cambios_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
+        )
+
+    except Exception as e:
+        logger.exception("Error exportando cambios")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # --- ESTADISTICAS ---
 
 @router.get("/estadisticas", response_model=EstadisticasMonitoreoResponse)

@@ -33,6 +33,12 @@ export default function ExtraccionMasivaDialog({ onClose }: ExtraccionMasivaDial
     intentos_maximos,
     historial_intentos,
     total_esperado,
+    // Campos de feedback de procesamiento detallado
+    expediente_procesando,
+    actuacion_actual,
+    actuaciones_total,
+    fase_procesamiento,
+    mensaje_procesamiento,
     iniciarExtraccionMasivaAvanzada,
     pausarExtraccion,
     reanudarExtraccion,
@@ -65,7 +71,13 @@ export default function ExtraccionMasivaDialog({ onClose }: ExtraccionMasivaDial
     intentos_realizados,
     intentos_maximos,
     historial_intentos,
-    total_esperado
+    total_esperado,
+    // Campos de feedback de procesamiento detallado
+    expediente_procesando,
+    actuacion_actual,
+    actuaciones_total,
+    fase_procesamiento,
+    mensaje_procesamiento
   }
 
   // Estados
@@ -353,7 +365,10 @@ export default function ExtraccionMasivaDialog({ onClose }: ExtraccionMasivaDial
   const formatearFecha = (fecha: string) => {
     if (!fecha) return '-'
     try {
-      return new Date(fecha).toLocaleDateString('es-AR', {
+      // Agregar hora del mediodía para evitar problemas de timezone
+      // (JavaScript interpreta fechas ISO como UTC, causando que en Argentina UTC-3 se muestre el día anterior)
+      const fechaConHora = fecha.includes('T') ? fecha : `${fecha}T12:00:00`
+      return new Date(fechaConHora).toLocaleDateString('es-AR', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric'
@@ -426,6 +441,11 @@ export default function ExtraccionMasivaDialog({ onClose }: ExtraccionMasivaDial
               tipoExtraccion={tipoExtraccion}
               procesarConPDF={procesarConPDF}
               totalEsperado={extraccionMasiva.total_esperado}
+              expedienteProcesando={extraccionMasiva.expediente_procesando}
+              actuacionActual={extraccionMasiva.actuacion_actual}
+              actuacionesTotal={extraccionMasiva.actuaciones_total}
+              faseProcesamiento={extraccionMasiva.fase_procesamiento}
+              mensajeProcesamiento={extraccionMasiva.mensaje_procesamiento}
               onPausar={handlePausar}
               onReanudar={handleReanudar}
               onCancelar={handleCancelar}

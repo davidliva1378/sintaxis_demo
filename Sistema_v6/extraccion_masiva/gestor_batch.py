@@ -80,6 +80,17 @@ class GestorBatch:
         self.monitoreo_service = monitoreo_service
         self._estados: Dict[str, EstadoExpediente] = {}
         self._errores: List[Dict] = []
+        # Variables para tracking de progreso global
+        self._idx_expediente_actual: int = 0
+        self._total_expedientes: int = 0
+        # Estado de procesamiento detallado (para feedback en UI)
+        self._estado_procesamiento: Dict[str, Any] = {
+            "expediente_procesando": None,
+            "actuacion_actual": 0,
+            "actuaciones_total": 0,
+            "fase_procesamiento": "",
+            "mensaje_procesamiento": ""
+        }
 
     async def procesar_seleccionados(
         self,
@@ -105,6 +116,9 @@ class GestorBatch:
         omitidos = 0
         total_archivos_descargados = 0  # Acumulador de archivos descargados
 
+        # Guardar total para el callback de procesamiento
+        self._total_expedientes = total
+
         # Inicializar estados
         for numero in numeros_expedientes:
             self._estados[numero] = EstadoExpediente.PENDIENTE
@@ -126,6 +140,9 @@ class GestorBatch:
 
                 # Procesar cada expediente
                 for idx, numero in enumerate(numeros_expedientes, 1):
+                    # Guardar índice actual para el callback de procesamiento
+                    self._idx_expediente_actual = idx
+
                     self._reportar_progreso(
                         idx - 1, total, f"Procesando {numero}..."
                     )
@@ -617,10 +634,12 @@ class GestorBatch:
                                 # Crear servicio con db_config
                                 procesador = ProcesadorActuacionesService(db_config)
                                 
-                                # Procesar JSON y guardar en MySQL
+                                # Procesar JSON y guardar en MySQL (con callback de progreso)
+                                progress_cb = self._crear_callback_procesamiento(numero_expediente)
                                 await procesador.procesar_desde_json(
                                     numero_expediente=numero_expediente,
-                                    ruta_json=str(ruta_json)
+                                    ruta_json=str(ruta_json),
+                                    progress_callback=progress_cb
                                 )
                                 
                                 logger.info(f"✅ Actuaciones persistidas en MySQL: {total_actuaciones} actuaciones")
@@ -711,6 +730,34 @@ class GestorBatch:
         logger.info(f"[{actual}/{total}] {mensaje}")
         if self.on_progress:
             self.on_progress(actual, total, mensaje)
+
+    def _crear_callback_procesamiento(self, expediente_num: str):
+        """
+        Crea un callback que actualiza el estado de procesamiento detallado.
+
+        Este callback es pasado a procesar_expediente_completo() para recibir
+        actualizaciones granulares sobre el procesamiento de actuaciones.
+        """
+        def callback(fase: str, actual: int, total: int, mensaje: str):
+            self._estado_procesamiento["expediente_procesando"] = expediente_num
+            self._estado_procesamiento["actuacion_actual"] = actual
+            self._estado_procesamiento["actuaciones_total"] = total
+            self._estado_procesamiento["fase_procesamiento"] = fase
+            self._estado_procesamiento["mensaje_procesamiento"] = mensaje
+            logger.debug(f"[Procesamiento {expediente_num}] {fase}: {actual}/{total} - {mensaje}")
+
+            # Disparar on_progress para que el router actualice la sesión con los campos detallados
+            if self.on_progress:
+                self.on_progress(
+                    self._idx_expediente_actual,
+                    self._total_expedientes,
+                    f"Procesando {expediente_num}..."
+                )
+        return callback
+
+    def obtener_estado_procesamiento(self) -> Dict[str, Any]:
+        """Obtiene el estado detallado del procesamiento actual."""
+        return self._estado_procesamiento.copy()
 
     def obtener_estado(self, numero_expediente: str) -> Optional[EstadoExpediente]:
         """Obtiene el estado actual de un expediente."""

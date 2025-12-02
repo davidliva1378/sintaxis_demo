@@ -10,6 +10,7 @@ Endpoints:
 - GET /api/v1/rag/health - Health check de servicios RAG
 """
 
+import json
 import logging
 from typing import Optional, List, Dict, Any
 from pathlib import Path
@@ -24,6 +25,21 @@ from infrastructure.rag.models.dto import SearchQuery
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/rag", tags=["RAG"])
+
+# Archivo de configuración de modelo LLM (compartido con ia.py y logs.py)
+_LLM_CONFIG_FILE = Path(__file__).parent.parent.parent.parent.parent / "data" / "llm_config.json"
+
+
+def _load_saved_model() -> Optional[str]:
+    """Carga el modelo guardado del archivo de configuración."""
+    try:
+        if _LLM_CONFIG_FILE.exists():
+            with open(_LLM_CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                return config.get('model')
+    except Exception as e:
+        logger.warning(f"Error cargando configuración de modelo: {e}")
+    return None
 
 
 # ==============================================================================
@@ -440,7 +456,13 @@ async def list_models(rag_service: RAGService = Depends(get_rag_service)):
     """
     try:
         models = rag_service.llm.list_models()
-        current_model = rag_service.llm.model
+
+        # Usar modelo guardado si existe y está disponible
+        saved_model = _load_saved_model()
+        if saved_model and saved_model in models:
+            current_model = saved_model
+        else:
+            current_model = rag_service.llm.model
 
         return ModelsResponse(
             models=models,
@@ -467,8 +489,12 @@ async def get_config(
         from infrastructure.rag.config import get_rag_settings
         settings = get_rag_settings()
 
+        # Usar modelo guardado si existe
+        saved_model = _load_saved_model()
+        current_model = saved_model if saved_model else rag_service.llm.model
+
         return ConfigResponse(
-            model=rag_service.llm.model,
+            model=current_model,
             temperature=rag_service.llm.temperature,
             dense_weight=indexer.search_service.dense_weight,
             sparse_weight=indexer.search_service.sparse_weight,

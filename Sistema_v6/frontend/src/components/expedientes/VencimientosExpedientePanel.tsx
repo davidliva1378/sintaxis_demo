@@ -1,21 +1,74 @@
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { AlertTriangle, Calendar, Clock } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
+import { AlertTriangle, Calendar, Clock, Check, X, MoreVertical, Loader2, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { VencimientoUrgente, NivelUrgencia } from '@/types/procesamiento'
 import { COLORES_URGENCIA, LABELS_URGENCIA, formatDiasRestantes } from '@/types/procesamiento'
+import { useVencimientosStore } from '@/stores/vencimientosStore'
+import { toast } from 'sonner'
 
 interface VencimientosExpedientePanelProps {
   vencimientos: VencimientoUrgente[]
   isLoading?: boolean
+  onVencimientoActualizado?: () => void
 }
 
 export default function VencimientosExpedientePanel({
   vencimientos,
-  isLoading = false
+  isLoading = false,
+  onVencimientoActualizado
 }: VencimientosExpedientePanelProps) {
+  const [procesandoId, setProcesandoId] = useState<number | null>(null)
+  const { atenderVencimiento, cancelarVencimiento, eliminarVencimiento } = useVencimientosStore()
+
+  const handleAtender = async (id: number) => {
+    setProcesandoId(id)
+    try {
+      await atenderVencimiento(id)
+      onVencimientoActualizado?.()
+    } catch (error) {
+      // El store ya muestra el toast de error
+    } finally {
+      setProcesandoId(null)
+    }
+  }
+
+  const handleCancelar = async (id: number) => {
+    setProcesandoId(id)
+    try {
+      await cancelarVencimiento(id)
+      onVencimientoActualizado?.()
+    } catch (error) {
+      // El store ya muestra el toast de error
+    } finally {
+      setProcesandoId(null)
+    }
+  }
+
+  const handleEliminar = async (id: number) => {
+    if (!confirm('¿Está seguro de eliminar este vencimiento? Esta acción no se puede deshacer.')) return
+    setProcesandoId(id)
+    try {
+      await eliminarVencimiento(id)
+      onVencimientoActualizado?.()
+    } catch (error) {
+      // El store ya muestra el toast de error
+    } finally {
+      setProcesandoId(null)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -99,11 +152,55 @@ export default function VencimientosExpedientePanel({
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <div className={`text-2xl font-bold ${getTextColorUrgencia(vencimiento.nivel_urgencia)}`}>
-                    {formatDiasRestantes(vencimiento.dias_restantes)}
+                <div className="flex items-start gap-3">
+                  <div className="text-right">
+                    <div className={`text-2xl font-bold ${getTextColorUrgencia(vencimiento.nivel_urgencia)}`}>
+                      {formatDiasRestantes(vencimiento.dias_restantes)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">restantes</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">restantes</p>
+
+                  {/* Menu de acciones */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        disabled={procesandoId === vencimiento.id}
+                      >
+                        {procesandoId === vencimiento.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <MoreVertical className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => handleAtender(vencimiento.id)}
+                        className="text-green-600"
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        Marcar como atendido
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleCancelar(vencimiento.id)}
+                        className="text-orange-600"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Cancelar vencimiento
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => handleEliminar(vencimiento.id)}
+                        className="text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Eliminar
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </CardContent>

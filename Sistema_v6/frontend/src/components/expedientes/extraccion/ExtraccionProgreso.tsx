@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, Pause, Play, XCircle, FileDown } from 'lucide-react'
+import { Loader2, Pause, Play, XCircle, FileDown, FileText, Cpu, Database } from 'lucide-react'
 import type { ProgresoExtraccion } from '@/stores/extraccionStore'
 
 interface ExtraccionProgresoProps {
@@ -9,6 +9,12 @@ interface ExtraccionProgresoProps {
     tipoExtraccion: 'masiva' | 'seleccionados'
     procesarConPDF: boolean
     totalEsperado: number | null
+    // Nuevos props para feedback de procesamiento detallado
+    expedienteProcesando?: string | null
+    actuacionActual?: number
+    actuacionesTotal?: number
+    faseProcesamiento?: string
+    mensajeProcesamiento?: string
     onPausar: () => void
     onReanudar: () => void
     onCancelar: () => void
@@ -20,10 +26,32 @@ export function ExtraccionProgreso({
     tipoExtraccion,
     procesarConPDF,
     totalEsperado,
+    expedienteProcesando,
+    actuacionActual = 0,
+    actuacionesTotal = 0,
+    faseProcesamiento = '',
+    mensajeProcesamiento = '',
     onPausar,
     onReanudar,
     onCancelar
 }: ExtraccionProgresoProps) {
+    // Helper para obtener icono de fase
+    const getFaseIcon = (fase: string) => {
+        if (fase.includes('ia')) return <Cpu className="h-4 w-4 text-purple-500" />
+        if (fase.includes('guardando')) return <Database className="h-4 w-4 text-green-500" />
+        return <FileText className="h-4 w-4 text-blue-500" />
+    }
+
+    // Helper para label de fase
+    const getFaseLabel = (fase: string) => {
+        switch (fase) {
+            case 'iniciando': return 'Iniciando'
+            case 'extrayendo': return 'Extrayendo texto'
+            case 'guardando': return 'Guardando en BD'
+            case 'ia': return 'Procesando con IA'
+            default: return fase || 'Procesando...'
+        }
+    }
     return (
         <div className="space-y-6">
             {/* Indicador de inicio cuando está iniciando */}
@@ -120,6 +148,42 @@ export function ExtraccionProgreso({
                     <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
                         <p className="text-sm font-mono">{progreso.mensaje || 'Esperando actualizaciones...'}</p>
                     </div>
+
+                    {/* Panel de procesamiento detallado (cuando hay expediente procesándose) */}
+                    {expedienteProcesando && actuacionesTotal > 0 && (
+                        <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    {getFaseIcon(faseProcesamiento)}
+                                    <span className="font-medium text-blue-900 dark:text-blue-100">
+                                        Procesando: {expedienteProcesando}
+                                    </span>
+                                </div>
+                                <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded">
+                                    {getFaseLabel(faseProcesamiento)}
+                                </span>
+                            </div>
+
+                            {/* Barra de progreso de actuaciones */}
+                            <div className="space-y-1">
+                                <div className="flex justify-between text-xs text-blue-700 dark:text-blue-300">
+                                    <span>Actuación {actuacionActual} de {actuacionesTotal}</span>
+                                    <span>{actuacionesTotal > 0 ? Math.round((actuacionActual / actuacionesTotal) * 100) : 0}%</span>
+                                </div>
+                                <Progress
+                                    value={actuacionesTotal > 0 ? (actuacionActual / actuacionesTotal) * 100 : 0}
+                                    className="h-2 bg-blue-100 dark:bg-blue-900"
+                                />
+                            </div>
+
+                            {/* Mensaje de procesamiento */}
+                            {mensajeProcesamiento && (
+                                <p className="text-xs text-blue-600 dark:text-blue-400 font-mono truncate">
+                                    {mensajeProcesamiento}
+                                </p>
+                            )}
+                        </div>
+                    )}
 
                     {/* Controles de extracción */}
                     <div className="flex gap-2">

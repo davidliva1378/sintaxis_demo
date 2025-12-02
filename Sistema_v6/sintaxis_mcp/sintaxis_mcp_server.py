@@ -652,6 +652,82 @@ async def list_tools():
                 "required": ["expediente_numero"]
             }
         ),
+
+        # === MONITOREO ===
+        Tool(
+            name="estado_monitoreo",
+            description="Obtiene el estado actual del sistema de monitoreo: si está activo, frecuencia, cambios pendientes",
+            inputSchema={"type": "object", "properties": {}}
+        ),
+        Tool(
+            name="listar_expedientes_monitoreados",
+            description="Lista los expedientes que están siendo monitoreados para detectar cambios",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "solo_activos": {"type": "boolean", "default": False, "description": "Solo expedientes con monitoreo activo"},
+                    "limite": {"type": "integer", "default": 50}
+                }
+            }
+        ),
+        Tool(
+            name="listar_cambios_monitoreo",
+            description="Lista los cambios detectados por el sistema de monitoreo (nuevas actuaciones, cambios de estado, etc)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "solo_no_leidos": {"type": "boolean", "default": False},
+                    "tipo_cambio": {"type": "string", "description": "nueva_actuacion, cambio_estado, etc"},
+                    "expediente_numero": {"type": "string"},
+                    "limite": {"type": "integer", "default": 50}
+                }
+            }
+        ),
+        Tool(
+            name="estadisticas_monitoreo",
+            description="Obtiene estadísticas del sistema de monitoreo: total expedientes, cambios detectados, etc",
+            inputSchema={"type": "object", "properties": {}}
+        ),
+        Tool(
+            name="sincronizar_expedientes_monitoreo",
+            description="Sincroniza todos los expedientes del sistema principal al sistema de monitoreo",
+            inputSchema={"type": "object", "properties": {}}
+        ),
+        Tool(
+            name="agregar_expediente_monitoreo",
+            description="Agrega un expediente específico al sistema de monitoreo",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "expediente_numero": {"type": "string", "description": "Número del expediente a monitorear"},
+                    "prioridad": {"type": "string", "enum": ["baja", "media", "alta"], "default": "media"},
+                    "notas": {"type": "string", "description": "Notas opcionales"}
+                },
+                "required": ["expediente_numero"]
+            }
+        ),
+        Tool(
+            name="pausar_expediente_monitoreo",
+            description="Pausa el monitoreo de un expediente específico",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "expediente_numero": {"type": "string"}
+                },
+                "required": ["expediente_numero"]
+            }
+        ),
+        Tool(
+            name="reanudar_expediente_monitoreo",
+            description="Reanuda el monitoreo de un expediente que fue pausado",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "expediente_numero": {"type": "string"}
+                },
+                "required": ["expediente_numero"]
+            }
+        ),
     ]
 
 

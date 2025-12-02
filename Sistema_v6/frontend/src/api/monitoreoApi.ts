@@ -361,3 +361,52 @@ export async function sincronizarExpedientes(): Promise<SincronizarResponse> {
   const response = await apiClient.post<SincronizarResponse>('/api/v1/monitoreo/sincronizar')
   return response.data
 }
+
+// --- NUEVAS FUNCIONES PARA GESTIÓN DE CAMBIOS ---
+
+/**
+ * Elimina un cambio específico
+ */
+export async function eliminarCambio(cambioId: number): Promise<{ success: boolean }> {
+  const response = await apiClient.delete<{ success: boolean }>(`/api/v1/monitoreo/cambios/${cambioId}`)
+  return response.data
+}
+
+/**
+ * Elimina todos los cambios marcados como leídos
+ */
+export async function eliminarCambiosLeidos(): Promise<{ success: boolean; cantidad_eliminados: number }> {
+  const response = await apiClient.delete<{ success: boolean; cantidad_eliminados: number }>(
+    '/api/v1/monitoreo/cambios/leidos'
+  )
+  return response.data
+}
+
+/**
+ * Exporta el historial de cambios
+ */
+export async function exportarCambios(
+  soloNoLeidos = false,
+  tipoCambio?: string,
+  formato: 'csv' | 'json' = 'csv'
+): Promise<void> {
+  const response = await apiClient.get('/api/v1/monitoreo/cambios/exportar', {
+    params: {
+      solo_no_leidos: soloNoLeidos,
+      tipo_cambio: tipoCambio,
+      formato
+    },
+    responseType: 'blob'
+  })
+
+  // Crear link de descarga
+  const url = window.URL.createObjectURL(new Blob([response.data]))
+  const link = document.createElement('a')
+  link.href = url
+  const extension = formato === 'json' ? 'json' : 'csv'
+  link.setAttribute('download', `historial_cambios_${new Date().toISOString().slice(0, 10)}.${extension}`)
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
+}

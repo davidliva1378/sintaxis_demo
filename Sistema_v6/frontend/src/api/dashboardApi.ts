@@ -8,6 +8,8 @@
  * - GET /api/v1/dashboard/vencimientos-urgentes - Vencimientos urgentes
  */
 
+import type { VencimientoUrgente, NivelUrgencia } from '@/types/vencimiento'
+
 // ============================================================================
 // Tipos
 // ============================================================================
@@ -50,18 +52,11 @@ export interface UltimosMovimientos {
   total: number
 }
 
-export interface VencimientoUrgenteDashboard {
-  id: number
-  expediente_numero: string
-  tipo: string
-  descripcion: string
-  fecha_vencimiento: string
-  dias_restantes: number
-  nivel_urgencia: 'vencido' | 'critico' | 'urgente' | 'proximo'
-}
+// Alias para compatibilidad - usar VencimientoUrgente del archivo centralizado
+export type VencimientoUrgenteDashboard = VencimientoUrgente
 
 export interface VencimientosUrgentes {
-  vencimientos: VencimientoUrgenteDashboard[]
+  vencimientos: VencimientoUrgente[]
   total: number
 }
 
@@ -199,12 +194,13 @@ export async function loadDashboardData(): Promise<{
 /**
  * Obtiene el color CSS segun el nivel de urgencia.
  */
-export function getUrgenciaColor(nivel: VencimientoUrgenteDashboard['nivel_urgencia']): string {
-  const colores: Record<typeof nivel, string> = {
+export function getUrgenciaColor(nivel: NivelUrgencia): string {
+  const colores: Record<NivelUrgencia, string> = {
     vencido: 'text-red-600 bg-red-50',
     critico: 'text-orange-600 bg-orange-50',
     urgente: 'text-yellow-600 bg-yellow-50',
     proximo: 'text-blue-600 bg-blue-50',
+    normal: 'text-green-600 bg-green-50',
   }
   return colores[nivel] || 'text-gray-600 bg-gray-50'
 }
